@@ -1,0 +1,28 @@
+import Foundation
+
+enum CommonComponentUsage {
+    static func createDefault() -> CommonOSRuntimeDescriptor {
+        CommonOSRuntimeDescriptor(
+            appName: "NameCardManager",
+            commonComponentUsage: [
+                "Card",
+                "List",
+                "Search Bar",
+                "Filter Panel",
+                "Status Chip",
+                "Attachment UI",
+                "Offline Queue Status UI",
+                "Sync Retry UI",
+                "Conflict Review UI",
+                "App Shell"
+            ],
+            featureVariants: [
+                "card.record",
+                "panel.sync",
+                "panel.conflict",
+                "input.default",
+                "button.primary"
+            ]
+        )
+    }
+}

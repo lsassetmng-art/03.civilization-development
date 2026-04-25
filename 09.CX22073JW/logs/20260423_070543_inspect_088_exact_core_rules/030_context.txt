@@ -1,0 +1,305 @@
+22:
+23:BASE="/data/data/com.termux/files/home/03.civilization-development/09.CX22073JW"
+24:LOGS_DIR="$BASE/logs"
+25:RUN_TS="$(date +%Y%m%d_%H%M%S)"
+26:RUN_CODE="access_baseline_health_${RUN_TS}"
+27:RUN_DIR="$LOGS_DIR/${RUN_TS}_access_baseline_health_gate"
+28:LOG_FILE="$RUN_DIR/000_run.log"
+29:DANGEROUS_HITS="$RUN_DIR/010_dangerous_table_hits.txt"
+30:TEXT_HITS="$RUN_DIR/020_text_hits.txt"
+31:FILENAME_HITS="$RUN_DIR/030_filename_hits.txt"
+54:CREATE EXTENSION IF NOT EXISTS pgcrypto;
+55:CREATE SCHEMA IF NOT EXISTS cx22073jw;
+56:SET search_path TO cx22073jw, public;
+57:
+58:CREATE TABLE IF NOT EXISTS cx22073jw.access_baseline_health_run (
+59:  baseline_health_run_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+60:  run_code                    text NOT NULL UNIQUE,
+61:  base_path                   text NOT NULL,
+62:  core_blocker_count          integer NOT NULL DEFAULT 0,
+70:  updated_at                  timestamptz NOT NULL DEFAULT NOW(),
+71:  ended_at                    timestamptz
+72:);
+73:
+74:CREATE TABLE IF NOT EXISTS cx22073jw.access_baseline_health_check_item (
+75:  baseline_health_check_item_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+76:  baseline_health_run_id        uuid NOT NULL REFERENCES cx22073jw.access_baseline_health_run(baseline_health_run_id) ON DELETE CASCADE,
+77:  check_group                   text NOT NULL CHECK (check_group IN ('core','legacy','operations')),
+78:  check_code                    text NOT NULL,
+79:  severity                      text NOT NULL CHECK (severity IN ('blocker','info')),
+80:  observed_value                text NOT NULL,
+84:  created_at                    timestamptz NOT NULL DEFAULT NOW(),
+85:  UNIQUE (baseline_health_run_id, check_code)
+86:);
+87:
+88:CREATE INDEX IF NOT EXISTS ix_access_baseline_health_run_created
+89:  ON cx22073jw.access_baseline_health_run (created_at DESC);
+90:
+91:CREATE INDEX IF NOT EXISTS ix_access_baseline_health_check_item_run
+92:  ON cx22073jw.access_baseline_health_check_item (baseline_health_run_id, check_group, severity, check_status);
+93:
+94:DO $$
+95:BEGIN
+96:  IF EXISTS (
+104:      SELECT 1
+105:      FROM pg_trigger tg
+106:      JOIN pg_class c ON c.oid = tg.tgrelid
+107:      JOIN pg_namespace n ON n.oid = c.relnamespace
+108:      WHERE tg.tgname = 'trg_access_baseline_health_run_updated_at'
+109:        AND n.nspname = 'cx22073jw'
+110:        AND c.relname = 'access_baseline_health_run'
+111:    ) THEN
+112:      EXECUTE '
+113:        CREATE TRIGGER trg_access_baseline_health_run_updated_at
+114:        BEFORE UPDATE ON cx22073jw.access_baseline_health_run
+115:        FOR EACH ROW
+116:        EXECUTE FUNCTION cx22073jw.fn_set_updated_at()
+117:      ';
+118:    END IF;
+119:  END IF;
+120:END;
+121:$$;
+122:
+123:CREATE OR REPLACE VIEW cx22073jw.v_access_baseline_health_latest_summary AS
+124:SELECT
+125:  run_code,
+126:  base_path,
+127:  core_blocker_count,
+131:  operations_status,
+132:  note_text,
+133:  created_at,
+134:  ended_at
+135:FROM cx22073jw.access_baseline_health_run
+136:ORDER BY created_at DESC
+137:LIMIT 1;
+138:
+139:CREATE OR REPLACE VIEW cx22073jw.v_access_baseline_health_latest_items AS
+140:SELECT
+141:  r.run_code,
+142:  i.check_group,
+143:  i.check_code,
+146:  i.expected_rule,
+147:  i.check_status,
+148:  i.detail_text,
+149:  i.created_at
+150:FROM cx22073jw.access_baseline_health_check_item i
+151:JOIN cx22073jw.access_baseline_health_run r
+152:  ON r.baseline_health_run_id = i.baseline_health_run_id
+153:WHERE r.baseline_health_run_id = (
+154:  SELECT baseline_health_run_id
+155:  FROM cx22073jw.access_baseline_health_run
+156:  ORDER BY created_at DESC
+157:  LIMIT 1
+158:)
+159:ORDER BY i.check_group, i.severity, i.check_code;
+164:  echo "============================================================"
+165:  echo "PHASE 2: COLLECT CORE FILE / DB CHECKS"
+166:  echo "============================================================"
+167:
+168:  FORBIDDEN_TABLE_COUNT="$(
+169:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | tr -d '[:space:]'
+170:SELECT COUNT(*)
+171:FROM pg_class c
+172:JOIN pg_namespace n
+178:    OR lower(c.relname) LIKE '%access%'
+179:  );
+180:SQL
+181:  )"
+182:  FORBIDDEN_TABLE_COUNT="$(num_or_zero "$FORBIDDEN_TABLE_COUNT")"
+183:
+184:  : > "$DANGEROUS_HITS"
+185:  find "$BASE" -type f \
+186:    \( -name '*.sh' -o -name '*.sql' -o -name '*.md' -o -name '*.txt' -o -name '*.tsv' -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' \) \
+189:    ! -path "$BASE/.git/*" \
+190:    -print0 |
+191:  while IFS= read -r -d '' f; do
+192:    if grep -nEi \
+193:      '(\bINSERT[[:space:]]+INTO\b|\bUPDATE\b|\bDELETE[[:space:]]+FROM\b|\bTRUNCATE[[:space:]]+TABLE\b|\bALTER[[:space:]]+TABLE\b|\bDROP[[:space:]]+TABLE\b|\bCREATE[[:space:]]+TABLE\b|\bFROM\b|\bJOIN\b|\bBEFORE[[:space:]]+UPDATE[[:space:]]+ON\b)[^;]*\b(aie[m]ployee_[A-Za-z0-9_]*|access_[A-Za-z0-9_]*)\b' \
+194:      "$f" >/dev/null 2>&1
+195:    then
+196:      {
+197:        echo "----- $f"
+198:        grep -nEi \
+199:          '(\bINSERT[[:space:]]+INTO\b|\bUPDATE\b|\bDELETE[[:space:]]+FROM\b|\bTRUNCATE[[:space:]]+TABLE\b|\bALTER[[:space:]]+TABLE\b|\bDROP[[:space:]]+TABLE\b|\bCREATE[[:space:]]+TABLE\b|\bFROM\b|\bJOIN\b|\bBEFORE[[:space:]]+UPDATE[[:space:]]+ON\b)[^;]*\b(aie[m]ployee_[A-Za-z0-9_]*|access_[A-Za-z0-9_]*)\b' \
+200:          "$f" || true
+201:      } >> "$DANGEROUS_HITS"
+202:    fi
+203:  done
+204:
+205:  DANGEROUS_FILE_COUNT="$(grep -c '^----- ' "$DANGEROUS_HITS" || true)"
+206:  DANGEROUS_FILE_COUNT="$(num_or_zero "$DANGEROUS_FILE_COUNT")"
+207:
+208:  find "$BASE" -type f \
+209:    ! -path "$BASE/logs/*" \
+210:    ! -path "$BASE/exports/*" \
+211:    | sort | grep 'access' > "$FILENAME_HITS" || true
+212:  AI_FILENAME_COUNT="$(awk 'END{print NR+0}' "$FILENAME_HITS")"
+213:  AI_FILENAME_COUNT="$(num_or_zero "$AI_FILENAME_COUNT")"
+214:
+215:  : > "$TEXT_HITS"
+216:  find "$BASE" -type f \
+217:    \( -name '*.sh' -o -name '*.sql' -o -name '*.md' -o -name '*.txt' -o -name '*.tsv' -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' \) \
+227:      } >> "$TEXT_HITS"
+228:    fi
+229:  done
+230:
+231:  AI_TEXT_FILE_COUNT="$(grep -c '^----- ' "$TEXT_HITS" || true)"
+232:  AI_TEXT_FILE_COUNT="$(num_or_zero "$AI_TEXT_FILE_COUNT")"
+233:
+234:  echo "FORBIDDEN_TABLE_COUNT=$FORBIDDEN_TABLE_COUNT"
+235:  echo "DANGEROUS_FILE_COUNT=$DANGEROUS_FILE_COUNT"
+236:  echo "AI_FILENAME_COUNT=$AI_FILENAME_COUNT"
+237:  echo "AI_TEXT_FILE_COUNT=$AI_TEXT_FILE_COUNT"
+238:
+239:  echo "============================================================"
+240:  echo "PHASE 3: COLLECT LEGACY / OPERATIONS CHECKS"
+241:  echo "============================================================"
+242:
+243:  LEGACY_GATE_STATUS="$(
+244:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+245:SELECT COALESCE(readiness_status, 'unknown')
+246:FROM cx22073jw.v_access_legacy_cutover_gate_latest_summary
+247:LIMIT 1;
+248:SQL
+249:  )"
+250:  LEGACY_GATE_STATUS="$(text_or_default "$LEGACY_GATE_STATUS" "unknown")"
+251:
+252:  LEGACY_BLOCKER_COUNT="$(
+253:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+254:SELECT COALESCE(blocker_count::text, '0')
+255:FROM cx22073jw.v_access_legacy_cutover_gate_latest_summary
+256:LIMIT 1;
+257:SQL
+258:  )"
+259:  LEGACY_BLOCKER_COUNT="$(num_or_zero "$LEGACY_BLOCKER_COUNT")"
+260:
+261:  RETIREMENT_PLAN_STATUS="$(
+262:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+263:SELECT COALESCE(plan_status, 'unknown')
+264:FROM cx22073jw.v_access_legacy_retirement_plan_latest_summary
+265:LIMIT 1;
+266:SQL
+267:  )"
+268:  RETIREMENT_PLAN_STATUS="$(text_or_default "$RETIREMENT_PLAN_STATUS" "unknown")"
+269:
+270:  PENDING_CONFIRM_COUNT="$(
+271:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+272:SELECT COALESCE(pending_confirmation_count::text, '0')
+273:FROM cx22073jw.v_access_manual_apply_receipt_latest_pending_summary
+274:LIMIT 1;
+275:SQL
+276:  )"
+277:  PENDING_CONFIRM_COUNT="$(num_or_zero "$PENDING_CONFIRM_COUNT")"
+278:
+279:  CONFIRMED_APPLIED_COUNT="$(
+280:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+281:SELECT COALESCE(confirmed_applied_count::text, '0')
+282:FROM cx22073jw.v_access_manual_apply_receipt_latest_pending_summary
+283:LIMIT 1;
+284:SQL
+285:  )"
+286:  CONFIRMED_APPLIED_COUNT="$(num_or_zero "$CONFIRMED_APPLIED_COUNT")"
+287:
+288:  CONFIRMED_REVERIFY_STATUS="$(
+289:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+290:SELECT COALESCE(run_status, 'unknown')
+291:FROM cx22073jw.v_access_post_apply_verification_latest_confirmed_only_summary
+292:LIMIT 1;
+293:SQL
+294:  )"
+295:  CONFIRMED_REVERIFY_STATUS="$(text_or_default "$CONFIRMED_REVERIFY_STATUS" "unknown")"
+318:  fi
+319:
+320:  RUN_ID="$(
+321:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<SQL | tr -d '[:space:]'
+322:INSERT INTO cx22073jw.access_baseline_health_run (
+323:  run_code,
+324:  base_path,
+325:  core_status,
+326:  legacy_status,
+347:  fi
+348:
+349:  echo "RUN_ID=$RUN_ID"
+350:
+351:  CORE_STATUS_FORBIDDEN="$( [ "$FORBIDDEN_TABLE_COUNT" -eq 0 ] && echo pass || echo fail )"
+352:  CORE_STATUS_DANGEROUS="$( [ "$DANGEROUS_FILE_COUNT" -eq 0 ] && echo pass || echo fail )"
+353:  CORE_STATUS_FILENAME="$( [ "$AI_FILENAME_COUNT" -eq 0 ] && echo pass || echo fail )"
+354:  CORE_STATUS_TEXT="$( [ "$AI_TEXT_FILE_COUNT" -eq 0 ] && echo pass || echo fail )"
+355:
+356:  LEGACY_STATUS_GATE="unknown"
+357:  case "$LEGACY_GATE_STATUS" in
+358:    ready) LEGACY_STATUS_GATE="pass" ;;
+379:    error) OPS_STATUS_REVERIFY="fail" ;;
+380:  esac
+381:
+382:  psql "$PERSONA_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+383:INSERT INTO cx22073jw.access_baseline_health_check_item (
+384:  baseline_health_run_id, check_group, check_code, severity, observed_value, expected_rule, check_status, detail_text
+385:) VALUES
+386:('$RUN_ID', 'core', 'forbidden_table_names', 'blocker', '$FORBIDDEN_TABLE_COUNT', 'must be 0', '$CORE_STATUS_FORBIDDEN', 'Forbidden access-style table names in cx22073jw.'),
+387:('$RUN_ID', 'core', 'dangerous_table_ref_files', 'blocker', '$DANGEROUS_FILE_COUNT', 'must be 0', '$CORE_STATUS_DANGEROUS', 'Dangerous file references to access-style table tokens.'),
+388:('$RUN_ID', 'core', 'access_filename_residue', 'blocker', '$AI_FILENAME_COUNT', 'must be 0', '$CORE_STATUS_FILENAME', 'Remaining file names containing access token.'),
+389:('$RUN_ID', 'core', 'access_text_residue', 'blocker', '$AI_TEXT_FILE_COUNT', 'must be 0', '$CORE_STATUS_TEXT', 'Remaining text files containing access / ACCESS residue.'),
+390:('$RUN_ID', 'legacy', 'legacy_cutover_gate_status', 'info', '$LEGACY_GATE_STATUS', 'ready is ideal', '$LEGACY_STATUS_GATE', 'Latest legacy cutover gate status.'),
+391:('$RUN_ID', 'legacy', 'legacy_cutover_blocker_count', 'info', '$LEGACY_BLOCKER_COUNT', '0 is ideal', '$LEGACY_STATUS_BLOCKER_COUNT', 'Latest legacy cutover blocker count.'),
+392:('$RUN_ID', 'legacy', 'legacy_retirement_plan_status', 'info', '$RETIREMENT_PLAN_STATUS', 'ready_for_manual_retirement is ideal', '$LEGACY_STATUS_RETIRE', 'Latest retirement plan status.'),
+393:('$RUN_ID', 'operations', 'manual_pending_confirmation_count', 'info', '$PENDING_CONFIRM_COUNT', 'operator dependent', '$OPS_STATUS_PENDING', 'Latest pending manual confirmation count.'),
+397:
+398:  CORE_BLOCKER_COUNT="$(
+399:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<SQL | tr -d '[:space:]'
+400:SELECT COUNT(*)
+401:FROM cx22073jw.access_baseline_health_check_item
+402:WHERE baseline_health_run_id = '$RUN_ID'
+403:  AND severity = 'blocker'
+404:  AND check_status = 'fail';
+405:SQL
+408:
+409:  INFO_COUNT="$(
+410:    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<SQL | tr -d '[:space:]'
+411:SELECT COUNT(*)
+412:FROM cx22073jw.access_baseline_health_check_item
+413:WHERE baseline_health_run_id = '$RUN_ID'
+414:  AND severity = 'info';
+415:SQL
+416:  )"
+419:  CORE_STATUS="pass"
+420:  [ "$CORE_BLOCKER_COUNT" -gt 0 ] && CORE_STATUS="blocked"
+421:
+422:  psql "$PERSONA_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+423:UPDATE cx22073jw.access_baseline_health_run
+424:   SET core_blocker_count = $CORE_BLOCKER_COUNT,
+425:       info_count         = $INFO_COUNT,
+426:       core_status        = '$CORE_STATUS',
+427:       legacy_status      = '$LEGACY_GATE_STATUS',
+438:  "info_count": $INFO_COUNT,
+439:  "core_status": "$CORE_STATUS",
+440:  "legacy_status": "$LEGACY_GATE_STATUS",
+441:  "operations_status": "$OPERATIONS_STATUS",
+442:  "forbidden_table_count": $FORBIDDEN_TABLE_COUNT,
+443:  "dangerous_file_count": $DANGEROUS_FILE_COUNT,
+444:  "access_filename_count": $AI_FILENAME_COUNT,
+445:  "access_text_file_count": $AI_TEXT_FILE_COUNT,
+446:  "legacy_blocker_count": $LEGACY_BLOCKER_COUNT,
+447:  "pending_confirmation_count": $PENDING_CONFIRM_COUNT,
+448:  "confirmed_applied_count": $CONFIRMED_APPLIED_COUNT,
+449:  "confirmed_reverify_status": "$CONFIRMED_REVERIFY_STATUS"
+453:  echo "============================================================"
+454:  echo "VERIFY"
+455:  echo "============================================================"
+456:  psql "$PERSONA_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+457:TABLE cx22073jw.v_access_baseline_health_latest_summary;
+458:
+459:SELECT
+460:  check_group,
+461:  severity,
+462:  check_status,
+463:  COUNT(*) AS item_count
+464:FROM cx22073jw.v_access_baseline_health_latest_items
+465:GROUP BY check_group, severity, check_status
+466:ORDER BY check_group, severity, check_status;
+467:
+468:TABLE cx22073jw.v_access_baseline_health_latest_items;
+469:SQL
+470:
+471:  echo "============================================================"
+472:  echo "ACCESS BASELINE HEALTH GATE DONE"

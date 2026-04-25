@@ -1,0 +1,479 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -euo pipefail
+
+: "${PERSONA_DATABASE_URL:?ERROR: PERSONA_DATABASE_URL is not set}"
+
+num_or_zero() {
+  case "${1:-}" in
+    ''|*[!0-9]*) echo 0 ;;
+    *) echo "$1" ;;
+  esac
+}
+
+text_or_default() {
+  local v="${1:-}"
+  local d="${2:-unknown}"
+  if [ -z "$v" ]; then
+    echo "$d"
+  else
+    echo "$v"
+  fi
+}
+
+BASE="/data/data/com.termux/files/home/03.civilization-development/09.CX22073JW"
+LOGS_DIR="$BASE/logs"
+RUN_TS="$(date +%Y%m%d_%H%M%S)"
+RUN_CODE="access_baseline_health_${RUN_TS}"
+RUN_DIR="$LOGS_DIR/${RUN_TS}_access_baseline_health_gate"
+LOG_FILE="$RUN_DIR/000_run.log"
+DANGEROUS_HITS="$RUN_DIR/010_dangerous_table_hits.txt"
+TEXT_HITS="$RUN_DIR/020_text_hits.txt"
+FILENAME_HITS="$RUN_DIR/030_filename_hits.txt"
+SUMMARY_JSON="$RUN_DIR/040_summary.json"
+
+mkdir -p "$RUN_DIR"
+
+{
+  echo "============================================================"
+  echo "ACCESS BASELINE HEALTH GATE START"
+  echo "target db    : PERSONA_DATABASE_URL"
+  echo "target schema: cx22073jw"
+  echo "reviewer     : Sato (DB)"
+  echo "run_code     : $RUN_CODE"
+  echo "base         : $BASE"
+  echo "run_dir      : $RUN_DIR"
+  echo "============================================================"
+
+  echo "============================================================"
+  echo "PHASE 1: CREATE GATE OBJECTS"
+  echo "============================================================"
+
+  psql "$PERSONA_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE SCHEMA IF NOT EXISTS cx22073jw;
+SET search_path TO cx22073jw, public;
+
+CREATE TABLE IF NOT EXISTS cx22073jw.access_baseline_health_run (
+  baseline_health_run_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_code                    text NOT NULL UNIQUE,
+  base_path                   text NOT NULL,
+  core_blocker_count          integer NOT NULL DEFAULT 0,
+  info_count                  integer NOT NULL DEFAULT 0,
+  core_status                 text NOT NULL CHECK (core_status IN ('pass','blocked','error')),
+  legacy_status               text NOT NULL CHECK (legacy_status IN ('ready','blocked','unknown','error')),
+  operations_status           text NOT NULL CHECK (operations_status IN ('healthy','attention','unknown','error')),
+  actor_name                  text NOT NULL DEFAULT 'Zero',
+  note_text                   text,
+  created_at                  timestamptz NOT NULL DEFAULT NOW(),
+  updated_at                  timestamptz NOT NULL DEFAULT NOW(),
+  ended_at                    timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS cx22073jw.access_baseline_health_check_item (
+  baseline_health_check_item_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  baseline_health_run_id        uuid NOT NULL REFERENCES cx22073jw.access_baseline_health_run(baseline_health_run_id) ON DELETE CASCADE,
+  check_group                   text NOT NULL CHECK (check_group IN ('core','legacy','operations')),
+  check_code                    text NOT NULL,
+  severity                      text NOT NULL CHECK (severity IN ('blocker','info')),
+  observed_value                text NOT NULL,
+  expected_rule                 text NOT NULL,
+  check_status                  text NOT NULL CHECK (check_status IN ('pass','warn','fail','unknown')),
+  detail_text                   text,
+  created_at                    timestamptz NOT NULL DEFAULT NOW(),
+  UNIQUE (baseline_health_run_id, check_code)
+);
+
+CREATE INDEX IF NOT EXISTS ix_access_baseline_health_run_created
+  ON cx22073jw.access_baseline_health_run (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS ix_access_baseline_health_check_item_run
+  ON cx22073jw.access_baseline_health_check_item (baseline_health_run_id, check_group, severity, check_status);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'cx22073jw'
+      AND p.proname = 'fn_set_updated_at'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_trigger tg
+      JOIN pg_class c ON c.oid = tg.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE tg.tgname = 'trg_access_baseline_health_run_updated_at'
+        AND n.nspname = 'cx22073jw'
+        AND c.relname = 'access_baseline_health_run'
+    ) THEN
+      EXECUTE '
+        CREATE TRIGGER trg_access_baseline_health_run_updated_at
+        BEFORE UPDATE ON cx22073jw.access_baseline_health_run
+        FOR EACH ROW
+        EXECUTE FUNCTION cx22073jw.fn_set_updated_at()
+      ';
+    END IF;
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE VIEW cx22073jw.v_access_baseline_health_latest_summary AS
+SELECT
+  run_code,
+  base_path,
+  core_blocker_count,
+  info_count,
+  core_status,
+  legacy_status,
+  operations_status,
+  note_text,
+  created_at,
+  ended_at
+FROM cx22073jw.access_baseline_health_run
+ORDER BY created_at DESC
+LIMIT 1;
+
+CREATE OR REPLACE VIEW cx22073jw.v_access_baseline_health_latest_items AS
+SELECT
+  r.run_code,
+  i.check_group,
+  i.check_code,
+  i.severity,
+  i.observed_value,
+  i.expected_rule,
+  i.check_status,
+  i.detail_text,
+  i.created_at
+FROM cx22073jw.access_baseline_health_check_item i
+JOIN cx22073jw.access_baseline_health_run r
+  ON r.baseline_health_run_id = i.baseline_health_run_id
+WHERE r.baseline_health_run_id = (
+  SELECT baseline_health_run_id
+  FROM cx22073jw.access_baseline_health_run
+  ORDER BY created_at DESC
+  LIMIT 1
+)
+ORDER BY i.check_group, i.severity, i.check_code;
+
+COMMIT;
+SQL
+
+  echo "============================================================"
+  echo "PHASE 2: COLLECT CORE FILE / DB CHECKS"
+  echo "============================================================"
+
+  FORBIDDEN_TABLE_COUNT="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | tr -d '[:space:]'
+SELECT COUNT(*)
+FROM pg_class c
+JOIN pg_namespace n
+  ON n.oid = c.relnamespace
+WHERE n.nspname = 'cx22073jw'
+  AND c.relkind IN ('r','p')
+  AND (
+    lower(c.relname) LIKE '%' || 'ai' || '_' || 'employee' || '%'
+    OR lower(c.relname) LIKE '%' || 'ai' || '_' || 'employee' || '%'
+  );
+SQL
+  )"
+  FORBIDDEN_TABLE_COUNT="$(num_or_zero "$FORBIDDEN_TABLE_COUNT")"
+
+  : > "$DANGEROUS_HITS"
+  find "$BASE" -type f \
+    \( -name '*.sh' -o -name '*.sql' -o -name '*.md' -o -name '*.txt' -o -name '*.tsv' -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' \) \
+    ! -path "$BASE/logs/*" \
+    ! -path "$BASE/exports/*" \
+    ! -path "$BASE/.git/*" \
+    -print0 |
+  while IFS= read -r -d '' f; do
+    if grep -nEi \
+      '(\bINSERT[[:space:]]+INTO\b|\bUPDATE\b|\bDELETE[[:space:]]+FROM\b|\bTRUNCATE[[:space:]]+TABLE\b|\bALTER[[:space:]]+TABLE\b|\bDROP[[:space:]]+TABLE\b|\bCREATE[[:space:]]+TABLE\b|\bFROM\b|\bJOIN\b|\bBEFORE[[:space:]]+UPDATE[[:space:]]+ON\b)[^;]*\b(a[i]employee_[A-Za-z0-9_]*|ai[_]employee_[A-Za-z0-9_]*)\b' \
+      "$f" >/dev/null 2>&1
+    then
+      {
+        echo "----- $f"
+        grep -nEi \
+          '(\bINSERT[[:space:]]+INTO\b|\bUPDATE\b|\bDELETE[[:space:]]+FROM\b|\bTRUNCATE[[:space:]]+TABLE\b|\bALTER[[:space:]]+TABLE\b|\bDROP[[:space:]]+TABLE\b|\bCREATE[[:space:]]+TABLE\b|\bFROM\b|\bJOIN\b|\bBEFORE[[:space:]]+UPDATE[[:space:]]+ON\b)[^;]*\b(a[i]employee_[A-Za-z0-9_]*|ai[_]employee_[A-Za-z0-9_]*)\b' \
+          "$f" || true
+      } >> "$DANGEROUS_HITS"
+    fi
+  done
+
+  DANGEROUS_FILE_COUNT="$(grep -c '^----- ' "$DANGEROUS_HITS" || true)"
+  DANGEROUS_FILE_COUNT="$(num_or_zero "$DANGEROUS_FILE_COUNT")"
+
+  find "$BASE" -type f \
+    ! -path "$BASE/logs/*" \
+    ! -path "$BASE/exports/*" \
+    | sort | grep -Ei 'a[i]employee|ai[_]employee' > "$FILENAME_HITS" || true
+  AI_FILENAME_COUNT="$(awk 'END{print NR+0}' "$FILENAME_HITS")"
+  AI_FILENAME_COUNT="$(num_or_zero "$AI_FILENAME_COUNT")"
+
+  : > "$TEXT_HITS"
+  find "$BASE" -type f \
+    \( -name '*.sh' -o -name '*.sql' -o -name '*.md' -o -name '*.txt' -o -name '*.tsv' -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' \) \
+    ! -path "$BASE/logs/*" \
+    ! -path "$BASE/exports/*" \
+    ! -path "$BASE/.git/*" \
+    -print0 |
+  while IFS= read -r -d '' f; do
+    if grep -nEi 'a[i]employee|ai[_]employee' "$f" >/dev/null 2>&1; then
+      {
+        echo "----- $f"
+        grep -nEi 'a[i]employee|ai[_]employee' "$f" || true
+      } >> "$TEXT_HITS"
+    fi
+  done
+
+  AI_TEXT_FILE_COUNT="$(grep -c '^----- ' "$TEXT_HITS" || true)"
+  AI_TEXT_FILE_COUNT="$(num_or_zero "$AI_TEXT_FILE_COUNT")"
+
+  echo "FORBIDDEN_TABLE_COUNT=$FORBIDDEN_TABLE_COUNT"
+  echo "DANGEROUS_FILE_COUNT=$DANGEROUS_FILE_COUNT"
+  echo "AI_FILENAME_COUNT=$AI_FILENAME_COUNT"
+  echo "AI_TEXT_FILE_COUNT=$AI_TEXT_FILE_COUNT"
+
+  echo "============================================================"
+  echo "PHASE 3: COLLECT LEGACY / OPERATIONS CHECKS"
+  echo "============================================================"
+
+  LEGACY_GATE_STATUS="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+SELECT COALESCE(readiness_status, 'unknown')
+FROM cx22073jw.v_access_legacy_cutover_gate_latest_summary
+LIMIT 1;
+SQL
+  )"
+  LEGACY_GATE_STATUS="$(text_or_default "$LEGACY_GATE_STATUS" "unknown")"
+
+  LEGACY_BLOCKER_COUNT="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+SELECT COALESCE(blocker_count::text, '0')
+FROM cx22073jw.v_access_legacy_cutover_gate_latest_summary
+LIMIT 1;
+SQL
+  )"
+  LEGACY_BLOCKER_COUNT="$(num_or_zero "$LEGACY_BLOCKER_COUNT")"
+
+  RETIREMENT_PLAN_STATUS="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+SELECT COALESCE(plan_status, 'unknown')
+FROM cx22073jw.v_access_legacy_retirement_plan_latest_summary
+LIMIT 1;
+SQL
+  )"
+  RETIREMENT_PLAN_STATUS="$(text_or_default "$RETIREMENT_PLAN_STATUS" "unknown")"
+
+  PENDING_CONFIRM_COUNT="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+SELECT COALESCE(pending_confirmation_count::text, '0')
+FROM cx22073jw.v_access_manual_apply_receipt_latest_pending_summary
+LIMIT 1;
+SQL
+  )"
+  PENDING_CONFIRM_COUNT="$(num_or_zero "$PENDING_CONFIRM_COUNT")"
+
+  CONFIRMED_APPLIED_COUNT="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+SELECT COALESCE(confirmed_applied_count::text, '0')
+FROM cx22073jw.v_access_manual_apply_receipt_latest_pending_summary
+LIMIT 1;
+SQL
+  )"
+  CONFIRMED_APPLIED_COUNT="$(num_or_zero "$CONFIRMED_APPLIED_COUNT")"
+
+  CONFIRMED_REVERIFY_STATUS="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<'SQL' | head -n 1
+SELECT COALESCE(run_status, 'unknown')
+FROM cx22073jw.v_access_post_apply_verification_latest_confirmed_only_summary
+LIMIT 1;
+SQL
+  )"
+  CONFIRMED_REVERIFY_STATUS="$(text_or_default "$CONFIRMED_REVERIFY_STATUS" "unknown")"
+
+  echo "LEGACY_GATE_STATUS=$LEGACY_GATE_STATUS"
+  echo "LEGACY_BLOCKER_COUNT=$LEGACY_BLOCKER_COUNT"
+  echo "RETIREMENT_PLAN_STATUS=$RETIREMENT_PLAN_STATUS"
+  echo "PENDING_CONFIRM_COUNT=$PENDING_CONFIRM_COUNT"
+  echo "CONFIRMED_APPLIED_COUNT=$CONFIRMED_APPLIED_COUNT"
+  echo "CONFIRMED_REVERIFY_STATUS=$CONFIRMED_REVERIFY_STATUS"
+
+  echo "============================================================"
+  echo "PHASE 4: STORE GATE"
+  echo "============================================================"
+
+  if [ "$LEGACY_GATE_STATUS" != "ready" ] && [ "$LEGACY_GATE_STATUS" != "blocked" ] && [ "$LEGACY_GATE_STATUS" != "error" ]; then
+    LEGACY_GATE_STATUS="unknown"
+  fi
+
+  if [ "$CONFIRMED_REVERIFY_STATUS" = "pass" ]; then
+    OPERATIONS_STATUS="healthy"
+  elif [ "$CONFIRMED_REVERIFY_STATUS" = "partial" ] || [ "$CONFIRMED_REVERIFY_STATUS" = "error" ]; then
+    OPERATIONS_STATUS="attention"
+  else
+    OPERATIONS_STATUS="unknown"
+  fi
+
+  RUN_ID="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<SQL | tr -d '[:space:]'
+INSERT INTO cx22073jw.access_baseline_health_run (
+  run_code,
+  base_path,
+  core_status,
+  legacy_status,
+  operations_status,
+  actor_name,
+  note_text
+)
+VALUES (
+  '$RUN_CODE',
+  '$BASE',
+  'error',
+  '$LEGACY_GATE_STATUS',
+  '$OPERATIONS_STATUS',
+  'Zero',
+  'Access baseline health gate snapshot.'
+)
+RETURNING baseline_health_run_id;
+SQL
+  )"
+
+  if [ -z "${RUN_ID:-}" ]; then
+    echo "ERROR: baseline health run was not created"
+    exit 1
+  fi
+
+  echo "RUN_ID=$RUN_ID"
+
+  CORE_STATUS_FORBIDDEN="$( [ "$FORBIDDEN_TABLE_COUNT" -eq 0 ] && echo pass || echo fail )"
+  CORE_STATUS_DANGEROUS="$( [ "$DANGEROUS_FILE_COUNT" -eq 0 ] && echo pass || echo fail )"
+  CORE_STATUS_FILENAME="$( [ "$AI_FILENAME_COUNT" -eq 0 ] && echo pass || echo fail )"
+  CORE_STATUS_TEXT="$( [ "$AI_TEXT_FILE_COUNT" -eq 0 ] && echo pass || echo fail )"
+
+  LEGACY_STATUS_GATE="unknown"
+  case "$LEGACY_GATE_STATUS" in
+    ready) LEGACY_STATUS_GATE="pass" ;;
+    blocked) LEGACY_STATUS_GATE="warn" ;;
+    error) LEGACY_STATUS_GATE="fail" ;;
+  esac
+
+  LEGACY_STATUS_BLOCKER_COUNT="$( [ "$LEGACY_BLOCKER_COUNT" -eq 0 ] && echo pass || echo warn )"
+
+  LEGACY_STATUS_RETIRE="unknown"
+  case "$RETIREMENT_PLAN_STATUS" in
+    ready_for_manual_retirement) LEGACY_STATUS_RETIRE="pass" ;;
+    blocked) LEGACY_STATUS_RETIRE="warn" ;;
+    error) LEGACY_STATUS_RETIRE="fail" ;;
+  esac
+
+  OPS_STATUS_PENDING="$( [ "$PENDING_CONFIRM_COUNT" -eq 0 ] && echo pass || echo warn )"
+  OPS_STATUS_CONFIRMED="$( [ "$CONFIRMED_APPLIED_COUNT" -eq 0 ] && echo warn || echo pass )"
+
+  OPS_STATUS_REVERIFY="unknown"
+  case "$CONFIRMED_REVERIFY_STATUS" in
+    pass) OPS_STATUS_REVERIFY="pass" ;;
+    partial) OPS_STATUS_REVERIFY="warn" ;;
+    error) OPS_STATUS_REVERIFY="fail" ;;
+  esac
+
+  psql "$PERSONA_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO cx22073jw.access_baseline_health_check_item (
+  baseline_health_run_id, check_group, check_code, severity, observed_value, expected_rule, check_status, detail_text
+) VALUES
+('$RUN_ID', 'core', 'forbidden_table_names', 'blocker', '$FORBIDDEN_TABLE_COUNT', 'must be 0', '$CORE_STATUS_FORBIDDEN', 'Forbidden legacy-employee-style table names in cx22073jw.'),
+('$RUN_ID', 'core', 'dangerous_table_ref_files', 'blocker', '$DANGEROUS_FILE_COUNT', 'must be 0', '$CORE_STATUS_DANGEROUS', 'Dangerous file references to legacy-employee-style table tokens.'),
+('$RUN_ID', 'core', 'legacy_employee_filename_residue', 'blocker', '$AI_FILENAME_COUNT', 'must be 0', '$CORE_STATUS_FILENAME', 'Remaining file names containing legacy employee token.'),
+('$RUN_ID', 'core', 'legacy_employee_text_residue', 'blocker', '$AI_TEXT_FILE_COUNT', 'must be 0', '$CORE_STATUS_TEXT', 'Remaining text files containing legacy employee residue.'),
+('$RUN_ID', 'legacy', 'legacy_cutover_gate_status', 'info', '$LEGACY_GATE_STATUS', 'ready is ideal', '$LEGACY_STATUS_GATE', 'Latest legacy cutover gate status.'),
+('$RUN_ID', 'legacy', 'legacy_cutover_blocker_count', 'info', '$LEGACY_BLOCKER_COUNT', '0 is ideal', '$LEGACY_STATUS_BLOCKER_COUNT', 'Latest legacy cutover blocker count.'),
+('$RUN_ID', 'legacy', 'legacy_retirement_plan_status', 'info', '$RETIREMENT_PLAN_STATUS', 'ready_for_manual_retirement is ideal', '$LEGACY_STATUS_RETIRE', 'Latest retirement plan status.'),
+('$RUN_ID', 'operations', 'manual_pending_confirmation_count', 'info', '$PENDING_CONFIRM_COUNT', 'operator dependent', '$OPS_STATUS_PENDING', 'Latest pending manual confirmation count.'),
+('$RUN_ID', 'operations', 'manual_confirmed_applied_count', 'info', '$CONFIRMED_APPLIED_COUNT', 'operator dependent', '$OPS_STATUS_CONFIRMED', 'Latest confirmed applied count.'),
+('$RUN_ID', 'operations', 'confirmed_only_reverify_status', 'info', '$CONFIRMED_REVERIFY_STATUS', 'pass is ideal when confirmed items exist', '$OPS_STATUS_REVERIFY', 'Latest confirmed-only reverify run status.');
+SQL
+
+  CORE_BLOCKER_COUNT="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<SQL | tr -d '[:space:]'
+SELECT COUNT(*)
+FROM cx22073jw.access_baseline_health_check_item
+WHERE baseline_health_run_id = '$RUN_ID'
+  AND severity = 'blocker'
+  AND check_status = 'fail';
+SQL
+  )"
+  CORE_BLOCKER_COUNT="$(num_or_zero "$CORE_BLOCKER_COUNT")"
+
+  INFO_COUNT="$(
+    psql "$PERSONA_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 <<SQL | tr -d '[:space:]'
+SELECT COUNT(*)
+FROM cx22073jw.access_baseline_health_check_item
+WHERE baseline_health_run_id = '$RUN_ID'
+  AND severity = 'info';
+SQL
+  )"
+  INFO_COUNT="$(num_or_zero "$INFO_COUNT")"
+
+  CORE_STATUS="pass"
+  [ "$CORE_BLOCKER_COUNT" -gt 0 ] && CORE_STATUS="blocked"
+
+  psql "$PERSONA_DATABASE_URL" -v ON_ERROR_STOP=1 <<SQL
+UPDATE cx22073jw.access_baseline_health_run
+   SET core_blocker_count = $CORE_BLOCKER_COUNT,
+       info_count         = $INFO_COUNT,
+       core_status        = '$CORE_STATUS',
+       legacy_status      = '$LEGACY_GATE_STATUS',
+       operations_status  = '$OPERATIONS_STATUS',
+       ended_at           = NOW(),
+       updated_at         = NOW()
+ WHERE baseline_health_run_id = '$RUN_ID';
+SQL
+
+  cat > "$SUMMARY_JSON" <<EOF
+{
+  "run_code": "$RUN_CODE",
+  "core_blocker_count": $CORE_BLOCKER_COUNT,
+  "info_count": $INFO_COUNT,
+  "core_status": "$CORE_STATUS",
+  "legacy_status": "$LEGACY_GATE_STATUS",
+  "operations_status": "$OPERATIONS_STATUS",
+  "forbidden_table_count": $FORBIDDEN_TABLE_COUNT,
+  "dangerous_file_count": $DANGEROUS_FILE_COUNT,
+  "legacy_employee_filename_count": $AI_FILENAME_COUNT,
+  "legacy_employee_text_file_count": $AI_TEXT_FILE_COUNT,
+  "legacy_blocker_count": $LEGACY_BLOCKER_COUNT,
+  "pending_confirmation_count": $PENDING_CONFIRM_COUNT,
+  "confirmed_applied_count": $CONFIRMED_APPLIED_COUNT,
+  "confirmed_reverify_status": "$CONFIRMED_REVERIFY_STATUS"
+}
+EOF
+
+  echo "============================================================"
+  echo "VERIFY"
+  echo "============================================================"
+  psql "$PERSONA_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+TABLE cx22073jw.v_access_baseline_health_latest_summary;
+
+SELECT
+  check_group,
+  severity,
+  check_status,
+  COUNT(*) AS item_count
+FROM cx22073jw.v_access_baseline_health_latest_items
+GROUP BY check_group, severity, check_status
+ORDER BY check_group, severity, check_status;
+
+TABLE cx22073jw.v_access_baseline_health_latest_items;
+SQL
+
+  echo "============================================================"
+  echo "ACCESS BASELINE HEALTH GATE DONE"
+  echo "dangerous_hits: $DANGEROUS_HITS"
+  echo "text_hits     : $TEXT_HITS"
+  echo "filename_hits : $FILENAME_HITS"
+  echo "summary_json  : $SUMMARY_JSON"
+  echo "log_file      : $LOG_FILE"
+  echo "============================================================"
+} | tee "$LOG_FILE"

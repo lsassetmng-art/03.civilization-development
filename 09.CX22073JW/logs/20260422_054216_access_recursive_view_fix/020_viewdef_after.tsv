@@ -1,0 +1,129 @@
+v_access_manual_apply_confirmation_latest_log	 SELECT b.batch_code,
+    l.request_code,
+    l.actual_view_code,
+    l.logical_view_name,
+    l.previous_receipt_status,
+    l.new_receipt_status,
+    l.executor_name,
+    l.confirmation_note,
+    l.created_at
+   FROM access_manual_apply_confirmation_log l
+     JOIN access_manual_apply_receipt_batch b ON b.manual_apply_receipt_batch_id = l.manual_apply_receipt_batch_id
+  WHERE b.manual_apply_receipt_batch_id = (( SELECT access_manual_apply_receipt_batch.manual_apply_receipt_batch_id
+           FROM access_manual_apply_receipt_batch
+          ORDER BY access_manual_apply_receipt_batch.created_at DESC
+         LIMIT 1))
+  ORDER BY l.created_at DESC, l.request_code, l.logical_view_name;
+v_access_manual_apply_receipt_latest_batch_summary	 SELECT batch_code,
+    source_handoff_run_code,
+    source_export_root_path,
+    requested_item_count,
+    seeded_item_count,
+    batch_status,
+    note_text,
+    created_at,
+    ended_at
+   FROM access_manual_apply_receipt_batch
+  ORDER BY created_at DESC
+ LIMIT 1;
+v_access_manual_apply_receipt_latest_items	 SELECT b.batch_code,
+    i.request_code,
+    i.target_domain_code,
+    i.target_role_code,
+    i.actual_view_code,
+    i.logical_view_name,
+    i.expected_db_role_name,
+    i.receipt_status,
+    i.manual_executor_name,
+    i.manual_apply_note,
+    i.created_at
+   FROM access_manual_apply_receipt_item i
+     JOIN access_manual_apply_receipt_batch b ON b.manual_apply_receipt_batch_id = i.manual_apply_receipt_batch_id
+  WHERE b.manual_apply_receipt_batch_id = (( SELECT access_manual_apply_receipt_batch.manual_apply_receipt_batch_id
+           FROM access_manual_apply_receipt_batch
+          ORDER BY access_manual_apply_receipt_batch.created_at DESC
+         LIMIT 1))
+  ORDER BY i.request_code, i.logical_view_name;
+v_access_manual_apply_receipt_latest_pending_summary	 SELECT b.batch_code,
+    count(*) AS total_item_count,
+    count(*) FILTER (WHERE i.receipt_status = 'pending_confirmation'::text) AS pending_confirmation_count,
+    count(*) FILTER (WHERE i.receipt_status = 'confirmed_applied'::text) AS confirmed_applied_count,
+    count(*) FILTER (WHERE i.receipt_status = 'confirmed_skipped'::text) AS confirmed_skipped_count,
+    count(*) FILTER (WHERE i.receipt_status = 'confirmed_failed'::text) AS confirmed_failed_count
+   FROM access_manual_apply_receipt_item i
+     JOIN access_manual_apply_receipt_batch b ON b.manual_apply_receipt_batch_id = i.manual_apply_receipt_batch_id
+  WHERE b.manual_apply_receipt_batch_id = (( SELECT access_manual_apply_receipt_batch.manual_apply_receipt_batch_id
+           FROM access_manual_apply_receipt_batch
+          ORDER BY access_manual_apply_receipt_batch.created_at DESC
+         LIMIT 1))
+  GROUP BY b.batch_code;
+v_access_post_apply_verification_latest_confirmed_only_items	 SELECT r.run_code,
+    i.source_receipt_batch_code,
+    i.request_code,
+    i.target_domain_code,
+    i.target_role_code,
+    i.actual_view_code,
+    i.logical_view_name,
+    i.expected_db_role_name,
+    i.role_exists_flag,
+    i.view_exists_flag,
+    i.select_grant_present_flag,
+    i.verification_status,
+    i.result_note,
+    i.created_at
+   FROM access_post_apply_verification_item i
+     JOIN access_post_apply_verification_run r ON r.post_apply_verification_run_id = i.post_apply_verification_run_id
+  WHERE r.post_apply_verification_run_id = (( SELECT access_post_apply_verification_run.post_apply_verification_run_id
+           FROM access_post_apply_verification_run
+          WHERE access_post_apply_verification_run.note_text ~~* 'Confirmed-only%'::text
+          ORDER BY access_post_apply_verification_run.created_at DESC
+         LIMIT 1))
+  ORDER BY i.request_code, i.logical_view_name;
+v_access_post_apply_verification_latest_confirmed_only_summary	 SELECT run_code,
+    source_receipt_batch_code,
+    requested_item_count,
+    verified_applied_count,
+    not_yet_applied_count,
+    precheck_fail_count,
+    run_status,
+    note_text,
+    created_at,
+    ended_at
+   FROM access_post_apply_verification_run
+  WHERE note_text ~~* 'Confirmed-only%'::text
+  ORDER BY created_at DESC
+ LIMIT 1;
+v_access_post_apply_verification_latest_items	 SELECT r.run_code,
+    i.source_receipt_batch_code,
+    i.request_code,
+    i.target_domain_code,
+    i.target_role_code,
+    i.actual_view_code,
+    i.logical_view_name,
+    i.expected_db_role_name,
+    i.role_exists_flag,
+    i.view_exists_flag,
+    i.select_grant_present_flag,
+    i.verification_status,
+    i.result_note,
+    i.created_at
+   FROM access_post_apply_verification_item i
+     JOIN access_post_apply_verification_run r ON r.post_apply_verification_run_id = i.post_apply_verification_run_id
+  WHERE r.post_apply_verification_run_id = (( SELECT access_post_apply_verification_run.post_apply_verification_run_id
+           FROM access_post_apply_verification_run
+          ORDER BY access_post_apply_verification_run.created_at DESC
+         LIMIT 1))
+  ORDER BY i.request_code, i.logical_view_name;
+v_access_post_apply_verification_latest_summary	 SELECT run_code,
+    source_receipt_batch_code,
+    requested_item_count,
+    verified_applied_count,
+    not_yet_applied_count,
+    precheck_fail_count,
+    run_status,
+    note_text,
+    created_at,
+    ended_at
+   FROM access_post_apply_verification_run
+  ORDER BY created_at DESC
+ LIMIT 1;

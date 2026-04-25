@@ -1,0 +1,38 @@
+import Foundation
+
+enum CommonOSMetadataRegistry {
+    static func createDefault() -> CommonOSMetadataDescriptor {
+        CommonOSMetadataDescriptor(
+            appName: "PocketSecretary",
+            localeKeys: [
+                "pocket_secretary.briefing.title",
+                "pocket_secretary.follow_through_queue.title",
+                "pocket_secretary.conversation_actions.title"
+            ],
+            screenTemplates: [
+                "briefing_dashboard_standard",
+                "queue_detail_standard",
+                "action_capture_flow"
+            ],
+            helpTemplates: [
+                "briefing_help_template",
+                "queue_retry_help_template"
+            ],
+            notificationTemplates: [
+                "briefing_ready_notice",
+                "follow_through_retry_required"
+            ],
+            attachmentTemporaryHolding: "local_storage",
+            attachmentPreviewShell: "CommonOS Attachment UI",
+            attachmentAllowedKinds: [
+                "image",
+                "pdf",
+                "text"
+            ],
+            exportTemplates: [
+                "briefing_export_pdf",
+                "action_summary_export_csv"
+            ]
+        )
+    }
+}

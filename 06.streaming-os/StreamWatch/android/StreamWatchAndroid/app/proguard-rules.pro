@@ -1,0 +1,1 @@
+# StreamWatch Android proguard rules

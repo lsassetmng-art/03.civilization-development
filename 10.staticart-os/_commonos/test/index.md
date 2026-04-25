@@ -1,0 +1,13 @@
+# 10.staticart-os _commonos/test / index
+
+status: active
+owner: Boss
+prepared_by: Zero
+location: /data/data/com.termux/files/home/03.civilization-development/10.staticart-os/_commonos/test
+
+purpose:
+Standardized test entrypoint for 10.staticart-os CommonOS consumption.
+
+contains:
+- index.md
+- overview.md

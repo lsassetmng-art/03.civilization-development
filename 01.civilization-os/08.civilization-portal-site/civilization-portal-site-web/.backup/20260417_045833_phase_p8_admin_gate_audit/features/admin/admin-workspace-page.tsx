@@ -1,0 +1,497 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { PageTitleBlock } from "../../components/common/page-title-block";
+import { StatusMessage } from "../../components/feedback/status-message";
+import { OS_CATALOG } from "../../mocks/os/catalog";
+import {
+  requestAdminListingList,
+  requestAdminListingUpsert,
+  requestAdminMaintenanceList,
+  requestAdminMaintenanceUpsert,
+  requestAdminNoticePublish,
+  requestAdminNoticesList,
+} from "../../services/portal-api/admin-client";
+import type {
+  PortalListingItem,
+  PortalListingVisibility,
+  PortalMaintenanceItem,
+  PortalMaintenanceTargetType,
+  PortalNoticeItem,
+  PortalNoticeLevel,
+  PortalNoticeVisibility,
+} from "../../types/portal-admin-api";
+
+const sortNotices = (items: PortalNoticeItem[]): PortalNoticeItem[] =>
+  [...items].sort((a, b) => {
+    if (a.publishedOn < b.publishedOn) return 1;
+    if (a.publishedOn > b.publishedOn) return -1;
+    return a.title.localeCompare(b.title);
+  });
+
+const sortListings = (items: PortalListingItem[]): PortalListingItem[] =>
+  [...items].sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) {
+      return a.sortOrder - b.sortOrder;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+export function AdminWorkspacePage() {
+  const [loading, setLoading] = useState(true);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  const [noticeItems, setNoticeItems] = useState<PortalNoticeItem[]>([]);
+  const [maintenanceItems, setMaintenanceItems] = useState<PortalMaintenanceItem[]>([]);
+  const [listingItems, setListingItems] = useState<PortalListingItem[]>([]);
+
+  const [noticeTitle, setNoticeTitle] = useState("");
+  const [noticeSummary, setNoticeSummary] = useState("");
+  const [noticeLevel, setNoticeLevel] = useState<PortalNoticeLevel>("info");
+  const [noticeVisibility, setNoticeVisibility] =
+    useState<PortalNoticeVisibility>("public");
+  const [noticeBusy, setNoticeBusy] = useState(false);
+
+  const [maintenanceTargetType, setMaintenanceTargetType] =
+    useState<PortalMaintenanceTargetType>("global");
+  const [maintenanceTargetCode, setMaintenanceTargetCode] = useState("portal");
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceTitle, setMaintenanceTitle] = useState("Portal maintenance");
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [maintenanceBusy, setMaintenanceBusy] = useState(false);
+
+  const [listingOsCode, setListingOsCode] = useState(OS_CATALOG[0]?.code ?? "civilization-os");
+  const [listingVisibility, setListingVisibility] =
+    useState<PortalListingVisibility>("listed");
+  const [listingFeatured, setListingFeatured] = useState(false);
+  const [listingBadge, setListingBadge] = useState("");
+  const [listingSortOrder, setListingSortOrder] = useState("10");
+  const [listingBusy, setListingBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const run = async () => {
+      try {
+        setLoading(true);
+        setGlobalError(null);
+
+        const [noticesResponse, maintenanceResponse, listingResponse] =
+          await Promise.all([
+            requestAdminNoticesList({ scope: "admin" }),
+            requestAdminMaintenanceList({ scope: "admin" }),
+            requestAdminListingList({ scope: "admin" }),
+          ]);
+
+        if (!active) {
+          return;
+        }
+
+        setNoticeItems(noticesResponse.data.items);
+        setMaintenanceItems(maintenanceResponse.data.items);
+        setListingItems(listingResponse.data.items);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Admin data could not be loaded.";
+
+        setGlobalError(message);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handlePublishNotice = async () => {
+    try {
+      setNoticeBusy(true);
+      setGlobalError(null);
+
+      const response = await requestAdminNoticePublish({
+        title: noticeTitle,
+        summary: noticeSummary,
+        level: noticeLevel,
+        visibility: noticeVisibility,
+        publishedOn: new Date().toISOString().slice(0, 10),
+      });
+
+      setNoticeItems((prev) => sortNotices([response.data.item, ...prev]));
+      setNoticeTitle("");
+      setNoticeSummary("");
+      setNoticeLevel("info");
+      setNoticeVisibility("public");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Notice could not be published.";
+      setGlobalError(message);
+    } finally {
+      setNoticeBusy(false);
+    }
+  };
+
+  const handleUpsertMaintenance = async () => {
+    try {
+      setMaintenanceBusy(true);
+      setGlobalError(null);
+
+      const response = await requestAdminMaintenanceUpsert({
+        targetType: maintenanceTargetType,
+        targetCode: maintenanceTargetCode,
+        enabled: maintenanceEnabled,
+        title: maintenanceTitle,
+        message: maintenanceMessage,
+      });
+
+      setMaintenanceItems((prev) => {
+        const filtered = prev.filter(
+          (item) =>
+            !(
+              item.targetType === response.data.item.targetType &&
+              item.targetCode === response.data.item.targetCode
+            ),
+        );
+        return [...filtered, response.data.item].sort((a, b) =>
+          a.targetCode.localeCompare(b.targetCode),
+        );
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Maintenance state could not be saved.";
+      setGlobalError(message);
+    } finally {
+      setMaintenanceBusy(false);
+    }
+  };
+
+  const handleUpsertListing = async () => {
+    try {
+      setListingBusy(true);
+      setGlobalError(null);
+
+      const response = await requestAdminListingUpsert({
+        osCode: listingOsCode,
+        visibility: listingVisibility,
+        featured: listingFeatured,
+        badge: listingBadge,
+        sortOrder: Number.parseInt(listingSortOrder || "0", 10),
+      });
+
+      setListingItems((prev) => {
+        const filtered = prev.filter((item) => item.osCode !== response.data.item.osCode);
+        return sortListings([...filtered, response.data.item]);
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Listing could not be saved.";
+      setGlobalError(message);
+    } finally {
+      setListingBusy(false);
+    }
+  };
+
+  return (
+    <div className="page-stack">
+      <PageTitleBlock
+        eyebrow="Portal Operations"
+        title="Admin workspace"
+        description="This workspace now uses exact payloads for notice publishing, maintenance updates, and OS listing administration."
+      />
+
+      {loading ? (
+        <StatusMessage
+          title="Loading admin data"
+          message="Reading the current admin payloads for notices, maintenance, and listings."
+          variant="info"
+        />
+      ) : null}
+
+      {globalError ? (
+        <StatusMessage
+          title="Admin action failed"
+          message={globalError}
+          variant="danger"
+        />
+      ) : null}
+
+      <section className="page-section">
+        <h2 className="section-title">Publish notice</h2>
+        <article className="card">
+          <div className="form-grid">
+            <label className="field-block">
+              <span className="label-text">Title</span>
+              <input
+                className="text-input"
+                value={noticeTitle}
+                onChange={(event) => setNoticeTitle(event.target.value)}
+                placeholder="Portal notice title"
+              />
+            </label>
+
+            <label className="field-block field-span-2">
+              <span className="label-text">Summary</span>
+              <textarea
+                className="text-area"
+                value={noticeSummary}
+                onChange={(event) => setNoticeSummary(event.target.value)}
+                placeholder="Portal notice summary"
+                rows={4}
+              />
+            </label>
+
+            <label className="field-block">
+              <span className="label-text">Level</span>
+              <select
+                className="select-input"
+                value={noticeLevel}
+                onChange={(event) => setNoticeLevel(event.target.value as PortalNoticeLevel)}
+              >
+                <option value="info">info</option>
+                <option value="warning">warning</option>
+                <option value="maintenance">maintenance</option>
+              </select>
+            </label>
+
+            <label className="field-block">
+              <span className="label-text">Visibility</span>
+              <select
+                className="select-input"
+                value={noticeVisibility}
+                onChange={(event) =>
+                  setNoticeVisibility(event.target.value as PortalNoticeVisibility)
+                }
+              >
+                <option value="public">public</option>
+                <option value="admin">admin</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="button-row">
+            <button
+              type="button"
+              className="button-link"
+              onClick={handlePublishNotice}
+              disabled={noticeBusy}
+            >
+              {noticeBusy ? "Publishing..." : "Publish Notice"}
+            </button>
+          </div>
+        </article>
+
+        <div className="grid-2">
+          {noticeItems.map((item) => (
+            <article key={item.id} className="card">
+              <p className="eyebrow">
+                {item.level.toUpperCase()} / {item.visibility.toUpperCase()}
+              </p>
+              <h3 className="card-title">{item.title}</h3>
+              <p className="card-copy">{item.summary}</p>
+              <p className="meta-text">Published: {item.publishedOn}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="page-section">
+        <h2 className="section-title">Maintenance control</h2>
+        <article className="card">
+          <div className="form-grid">
+            <label className="field-block">
+              <span className="label-text">Target type</span>
+              <select
+                className="select-input"
+                value={maintenanceTargetType}
+                onChange={(event) =>
+                  setMaintenanceTargetType(
+                    event.target.value as PortalMaintenanceTargetType,
+                  )
+                }
+              >
+                <option value="global">global</option>
+                <option value="os">os</option>
+              </select>
+            </label>
+
+            <label className="field-block">
+              <span className="label-text">Target code</span>
+              <input
+                className="text-input"
+                value={maintenanceTargetCode}
+                onChange={(event) => setMaintenanceTargetCode(event.target.value)}
+                placeholder="portal or os code"
+              />
+            </label>
+
+            <label className="field-block field-span-2">
+              <span className="label-text">Title</span>
+              <input
+                className="text-input"
+                value={maintenanceTitle}
+                onChange={(event) => setMaintenanceTitle(event.target.value)}
+                placeholder="Maintenance title"
+              />
+            </label>
+
+            <label className="field-block field-span-2">
+              <span className="label-text">Message</span>
+              <textarea
+                className="text-area"
+                value={maintenanceMessage}
+                onChange={(event) => setMaintenanceMessage(event.target.value)}
+                placeholder="Maintenance message"
+                rows={4}
+              />
+            </label>
+
+            <label className="field-block checkbox-field">
+              <input
+                type="checkbox"
+                checked={maintenanceEnabled}
+                onChange={(event) => setMaintenanceEnabled(event.target.checked)}
+              />
+              <span className="label-text">Enabled</span>
+            </label>
+          </div>
+
+          <div className="button-row">
+            <button
+              type="button"
+              className="button-link"
+              onClick={handleUpsertMaintenance}
+              disabled={maintenanceBusy}
+            >
+              {maintenanceBusy ? "Saving..." : "Save Maintenance State"}
+            </button>
+          </div>
+        </article>
+
+        <div className="grid-2">
+          {maintenanceItems.map((item) => (
+            <article key={item.id} className="card">
+              <p className="eyebrow">
+                {item.targetType.toUpperCase()} / {item.targetCode}
+              </p>
+              <h3 className="card-title">{item.title}</h3>
+              <p className="card-copy">{item.message}</p>
+              <div className="chip-row">
+                <span className="chip">{item.enabled ? "enabled" : "disabled"}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="page-section">
+        <h2 className="section-title">OS listing control</h2>
+        <article className="card">
+          <div className="form-grid">
+            <label className="field-block">
+              <span className="label-text">OS code</span>
+              <select
+                className="select-input"
+                value={listingOsCode}
+                onChange={(event) => setListingOsCode(event.target.value)}
+              >
+                {OS_CATALOG.map((os) => (
+                  <option key={os.code} value={os.code}>
+                    {os.code}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field-block">
+              <span className="label-text">Visibility</span>
+              <select
+                className="select-input"
+                value={listingVisibility}
+                onChange={(event) =>
+                  setListingVisibility(event.target.value as PortalListingVisibility)
+                }
+              >
+                <option value="listed">listed</option>
+                <option value="hidden">hidden</option>
+                <option value="featured-only">featured-only</option>
+              </select>
+            </label>
+
+            <label className="field-block">
+              <span className="label-text">Badge</span>
+              <input
+                className="text-input"
+                value={listingBadge}
+                onChange={(event) => setListingBadge(event.target.value)}
+                placeholder="featured / beta / curated"
+              />
+            </label>
+
+            <label className="field-block">
+              <span className="label-text">Sort order</span>
+              <input
+                className="text-input"
+                value={listingSortOrder}
+                onChange={(event) => setListingSortOrder(event.target.value)}
+                placeholder="10"
+              />
+            </label>
+
+            <label className="field-block checkbox-field">
+              <input
+                type="checkbox"
+                checked={listingFeatured}
+                onChange={(event) => setListingFeatured(event.target.checked)}
+              />
+              <span className="label-text">Featured</span>
+            </label>
+          </div>
+
+          <div className="button-row">
+            <button
+              type="button"
+              className="button-link"
+              onClick={handleUpsertListing}
+              disabled={listingBusy}
+            >
+              {listingBusy ? "Saving..." : "Save Listing"}
+            </button>
+          </div>
+        </article>
+
+        <div className="grid-2">
+          {listingItems.map((item) => (
+            <article key={item.id} className="card">
+              <p className="eyebrow">{item.osCode}</p>
+              <h3 className="card-title">{item.name}</h3>
+              <p className="card-copy">{item.category}</p>
+              <div className="chip-row">
+                <span className="chip">{item.visibility}</span>
+                <span className="chip">sort:{item.sortOrder}</span>
+                {item.featured ? <span className="chip">featured</span> : null}
+                {item.badge ? <span className="chip">{item.badge}</span> : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}

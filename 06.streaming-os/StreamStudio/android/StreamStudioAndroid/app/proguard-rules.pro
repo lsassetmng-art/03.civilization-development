@@ -1,0 +1,1 @@
+# StreamStudio Android proguard rules

@@ -1,0 +1,111 @@
+(function () {
+  const backgrounds = {
+    sunrise: "linear-gradient(135deg, #f59e0b, #ef4444)",
+    forest: "linear-gradient(135deg, #10b981, #065f46)",
+    night: "linear-gradient(135deg, #312e81, #0f172a)",
+    ocean: "linear-gradient(135deg, #0ea5e9, #1d4ed8)"
+  };
+
+  function readJson(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function writeJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function esc(str) {
+    return String(str == null ? "" : str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
+  function today() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
+  function average(nums) {
+    if (!nums.length) return 0;
+    return nums.reduce((a, b) => a + b, 0) / nums.length;
+  }
+
+  function sum(nums) {
+    return nums.reduce((a, b) => a + b, 0);
+  }
+
+  function mountPersonaBackground(appKey) {
+    const hero = document.getElementById("hero");
+    const personaInput = document.getElementById("personaName");
+    const backgroundSelect = document.getElementById("backgroundSelect");
+    const saveShellBtn = document.getElementById("saveShellBtn");
+    const resetShellBtn = document.getElementById("resetShellBtn");
+    const shellStatus = document.getElementById("shellStatus");
+
+    const shellKey = "lifeos_shell_" + appKey;
+
+    function applyBackground(bg) {
+      if (hero) {
+        hero.style.background = backgrounds[bg] || backgrounds.sunrise;
+      }
+    }
+
+    function loadShell() {
+      const state = readJson(shellKey, { personaName: "", background: "sunrise" });
+      personaInput.value = state.personaName || "";
+      backgroundSelect.value = state.background || "sunrise";
+      applyBackground(backgroundSelect.value);
+      shellStatus.textContent = state.personaName
+        ? "Saved persona: " + state.personaName
+        : "Persona not saved yet";
+    }
+
+    function saveShell() {
+      const state = {
+        personaName: personaInput.value.trim(),
+        background: backgroundSelect.value
+      };
+      writeJson(shellKey, state);
+      applyBackground(state.background);
+      shellStatus.textContent = state.personaName
+        ? "Saved persona: " + state.personaName
+        : "Saved shell state";
+    }
+
+    function resetShell() {
+      localStorage.removeItem(shellKey);
+      personaInput.value = "";
+      backgroundSelect.value = "sunrise";
+      applyBackground("sunrise");
+      shellStatus.textContent = "Shell state reset";
+    }
+
+    backgroundSelect.addEventListener("change", function () {
+      applyBackground(backgroundSelect.value);
+    });
+    saveShellBtn.addEventListener("click", saveShell);
+    resetShellBtn.addEventListener("click", resetShell);
+
+    loadShell();
+  }
+
+  window.LifeWebCommon = {
+    readJson,
+    writeJson,
+    esc,
+    today,
+    average,
+    sum,
+    mountPersonaBackground
+  };
+})();

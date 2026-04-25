@@ -1,0 +1,231 @@
+-- ============================================================
+-- AI EMPLOYEE ACTIVATION APPLY PLAN SKELETON
+-- ============================================================
+-- generated_at: 20260421_101717
+-- export_run_code: ai_employee_activation_review_export_20260421_101717
+-- caution:
+--   this is a review skeleton only
+--   do not auto-execute without governed approval
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- request_code: actreq_education_subject_lecturer_20260420_205007819
+-- domain_code : education
+-- role_code   : subject_lecturer
+-- actual_view : AV_EDU_LEVEL_ADAPTIVE_CONTEXT
+-- logical_view: vw_aiemp_edu_level_adaptive_context
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_education_subject_lecturer_20260420_205007819
+-- domain_code : education
+-- role_code   : subject_lecturer
+-- actual_view : AV_EDU_PUBLIC_GUIDE
+-- logical_view: vw_aiemp_edu_public_guide
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_education_subject_lecturer_20260420_205007819
+-- domain_code : education
+-- role_code   : subject_lecturer
+-- actual_view : AV_EDU_SUBJECT_CATALOG
+-- logical_view: vw_aiemp_edu_subject_catalog
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_education_subject_lecturer_20260420_205007819
+-- domain_code : education
+-- role_code   : subject_lecturer
+-- actual_view : AV_EDU_TEACHING_GUIDE
+-- logical_view: vw_aiemp_edu_teaching_guide
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_operations_consult_support_20260420_205007819
+-- domain_code : operations
+-- role_code   : consult_support
+-- actual_view : AV_SHARED_APP_HELP
+-- logical_view: vw_aiemp_app_help
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_operations_consult_support_20260420_205007819
+-- domain_code : operations
+-- role_code   : consult_support
+-- actual_view : AV_OPS_MASKED_RECORD_CONTEXT
+-- logical_view: vw_aiemp_masked_record_context
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_operations_consult_support_20260420_205007819
+-- domain_code : operations
+-- role_code   : consult_support
+-- actual_view : AV_SHARED_PUBLIC_GUIDE
+-- logical_view: vw_aiemp_public_guide
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_operations_consult_support_20260420_205007819
+-- domain_code : operations
+-- role_code   : consult_support
+-- actual_view : AV_OPS_REVIEW_PACKAGE_CONTEXT
+-- logical_view: vw_aiemp_review_package_context
+-- inclusion   : conditional
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_streaming_stream_cohost_20260420_205007819
+-- domain_code : streaming
+-- role_code   : stream_cohost
+-- actual_view : AV_GAME_RULE_GUIDE
+-- logical_view: vw_aiemp_game_rule_guide
+-- inclusion   : conditional
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_streaming_stream_cohost_20260420_205007819
+-- domain_code : streaming
+-- role_code   : stream_cohost
+-- actual_view : AV_SHARED_PUBLIC_GUIDE
+-- logical_view: vw_aiemp_public_guide
+-- inclusion   : conditional
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_streaming_stream_cohost_20260420_205007819
+-- domain_code : streaming
+-- role_code   : stream_cohost
+-- actual_view : AV_STREAM_PUBLIC_CONTEXT
+-- logical_view: vw_aiemp_stream_public_context
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_streaming_stream_cohost_20260420_205007819
+-- domain_code : streaming
+-- role_code   : stream_cohost
+-- actual_view : AV_STREAM_SEGMENT_PUBLIC_CONTEXT
+-- logical_view: vw_aiemp_stream_segment_public_context
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_streaming_stream_cohost_20260420_205007819
+-- domain_code : streaming
+-- role_code   : stream_cohost
+-- actual_view : AV_STREAM_SHOW_FLOW_CONTEXT
+-- logical_view: vw_aiemp_stream_show_flow_context
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_streaming_stream_cohost_20260420_205007819
+-- domain_code : streaming
+-- role_code   : stream_cohost
+-- actual_view : AV_STREAM_SUPPORT_CONTEXT
+-- logical_view: vw_aiemp_stream_support_context
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_utility_assist_document_writer_20260420_205007819
+-- domain_code : utility_assist
+-- role_code   : document_writer
+-- actual_view : AV_UTILITY_MASKED_USER_CONTEXT
+-- logical_view: vw_aiemp_utility_masked_user_context
+-- inclusion   : conditional
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_utility_assist_document_writer_20260420_205007819
+-- domain_code : utility_assist
+-- role_code   : document_writer
+-- actual_view : AV_UTILITY_SUMMARY_CONTEXT
+-- logical_view: vw_aiemp_utility_summary_context
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+
+-- ------------------------------------------------------------
+-- request_code: actreq_utility_assist_document_writer_20260420_205007819
+-- domain_code : utility_assist
+-- role_code   : document_writer
+-- actual_view : AV_UTILITY_WRITING_CONTEXT
+-- logical_view: vw_aiemp_utility_writing_context
+-- inclusion   : required
+-- gate_needed : false
+-- action_hint : allow_apply_candidate
+-- example next controlled step:
+-- INSERT INTO governed_apply_queue(...) VALUES (...);
+-- REVIEW BEFORE APPLY
+

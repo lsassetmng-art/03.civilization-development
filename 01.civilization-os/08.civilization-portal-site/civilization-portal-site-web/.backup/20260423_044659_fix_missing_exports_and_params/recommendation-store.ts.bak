@@ -1,0 +1,63 @@
+import { PORTAL_RECOMMENDATION_SEED_RULES } from "../../mocks/recommendation/seed-rules";
+import type { PortalSessionSummary } from "../../types/auth";
+import type { PortalResolvedRecommendationItem } from "../../types/portal-recommendation-api";
+
+const isOperatorSession = (session: PortalSessionSummary): boolean =>
+  session.isLoggedIn &&
+  session.entityType === "human" &&
+  session.contractTier === "business" &&
+  session.affiliations.includes("operator");
+
+const audienceAllowed = (
+  audience: "public" | "member" | "operator",
+  session: PortalSessionSummary,
+): boolean => {
+  if (audience === "public") {
+    return true;
+  }
+  if (audience === "member") {
+    return session.isLoggedIn;
+  }
+  return isOperatorSession(session);
+};
+
+export const resolvePublicRecommendations = (input: {
+  anchorPage: string;
+  session: PortalSessionSummary;
+  limit: number;
+  query?: string;
+}): PortalResolvedRecommendationItem[] => {
+  const query = (input.query ?? "").trim().toLowerCase();
+
+  return PORTAL_RECOMMENDATION_SEED_RULES
+    .filter((item) => item.visibility === "visible")
+    .filter((item) => item.anchorPage === input.anchorPage)
+    .filter((item) => audienceAllowed(item.audience, input.session))
+    .filter((item) => {
+      if (query.length === 0) {
+        return true;
+      }
+
+      return (
+        item.title.toLowerCase().includes(query) ||
+        item.summary.toLowerCase().includes(query) ||
+        item.keywords.some((keyword) => keyword.toLowerCase().includes(query))
+      );
+    })
+    .sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return a.priority - b.priority;
+      }
+      return a.title.localeCompare(b.title);
+    })
+    .slice(0, input.limit)
+    .map((item) => ({
+      code: item.code,
+      targetKind: item.targetKind,
+      title: item.title,
+      summary: item.summary,
+      href: item.href,
+      featured: item.featured,
+      priority: item.priority,
+    }));
+};
