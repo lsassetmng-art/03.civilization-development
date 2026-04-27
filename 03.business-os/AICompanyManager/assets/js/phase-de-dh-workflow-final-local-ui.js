@@ -4971,3 +4971,218 @@
     init();
   }
 })(window);
+
+/* AICM_ROBOT_ADD_LOCAL_FALLBACK_PATCH_BEGIN */
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "aicm.robotPlacements.v1";
+
+  function ready(fn) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", fn);
+    } else {
+      fn();
+    }
+  }
+
+  function loadRobots() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRobots(items) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items, null, 2));
+  }
+
+  function createEl(tag, attrs, text) {
+    var el = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (key) {
+      if (key === "className") {
+        el.className = attrs[key];
+      } else {
+        el.setAttribute(key, attrs[key]);
+      }
+    });
+    if (typeof text === "string") {
+      el.textContent = text;
+    }
+    return el;
+  }
+
+  function injectStyle() {
+    if (document.getElementById("aicm-robot-fallback-style")) return;
+    var style = createEl("style", { id: "aicm-robot-fallback-style" });
+    style.textContent = [
+      ".aicm-robot-fallback{margin:16px;padding:16px;border:1px solid #d0d7de;border-radius:14px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.05);font-family:system-ui,sans-serif;}",
+      ".aicm-robot-fallback h2{margin:0 0 8px;font-size:18px;}",
+      ".aicm-robot-fallback p{margin:4px 0 12px;color:#555;}",
+      ".aicm-robot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:12px 0;}",
+      ".aicm-robot-grid label{display:flex;flex-direction:column;font-size:12px;color:#555;gap:4px;}",
+      ".aicm-robot-grid input,.aicm-robot-grid select{padding:8px;border:1px solid #ccd0d5;border-radius:8px;font-size:14px;}",
+      ".aicm-robot-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}",
+      ".aicm-robot-actions button{padding:9px 12px;border-radius:9px;border:1px solid #999;background:#f6f8fa;}",
+      ".aicm-robot-list{margin-top:12px;display:grid;gap:8px;}",
+      ".aicm-robot-card{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#fafafa;}",
+      ".aicm-robot-card strong{display:block;margin-bottom:4px;}",
+      ".aicm-robot-muted{color:#667085;font-size:12px;}",
+      ".aicm-robot-ok{color:#0969da;font-size:12px;}",
+      ".aicm-robot-danger{color:#b42318;font-size:12px;}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  function renderList(root) {
+    var list = root.querySelector("[data-aicm-robot-list]");
+    var status = root.querySelector("[data-aicm-robot-status]");
+    if (!list) return;
+
+    var robots = loadRobots();
+    list.innerHTML = "";
+
+    if (robots.length === 0) {
+      list.appendChild(createEl("div", { className: "aicm-robot-muted" }, "まだロボットは追加されていません。"));
+    } else {
+      robots.forEach(function (robot, index) {
+        var card = createEl("div", { className: "aicm-robot-card" });
+        card.appendChild(createEl("strong", {}, robot.robot_name || "名称未設定"));
+        card.appendChild(createEl("div", {}, "種別: Ai(ロボット)"));
+        card.appendChild(createEl("div", {}, "役割: " + (robot.role || "Worker")));
+        card.appendChild(createEl("div", {}, "部門: " + (robot.department_name || "未指定")));
+        card.appendChild(createEl("div", {}, "組織: " + (robot.organization_name || "未指定")));
+        if (robot.note) {
+          card.appendChild(createEl("div", { className: "aicm-robot-muted" }, "メモ: " + robot.note));
+        }
+
+        var del = createEl("button", { type: "button", "data-index": String(index) }, "この表示から外す");
+        del.addEventListener("click", function () {
+          var current = loadRobots();
+          current.splice(index, 1);
+          saveRobots(current);
+          renderList(root);
+        });
+        card.appendChild(del);
+
+        list.appendChild(card);
+      });
+    }
+
+    if (status) {
+      status.textContent = "localStorage保存件数: " + robots.length + "件";
+      status.className = "aicm-robot-ok";
+    }
+  }
+
+  function buildPanel() {
+    if (document.getElementById("aicm-robot-add-local-fallback")) return;
+
+    injectStyle();
+
+    var root = createEl("section", {
+      id: "aicm-robot-add-local-fallback",
+      className: "aicm-robot-fallback"
+    });
+
+    root.appendChild(createEl("h2", {}, "ロボット追加 / 配置 local fallback"));
+    root.appendChild(createEl("p", {}, "DBへは書き込まず、この端末のブラウザ localStorage に Ai(ロボット) 配置を保存します。"));
+
+    var grid = createEl("div", { className: "aicm-robot-grid" });
+
+    var nameLabel = createEl("label", {}, "ロボット名");
+    var nameInput = createEl("input", { type: "text", placeholder: "例: 作業ロボット01", "data-aicm-robot-name": "1" });
+    nameLabel.appendChild(nameInput);
+
+    var roleLabel = createEl("label", {}, "役割");
+    var roleSelect = createEl("select", { "data-aicm-robot-role": "1" });
+    ["Manager", "Leader", "Worker", "Reviewer"].forEach(function (role) {
+      roleSelect.appendChild(createEl("option", { value: role }, role));
+    });
+    roleSelect.value = "Worker";
+    roleLabel.appendChild(roleSelect);
+
+    var deptLabel = createEl("label", {}, "部門");
+    var deptInput = createEl("input", { type: "text", placeholder: "例: 開発部", "data-aicm-robot-department": "1" });
+    deptLabel.appendChild(deptInput);
+
+    var orgLabel = createEl("label", {}, "組織");
+    var orgInput = createEl("input", { type: "text", placeholder: "例: Workerチーム", "data-aicm-robot-organization": "1" });
+    orgLabel.appendChild(orgInput);
+
+    var noteLabel = createEl("label", {}, "メモ");
+    var noteInput = createEl("input", { type: "text", placeholder: "任意", "data-aicm-robot-note": "1" });
+    noteLabel.appendChild(noteInput);
+
+    grid.appendChild(nameLabel);
+    grid.appendChild(roleLabel);
+    grid.appendChild(deptLabel);
+    grid.appendChild(orgLabel);
+    grid.appendChild(noteLabel);
+    root.appendChild(grid);
+
+    var actions = createEl("div", { className: "aicm-robot-actions" });
+    var addButton = createEl("button", { type: "button" }, "ロボットを追加");
+    var clearButton = createEl("button", { type: "button" }, "local表示を全クリア");
+    var status = createEl("span", { "data-aicm-robot-status": "1", className: "aicm-robot-muted" }, "");
+
+    addButton.addEventListener("click", function () {
+      var robotName = nameInput.value.trim();
+      if (!robotName) {
+        status.textContent = "ロボット名を入力してください。";
+        status.className = "aicm-robot-danger";
+        nameInput.focus();
+        return;
+      }
+
+      var robots = loadRobots();
+      robots.push({
+        robot_local_id: "local-robot-" + Date.now() + "-" + Math.random().toString(16).slice(2),
+        robot_kind: "ai_robot",
+        robot_name: robotName,
+        role: roleSelect.value || "Worker",
+        department_name: deptInput.value.trim(),
+        organization_name: orgInput.value.trim(),
+        note: noteInput.value.trim(),
+        created_at: new Date().toISOString(),
+        source: "ui_local_fallback"
+      });
+      saveRobots(robots);
+
+      nameInput.value = "";
+      noteInput.value = "";
+      status.textContent = "追加しました。";
+      status.className = "aicm-robot-ok";
+      renderList(root);
+    });
+
+    clearButton.addEventListener("click", function () {
+      saveRobots([]);
+      renderList(root);
+    });
+
+    actions.appendChild(addButton);
+    actions.appendChild(clearButton);
+    actions.appendChild(status);
+    root.appendChild(actions);
+
+    root.appendChild(createEl("div", { className: "aicm-robot-list", "data-aicm-robot-list": "1" }));
+
+    var mount = document.querySelector("main") || document.body;
+    if (mount.firstChild) {
+      mount.insertBefore(root, mount.firstChild);
+    } else {
+      mount.appendChild(root);
+    }
+
+    renderList(root);
+  }
+
+  ready(buildPanel);
+}());
+/* AICM_ROBOT_ADD_LOCAL_FALLBACK_PATCH_END */
