@@ -1017,7 +1017,7 @@
   function organizationOptions(company, selected) {
     var rows = allOrganizations(company);
     var selectedId = selected || app.organizationId;
-    if (!rows.length) return '<option value="">組織なし</option>';
+    if (!rows.length) return '<option value="">課なし</option>';
     return rows.map(function (r) {
       return '<option value="' + esc(r.org.id) + '"' + (r.org.id === selectedId ? " selected" : "") + '>' + esc(r.dept.name + " / " + r.org.name) + '</option>';
     }).join("");
@@ -1229,7 +1229,7 @@
 
   function aicmOrganizationTreeHtml(data, company) {
     if (!company || !company.departments || !company.departments.length) {
-      return '<p class="aicm-muted">部門・組織がありません。</p>';
+      return '<p class="aicm-muted">部門・課がありません。</p>';
     }
 
     return '<div class="aicm-org-tree">' + company.departments.map(function (department) {
@@ -1241,7 +1241,7 @@
               '<div>配置ロボット: ' + (labels.length ? esc(labels.join(" / ")) : '<span class="aicm-muted">未配置</span>') + '</div>' +
               '</li>';
           }).join("")
-        : '<li><span class="aicm-muted">組織なし</span></li>';
+        : '<li><span class="aicm-muted">課なし</span></li>';
 
       return '<div class="aicm-card"><h3>' + esc(department.name) + '</h3>' +
         '<p class="aicm-muted">' + esc(department.purpose || "") + '</p>' +
@@ -1262,7 +1262,7 @@
     var rows = assignments.length ? assignments.map(function (assignment) {
       return '<div class="aicm-row"><strong>' + esc(aicmAssignmentLabel(data, assignment)) + '</strong>' +
         '<p class="aicm-muted">Business側ロボット: ' + esc(assignment.robot_id) + ' / 無制限割当</p></div>';
-    }).join("") : '<p class="aicm-muted">この組織にはまだロボットが配置されていません。</p>';
+    }).join("") : '<p class="aicm-muted">この課にはまだロボットが配置されていません。</p>';
 
     return [
       '<div class="aicm-card"><h2>ロボット配置</h2>',
@@ -1314,25 +1314,25 @@
       '</div>',
       '<div class="aicm-card"><h2>全体状況</h2>',
       '<p>部門数: ' + (company ? company.departments.length : 0) + '</p>',
-      '<p>組織数: ' + orgRows.length + '</p>',
+      '<p>課数: ' + orgRows.length + '</p>',
       '<p>台帳行: ' + totalTasks + '</p>',
       '<p>完了: ' + totalDone + '</p>',
       '<p>レビュー・承認待ち: ' + totalReview + '</p>',
       '</div>',
-      '<div class="aicm-card aicm-wide"><h2>組織ツリー</h2>',
+      '<div class="aicm-card aicm-wide"><h2>課ツリー</h2>',
       aicmOrganizationTreeHtml(data, company),
       '</div>',
       '<div class="aicm-card"><h2>部門一覧</h2>',
       company && company.departments.length ? company.departments.map(function (d) {
-        return '<div class="aicm-row"><strong>' + esc(d.name) + '</strong><p class="aicm-muted">' + esc(d.purpose) + '</p><p>組織: ' + d.organizations.length + ' / 台帳: ' + d.task_ledger.length + '</p></div>';
+        return '<div class="aicm-row"><strong>' + esc(d.name) + '</strong><p class="aicm-muted">' + esc(d.purpose) + '</p><p>課: ' + d.organizations.length + ' / 台帳: ' + d.task_ledger.length + '</p></div>';
       }).join("") : '<p class="aicm-muted">部門なし。新規追加から作成してください。</p>',
       '<div class="aicm-card-footer"><button class="primary" data-screen="department-detail">部門詳細</button><button class="primary" data-screen="department-add">新規追加</button></div>',
       '</div>',
-      '<div class="aicm-card"><h2>組織一覧</h2>',
+      '<div class="aicm-card"><h2>課一覧</h2>',
       orgRows.length ? orgRows.map(function (r) {
         return '<div class="aicm-row"><strong>' + esc(r.org.name) + '</strong><p class="aicm-muted">' + esc(r.dept.name + " / " + r.org.purpose) + '</p><p>ロボット: ' + esc(aicmOrganizationAssignmentLabels(data, r.org).join(" / ")) + '</p></div>';
-      }).join("") : '<p class="aicm-muted">組織なし。先に部門を作成し、その後に組織を追加してください。</p>',
-      '<div class="aicm-card-footer"><button class="primary" data-screen="organization-detail">組織詳細</button><button class="primary" data-screen="organization-add">新規追加</button></div>',
+      }).join("") : '<p class="aicm-muted">課なし。先に部門を作成し、その後に課を追加してください。</p>',
+      '<div class="aicm-card-footer"><button class="primary" data-screen="organization-detail">課詳細</button><button class="primary" data-screen="organization-add">新規追加</button></div>',
       '</div>',
       '</section>'
     ].join(""));
@@ -1403,7 +1403,7 @@
       '<div class="aicm-card-footer"><button class="primary" data-screen="department-add">新規追加</button></div>',
       '</div>',
       '<div class="aicm-card aicm-wide"><h2>現在の部門</h2>',
-      dept ? '<p><strong>' + esc(dept.name) + '</strong></p><p class="aicm-muted">' + esc(dept.purpose) + '</p><p>組織数: ' + dept.organizations.length + '</p><p>台帳行: ' + dept.task_ledger.length + '</p>' : '<p class="aicm-muted">部門がありません。新規追加を押して作成してください。</p>',
+      dept ? '<p><strong>' + esc(dept.name) + '</strong></p><p class="aicm-muted">' + esc(dept.purpose) + '</p><p>課数: ' + dept.organizations.length + '</p><p>台帳行: ' + dept.task_ledger.length + '</p>' : '<p class="aicm-muted">部門がありません。新規追加を押して作成してください。</p>',
       '</div>',
       dept ? '<div class="aicm-card"><h2>部門変更・削除</h2>' +
         field("部門名", "edit-department-name", dept.name) +
@@ -1464,24 +1464,24 @@
 
     return shell([
       '<section class="aicm-grid" data-screen-scope="organization-detail">',
-      '<div class="aicm-card aicm-wide"><h2>組織詳細</h2><p class="aicm-muted">組織を選択し、この画面内で変更・削除・ロボット配置を行います。コンボボックスで選択して追加します。数量消費はしません。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
-      '<div class="aicm-card"><h2>組織選択</h2>',
+      '<div class="aicm-card aicm-wide"><h2>課詳細</h2><p class="aicm-muted">課を選択し、この画面内で変更・削除・ロボット配置を行います。コンボボックスで選択して追加します。数量消費はしません。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
+      '<div class="aicm-card"><h2>課選択</h2>',
       '<div class="aicm-field"><label>組織</label><select id="organization-select">' + organizationOptions(company) + '</select></div>',
-      '<button class="primary" data-action="switch-organization">組織を表示</button>',
+      '<button class="primary" data-action="switch-organization">課を表示</button>',
       '<div class="aicm-card-footer"><button class="primary" data-screen="organization-add">新規追加</button></div>',
       '</div>',
-      '<div class="aicm-card aicm-wide"><h2>現在の組織</h2>',
-      current ? '<p><strong>' + esc(org.name) + '</strong></p><p class="aicm-muted">' + esc(current.dept.name + " / " + org.purpose) + '</p><p>ロボット: ' + esc(aicmOrganizationAssignmentLabels(data, org).join(" / ")) + '</p>' : '<p class="aicm-muted">組織がありません。先に部門を作成し、その後に新規追加を押してください。</p>',
+      '<div class="aicm-card aicm-wide"><h2>現在の課</h2>',
+      current ? '<p><strong>' + esc(org.name) + '</strong></p><p class="aicm-muted">' + esc(current.dept.name + " / " + org.purpose) + '</p><p>ロボット: ' + esc(aicmOrganizationAssignmentLabels(data, org).join(" / ")) + '</p>' : '<p class="aicm-muted">課がありません。先に部門を作成し、その後に新規追加を押してください。</p>',
       '</div>',
-      current ? '<div class="aicm-card"><h2>組織変更・削除</h2>' +
-        field("組織名", "edit-org-name", org.name) +
+      current ? '<div class="aicm-card"><h2>課変更・削除</h2>' +
+        field("課名", "edit-org-name", org.name) +
         field("目的", "edit-org-purpose", org.purpose) +
         aicmHiddenRobotIdsSelect(data, org) +
-        '<div class="aicm-card-footer"><button class="primary" data-action="save-organization">組織を変更</button><button class="danger" data-action="delete-organization">組織を削除</button></div>' +
+        '<div class="aicm-card-footer"><button class="primary" data-action="save-organization">課を変更</button><button class="danger" data-action="delete-organization">課を削除</button></div>' +
         '</div>' +
         aicmOrganizationRobotAddUi(data, "org-detail", org)
         : '',
-      '<div class="aicm-card aicm-wide"><h2>組織ツリー</h2>' + aicmOrganizationTreeHtml(data, company) + '</div>',
+      '<div class="aicm-card aicm-wide"><h2>課ツリー</h2>' + aicmOrganizationTreeHtml(data, company) + '</div>',
       '</section>'
     ].join(""));
   }
@@ -1490,18 +1490,18 @@
     aicmEnsureBusinessRobots(data);
 
     if (!company || !company.departments.length) {
-      return shell('<section class="aicm-grid"><div class="aicm-card"><h2>組織追加</h2><p class="aicm-muted">組織を追加するには先に部門が必要です。</p><button class="primary" data-screen="department-add">新規追加へ</button></div></section>');
+      return shell('<section class="aicm-grid"><div class="aicm-card"><h2>課追加</h2><p class="aicm-muted">課を追加するには先に部門が必要です。</p><button class="primary" data-screen="department-add">新規追加へ</button></div></section>');
     }
 
     return shell([
       '<section class="aicm-grid" data-screen-scope="organization-add">',
-      '<div class="aicm-card aicm-wide"><h2>組織追加</h2><p class="aicm-muted">組織詳細とは分けた追加専用画面です。ロボットは組織作成後に組織詳細でコンボボックスから複数追加できます。</p><button data-screen="organization-detail">組織詳細へ戻る</button></div>',
+      '<div class="aicm-card aicm-wide"><h2>課追加</h2><p class="aicm-muted">課詳細とは分けた追加専用画面です。ロボットは組織作成後に課詳細でコンボボックスから複数追加できます。</p><button data-screen="organization-detail">課詳細へ戻る</button></div>',
       '<div class="aicm-card">',
       '<div class="aicm-field"><label>所属部門</label><select id="org-add-department">' + departmentOptions(company) + '</select></div>',
-      field("組織名", "new-org-name", "新規組織"),
-      field("目的", "new-org-purpose", "組織目的"),
+      field("課名", "new-org-name", "新規組織"),
+      field("目的", "new-org-purpose", "課目的"),
       '<div style="display:none"><select id="new-org-robots" multiple></select></div>',
-      '<button class="primary" data-action="add-organization">組織を追加</button>',
+      '<button class="primary" data-action="add-organization">課を追加</button>',
       '</div></section>'
     ].join(""));
   }
@@ -1514,22 +1514,22 @@
     if (org) aicmNormalizeAssignments(org);
 
     if (!org) {
-      return shell('<section class="aicm-grid"><div class="aicm-card"><h2>組織変更</h2><p class="aicm-muted">変更できる組織がありません。</p><button data-screen="organization-add">新規追加へ</button></div></section>');
+      return shell('<section class="aicm-grid"><div class="aicm-card"><h2>課変更</h2><p class="aicm-muted">変更できる課がありません。</p><button data-screen="organization-add">新規追加へ</button></div></section>');
     }
 
     return shell([
       '<section class="aicm-grid" data-screen-scope="organization-edit">',
-      '<div class="aicm-card aicm-wide"><h2>組織変更</h2><p class="aicm-muted">ロボット配置はコンボボックスで選択し、追加ボタンで複数追加できます。</p><button data-screen="organization-detail">組織詳細へ戻る</button></div>',
+      '<div class="aicm-card aicm-wide"><h2>課変更</h2><p class="aicm-muted">ロボット配置はコンボボックスで選択し、追加ボタンで複数追加できます。</p><button data-screen="organization-detail">課詳細へ戻る</button></div>',
       '<div class="aicm-card">',
-      '<div class="aicm-field"><label>変更対象組織</label><select id="organization-select">' + organizationOptions(company) + '</select></div>',
+      '<div class="aicm-field"><label>変更対象課</label><select id="organization-select">' + organizationOptions(company) + '</select></div>',
       '<button data-action="switch-organization">読み込み</button>',
-      field("組織名", "edit-org-name", org.name),
+      field("課名", "edit-org-name", org.name),
       field("目的", "edit-org-purpose", org.purpose),
       aicmHiddenRobotIdsSelect(data, org),
-      '<button class="primary" data-action="save-organization">組織を変更</button>',
+      '<button class="primary" data-action="save-organization">課を変更</button>',
       '</div>',
       aicmOrganizationRobotAddUi(data, "org-detail", org),
-      '<div class="aicm-card aicm-wide"><h2>組織ツリー</h2>' + aicmOrganizationTreeHtml(data, company) + '</div>',
+      '<div class="aicm-card aicm-wide"><h2>課ツリー</h2>' + aicmOrganizationTreeHtml(data, company) + '</div>',
       '</section>'
     ].join(""));
   }
@@ -1538,9 +1538,9 @@
     var current = currentOrganization(company);
     return shell([
       '<section class="aicm-grid" data-screen-scope="organization-delete">',
-      '<div class="aicm-card aicm-wide"><h2>組織削除</h2><button data-screen="organization-detail">組織詳細へ戻る</button></div>',
+      '<div class="aicm-card aicm-wide"><h2>課削除</h2><button data-screen="organization-detail">課詳細へ戻る</button></div>',
       '<div class="aicm-card">',
-      current ? '<p>削除対象: <strong>' + esc(current.org.name) + '</strong></p><p class="aicm-muted">' + esc(current.dept.name) + '</p><button class="danger" data-action="delete-organization">組織を削除</button>' : '<p class="aicm-muted">削除できる組織がありません。</p>',
+      current ? '<p>削除対象: <strong>' + esc(current.org.name) + '</strong></p><p class="aicm-muted">' + esc(current.dept.name) + '</p><button class="danger" data-action="delete-organization">課を削除</button>' : '<p class="aicm-muted">削除できる課がありません。</p>',
       '</div></section>'
     ].join(""));
   }
