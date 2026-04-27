@@ -1102,6 +1102,7 @@
     robots.forEach(function (robot) {
       existingIds[aicmRobotId(robot)] = true;
       if (!robot.assignment_policy) robot.assignment_policy = "unlimited_system_use";
+      if (!robot.robot_kind) robot.robot_kind = "ai_robot";
     });
 
     seeds.forEach(function (seed) {
@@ -1109,7 +1110,7 @@
     });
 
     return robots.filter(function (robot) {
-      return robot && aicmRobotId(robot) && (robot.robot_kind === "ai_robot" || !robot.robot_kind);
+      return robot && aicmRobotId(robot) && robot.robot_kind === "ai_robot";
     });
   }
 
@@ -1131,6 +1132,8 @@
 
     if (!Array.isArray(selected)) selected = selected ? [selected] : [];
 
+    rows.push('<option value="">選択してください</option>');
+
     robots.forEach(function (robot) {
       var id = aicmRobotId(robot);
       var role = aicmRobotRole(robot);
@@ -1142,15 +1145,44 @@
       rows.push(
         '<option value="' + esc(id) + '"' +
         (selected.indexOf(id) >= 0 ? " selected" : "") +
-        '>' + esc(aicmRobotName(robot) + " / " + role + " / システム用: 無制限割当") + '</option>'
+        '>' + esc(aicmRobotName(robot) + " / " + role + " / 無制限割当") + '</option>'
       );
     });
 
-    if (!rows.length) {
-      rows.push('<option value="">Business側ロボットプールにAi(ロボット)なし</option>');
+    return rows.join("");
+  }
+
+  function aicmNormalizeAssignments(org) {
+    if (!org) return [];
+    if (!Array.isArray(org.robot_assignments)) org.robot_assignments = [];
+
+    if (Array.isArray(org.robot_ids)) {
+      org.robot_ids.forEach(function (robotId) {
+        var exists = org.robot_assignments.some(function (a) {
+          return a.robot_id === robotId && a.source === "legacy_robot_ids";
+        });
+
+        if (!exists) {
+          org.robot_assignments.push({
+            assignment_id: makeId("robot-assignment"),
+            robot_id: robotId,
+            role: "",
+            nickname: "",
+            source: "legacy_robot_ids",
+            assignment_policy: "unlimited_system_use"
+          });
+        }
+      });
     }
 
-    return rows.join("");
+    return org.robot_assignments;
+  }
+
+  function aicmAssignmentLabel(data, assignment) {
+    var robot = aicmFindBusinessRobot(data, assignment.robot_id);
+    var role = assignment.role || (robot ? aicmRobotRole(robot) : "") || "Robot";
+    var nickname = assignment.nickname || (robot ? aicmRobotName(robot) : assignment.robot_id);
+    return nickname + "@" + role;
   }
 
   function aicmRobotLabels(data, ids) {
@@ -1163,17 +1195,28 @@
     });
   }
 
+  function aicmOrganizationAssignmentLabels(data, org) {
+    var assignments = aicmNormalizeAssignments(org);
+    if (!assignments.length) return [];
+
+    return assignments.map(function (assignment) {
+      return aicmAssignmentLabel(data, assignment);
+    });
+  }
+
   function aicmPresidentRobotSummary(data, company) {
     var robot;
+    var nickname;
 
     if (!company || !company.president_robot_id) {
       return '<p class="aicm-muted">Presidentロボット未設定</p>';
     }
 
     robot = aicmFindBusinessRobot(data, company.president_robot_id);
+    nickname = company.president_robot_nickname || (robot ? aicmRobotName(robot) : company.president_robot_id);
 
-    return '<p><strong>' + esc(robot ? aicmRobotName(robot) : company.president_robot_id) + '</strong></p>' +
-      '<p class="aicm-muted">役割: President / Business側ロボットプール: ' + esc(company.president_robot_id) + ' / システム用: 無制限割当</p>';
+    return '<p><strong>' + esc(nickname + "@President") + '</strong></p>' +
+      '<p class="aicm-muted">Business側ロボットプール: ' + esc(company.president_robot_id) + ' / システム用: 無制限割当</p>';
   }
 
   function aicmPresidentPolicySummary(company) {
@@ -1183,7 +1226,58 @@
 
     return '<p>' + esc(company.company_business_policy_instruction_to_president) + '</p>';
   }
+
+  function aicmOrganizationTreeHtml(data, company) {
+    if (!company || !company.departments || !company.departments.length) {
+      return '<p class="aicm-muted">部門・組織がありません。</p>';
+    }
+
+    return '<div class="aicm-org-tree">' + company.departments.map(function (department) {
+      var orgHtml = department.organizations && department.organizations.length
+        ? department.organizations.map(function (org) {
+            var labels = aicmOrganizationAssignmentLabels(data, org);
+            return '<li><strong>' + esc(org.name) + '</strong>' +
+              '<div class="aicm-muted">' + esc(org.purpose || "") + '</div>' +
+              '<div>配置ロボット: ' + (labels.length ? esc(labels.join(" / ")) : '<span class="aicm-muted">未配置</span>') + '</div>' +
+              '</li>';
+          }).join("")
+        : '<li><span class="aicm-muted">組織なし</span></li>';
+
+      return '<div class="aicm-card"><h3>' + esc(department.name) + '</h3>' +
+        '<p class="aicm-muted">' + esc(department.purpose || "") + '</p>' +
+        '<ul>' + orgHtml + '</ul>' +
+        '</div>';
+    }).join("") + '</div>';
+  }
+
+  function aicmHiddenRobotIdsSelect(data, org) {
+    var ids = org && Array.isArray(org.robot_ids) ? org.robot_ids : [];
+    return '<div style="display:none"><select id="edit-org-robots" multiple>' +
+      aicmBusinessRobotOptions(data, ids, "organization") +
+      '</select></div>';
+  }
+
+  function aicmOrganizationRobotAddUi(data, prefix, org) {
+    var assignments = aicmNormalizeAssignments(org);
+    var rows = assignments.length ? assignments.map(function (assignment) {
+      return '<div class="aicm-row"><strong>' + esc(aicmAssignmentLabel(data, assignment)) + '</strong>' +
+        '<p class="aicm-muted">Business側ロボット: ' + esc(assignment.robot_id) + ' / 無制限割当</p></div>';
+    }).join("") : '<p class="aicm-muted">この組織にはまだロボットが配置されていません。</p>';
+
+    return [
+      '<div class="aicm-card"><h2>ロボット配置</h2>',
+      '<p class="aicm-muted">コンボボックスでBusiness側ロボットを選択し、社内通称と役割を指定して追加します。複数追加できます。数量消費はしません。</p>',
+      '<div class="aicm-field"><label>ロボット選択</label><select id="' + prefix + '-robot-select">' + aicmBusinessRobotOptions(data, [], "organization") + '</select></div>',
+      '<div class="aicm-field"><label>役割</label><select id="' + prefix + '-robot-role"><option value="Manager">Manager</option><option value="Leader">Leader</option><option value="Worker" selected>Worker</option><option value="Reviewer">Reviewer</option></select></div>',
+      field("社内通称", prefix + "-robot-nickname", ""),
+      '<button class="primary" data-action="add-organization-robot-assignment-v2">ロボットを追加</button>',
+      '<div class="aicm-card"><h3>配置済みロボット</h3>' + rows + '</div>',
+      '</div>'
+    ].join("");
+  }
   /* AICM_DIRECT_SOURCE_REPAIR_HELPERS_END */
+
+
 
 
 
@@ -1225,6 +1319,9 @@
       '<p>完了: ' + totalDone + '</p>',
       '<p>レビュー・承認待ち: ' + totalReview + '</p>',
       '</div>',
+      '<div class="aicm-card aicm-wide"><h2>組織ツリー</h2>',
+      aicmOrganizationTreeHtml(data, company),
+      '</div>',
       '<div class="aicm-card"><h2>部門一覧</h2>',
       company && company.departments.length ? company.departments.map(function (d) {
         return '<div class="aicm-row"><strong>' + esc(d.name) + '</strong><p class="aicm-muted">' + esc(d.purpose) + '</p><p>組織: ' + d.organizations.length + ' / 台帳: ' + d.task_ledger.length + '</p></div>';
@@ -1233,7 +1330,7 @@
       '</div>',
       '<div class="aicm-card"><h2>組織一覧</h2>',
       orgRows.length ? orgRows.map(function (r) {
-        return '<div class="aicm-row"><strong>' + esc(r.org.name) + '</strong><p class="aicm-muted">' + esc(r.dept.name + " / " + r.org.purpose) + '</p><p>ロボット: ' + esc(aicmRobotLabels(data, r.org.robot_ids).join(" / ")) + '</p></div>';
+        return '<div class="aicm-row"><strong>' + esc(r.org.name) + '</strong><p class="aicm-muted">' + esc(r.dept.name + " / " + r.org.purpose) + '</p><p>ロボット: ' + esc(aicmOrganizationAssignmentLabels(data, r.org).join(" / ")) + '</p></div>';
       }).join("") : '<p class="aicm-muted">組織なし。先に部門を作成し、その後に組織を追加してください。</p>',
       '<div class="aicm-card-footer"><button class="primary" data-screen="organization-detail">組織詳細</button><button class="primary" data-screen="organization-add">新規追加</button></div>',
       '</div>',
@@ -1273,13 +1370,14 @@
       '<div class="aicm-card"><h2>Presidentロボット</h2>',
       '<p class="aicm-muted">会社単位のPresidentはAI企業設定で設定します。Business側ロボットプールから選択します。AICompanyManagerはシステム用のため数量消費せず無制限割当です。</p>',
       '<div class="aicm-field"><label>Presidentロボット</label><select id="company-president-robot">' + aicmBusinessRobotOptions(data, editing && editing.president_robot_id ? [editing.president_robot_id] : [], "president") + '</select></div>',
-      '<button class="primary" data-action="save-company-president">Presidentを設定</button>',
+      field("社内通称", "company-president-nickname", editing ? editing.president_robot_nickname : ""),
+      '<button class="primary" data-action="save-company-president-v2">Presidentを設定</button>',
       aicmPresidentRobotSummary(data, editing),
       '</div>',
       '<div class="aicm-card"><h2>会社事業方針をPresidentへ指示</h2>',
       '<p class="aicm-muted">会社の事業方針をPresidentロボットへ指示します。local UI状態へ保存します。</p>',
       textArea("事業方針", "company-president-policy", editing ? editing.company_business_policy_instruction_to_president : ""),
-      '<button class="primary" data-action="instruct-company-president-policy">Presidentへ指示</button>',
+      '<button class="primary" data-action="instruct-company-president-policy-v2">Presidentへ指示</button>',
       aicmPresidentPolicySummary(editing),
       '</div>',
       '<div class="aicm-card"><h2>会社共通ルール</h2>',
@@ -1362,24 +1460,28 @@
     var org = current ? current.org : null;
 
     aicmEnsureBusinessRobots(data);
+    if (org) aicmNormalizeAssignments(org);
 
     return shell([
       '<section class="aicm-grid" data-screen-scope="organization-detail">',
-      '<div class="aicm-card aicm-wide"><h2>組織詳細</h2><p class="aicm-muted">組織を選択し、この画面内で変更・削除・ロボット配置変更を行います。ロボットはBusiness側ロボットプールから選択します。システム用のため数量消費はしません。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
+      '<div class="aicm-card aicm-wide"><h2>組織詳細</h2><p class="aicm-muted">組織を選択し、この画面内で変更・削除・ロボット配置を行います。コンボボックスで選択して追加します。数量消費はしません。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
       '<div class="aicm-card"><h2>組織選択</h2>',
       '<div class="aicm-field"><label>組織</label><select id="organization-select">' + organizationOptions(company) + '</select></div>',
       '<button class="primary" data-action="switch-organization">組織を表示</button>',
       '<div class="aicm-card-footer"><button class="primary" data-screen="organization-add">新規追加</button></div>',
       '</div>',
       '<div class="aicm-card aicm-wide"><h2>現在の組織</h2>',
-      current ? '<p><strong>' + esc(org.name) + '</strong></p><p class="aicm-muted">' + esc(current.dept.name + " / " + org.purpose) + '</p><p>ロボット: ' + esc(aicmRobotLabels(data, org.robot_ids).join(" / ")) + '</p>' : '<p class="aicm-muted">組織がありません。先に部門を作成し、その後に新規追加を押してください。</p>',
+      current ? '<p><strong>' + esc(org.name) + '</strong></p><p class="aicm-muted">' + esc(current.dept.name + " / " + org.purpose) + '</p><p>ロボット: ' + esc(aicmOrganizationAssignmentLabels(data, org).join(" / ")) + '</p>' : '<p class="aicm-muted">組織がありません。先に部門を作成し、その後に新規追加を押してください。</p>',
       '</div>',
       current ? '<div class="aicm-card"><h2>組織変更・削除</h2>' +
         field("組織名", "edit-org-name", org.name) +
         field("目的", "edit-org-purpose", org.purpose) +
-        '<div class="aicm-field"><label>ロボット配置</label><select id="edit-org-robots" multiple size="6">' + aicmBusinessRobotOptions(data, org.robot_ids, "organization") + '</select><p class="aicm-muted">Business側ロボットプールから選択します。AICompanyManagerはシステム用のため無制限割当です。</p></div>' +
+        aicmHiddenRobotIdsSelect(data, org) +
         '<div class="aicm-card-footer"><button class="primary" data-action="save-organization">組織を変更</button><button class="danger" data-action="delete-organization">組織を削除</button></div>' +
-        '</div>' : '',
+        '</div>' +
+        aicmOrganizationRobotAddUi(data, "org-detail", org)
+        : '',
+      '<div class="aicm-card aicm-wide"><h2>組織ツリー</h2>' + aicmOrganizationTreeHtml(data, company) + '</div>',
       '</section>'
     ].join(""));
   }
@@ -1393,12 +1495,12 @@
 
     return shell([
       '<section class="aicm-grid" data-screen-scope="organization-add">',
-      '<div class="aicm-card aicm-wide"><h2>組織追加</h2><p class="aicm-muted">組織詳細とは分けた追加専用画面です。ロボットはBusiness側ロボットプールから選択します。数量消費はしません。</p><button data-screen="organization-detail">組織詳細へ戻る</button></div>',
+      '<div class="aicm-card aicm-wide"><h2>組織追加</h2><p class="aicm-muted">組織詳細とは分けた追加専用画面です。ロボットは組織作成後に組織詳細でコンボボックスから複数追加できます。</p><button data-screen="organization-detail">組織詳細へ戻る</button></div>',
       '<div class="aicm-card">',
       '<div class="aicm-field"><label>所属部門</label><select id="org-add-department">' + departmentOptions(company) + '</select></div>',
       field("組織名", "new-org-name", "新規組織"),
       field("目的", "new-org-purpose", "組織目的"),
-      '<div class="aicm-field"><label>ロボット配置</label><select id="new-org-robots" multiple size="6">' + aicmBusinessRobotOptions(data, [], "organization") + '</select><p class="aicm-muted">Business側ロボットプールから選択します。システム用のため無制限割当です。</p></div>',
+      '<div style="display:none"><select id="new-org-robots" multiple></select></div>',
       '<button class="primary" data-action="add-organization">組織を追加</button>',
       '</div></section>'
     ].join(""));
@@ -1409,6 +1511,7 @@
     var org = current ? current.org : null;
 
     aicmEnsureBusinessRobots(data);
+    if (org) aicmNormalizeAssignments(org);
 
     if (!org) {
       return shell('<section class="aicm-grid"><div class="aicm-card"><h2>組織変更</h2><p class="aicm-muted">変更できる組織がありません。</p><button data-screen="organization-add">新規追加へ</button></div></section>');
@@ -1416,15 +1519,18 @@
 
     return shell([
       '<section class="aicm-grid" data-screen-scope="organization-edit">',
-      '<div class="aicm-card aicm-wide"><h2>組織変更</h2><button data-screen="organization-detail">組織詳細へ戻る</button></div>',
+      '<div class="aicm-card aicm-wide"><h2>組織変更</h2><p class="aicm-muted">ロボット配置はコンボボックスで選択し、追加ボタンで複数追加できます。</p><button data-screen="organization-detail">組織詳細へ戻る</button></div>',
       '<div class="aicm-card">',
       '<div class="aicm-field"><label>変更対象組織</label><select id="organization-select">' + organizationOptions(company) + '</select></div>',
       '<button data-action="switch-organization">読み込み</button>',
       field("組織名", "edit-org-name", org.name),
       field("目的", "edit-org-purpose", org.purpose),
-      '<div class="aicm-field"><label>ロボット配置</label><select id="edit-org-robots" multiple size="6">' + aicmBusinessRobotOptions(data, org.robot_ids, "organization") + '</select><p class="aicm-muted">Business側ロボットプールから選択します。数量消費なし・無制限割当です。</p></div>',
+      aicmHiddenRobotIdsSelect(data, org),
       '<button class="primary" data-action="save-organization">組織を変更</button>',
-      '</div></section>'
+      '</div>',
+      aicmOrganizationRobotAddUi(data, "org-detail", org),
+      '<div class="aicm-card aicm-wide"><h2>組織ツリー</h2>' + aicmOrganizationTreeHtml(data, company) + '</div>',
+      '</section>'
     ].join(""));
   }
 
@@ -1605,6 +1711,64 @@
     var company = currentCompany(data);
     var dept = currentDepartment(company);
     var orgInfo;
+
+    if (action === "save-company-president-v2") {
+      if (company) {
+        aicmEnsureBusinessRobots(data);
+        company.president_robot_id = val("company-president-robot");
+        company.president_robot_nickname = val("company-president-nickname") || "President";
+        company.president_robot_assignment_policy = "unlimited_system_use";
+        save(data);
+      }
+      app.screen = "settings";
+      render();
+      return;
+    }
+
+    if (action === "instruct-company-president-policy-v2") {
+      if (company) {
+        company.company_business_policy_instruction_to_president = val("company-president-policy");
+        company.president_policy_instruction_target = company.president_robot_id || "";
+        save(data);
+      }
+      app.screen = "settings";
+      render();
+      return;
+    }
+
+    if (action === "add-organization-robot-assignment-v2") {
+      orgInfo = currentOrganization(company);
+      if (orgInfo && orgInfo.org) {
+        var robotId = val("org-detail-robot-select");
+        var robot = aicmFindBusinessRobot(data, robotId);
+        var role = val("org-detail-robot-role") || (robot ? aicmRobotRole(robot) : "Worker");
+        var nickname = val("org-detail-robot-nickname") || (robot ? aicmRobotName(robot) : "Robot");
+
+        if (robotId) {
+          if (!Array.isArray(orgInfo.org.robot_assignments)) orgInfo.org.robot_assignments = [];
+          if (!Array.isArray(orgInfo.org.robot_ids)) orgInfo.org.robot_ids = [];
+
+          orgInfo.org.robot_assignments.push({
+            assignment_id: makeId("robot-assignment"),
+            robot_id: robotId,
+            role: role,
+            nickname: nickname,
+            display_label: nickname + "@" + role,
+            assignment_policy: "unlimited_system_use",
+            source: "business_side_robot_pool_combo_add"
+          });
+
+          if (orgInfo.org.robot_ids.indexOf(robotId) < 0) {
+            orgInfo.org.robot_ids.push(robotId);
+          }
+
+          save(data);
+        }
+      }
+      app.screen = "organization-detail";
+      render();
+      return;
+    }
 
     if (action === "save-company-president") {
       if (company) {
