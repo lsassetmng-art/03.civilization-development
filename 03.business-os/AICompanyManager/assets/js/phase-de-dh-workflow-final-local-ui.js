@@ -1131,7 +1131,6 @@
     var rows = [];
 
     if (!Array.isArray(selected)) selected = selected ? [selected] : [];
-
     rows.push('<option value="">選択してください</option>');
 
     robots.forEach(function (robot) {
@@ -1140,7 +1139,10 @@
       var isPresident = role === "President" || robot.assignable_company_president === true;
 
       if (mode === "president" && !isPresident) return;
-      if (mode === "organization" && isPresident) return;
+      if (mode === "manager" && role !== "Manager") return;
+      if (mode === "leader" && role !== "Leader") return;
+      if (mode === "worker" && role !== "Worker") return;
+      if (mode === "section" && isPresident) return;
 
       rows.push(
         '<option value="' + esc(id) + '"' +
@@ -1152,56 +1154,64 @@
     return rows.join("");
   }
 
-  function aicmNormalizeAssignments(org) {
-    if (!org) return [];
-    if (!Array.isArray(org.robot_assignments)) org.robot_assignments = [];
+  function aicmDomId(value) {
+    return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
 
-    if (Array.isArray(org.robot_ids)) {
-      org.robot_ids.forEach(function (robotId) {
-        var exists = org.robot_assignments.some(function (a) {
-          return a.robot_id === robotId && a.source === "legacy_robot_ids";
+  function aicmNormalizeWorkerAssignments(org) {
+    if (!org) return [];
+    if (!Array.isArray(org.worker_robot_assignments)) org.worker_robot_assignments = [];
+
+    if (Array.isArray(org.robot_assignments)) {
+      org.robot_assignments.forEach(function (assignment) {
+        var role = assignment.role || "Worker";
+        var exists;
+
+        if (role !== "Worker") return;
+
+        exists = org.worker_robot_assignments.some(function (item) {
+          return item.assignment_id === assignment.assignment_id;
         });
 
         if (!exists) {
-          org.robot_assignments.push({
-            assignment_id: makeId("robot-assignment"),
-            robot_id: robotId,
-            role: "",
-            nickname: "",
-            source: "legacy_robot_ids",
+          org.worker_robot_assignments.push({
+            assignment_id: assignment.assignment_id || makeId("worker-assignment"),
+            robot_id: assignment.robot_id,
+            nickname: assignment.nickname || assignment.display_label || "",
+            role: "Worker",
+            display_label: assignment.display_label || "",
             assignment_policy: "unlimited_system_use"
           });
         }
       });
     }
 
-    return org.robot_assignments;
+    if (Array.isArray(org.robot_ids)) {
+      org.robot_ids.forEach(function (robotId) {
+        var exists = org.worker_robot_assignments.some(function (item) {
+          return item.robot_id === robotId;
+        });
+
+        if (!exists) {
+          org.worker_robot_assignments.push({
+            assignment_id: makeId("worker-assignment"),
+            robot_id: robotId,
+            nickname: "",
+            role: "Worker",
+            display_label: "",
+            assignment_policy: "unlimited_system_use"
+          });
+        }
+      });
+    }
+
+    return org.worker_robot_assignments;
   }
 
-  function aicmAssignmentLabel(data, assignment) {
-    var robot = aicmFindBusinessRobot(data, assignment.robot_id);
-    var role = assignment.role || (robot ? aicmRobotRole(robot) : "") || "Robot";
-    var nickname = assignment.nickname || (robot ? aicmRobotName(robot) : assignment.robot_id);
-    return nickname + "@" + role;
-  }
-
-  function aicmRobotLabels(data, ids) {
-    var values = ids || [];
-    if (!Array.isArray(values)) values = values ? [values] : [];
-
-    return values.map(function (id) {
-      var robot = aicmFindBusinessRobot(data, id);
-      return robot ? aicmRobotName(robot) + "@" + aicmRobotRole(robot) : id;
-    });
-  }
-
-  function aicmOrganizationAssignmentLabels(data, org) {
-    var assignments = aicmNormalizeAssignments(org);
-    if (!assignments.length) return [];
-
-    return assignments.map(function (assignment) {
-      return aicmAssignmentLabel(data, assignment);
-    });
+  function aicmRoleLabel(data, robotId, nickname, role) {
+    var robot = aicmFindBusinessRobot(data, robotId);
+    var displayName = nickname || (robot ? aicmRobotName(robot) : robotId);
+    return displayName + "@" + role;
   }
 
   function aicmPresidentRobotSummary(data, company) {
@@ -1227,55 +1237,91 @@
     return '<p>' + esc(company.company_business_policy_instruction_to_president) + '</p>';
   }
 
-  function aicmOrganizationTreeHtml(data, company) {
-    if (!company || !company.departments || !company.departments.length) {
-      return '<p class="aicm-muted">部門・課がありません。</p>';
+  function aicmManagerRobotSummary(data, department) {
+    if (!department || !department.manager_robot_id) return '<p class="aicm-muted">Managerロボット未設定</p>';
+    return '<p><strong>' + esc(aicmRoleLabel(data, department.manager_robot_id, department.manager_robot_nickname, "Manager")) + '</strong></p>' +
+      '<p class="aicm-muted">Business側ロボットプール: ' + esc(department.manager_robot_id) + ' / 無制限割当</p>';
+  }
+
+  function aicmLeaderRobotSummary(data, org) {
+    if (!org || !org.leader_robot_id) return '<p class="aicm-muted">Leaderロボット未設定</p>';
+    return '<p><strong>' + esc(aicmRoleLabel(data, org.leader_robot_id, org.leader_robot_nickname, "Leader")) + '</strong></p>' +
+      '<p class="aicm-muted">Business側ロボットプール: ' + esc(org.leader_robot_id) + ' / 無制限割当</p>';
+  }
+
+  function aicmWorkerAssignmentLabels(data, org) {
+    var rows = aicmNormalizeWorkerAssignments(org);
+    return rows.map(function (item) {
+      return aicmRoleLabel(data, item.robot_id, item.nickname, "Worker");
+    });
+  }
+
+  function aicmDepartmentManagerUi(data, department) {
+    return [
+      '<div class="aicm-card"><h2>Managerロボット設定</h2>',
+      '<p class="aicm-muted">部門詳細でManagerロボットと社内通称を設定します。数量消費なし・無制限割当です。</p>',
+      '<div class="aicm-field"><label>Managerロボット</label><select id="department-manager-robot">' + aicmBusinessRobotOptions(data, department && department.manager_robot_id ? [department.manager_robot_id] : [], "manager") + '</select></div>',
+      field("社内通称", "department-manager-nickname", department ? department.manager_robot_nickname : ""),
+      '<button class="primary" data-action="save-department-manager-v2">Managerを設定</button>',
+      aicmManagerRobotSummary(data, department),
+      '</div>'
+    ].join("");
+  }
+
+  function aicmOrganizationLeaderUi(data, org) {
+    return [
+      '<div class="aicm-card"><h2>Leaderロボット設定</h2>',
+      '<p class="aicm-muted">課詳細でLeaderロボットと社内通称を設定します。数量消費なし・無制限割当です。</p>',
+      '<div class="aicm-field"><label>Leaderロボット</label><select id="section-leader-robot">' + aicmBusinessRobotOptions(data, org && org.leader_robot_id ? [org.leader_robot_id] : [], "leader") + '</select></div>',
+      field("社内通称", "section-leader-nickname", org ? org.leader_robot_nickname : ""),
+      '<button class="primary" data-action="save-section-leader-v2">Leaderを設定</button>',
+      aicmLeaderRobotSummary(data, org),
+      '</div>'
+    ].join("");
+  }
+
+  function aicmWorkerAssignmentRows(data, org) {
+    var rows = aicmNormalizeWorkerAssignments(org);
+
+    if (!rows.length) {
+      return '<p class="aicm-muted">Workerロボットはまだ配置されていません。</p>';
     }
 
-    return '<div class="aicm-org-tree">' + company.departments.map(function (department) {
-      var orgHtml = department.organizations && department.organizations.length
-        ? department.organizations.map(function (org) {
-            var labels = aicmOrganizationAssignmentLabels(data, org);
-            return '<li><strong>' + esc(org.name) + '</strong>' +
-              '<div class="aicm-muted">' + esc(org.purpose || "") + '</div>' +
-              '<div>配置ロボット: ' + (labels.length ? esc(labels.join(" / ")) : '<span class="aicm-muted">未配置</span>') + '</div>' +
-              '</li>';
-          }).join("")
-        : '<li><span class="aicm-muted">課なし</span></li>';
+    return rows.map(function (item) {
+      var domId = aicmDomId(item.assignment_id);
+      return [
+        '<div class="aicm-row">',
+        '<strong>' + esc(aicmRoleLabel(data, item.robot_id, item.nickname, "Worker")) + '</strong>',
+        '<div class="aicm-field"><label>Workerロボット変更</label><select id="worker-assignment-' + esc(domId) + '-robot">' + aicmBusinessRobotOptions(data, item.robot_id ? [item.robot_id] : [], "worker") + '</select></div>',
+        field("社内通称", "worker-assignment-" + domId + "-nickname", item.nickname || ""),
+        '<button class="primary" data-action="update-section-worker-assignment-v2" data-assignment-id="' + esc(item.assignment_id) + '">この配置を変更</button>',
+        '<p class="aicm-muted">Business側ロボットプール: ' + esc(item.robot_id || "") + ' / 無制限割当</p>',
+        '</div>'
+      ].join("");
+    }).join("");
+  }
 
-      return '<div class="aicm-card"><h3>' + esc(department.name) + '</h3>' +
-        '<p class="aicm-muted">' + esc(department.purpose || "") + '</p>' +
-        '<ul>' + orgHtml + '</ul>' +
-        '</div>';
-    }).join("") + '</div>';
+  function aicmSectionWorkerUi(data, org) {
+    return [
+      '<div class="aicm-card"><h2>Workerロボット配置</h2>',
+      '<p class="aicm-muted">コンボボックスでWorkerロボットを選択し、社内通称を入力して追加します。複数配置できます。配置済みWorkerも変更できます。</p>',
+      '<div class="aicm-field"><label>追加するWorkerロボット</label><select id="section-worker-robot-select">' + aicmBusinessRobotOptions(data, [], "worker") + '</select></div>',
+      field("社内通称", "section-worker-nickname", ""),
+      '<button class="primary" data-action="add-section-worker-assignment-v2">Workerを追加</button>',
+      '<div class="aicm-card"><h3>配置済みWorker</h3>' + aicmWorkerAssignmentRows(data, org) + '</div>',
+      '</div>'
+    ].join("");
   }
 
   function aicmHiddenRobotIdsSelect(data, org) {
     var ids = org && Array.isArray(org.robot_ids) ? org.robot_ids : [];
     return '<div style="display:none"><select id="edit-org-robots" multiple>' +
-      aicmBusinessRobotOptions(data, ids, "organization") +
+      aicmBusinessRobotOptions(data, ids, "worker") +
       '</select></div>';
   }
-
-  function aicmOrganizationRobotAddUi(data, prefix, org) {
-    var assignments = aicmNormalizeAssignments(org);
-    var rows = assignments.length ? assignments.map(function (assignment) {
-      return '<div class="aicm-row"><strong>' + esc(aicmAssignmentLabel(data, assignment)) + '</strong>' +
-        '<p class="aicm-muted">Business側ロボット: ' + esc(assignment.robot_id) + ' / 無制限割当</p></div>';
-    }).join("") : '<p class="aicm-muted">この課にはまだロボットが配置されていません。</p>';
-
-    return [
-      '<div class="aicm-card"><h2>ロボット配置</h2>',
-      '<p class="aicm-muted">コンボボックスでBusiness側ロボットを選択し、社内通称と役割を指定して追加します。複数追加できます。数量消費はしません。</p>',
-      '<div class="aicm-field"><label>ロボット選択</label><select id="' + prefix + '-robot-select">' + aicmBusinessRobotOptions(data, [], "organization") + '</select></div>',
-      '<div class="aicm-field"><label>役割</label><select id="' + prefix + '-robot-role"><option value="Manager">Manager</option><option value="Leader">Leader</option><option value="Worker" selected>Worker</option><option value="Reviewer">Reviewer</option></select></div>',
-      field("社内通称", prefix + "-robot-nickname", ""),
-      '<button class="primary" data-action="add-organization-robot-assignment-v2">ロボットを追加</button>',
-      '<div class="aicm-card"><h3>配置済みロボット</h3>' + rows + '</div>',
-      '</div>'
-    ].join("");
-  }
   /* AICM_DIRECT_SOURCE_REPAIR_HELPERS_END */
+
+
 
 
 
@@ -1319,9 +1365,6 @@
       '<p>完了: ' + totalDone + '</p>',
       '<p>レビュー・承認待ち: ' + totalReview + '</p>',
       '</div>',
-      '<div class="aicm-card aicm-wide"><h2>課ツリー</h2>',
-      aicmOrganizationTreeHtml(data, company),
-      '</div>',
       '<div class="aicm-card"><h2>部門一覧</h2>',
       company && company.departments.length ? company.departments.map(function (d) {
         return '<div class="aicm-row"><strong>' + esc(d.name) + '</strong><p class="aicm-muted">' + esc(d.purpose) + '</p><p>課: ' + d.organizations.length + ' / 台帳: ' + d.task_ledger.length + '</p></div>';
@@ -1330,13 +1373,14 @@
       '</div>',
       '<div class="aicm-card"><h2>課一覧</h2>',
       orgRows.length ? orgRows.map(function (r) {
-        return '<div class="aicm-row"><strong>' + esc(r.org.name) + '</strong><p class="aicm-muted">' + esc(r.dept.name + " / " + r.org.purpose) + '</p><p>ロボット: ' + esc(aicmOrganizationAssignmentLabels(data, r.org).join(" / ")) + '</p></div>';
+        return '<div class="aicm-row"><strong>' + esc(r.org.name) + '</strong><p class="aicm-muted">' + esc(r.dept.name + " / " + r.org.purpose) + '</p><p>Leader: ' + esc(aicmRoleLabel(data, r.org.leader_robot_id, r.org.leader_robot_nickname, "Leader")) + '</p><p>Worker: ' + esc(aicmWorkerAssignmentLabels(data, r.org).join(" / ")) + '</p></div>';
       }).join("") : '<p class="aicm-muted">課なし。先に部門を作成し、その後に課を追加してください。</p>',
       '<div class="aicm-card-footer"><button class="primary" data-screen="organization-detail">課詳細</button><button class="primary" data-screen="organization-add">新規追加</button></div>',
       '</div>',
       '</section>'
     ].join(""));
   }
+
 
   function renderCompanyAdd() {
     return shell([
@@ -1391,12 +1435,14 @@
     ].join(""));
   }
 
-  function renderDepartmentDetail(company) {
+  function renderDepartmentDetail(data, company) {
     var dept = currentDepartment(company);
+
+    aicmEnsureBusinessRobots(data);
 
     return shell([
       '<section class="aicm-grid" data-screen-scope="department-detail">',
-      '<div class="aicm-card aicm-wide"><h2>部門詳細</h2><p class="aicm-muted">部門を選択し、この画面内で変更・削除します。分離するのは新規追加画面だけです。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
+      '<div class="aicm-card aicm-wide"><h2>部門詳細</h2><p class="aicm-muted">部門を選択し、この画面内で変更・削除します。Managerロボット設定もここで行います。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
       '<div class="aicm-card"><h2>部門選択</h2>',
       '<div class="aicm-field"><label>部門</label><select id="department-select">' + departmentOptions(company) + '</select></div>',
       '<button class="primary" data-action="switch-department">部門を表示</button>',
@@ -1405,6 +1451,7 @@
       '<div class="aicm-card aicm-wide"><h2>現在の部門</h2>',
       dept ? '<p><strong>' + esc(dept.name) + '</strong></p><p class="aicm-muted">' + esc(dept.purpose) + '</p><p>課数: ' + dept.organizations.length + '</p><p>台帳行: ' + dept.task_ledger.length + '</p>' : '<p class="aicm-muted">部門がありません。新規追加を押して作成してください。</p>',
       '</div>',
+      dept ? aicmDepartmentManagerUi(data, dept) : '',
       dept ? '<div class="aicm-card"><h2>部門変更・削除</h2>' +
         field("部門名", "edit-department-name", dept.name) +
         field("目的", "edit-department-purpose", dept.purpose) +
@@ -1413,6 +1460,8 @@
       '</section>'
     ].join(""));
   }
+
+
   function renderDepartmentAdd() {
     return shell([
       '<section class="aicm-grid" data-screen-scope="department-add">',
@@ -1460,31 +1509,31 @@
     var org = current ? current.org : null;
 
     aicmEnsureBusinessRobots(data);
-    if (org) aicmNormalizeAssignments(org);
+    if (org) aicmNormalizeWorkerAssignments(org);
 
     return shell([
       '<section class="aicm-grid" data-screen-scope="organization-detail">',
-      '<div class="aicm-card aicm-wide"><h2>課詳細</h2><p class="aicm-muted">課を選択し、この画面内で変更・削除・ロボット配置を行います。コンボボックスで選択して追加します。数量消費はしません。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
+      '<div class="aicm-card aicm-wide"><h2>課詳細</h2><p class="aicm-muted">課を選択し、この画面内で変更・削除・Leader設定・Worker配置を行います。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
       '<div class="aicm-card"><h2>課選択</h2>',
-      '<div class="aicm-field"><label>組織</label><select id="organization-select">' + organizationOptions(company) + '</select></div>',
+      '<div class="aicm-field"><label>課</label><select id="organization-select">' + organizationOptions(company) + '</select></div>',
       '<button class="primary" data-action="switch-organization">課を表示</button>',
       '<div class="aicm-card-footer"><button class="primary" data-screen="organization-add">新規追加</button></div>',
       '</div>',
       '<div class="aicm-card aicm-wide"><h2>現在の課</h2>',
-      current ? '<p><strong>' + esc(org.name) + '</strong></p><p class="aicm-muted">' + esc(current.dept.name + " / " + org.purpose) + '</p><p>ロボット: ' + esc(aicmOrganizationAssignmentLabels(data, org).join(" / ")) + '</p>' : '<p class="aicm-muted">課がありません。先に部門を作成し、その後に新規追加を押してください。</p>',
+      current ? '<p><strong>' + esc(org.name) + '</strong></p><p class="aicm-muted">' + esc(current.dept.name + " / " + org.purpose) + '</p><p>Leader: ' + esc(aicmRoleLabel(data, org.leader_robot_id, org.leader_robot_nickname, "Leader")) + '</p><p>Worker: ' + esc(aicmWorkerAssignmentLabels(data, org).join(" / ")) + '</p>' : '<p class="aicm-muted">課がありません。先に部門を作成し、その後に新規追加を押してください。</p>',
       '</div>',
+      current ? aicmOrganizationLeaderUi(data, org) : '',
+      current ? aicmSectionWorkerUi(data, org) : '',
       current ? '<div class="aicm-card"><h2>課変更・削除</h2>' +
         field("課名", "edit-org-name", org.name) +
         field("目的", "edit-org-purpose", org.purpose) +
         aicmHiddenRobotIdsSelect(data, org) +
         '<div class="aicm-card-footer"><button class="primary" data-action="save-organization">課を変更</button><button class="danger" data-action="delete-organization">課を削除</button></div>' +
-        '</div>' +
-        aicmOrganizationRobotAddUi(data, "org-detail", org)
-        : '',
-      '<div class="aicm-card aicm-wide"><h2>課ツリー</h2>' + aicmOrganizationTreeHtml(data, company) + '</div>',
+        '</div>' : '',
       '</section>'
     ].join(""));
   }
+
 
   function renderOrganizationAdd(data, company) {
     aicmEnsureBusinessRobots(data);
@@ -1511,7 +1560,7 @@
     var org = current ? current.org : null;
 
     aicmEnsureBusinessRobots(data);
-    if (org) aicmNormalizeAssignments(org);
+    if (org) aicmNormalizeWorkerAssignments(org);
 
     if (!org) {
       return shell('<section class="aicm-grid"><div class="aicm-card"><h2>課変更</h2><p class="aicm-muted">変更できる課がありません。</p><button data-screen="organization-add">新規追加へ</button></div></section>');
@@ -1519,7 +1568,7 @@
 
     return shell([
       '<section class="aicm-grid" data-screen-scope="organization-edit">',
-      '<div class="aicm-card aicm-wide"><h2>課変更</h2><p class="aicm-muted">ロボット配置はコンボボックスで選択し、追加ボタンで複数追加できます。</p><button data-screen="organization-detail">課詳細へ戻る</button></div>',
+      '<div class="aicm-card aicm-wide"><h2>課変更</h2><p class="aicm-muted">Leader設定・Worker配置変更もできます。</p><button data-screen="organization-detail">課詳細へ戻る</button></div>',
       '<div class="aicm-card">',
       '<div class="aicm-field"><label>変更対象課</label><select id="organization-select">' + organizationOptions(company) + '</select></div>',
       '<button data-action="switch-organization">読み込み</button>',
@@ -1528,11 +1577,12 @@
       aicmHiddenRobotIdsSelect(data, org),
       '<button class="primary" data-action="save-organization">課を変更</button>',
       '</div>',
-      aicmOrganizationRobotAddUi(data, "org-detail", org),
-      '<div class="aicm-card aicm-wide"><h2>課ツリー</h2>' + aicmOrganizationTreeHtml(data, company) + '</div>',
+      aicmOrganizationLeaderUi(data, org),
+      aicmSectionWorkerUi(data, org),
       '</section>'
     ].join(""));
   }
+
 
   function renderOrganizationDelete(company) {
     var current = currentOrganization(company);
@@ -1670,7 +1720,7 @@
     if (app.screen === "dashboard") html = renderDashboard(data, company);
     else if (app.screen === "company-add") html = renderCompanyAdd();
     else if (app.screen === "settings") html = renderSettings(data, company);
-    else if (app.screen === "department-detail") html = renderDepartmentDetail(company);
+    else if (app.screen === "department-detail") html = renderDepartmentDetail(data, company);
     else if (app.screen === "department-add") html = renderDepartmentAdd();
     else if (app.screen === "department-edit") html = renderDepartmentEdit(company);
     else if (app.screen === "department-delete") html = renderDepartmentDelete(company);
@@ -1711,6 +1761,94 @@
     var company = currentCompany(data);
     var dept = currentDepartment(company);
     var orgInfo;
+
+    if (action === "save-department-manager-v2") {
+      if (dept) {
+        aicmEnsureBusinessRobots(data);
+        dept.manager_robot_id = val("department-manager-robot");
+        dept.manager_robot_nickname = val("department-manager-nickname") || "Manager";
+        dept.manager_robot_assignment_policy = "unlimited_system_use";
+        save(data);
+      }
+      app.screen = "department-detail";
+      render();
+      return;
+    }
+
+    if (action === "save-section-leader-v2") {
+      orgInfo = currentOrganization(company);
+      if (orgInfo && orgInfo.org) {
+        aicmEnsureBusinessRobots(data);
+        orgInfo.org.leader_robot_id = val("section-leader-robot");
+        orgInfo.org.leader_robot_nickname = val("section-leader-nickname") || "Leader";
+        orgInfo.org.leader_robot_assignment_policy = "unlimited_system_use";
+        save(data);
+      }
+      app.screen = "organization-detail";
+      render();
+      return;
+    }
+
+    if (action === "add-section-worker-assignment-v2") {
+      orgInfo = currentOrganization(company);
+      if (orgInfo && orgInfo.org) {
+        var robotId = val("section-worker-robot-select");
+        var robot = aicmFindBusinessRobot(data, robotId);
+        var nickname = val("section-worker-nickname") || (robot ? aicmRobotName(robot) : "Worker");
+
+        if (robotId) {
+          if (!Array.isArray(orgInfo.org.worker_robot_assignments)) orgInfo.org.worker_robot_assignments = [];
+          if (!Array.isArray(orgInfo.org.robot_ids)) orgInfo.org.robot_ids = [];
+
+          orgInfo.org.worker_robot_assignments.push({
+            assignment_id: makeId("worker-assignment"),
+            robot_id: robotId,
+            role: "Worker",
+            nickname: nickname,
+            display_label: nickname + "@Worker",
+            assignment_policy: "unlimited_system_use",
+            source: "business_side_robot_pool_combo_add"
+          });
+
+          if (orgInfo.org.robot_ids.indexOf(robotId) < 0) orgInfo.org.robot_ids.push(robotId);
+          save(data);
+        }
+      }
+      app.screen = "organization-detail";
+      render();
+      return;
+    }
+
+    if (action === "update-section-worker-assignment-v2") {
+      orgInfo = currentOrganization(company);
+      if (orgInfo && orgInfo.org && button) {
+        var assignmentId = button.getAttribute("data-assignment-id");
+        var domId = aicmDomId(assignmentId);
+        var assignments = aicmNormalizeWorkerAssignments(orgInfo.org);
+        var target = assignments.find(function (item) { return item.assignment_id === assignmentId; });
+
+        if (target) {
+          var updatedRobotId = val("worker-assignment-" + domId + "-robot");
+          var updatedRobot = aicmFindBusinessRobot(data, updatedRobotId);
+          var updatedNickname = val("worker-assignment-" + domId + "-nickname") || (updatedRobot ? aicmRobotName(updatedRobot) : "Worker");
+
+          target.robot_id = updatedRobotId;
+          target.role = "Worker";
+          target.nickname = updatedNickname;
+          target.display_label = updatedNickname + "@Worker";
+          target.assignment_policy = "unlimited_system_use";
+
+          orgInfo.org.robot_ids = assignments.map(function (item) { return item.robot_id; }).filter(function (id, index, list) {
+            return id && list.indexOf(id) === index;
+          });
+
+          save(data);
+        }
+      }
+      app.screen = "organization-detail";
+      render();
+      return;
+    }
 
     if (action === "save-company-president-v2") {
       if (company) {
