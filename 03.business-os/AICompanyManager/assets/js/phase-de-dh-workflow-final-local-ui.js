@@ -5686,3 +5686,509 @@
   ready(buildCorrectRobotUi);
 }());
 /* AICM_CORRECT_ROBOT_RESPONSIBILITY_UI_PATCH_END */
+
+/* AICM_ROBOT_UI_SCREEN_PLACEMENT_REPAIR_PATCH_BEGIN */
+(function () {
+  "use strict";
+
+  var SCREEN_KEY = "aicm.currentScreen.v1";
+  var ROBOT_CATALOG_KEY = "aicm.businessRegisteredRobots.v1";
+  var PRESIDENT_KEY = "aicm.companyPresidentRobot.v2";
+  var PRESIDENT_POLICY_KEY = "aicm.companyPresidentPolicyInstruction.v1";
+  var ORG_KEY = "aicm.organizationCards.v1";
+  var ORG_PLACEMENT_KEY = "aicm.organizationRobotPlacements.v2";
+
+  function ready(fn) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", fn);
+    } else {
+      fn();
+    }
+  }
+
+  function readJson(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      var parsed = JSON.parse(raw);
+      return parsed == null ? fallback : parsed;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function writeJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value, null, 2));
+  }
+
+  function createEl(tag, attrs, text) {
+    var el = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (key) {
+      if (key === "className") {
+        el.className = attrs[key];
+      } else {
+        el.setAttribute(key, attrs[key]);
+      }
+    });
+    if (typeof text === "string") el.textContent = text;
+    return el;
+  }
+
+  function injectStyle() {
+    if (document.getElementById("aicm-screen-placement-style")) return;
+
+    var style = createEl("style", { id: "aicm-screen-placement-style" });
+    style.textContent = [
+      ".aicm-screen-router{margin:16px;padding:16px;border:1px solid #c7d7fe;border-radius:14px;background:#f8fbff;font-family:system-ui,sans-serif;}",
+      ".aicm-screen-router h2{margin:0 0 8px;font-size:18px;}",
+      ".aicm-screen-nav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;}",
+      ".aicm-screen-nav button{padding:9px 12px;border-radius:9px;border:1px solid #999;background:#f6f8fa;}",
+      ".aicm-screen-nav button[data-active='true']{background:#e0ecff;border-color:#5b8def;font-weight:700;}",
+      ".aicm-screen{display:none;}",
+      ".aicm-screen[data-active='true']{display:block;}",
+      ".aicm-card{border:1px solid #dbeafe;border-radius:12px;padding:12px;background:#fff;margin-top:10px;}",
+      ".aicm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin:12px 0;}",
+      ".aicm-grid label{display:flex;flex-direction:column;font-size:12px;color:#555;gap:4px;}",
+      ".aicm-grid input,.aicm-grid select,.aicm-grid textarea{padding:8px;border:1px solid #ccd0d5;border-radius:8px;font-size:14px;background:#fff;}",
+      ".aicm-grid textarea{min-height:72px;resize:vertical;}",
+      ".aicm-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;}",
+      ".aicm-actions button{padding:9px 12px;border-radius:9px;border:1px solid #999;background:#f6f8fa;}",
+      ".aicm-muted{color:#667085;font-size:12px;}",
+      ".aicm-ok{color:#0969da;font-size:12px;}",
+      ".aicm-danger{color:#b42318;font-size:12px;}",
+      ".aicm-superseded-panel{display:none !important;}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  function hideSupersededPanels() {
+    [
+      "aicm-robot-add-local-fallback",
+      "aicm-company-president-robot-fallback",
+      "aicm-correct-robot-responsibility-ui"
+    ].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.classList.add("aicm-superseded-panel");
+        el.setAttribute("data-aicm-hidden-reason", "moved_to_correct_screen");
+      }
+    });
+  }
+
+  function seedRobotCatalog() {
+    var existing = readJson(ROBOT_CATALOG_KEY, null);
+    if (Array.isArray(existing) && existing.length > 0) return existing;
+
+    var seeded = [
+      {
+        business_robot_id: "business-robot-president-001",
+        robot_kind: "ai_robot",
+        display_name: "President候補ロボット",
+        assignable_company_president: true,
+        assignable_org_roles: []
+      },
+      {
+        business_robot_id: "business-robot-manager-001",
+        robot_kind: "ai_robot",
+        display_name: "Manager候補ロボット",
+        assignable_company_president: false,
+        assignable_org_roles: ["Manager"]
+      },
+      {
+        business_robot_id: "business-robot-leader-001",
+        robot_kind: "ai_robot",
+        display_name: "Leader候補ロボット",
+        assignable_company_president: false,
+        assignable_org_roles: ["Leader"]
+      },
+      {
+        business_robot_id: "business-robot-worker-001",
+        robot_kind: "ai_robot",
+        display_name: "Worker候補ロボット",
+        assignable_company_president: false,
+        assignable_org_roles: ["Worker"]
+      },
+      {
+        business_robot_id: "business-robot-reviewer-001",
+        robot_kind: "ai_robot",
+        display_name: "Reviewer候補ロボット",
+        assignable_company_president: false,
+        assignable_org_roles: ["Reviewer"]
+      }
+    ];
+
+    writeJson(ROBOT_CATALOG_KEY, seeded);
+    return seeded;
+  }
+
+  function seedOrganizations() {
+    var existing = readJson(ORG_KEY, null);
+    if (Array.isArray(existing) && existing.length > 0) return existing;
+
+    var seeded = [
+      { organization_local_id: "org-current-main", organization_name: "現在の組織", department_name: "現在の部門" },
+      { organization_local_id: "org-leader-worker", organization_name: "Leader / Worker チーム", department_name: "開発部門" },
+      { organization_local_id: "org-review", organization_name: "レビュー組織", department_name: "品質レビュー部門" }
+    ];
+
+    writeJson(ORG_KEY, seeded);
+    return seeded;
+  }
+
+  function getRobot(robotId) {
+    var robots = seedRobotCatalog();
+    for (var i = 0; i < robots.length; i += 1) {
+      if (robots[i].business_robot_id === robotId) return robots[i];
+    }
+    return null;
+  }
+
+  function renderPresidentCurrent(root) {
+    var holder = root.querySelector("[data-president-current]");
+    var policyHolder = root.querySelector("[data-president-policy-current]");
+    if (!holder || !policyHolder) return;
+
+    var president = readJson(PRESIDENT_KEY, null);
+    var policy = readJson(PRESIDENT_POLICY_KEY, null);
+
+    holder.innerHTML = "";
+    policyHolder.innerHTML = "";
+
+    if (!president) {
+      holder.appendChild(createEl("div", { className: "aicm-muted" }, "Presidentロボットは未設定です。"));
+    } else {
+      var p = createEl("div", { className: "aicm-card" });
+      p.appendChild(createEl("strong", {}, president.robot_name));
+      p.appendChild(createEl("div", {}, "画面: AI企業設定"));
+      p.appendChild(createEl("div", {}, "役割: President"));
+      p.appendChild(createEl("div", {}, "Business登録ロボットID: " + president.business_robot_id));
+      p.appendChild(createEl("div", { className: "aicm-muted" }, "localStorage保存 / DB未書込"));
+      holder.appendChild(p);
+    }
+
+    if (!policy) {
+      policyHolder.appendChild(createEl("div", { className: "aicm-muted" }, "Presidentへの会社事業方針指示は未登録です。"));
+    } else {
+      var c = createEl("div", { className: "aicm-card" });
+      c.appendChild(createEl("strong", {}, "Presidentへの会社事業方針指示"));
+      c.appendChild(createEl("div", {}, policy.policy_text));
+      c.appendChild(createEl("div", { className: "aicm-muted" }, "指示先: " + policy.president_robot_name));
+      policyHolder.appendChild(c);
+    }
+  }
+
+  function buildCompanySettingsScreen() {
+    var screen = createEl("section", { className: "aicm-screen", "data-screen": "company_settings" });
+    screen.appendChild(createEl("h2", {}, "AI企業設定"));
+    screen.appendChild(createEl("p", {}, "Presidentロボット設定と、Presidentへの会社事業方針指示を行います。"));
+
+    var robots = seedRobotCatalog().filter(function (r) {
+      return r.robot_kind === "ai_robot" && r.assignable_company_president === true;
+    });
+
+    var card = createEl("div", { className: "aicm-card" });
+    card.appendChild(createEl("h3", {}, "Presidentロボット / 会社事業方針"));
+
+    var grid = createEl("div", { className: "aicm-grid" });
+
+    var robotLabel = createEl("label", {}, "Presidentロボット");
+    var robotSelect = createEl("select");
+    robotSelect.appendChild(createEl("option", { value: "" }, "Business登録済みPresident候補を選択"));
+    robots.forEach(function (robot) {
+      robotSelect.appendChild(createEl("option", { value: robot.business_robot_id }, robot.display_name + " / " + robot.business_robot_id));
+    });
+    robotLabel.appendChild(robotSelect);
+
+    var policyLabel = createEl("label", {}, "会社の事業方針をPresidentへ指示");
+    var policyText = createEl("textarea", { placeholder: "例: 今期は運用品質向上とstrict tenant RLS監視を重視する" });
+    policyLabel.appendChild(policyText);
+
+    grid.appendChild(robotLabel);
+    grid.appendChild(policyLabel);
+    card.appendChild(grid);
+
+    var actions = createEl("div", { className: "aicm-actions" });
+    var setPresident = createEl("button", { type: "button" }, "AI企業設定にPresidentを設定");
+    var instructPolicy = createEl("button", { type: "button" }, "Presidentへ事業方針を指示");
+    var clear = createEl("button", { type: "button" }, "AI企業設定local保存をクリア");
+    var status = createEl("span", { className: "aicm-muted" }, "");
+
+    setPresident.addEventListener("click", function () {
+      var robot = getRobot(robotSelect.value);
+      if (!robot || robot.assignable_company_president !== true) {
+        status.textContent = "Business登録済みPresident候補を選択してください。";
+        status.className = "aicm-danger";
+        return;
+      }
+
+      writeJson(PRESIDENT_KEY, {
+        business_robot_id: robot.business_robot_id,
+        robot_kind: "ai_robot",
+        robot_name: robot.display_name,
+        robot_role: "President",
+        setting_screen: "AI企業設定",
+        source: "business_registered_robot_catalog_local_mirror",
+        saved_at: new Date().toISOString()
+      });
+
+      status.textContent = "AI企業設定にPresidentを設定しました。";
+      status.className = "aicm-ok";
+      renderPresidentCurrent(screen);
+    });
+
+    instructPolicy.addEventListener("click", function () {
+      var president = readJson(PRESIDENT_KEY, null);
+      var text = policyText.value.trim();
+
+      if (!president) {
+        status.textContent = "先にPresidentロボットを設定してください。";
+        status.className = "aicm-danger";
+        return;
+      }
+
+      if (!text) {
+        status.textContent = "会社の事業方針を入力してください。";
+        status.className = "aicm-danger";
+        return;
+      }
+
+      writeJson(PRESIDENT_POLICY_KEY, {
+        president_business_robot_id: president.business_robot_id,
+        president_robot_name: president.robot_name,
+        policy_text: text,
+        instruction_screen: "AI企業設定",
+        source: "ui_local_fallback",
+        instructed_at: new Date().toISOString()
+      });
+
+      status.textContent = "Presidentへ会社の事業方針を指示しました。";
+      status.className = "aicm-ok";
+      renderPresidentCurrent(screen);
+    });
+
+    clear.addEventListener("click", function () {
+      localStorage.removeItem(PRESIDENT_KEY);
+      localStorage.removeItem(PRESIDENT_POLICY_KEY);
+      status.textContent = "AI企業設定local保存をクリアしました。";
+      status.className = "aicm-muted";
+      renderPresidentCurrent(screen);
+    });
+
+    actions.appendChild(setPresident);
+    actions.appendChild(instructPolicy);
+    actions.appendChild(clear);
+    actions.appendChild(status);
+    card.appendChild(actions);
+
+    card.appendChild(createEl("div", { "data-president-current": "1" }));
+    card.appendChild(createEl("div", { "data-president-policy-current": "1" }));
+
+    screen.appendChild(card);
+    return screen;
+  }
+
+  function renderOrganizationPlacements(root) {
+    var cards = root.querySelectorAll("[data-org-card]");
+    var placements = readJson(ORG_PLACEMENT_KEY, []);
+
+    cards.forEach(function (card) {
+      var orgId = card.getAttribute("data-org-card");
+      var list = card.querySelector("[data-placement-list]");
+      if (!list) return;
+
+      list.innerHTML = "";
+      var items = placements.filter(function (p) { return p.organization_local_id === orgId; });
+
+      if (items.length === 0) {
+        list.appendChild(createEl("div", { className: "aicm-muted" }, "この組織にはまだロボットが配置されていません。"));
+        return;
+      }
+
+      items.forEach(function (item) {
+        var row = createEl("div", { className: "aicm-card" });
+        row.appendChild(createEl("strong", {}, item.robot_name));
+        row.appendChild(createEl("div", {}, "組織役割: " + item.organization_role));
+        row.appendChild(createEl("div", {}, "Business登録ロボットID: " + item.business_robot_id));
+        row.appendChild(createEl("div", { className: "aicm-muted" }, "追加元: 組織カード / DB未書込"));
+        list.appendChild(row);
+      });
+    });
+  }
+
+  function buildOrganizationDetailScreen() {
+    var screen = createEl("section", { className: "aicm-screen", "data-screen": "organization_detail" });
+    screen.appendChild(createEl("h2", {}, "組織詳細"));
+    screen.appendChild(createEl("p", {}, "組織カードの追加ボタンから、Business登録済みロボットを配置します。"));
+
+    var organizations = seedOrganizations();
+    var robots = seedRobotCatalog().filter(function (r) {
+      return r.robot_kind === "ai_robot" && Array.isArray(r.assignable_org_roles) && r.assignable_org_roles.length > 0;
+    });
+
+    organizations.forEach(function (org) {
+      var card = createEl("div", { className: "aicm-card", "data-org-card": org.organization_local_id });
+      card.appendChild(createEl("h3", {}, org.organization_name));
+      card.appendChild(createEl("div", { className: "aicm-muted" }, "部門: " + org.department_name));
+
+      var grid = createEl("div", { className: "aicm-grid" });
+
+      var roleLabel = createEl("label", {}, "組織内役割");
+      var roleSelect = createEl("select");
+      ["Manager", "Leader", "Worker", "Reviewer"].forEach(function (role) {
+        roleSelect.appendChild(createEl("option", { value: role }, role));
+      });
+      roleSelect.value = "Worker";
+      roleLabel.appendChild(roleSelect);
+
+      var robotLabel = createEl("label", {}, "Business登録済みロボット");
+      var robotSelect = createEl("select");
+      robotSelect.appendChild(createEl("option", { value: "" }, "ロボットを選択"));
+      robots.forEach(function (robot) {
+        robotSelect.appendChild(createEl("option", { value: robot.business_robot_id }, robot.display_name + " / " + robot.assignable_org_roles.join(",")));
+      });
+      robotLabel.appendChild(robotSelect);
+
+      grid.appendChild(roleLabel);
+      grid.appendChild(robotLabel);
+      card.appendChild(grid);
+
+      var actions = createEl("div", { className: "aicm-actions" });
+      var add = createEl("button", { type: "button" }, "この組織カードにロボットを追加");
+      var clear = createEl("button", { type: "button" }, "この組織のlocal配置をクリア");
+      var status = createEl("span", { className: "aicm-muted" }, "");
+
+      add.addEventListener("click", function () {
+        var role = roleSelect.value;
+        var robot = getRobot(robotSelect.value);
+
+        if (!robot) {
+          status.textContent = "Business登録済みロボットを選択してください。";
+          status.className = "aicm-danger";
+          return;
+        }
+
+        if (robot.assignable_org_roles.indexOf(role) < 0) {
+          status.textContent = "選択ロボットはこの組織役割に対応していません。";
+          status.className = "aicm-danger";
+          return;
+        }
+
+        var placements = readJson(ORG_PLACEMENT_KEY, []);
+        placements.push({
+          placement_local_id: "local-org-placement-" + Date.now() + "-" + Math.random().toString(16).slice(2),
+          organization_local_id: org.organization_local_id,
+          organization_name: org.organization_name,
+          department_name: org.department_name,
+          business_robot_id: robot.business_robot_id,
+          robot_name: robot.display_name,
+          robot_kind: "ai_robot",
+          organization_role: role,
+          add_source: "organization_card_add_button",
+          source: "business_registered_robot_catalog_local_mirror",
+          saved_at: new Date().toISOString()
+        });
+
+        writeJson(ORG_PLACEMENT_KEY, placements);
+        status.textContent = "組織カードにロボットを追加しました。";
+        status.className = "aicm-ok";
+        renderOrganizationPlacements(screen);
+      });
+
+      clear.addEventListener("click", function () {
+        var placements = readJson(ORG_PLACEMENT_KEY, []);
+        placements = placements.filter(function (p) {
+          return p.organization_local_id !== org.organization_local_id;
+        });
+        writeJson(ORG_PLACEMENT_KEY, placements);
+        status.textContent = "この組織のlocal配置をクリアしました。";
+        status.className = "aicm-muted";
+        renderOrganizationPlacements(screen);
+      });
+
+      actions.appendChild(add);
+      actions.appendChild(clear);
+      actions.appendChild(status);
+      card.appendChild(actions);
+      card.appendChild(createEl("div", { "data-placement-list": "1" }));
+
+      screen.appendChild(card);
+    });
+
+    return screen;
+  }
+
+  function buildDashboardScreen() {
+    var screen = createEl("section", { className: "aicm-screen", "data-screen": "dashboard" });
+    screen.appendChild(createEl("h2", {}, "会社ダッシュボード"));
+    screen.appendChild(createEl("p", {}, "ダッシュボードでは状態確認のみ行います。President設定はAI企業設定、ロボット配置は組織詳細で行います。"));
+
+    var card = createEl("div", { className: "aicm-card" });
+    card.appendChild(createEl("strong", {}, "ロボット設定の配置"));
+    card.appendChild(createEl("div", {}, "President: AI企業設定"));
+    card.appendChild(createEl("div", {}, "組織ロボット: 組織詳細の各組織カード"));
+    card.appendChild(createEl("div", {}, "ロボット選択元: Business登録済みロボット"));
+    screen.appendChild(card);
+
+    return screen;
+  }
+
+  function showScreen(root, screenName) {
+    writeJson(SCREEN_KEY, screenName);
+
+    var buttons = root.querySelectorAll("[data-screen-button]");
+    buttons.forEach(function (button) {
+      button.setAttribute("data-active", button.getAttribute("data-screen-button") === screenName ? "true" : "false");
+    });
+
+    var screens = root.querySelectorAll("[data-screen]");
+    screens.forEach(function (screen) {
+      screen.setAttribute("data-active", screen.getAttribute("data-screen") === screenName ? "true" : "false");
+    });
+  }
+
+  function buildRouter() {
+    injectStyle();
+    hideSupersededPanels();
+
+    var old = document.getElementById("aicm-screen-placement-router");
+    if (old) old.remove();
+
+    var root = createEl("section", { id: "aicm-screen-placement-router", className: "aicm-screen-router" });
+    root.appendChild(createEl("h2", {}, "AICompanyManager 画面"));
+
+    var nav = createEl("div", { className: "aicm-screen-nav" });
+
+    [
+      ["dashboard", "会社ダッシュボード"],
+      ["company_settings", "AI企業設定"],
+      ["organization_detail", "組織詳細"]
+    ].forEach(function (entry) {
+      var button = createEl("button", { type: "button", "data-screen-button": entry[0] }, entry[1]);
+      button.addEventListener("click", function () { showScreen(root, entry[0]); });
+      nav.appendChild(button);
+    });
+
+    root.appendChild(nav);
+    root.appendChild(buildDashboardScreen());
+    root.appendChild(buildCompanySettingsScreen());
+    root.appendChild(buildOrganizationDetailScreen());
+
+    var mount = document.querySelector("main") || document.body;
+    if (mount.firstChild) {
+      mount.insertBefore(root, mount.firstChild);
+    } else {
+      mount.appendChild(root);
+    }
+
+    renderPresidentCurrent(root);
+    renderOrganizationPlacements(root);
+
+    var current = readJson(SCREEN_KEY, "dashboard");
+    if (["dashboard", "company_settings", "organization_detail"].indexOf(current) < 0) current = "dashboard";
+    showScreen(root, current);
+  }
+
+  ready(buildRouter);
+}());
+/* AICM_ROBOT_UI_SCREEN_PLACEMENT_REPAIR_PATCH_END */
