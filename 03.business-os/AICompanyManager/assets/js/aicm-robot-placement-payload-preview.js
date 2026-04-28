@@ -1,10 +1,10 @@
-/* AICM_TARGET_ID_CANONICALIZATION_PREVIEW_V2 */
+/* AICM_COMPACT_PAYLOAD_PREVIEW_REPAIR_V3 */
 (function () {
   "use strict";
 
   var ROBOT_API_URL = "./api/aicm/business-robot-pool";
   var STRUCTURE_API_URL = "./api/aicm/structure-map";
-  var STYLE_ID = "aicm-target-id-canonical-preview-style-v2";
+  var STYLE_ID = "aicm-compact-payload-preview-style-v3";
   var TIMER = null;
 
   var STATE = {
@@ -29,7 +29,7 @@
       targetIdIds: [],
       targetTextIds: [],
       titleHints: ["Presidentロボット", "President robot", "社長ロボット"],
-      cardTitle: "President配置payload preview"
+      cardTitle: "President配置payload"
     },
     {
       role: "Manager",
@@ -39,7 +39,7 @@
       targetIdIds: ["department-select", "edit-department-select"],
       targetTextIds: ["department-name", "edit-department-name"],
       titleHints: ["Managerロボット設定", "Managerロボット", "部門長ロボット"],
-      cardTitle: "Manager配置payload preview"
+      cardTitle: "Manager配置payload"
     },
     {
       role: "Leader",
@@ -49,7 +49,7 @@
       targetIdIds: ["organization-select", "section-select", "edit-organization-select"],
       targetTextIds: ["organization-name", "section-name", "edit-organization-name"],
       titleHints: ["Leaderロボット設定", "Leaderロボット", "課長"],
-      cardTitle: "Leader配置payload preview"
+      cardTitle: "Leader配置payload"
     },
     {
       role: "Worker",
@@ -59,8 +59,14 @@
       targetIdIds: ["organization-select", "section-select", "edit-organization-select"],
       targetTextIds: ["organization-name", "section-name", "edit-organization-name"],
       titleHints: ["Workerロボット配置", "Worker配置", "配置済みWorker"],
-      cardTitle: "Worker配置payload preview"
+      cardTitle: "Worker配置payload"
     }
+  ];
+
+  var MODEL_CODES = [
+    "HD-R2T-0", "MG-NORN-001", "MG-NORN-002", "MG-NORN-003",
+    "BYD1-001", "BYD1-002", "BYD1-003", "BYD2-001", "BYD2-002", "BYD2-003",
+    "HD-R5P", "HD-R2S", "HD-R2G", "HD-R1C", "HD-R1A", "HD-R5", "HD-R4", "HD-R3", "HD-R2", "HD-R1"
   ];
 
   function esc(value) {
@@ -73,29 +79,39 @@
 
   function injectStyle() {
     if (document.getElementById(STYLE_ID)) return;
-
     var style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = [
       ".aicm-payload-preview{border:1px solid #d6e4ff;border-radius:12px;background:#f8fbff;padding:12px;margin-top:12px;}",
       ".aicm-payload-preview h3{font-size:15px;margin:0 0 8px;}",
-      ".aicm-payload-preview pre{white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:10px;font-size:12px;line-height:1.45;}",
-      ".aicm-payload-preview .aicm-preview-note{color:#667085;font-size:13px;margin:6px 0;}",
-      ".aicm-payload-preview .aicm-preview-badge{display:inline-block;padding:3px 7px;border-radius:999px;background:#e8fff2;color:#087443;font-weight:700;font-size:11px;margin:2px;}",
-      ".aicm-payload-preview .aicm-preview-warn{background:#fff7e8;color:#9a5b00;}"
+      ".aicm-preview-grid{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:13px;line-height:1.45;margin-top:8px;}",
+      ".aicm-preview-key{color:#667085;font-weight:700;}",
+      ".aicm-preview-value{color:#101828;word-break:break-word;}",
+      ".aicm-preview-badge{display:inline-block;padding:3px 7px;border-radius:999px;background:#e8fff2;color:#087443;font-weight:700;font-size:11px;margin:2px;}",
+      ".aicm-preview-warn{background:#fff7e8;color:#9a5b00;}",
+      ".aicm-preview-danger{background:#ffecec;color:#b42318;}",
+      ".aicm-payload-preview details{margin-top:8px;}",
+      ".aicm-payload-preview summary{cursor:pointer;color:#175cd3;font-weight:700;font-size:13px;}",
+      ".aicm-payload-preview pre{white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:10px;font-size:12px;line-height:1.45;max-height:240px;overflow:auto;}"
     ].join("\n");
-
     document.head.appendChild(style);
   }
 
+  function removeExistingPreviewNodes(root) {
+    Array.prototype.slice.call((root || document).querySelectorAll("[data-aicm-placement-payload-preview]")).forEach(function (node) {
+      if (node.parentNode) node.parentNode.removeChild(node);
+    });
+  }
+
   function textOf(el) {
-    return (el && el.textContent ? el.textContent : "").replace(/\s+/g, " ").trim();
+    if (!el) return "";
+    var clone = el.cloneNode(true);
+    removeExistingPreviewNodes(clone);
+    return (clone.textContent || "").replace(/\s+/g, " ").trim();
   }
 
   function normalize(value) {
-    return String(value == null ? "" : value)
-      .toLowerCase()
-      .replace(/[\s　／/・|:：,，。\.\-＿_]+/g, "");
+    return String(value == null ? "" : value).toLowerCase().replace(/[\s　／/・|:：,，。\.\-＿_]+/g, "");
   }
 
   function isUuid(value) {
@@ -107,8 +123,7 @@
   }
 
   function firstValue(ids) {
-    var i;
-    var el;
+    var i, el;
     for (i = 0; i < ids.length; i += 1) {
       el = byId(ids[i]);
       if (el && el.value) return el.value;
@@ -117,8 +132,7 @@
   }
 
   function firstSelectedText(ids) {
-    var i;
-    var el;
+    var i, el;
     for (i = 0; i < ids.length; i += 1) {
       el = byId(ids[i]);
       if (el && el.selectedIndex >= 0 && el.options && el.options[el.selectedIndex]) {
@@ -129,8 +143,7 @@
   }
 
   function firstTextInput(ids) {
-    var i;
-    var el;
+    var i, el;
     for (i = 0; i < ids.length; i += 1) {
       el = byId(ids[i]);
       if (el && el.value) return el.value;
@@ -139,7 +152,7 @@
   }
 
   function companyId() {
-    return firstValue(["company-select", "edit-company-select, aicm-company-id", "aicm-company-id", "company-id"]) ||
+    return firstValue(["company-select", "edit-company-select", "aicm-company-id", "company-id"]) ||
       "00000000-0000-4000-8000-1db11893cb24";
   }
 
@@ -163,22 +176,14 @@
   }
 
   function rowUuid(row, scope) {
-    if (scope === "department") {
-      return String(pick(row, ["department_id", "id", "aicm_department_id", "uuid"]));
-    }
-    if (scope === "section") {
-      return String(pick(row, ["organization_id", "section_id", "id", "aicm_organization_id", "uuid"]));
-    }
+    if (scope === "department") return String(pick(row, ["department_id", "id", "aicm_department_id", "uuid"]));
+    if (scope === "section") return String(pick(row, ["organization_id", "section_id", "id", "aicm_organization_id", "uuid"]));
     return String(pick(row, ["company_id", "id", "aicm_company_id", "uuid"]));
   }
 
   function rowName(row, scope) {
-    if (scope === "department") {
-      return String(pick(row, ["department_name", "name", "display_name", "title"]));
-    }
-    if (scope === "section") {
-      return String(pick(row, ["organization_name", "section_name", "name", "display_name", "title"]));
-    }
+    if (scope === "department") return String(pick(row, ["department_name", "name", "display_name", "title"]));
+    if (scope === "section") return String(pick(row, ["organization_name", "section_name", "name", "display_name", "title"]));
     return String(pick(row, ["company_name", "name", "display_name", "title"]));
   }
 
@@ -186,64 +191,28 @@
     return String(pick(row, ["company_id", "aicm_company_id"]));
   }
 
-  var MODEL_CODES = [
-    "HD-R2T-0", "MG-NORN-001", "MG-NORN-002", "MG-NORN-003",
-    "BYD1-001", "BYD1-002", "BYD1-003", "BYD2-001", "BYD2-002", "BYD2-003",
-    "HD-R5P", "HD-R2S", "HD-R2G", "HD-R1C", "HD-R1A", "HD-R5", "HD-R4", "HD-R3", "HD-R2", "HD-R1"
-  ];
-
   function detectModelCode(row, optionText) {
-    var raw = String(pick(row, [
-      "model_code",
-      "robot_model_code",
-      "aiworker_model_code",
-      "model_no",
-      "model_number",
-      "robot_code",
-      "model_id"
-    ]) || "");
-
+    var raw = String(pick(row, ["model_code", "robot_model_code", "aiworker_model_code", "model_no", "model_number", "robot_code", "model_id"]) || "");
     var all = raw + " " + asText(row) + " " + String(optionText || "");
     var i;
-
     for (i = 0; i < MODEL_CODES.length; i += 1) {
       if (all.indexOf(MODEL_CODES[i]) >= 0) return MODEL_CODES[i];
     }
-
     return raw || "";
   }
 
   function robotId(row, fallback) {
-    return String(pick(row, [
-      "business_robot_id",
-      "robot_pool_id",
-      "pool_robot_id",
-      "company_robot_id",
-      "robot_id",
-      "aiworker_robot_id",
-      "id"
-    ]) || fallback || "");
+    return String(pick(row, ["business_robot_id", "robot_pool_id", "pool_robot_id", "company_robot_id", "robot_id", "aiworker_robot_id", "id"]) || fallback || "");
   }
 
   function displayName(row, optionText) {
-    return String(pick(row, [
-      "display_name",
-      "robot_display_name",
-      "robot_name",
-      "model_name_ja",
-      "model_name",
-      "name",
-      "model_code",
-      "id"
-    ]) || optionText || "");
+    return String(pick(row, ["display_name", "robot_display_name", "robot_name", "model_name_ja", "model_name", "name", "model_code", "id"]) || optionText || "");
   }
 
   function findRobotBySelect(select) {
     var value = select && select.value ? String(select.value) : "";
     var optionText = selectedText(select);
-    var i;
-    var row;
-    var rid;
+    var i, row, rid;
 
     if (!value) return null;
 
@@ -258,44 +227,42 @@
       if (asText(row).indexOf(value) >= 0) return row;
     }
 
-    return {
-      id: value,
-      display_name: optionText,
-      model_code: detectModelCode({}, optionText)
-    };
+    return { id: value, display_name: optionText, model_code: detectModelCode({}, optionText) };
   }
 
   function cardForTarget(target) {
     var cards = Array.prototype.slice.call(document.querySelectorAll(".aicm-card"));
-    var i;
-    var h;
-    var text;
-
+    var i, h, text;
     for (i = 0; i < cards.length; i += 1) {
       text = textOf(cards[i]);
       for (h = 0; h < target.titleHints.length; h += 1) {
         if (text.indexOf(target.titleHints[h]) >= 0) return cards[i];
       }
     }
-
     return null;
+  }
+
+  function compactHint(target, card) {
+    var selectedHint = firstSelectedText(target.targetIdIds);
+    var typedHint = firstTextInput(target.targetTextIds);
+    var cardText = textOf(card);
+    var simpleCard = "";
+
+    target.titleHints.forEach(function (hint) {
+      if (!simpleCard && cardText.indexOf(hint) >= 0) simpleCard = hint;
+    });
+
+    return [selectedHint, typedHint, simpleCard].filter(Boolean).join(" / ").slice(0, 160);
   }
 
   function canonicalizeTarget(target, card) {
     var currentCompanyId = companyId();
     var input = firstValue(target.targetIdIds);
-    var selectedHint = firstSelectedText(target.targetIdIds);
-    var typedHint = firstTextInput(target.targetTextIds);
-    var cardHint = textOf(card);
-    var hint = [selectedHint, typedHint, cardHint].filter(Boolean).join(" / ");
-    var rows = [];
-    var i;
-    var row;
-    var uuid;
-    var name;
+    var hint = compactHint(target, card);
+    var rows = target.scope === "department" ? STATE.departments : STATE.organizations;
     var nHint = normalize(hint);
     var nInput = normalize(input);
-    var companyOkRows;
+    var companyOkRows, i, row, uuid, name;
 
     if (target.scope === "company") {
       return {
@@ -303,7 +270,8 @@
         target_id: "",
         target_id_source: "company_scope_no_target_id",
         target_id_canonicalization_status: "OK_COMPANY_SCOPE",
-        target_display_hint: hint,
+        target_display_hint: "company scope",
+        matched_db_name: "",
         save_blocked: false
       };
     }
@@ -315,11 +283,10 @@
         target_id_source: "input_uuid",
         target_id_canonicalization_status: "OK_INPUT_UUID",
         target_display_hint: hint,
+        matched_db_name: "",
         save_blocked: false
       };
     }
-
-    rows = target.scope === "department" ? STATE.departments : STATE.organizations;
 
     companyOkRows = rows.filter(function (r) {
       var rc = rowCompanyId(r);
@@ -338,6 +305,7 @@
           target_id_source: "db_uuid_exact",
           target_id_canonicalization_status: "OK_DB_UUID_EXACT",
           target_display_hint: hint,
+          matched_db_name: rowName(row, target.scope) || "",
           save_blocked: false
         };
       }
@@ -397,6 +365,7 @@
       target_id_source: "local_only_unresolved",
       target_id_canonicalization_status: "BLOCKED_LOCAL_ONLY_TARGET_ID",
       target_display_hint: hint,
+      matched_db_name: "",
       save_blocked: true
     };
   }
@@ -408,9 +377,7 @@
     var nickname = firstValue(target.nicknameIds);
     var canonical = canonicalizeTarget(target, card);
 
-    if (!nickname && selectedRobot) {
-      nickname = displayName(selectedRobot, optionText);
-    }
+    if (!nickname && selectedRobot) nickname = displayName(selectedRobot, optionText);
 
     return {
       source: "AICompanyManager UI preview",
@@ -439,18 +406,19 @@
     };
   }
 
+  function row(label, value) {
+    return '<div class="aicm-preview-key">' + esc(label) + '</div><div class="aicm-preview-value">' + esc(value || "-") + '</div>';
+  }
+
   function renderPreview(target) {
     var card = cardForTarget(target);
-    var payload;
-    var existing;
-    var html;
-    var warnClass;
+    var payload, existing, html, statusClass;
 
     if (!card) return;
 
     existing = card.querySelector("[data-aicm-placement-payload-preview='" + target.role + "']");
     payload = buildPayload(target, card);
-    warnClass = payload.save_blocked ? " aicm-preview-warn" : "";
+    statusClass = payload.save_blocked ? " aicm-preview-danger" : "";
 
     html = [
       '<div class="aicm-payload-preview" data-aicm-placement-payload-preview="' + esc(target.role) + '">',
@@ -458,26 +426,30 @@
       '<span class="aicm-preview-badge">preview only</span>',
       '<span class="aicm-preview-badge">DB保存なし</span>',
       '<span class="aicm-preview-badge">数量消費なし</span>',
-      '<span class="aicm-preview-badge' + warnClass + '">' + esc(payload.target_id_canonicalization_status) + '</span>',
-      '<p class="aicm-preview-note">保存前に、target_id をDB保存用IDへ正本化できるか確認します。</p>',
-      '<pre>' + esc(JSON.stringify(payload, null, 2)) + '</pre>',
+      '<span class="aicm-preview-badge' + statusClass + '">' + esc(payload.target_id_canonicalization_status) + '</span>',
+      '<div class="aicm-preview-grid">',
+      row("role", payload.placement_role_code),
+      row("robot", payload.robot_display_name + (payload.model_code ? " / " + payload.model_code : "")),
+      row("nickname", payload.internal_nickname),
+      row("scope", payload.target_scope),
+      row("target", payload.target_id || payload.target_id_source),
+      row("status", payload.save_status),
+      '</div>',
+      '<details><summary>詳細JSONを表示</summary><pre>' + esc(JSON.stringify(payload, null, 2)) + '</pre></details>',
       '</div>'
     ].join("");
 
-    if (existing) {
-      existing.outerHTML = html;
-    } else {
-      card.insertAdjacentHTML("beforeend", html);
-    }
+    if (existing) existing.outerHTML = html;
+    else card.insertAdjacentHTML("beforeend", html);
   }
 
   function renderAll() {
     try {
       injectStyle();
       TARGETS.forEach(renderPreview);
-      window.AICM_TARGET_ID_CANONICALIZATION_PREVIEW_STATUS = {
+      window.AICM_COMPACT_PAYLOAD_PREVIEW_STATUS = {
         ok: true,
-        mode: "target_id_canonicalization_preview_v2",
+        mode: "compact_payload_preview_repair_v3",
         robot_api_ok: STATE.robot_api_ok,
         structure_api_ok: STATE.structure_api_ok,
         robot_count: STATE.robots.length,
@@ -489,7 +461,7 @@
         quantity_consumption: false
       };
     } catch (error) {
-      window.AICM_TARGET_ID_CANONICALIZATION_PREVIEW_STATUS = {
+      window.AICM_COMPACT_PAYLOAD_PREVIEW_STATUS = {
         ok: false,
         error: error && error.message ? error.message : String(error)
       };
@@ -510,10 +482,7 @@
 
     STATE.loading = true;
 
-    return Promise.all([
-      fetchJson(ROBOT_API_URL),
-      fetchJson(STRUCTURE_API_URL)
-    ])
+    return Promise.all([fetchJson(ROBOT_API_URL), fetchJson(STRUCTURE_API_URL)])
       .then(function (results) {
         var robot = results[0];
         var structure = results[1];
@@ -557,11 +526,8 @@
   }
 
   try {
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", schedule);
-    } else {
-      schedule();
-    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", schedule);
+    else schedule();
 
     window.addEventListener("load", schedule);
     window.addEventListener("focus", schedule);
@@ -571,9 +537,7 @@
       if (!node || !node.id) return;
       if (TARGETS.some(function (t) {
         return t.selectId === node.id || t.nicknameIds.indexOf(node.id) >= 0 || t.targetIdIds.indexOf(node.id) >= 0 || t.targetTextIds.indexOf(node.id) >= 0;
-      })) {
-        schedule();
-      }
+      })) schedule();
     }, true);
 
     document.addEventListener("input", function (event) {
@@ -581,19 +545,17 @@
       if (!node || !node.id) return;
       if (TARGETS.some(function (t) {
         return t.nicknameIds.indexOf(node.id) >= 0 || t.targetTextIds.indexOf(node.id) >= 0;
-      })) {
-        schedule();
-      }
+      })) schedule();
     }, true);
 
     document.addEventListener("click", function () {
       window.setTimeout(schedule, 250);
     }, true);
   } catch (error) {
-    window.AICM_TARGET_ID_CANONICALIZATION_PREVIEW_STATUS = {
+    window.AICM_COMPACT_PAYLOAD_PREVIEW_STATUS = {
       ok: false,
       error: error && error.message ? error.message : String(error)
     };
   }
 }());
-/* AICM_TARGET_ID_CANONICALIZATION_PREVIEW_V2_END */
+/* AICM_COMPACT_PAYLOAD_PREVIEW_REPAIR_V3_END */
