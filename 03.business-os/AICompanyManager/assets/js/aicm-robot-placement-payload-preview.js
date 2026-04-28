@@ -1,4 +1,5 @@
 /* AICM_PAYLOAD_PREVIEW_STRICT_VALIDATION_V6 */
+/* AICM_FINAL_PREVIEW_READINESS_ALIGNMENT_V8 */
 /* AICM_BUSINESSOS_DB_COMPANY_BINDING_PREVIEW_V7 */
 (function () {
   "use strict";
@@ -153,6 +154,19 @@
   }
 
   function companyId() {
+    var binding = document.getElementById("aicm-db-company-binding-select");
+    var stored = "";
+
+    if (binding && binding.value) return binding.value;
+
+    try {
+      stored = localStorage.getItem("aicm_businessos_db_company_binding_id") || "";
+    } catch (error) {
+      stored = "";
+    }
+
+    if (stored) return stored;
+
     return firstValue(["aicm-db-company-binding-select", "company-select", "edit-company-select", "aicm-company-id", "company-id"]) ||
       "00000000-0000-4000-8000-1db11893cb24";
   }
@@ -513,6 +527,8 @@
 
     if (!payload.robot_pool_id) {
       errors.push("robot_pool_id_required");
+    } else if (!isUuid(payload.robot_pool_id)) {
+      errors.push("robot_pool_id_not_canonical_uuid");
     }
 
     if (!payload.model_code) {
@@ -525,12 +541,19 @@
 
     if (isPlaceholderOption(payload.selected_option_text)) {
       errors.push("robot_not_selected");
+    } else if (String(payload.selected_option_text || "").indexOf("BusinessOS DB") < 0) {
+      errors.push("robot_selection_not_businessos_db");
     }
 
     return {
       validation_errors: errors,
       validation_warnings: warnings,
-      robot_selection_status: errors.indexOf("robot_not_selected") >= 0 || errors.indexOf("robot_pool_id_required") >= 0 ? "BLOCKED_ROBOT_NOT_SELECTED" : "OK_ROBOT_SELECTED",
+      robot_selection_status: (
+        errors.indexOf("robot_not_selected") >= 0 ||
+        errors.indexOf("robot_pool_id_required") >= 0 ||
+        errors.indexOf("robot_pool_id_not_canonical_uuid") >= 0 ||
+        errors.indexOf("robot_selection_not_businessos_db") >= 0
+      ) ? "BLOCKED_ROBOT_NOT_SELECTED" : "OK_ROBOT_SELECTED",
       company_mapping_warning: warnings.indexOf("company_id_single_db_fallback_confirm_before_save") >= 0 ? "CONFIRM_SINGLE_DB_COMPANY_FALLBACK" : "",
       strict_validation_status: errors.length ? "BLOCKED_PREVIEW_VALIDATION_ERRORS" : "OK_STRICT_PREVIEW_VALIDATION",
       strict_save_blocked: errors.length > 0
@@ -588,8 +611,15 @@
     payload.save_blocked = !!(payload.save_blocked || validation.strict_save_blocked);
     payload.save_status = payload.save_blocked ? "PREVIEW_ONLY_SAVE_BLOCKED_VALIDATION" : "PREVIEW_ONLY_CANONICAL_OK";
 
-    if (validation.validation_errors.indexOf("robot_not_selected") >= 0 || validation.validation_errors.indexOf("robot_pool_id_required") >= 0) {
+    if (
+      validation.validation_errors.indexOf("robot_not_selected") >= 0 ||
+      validation.validation_errors.indexOf("robot_pool_id_required") >= 0
+    ) {
       payload.preview_warning = "robot_not_selected_save_blocked";
+    } else if (validation.validation_errors.indexOf("robot_pool_id_not_canonical_uuid") >= 0) {
+      payload.preview_warning = "robot_pool_id_not_canonical_uuid_save_blocked";
+    } else if (validation.validation_errors.indexOf("robot_selection_not_businessos_db") >= 0) {
+      payload.preview_warning = "robot_selection_not_businessos_db_save_blocked";
     } else if (payload.company_mapping_warning) {
       payload.preview_warning = payload.company_mapping_warning;
     }

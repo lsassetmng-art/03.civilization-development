@@ -1,4 +1,5 @@
 /* AICM_BUSINESSOS_DB_COMPANY_BINDING_V1 */
+/* AICM_BUSINESSOS_DB_COMPANY_BINDING_STORAGE_V2 */
 (function () {
   "use strict";
 
@@ -81,7 +82,12 @@
       }
     }
 
-    if (companies.length === 1) return companyId(companies[0]);
+    if (companies.length === 1) {
+      try {
+        localStorage.setItem(STORAGE_KEY, companyId(companies[0]));
+      } catch (error) {}
+      return companyId(companies[0]);
+    }
 
     return "";
   }
@@ -134,6 +140,9 @@
       }, false);
 
       if (select.value) {
+        try {
+          localStorage.setItem(STORAGE_KEY, select.value || "");
+        } catch (error) {}
         select.setAttribute("data-aicm-db-company-binding-active", "true");
         window.setTimeout(function () { dispatchChange(select); }, 120);
       }
