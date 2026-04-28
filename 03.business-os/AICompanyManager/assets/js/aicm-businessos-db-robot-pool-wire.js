@@ -1,4 +1,4 @@
-/* AICM_BUSINESSOS_DB_ROBOT_POOL_ROLE_EXACT_FILTER_V3 */
+/* AICM_BUSINESSOS_DB_ROBOT_POOL_LABEL_CLEANUP_V4 */
 (function () {
   "use strict";
 
@@ -22,10 +22,10 @@
   ];
 
   var SELECT_TARGETS = [
-    { id: "company-president-robot", role: "President" },
-    { id: "department-manager-robot", role: "Manager" },
-    { id: "section-leader-robot", role: "Leader" },
-    { id: "section-worker-robot-select", role: "Worker" }
+    { id: "company-president-robot", role: "President", label: "President配置" },
+    { id: "department-manager-robot", role: "Manager", label: "Manager配置" },
+    { id: "section-leader-robot", role: "Leader", label: "Leader配置" },
+    { id: "section-worker-robot-select", role: "Worker", label: "Worker配置" }
   ];
 
   var MODEL_ROLE_MAP = {
@@ -114,11 +114,6 @@
       if (all.indexOf(code) >= 0) return code;
     }
 
-    /*
-     * LoVerS model codes are versioned.
-     * All LoVerS are Lover in normal canon and therefore excluded from
-     * President/Manager/Leader/Worker business placement screens.
-     */
     if (/LVS-\d{2}[FM]v\d{3}/.test(all)) return "LOVERS";
 
     return raw || "";
@@ -170,24 +165,32 @@
     });
   }
 
-  function optionLabel(robot) {
+  function roleJoin(roles) {
+    return roles.join("・");
+  }
+
+  function optionLabel(robot, screenRole, screenLabel) {
     var name = displayName(robot);
     var model = detectModelCode(robot);
     var roles = canonicalRolesForRobot(robot);
-    var parts = [];
+    var base = screenLabel + ": " + name;
 
-    if (model) parts.push(model);
-    if (roles.length) parts.push(roles.join("/"));
-    parts.push("BusinessOS DB");
+    if (model) base += " / " + model;
 
-    return name + " / " + parts.join(" / ");
+    if (roles.length) {
+      base += " / 対応: " + roleJoin(roles);
+    }
+
+    base += " / BusinessOS DB";
+
+    return base;
   }
 
   function isSelectBusy(select) {
     return document.activeElement === select;
   }
 
-  function populateSelect(select, role) {
+  function populateSelect(select, role, screenLabel) {
     if (!select) return;
     if (isSelectBusy(select)) return;
 
@@ -202,19 +205,16 @@
     });
 
     candidates.sort(function (a, b) {
-      return optionLabel(a).localeCompare(optionLabel(b), "ja");
+      return optionLabel(a, role, screenLabel).localeCompare(optionLabel(b, role, screenLabel), "ja");
     });
 
     select.setAttribute("data-aicm-businessos-db-backed", STATE.api_ok ? "true" : "false");
     select.setAttribute("data-aicm-role-filter", role);
     select.setAttribute("data-aicm-businessos-db-candidate-count", String(candidates.length));
-    select.setAttribute("data-aicm-role-filter-mode", "canonical_model_role_exact_v3");
+    select.setAttribute("data-aicm-role-filter-mode", "canonical_model_role_exact_v4_label_cleanup");
 
     if (!STATE.api_ok) return;
 
-    /*
-     * If no exact candidates exist, preserve accepted local value.
-     */
     if (!candidates.length) {
       select.setAttribute("data-aicm-db-empty-exact", "true");
 
@@ -233,7 +233,7 @@
       return;
     }
 
-    var signature = role + "::" + candidates.map(function (r) { return robotId(r); }).join("|");
+    var signature = role + "::label-v4::" + candidates.map(function (r) { return robotId(r); }).join("|");
 
     if (select.getAttribute("data-aicm-db-signature") === signature) {
       return;
@@ -249,7 +249,7 @@
     candidates.forEach(function (robot) {
       var opt = document.createElement("option");
       opt.value = robotId(robot);
-      opt.textContent = optionLabel(robot);
+      opt.textContent = optionLabel(robot, role, screenLabel);
       if (current && current === opt.value) opt.selected = true;
       select.appendChild(opt);
     });
@@ -259,7 +259,7 @@
 
   function populateAllSelects() {
     SELECT_TARGETS.forEach(function (target) {
-      populateSelect(document.getElementById(target.id), target.role);
+      populateSelect(document.getElementById(target.id), target.role, target.label);
     });
   }
 
@@ -289,7 +289,7 @@
           " / Manager=" + roleCount("Manager") +
           " / Leader=" + roleCount("Leader") +
           " / Worker=" + roleCount("Worker") +
-          " / exact filter / 数量消費なし";
+          " / label cleanup / exact filter / 数量消費なし";
         card.appendChild(p);
       });
     });
@@ -307,7 +307,7 @@
 
       window.AICM_BUSINESSOS_DB_ROBOT_POOL_WIRE_STATUS = {
         ok: true,
-        mode: "canonical_model_role_exact_filter_v3",
+        mode: "candidate_label_cleanup_v4",
         api_ok: STATE.api_ok,
         robot_count: STATE.robots.length,
         role_catalog_count: STATE.role_catalog.length,
@@ -401,4 +401,4 @@
     };
   }
 }());
-/* AICM_BUSINESSOS_DB_ROBOT_POOL_ROLE_EXACT_FILTER_V3_END */
+/* AICM_BUSINESSOS_DB_ROBOT_POOL_LABEL_CLEANUP_V4_END */
