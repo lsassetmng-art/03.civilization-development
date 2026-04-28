@@ -1,4 +1,4 @@
-/* AICM_COMPACT_PAYLOAD_PREVIEW_DETAILS_TOGGLE_REPAIR_V4 */
+/* AICM_COMPANY_ID_CANONICALIZATION_PREVIEW_V5 */
 (function () {
   "use strict";
 
@@ -191,6 +191,116 @@
     return String(pick(row, ["company_id", "aicm_company_id"]));
   }
 
+  function companyRowUuid(row) {
+    return String(pick(row, ["company_id", "id", "aicm_company_id", "uuid"]));
+  }
+
+  function companyRowLocalId(row) {
+    return String(pick(row, ["local_company_id", "client_company_id", "ui_company_id", "company_local_id", "slug", "code"]));
+  }
+
+  function companyRowName(row) {
+    return String(pick(row, ["company_name", "name", "display_name", "title"]));
+  }
+
+  function canonicalCompany() {
+    var input = companyId();
+    var selectedHint = "";
+    var companySelect = byId("company-select") || byId("edit-company-select");
+    var i;
+    var row;
+    var uuid;
+    var local;
+    var name;
+    var nInput = normalize(input);
+
+    if (companySelect && companySelect.selectedIndex >= 0 && companySelect.options && companySelect.options[companySelect.selectedIndex]) {
+      selectedHint = companySelect.options[companySelect.selectedIndex].textContent || "";
+    }
+
+    if (isUuid(input)) {
+      return {
+        company_id_input: input,
+        company_id: input,
+        company_id_source: "input_uuid",
+        company_id_canonicalization_status: "OK_INPUT_UUID",
+        company_display_hint: selectedHint,
+        company_save_blocked: false
+      };
+    }
+
+    for (i = 0; i < STATE.companies.length; i += 1) {
+      row = STATE.companies[i];
+      uuid = companyRowUuid(row);
+      local = companyRowLocalId(row);
+      name = companyRowName(row);
+
+      if (uuid && input && uuid === input) {
+        return {
+          company_id_input: input,
+          company_id: uuid,
+          company_id_source: "db_uuid_exact",
+          company_id_canonicalization_status: "OK_DB_UUID_EXACT",
+          company_display_hint: name || selectedHint,
+          matched_company_name: name || "",
+          company_save_blocked: false
+        };
+      }
+
+      if (uuid && local && input && local === input) {
+        return {
+          company_id_input: input,
+          company_id: uuid,
+          company_id_source: "db_local_id_match",
+          company_id_canonicalization_status: "OK_DB_LOCAL_ID_MATCH",
+          company_display_hint: name || selectedHint,
+          matched_company_name: name || "",
+          company_save_blocked: false
+        };
+      }
+
+      if (uuid && name && nInput && (normalize(name).indexOf(nInput) >= 0 || nInput.indexOf(normalize(name)) >= 0)) {
+        return {
+          company_id_input: input,
+          company_id: uuid,
+          company_id_source: "db_company_name_match",
+          company_id_canonicalization_status: "OK_DB_COMPANY_NAME_MATCH",
+          company_display_hint: name || selectedHint,
+          matched_company_name: name || "",
+          company_save_blocked: false
+        };
+      }
+    }
+
+    if (STATE.companies.length === 1) {
+      row = STATE.companies[0];
+      uuid = companyRowUuid(row);
+      name = companyRowName(row);
+      if (uuid) {
+        return {
+          company_id_input: input,
+          company_id: uuid,
+          company_id_source: "single_db_company_fallback",
+          company_id_canonicalization_status: "OK_SINGLE_DB_COMPANY_FALLBACK",
+          company_display_hint: name || selectedHint,
+          matched_company_name: name || "",
+          company_save_blocked: false
+        };
+      }
+    }
+
+    return {
+      company_id_input: input,
+      company_id: "",
+      company_id_source: "local_only_unresolved",
+      company_id_canonicalization_status: "BLOCKED_LOCAL_ONLY_COMPANY_ID",
+      company_display_hint: selectedHint,
+      matched_company_name: "",
+      company_save_blocked: true
+    };
+  }
+
+
   function detectModelCode(row, optionText) {
     var raw = String(pick(row, ["model_code", "robot_model_code", "aiworker_model_code", "model_no", "model_number", "robot_code", "model_id"]) || "");
     var all = raw + " " + asText(row) + " " + String(optionText || "");
@@ -376,16 +486,22 @@
     var optionText = selectedText(select);
     var nickname = firstValue(target.nicknameIds);
     var canonical = canonicalizeTarget(target, card);
+    var companyCanonical = canonicalCompany();
 
     if (!nickname && selectedRobot) nickname = displayName(selectedRobot, optionText);
 
     return {
       source: "AICompanyManager UI preview",
       operation: "company_robot_placement.preview_only",
-      save_status: canonical.save_blocked ? "PREVIEW_ONLY_SAVE_BLOCKED_TARGET_ID" : "PREVIEW_ONLY_CANONICAL_OK",
+      save_status: (companyCanonical.company_save_blocked || canonical.save_blocked) ? "PREVIEW_ONLY_SAVE_BLOCKED_CANONICAL_ID" : "PREVIEW_ONLY_CANONICAL_OK",
       api_write: false,
       db_write: false,
-      company_id: companyId(),
+      company_id_input: companyCanonical.company_id_input,
+      company_id: companyCanonical.company_id,
+      company_id_source: companyCanonical.company_id_source,
+      company_id_canonicalization_status: companyCanonical.company_id_canonicalization_status,
+      company_display_hint: companyCanonical.company_display_hint || "",
+      matched_company_name: companyCanonical.matched_company_name || "",
       target_scope: target.scope,
       target_id_input: canonical.target_id_input,
       target_id: canonical.target_id,
@@ -393,7 +509,7 @@
       target_id_canonicalization_status: canonical.target_id_canonicalization_status,
       target_display_hint: canonical.target_display_hint,
       matched_db_name: canonical.matched_db_name || "",
-      save_blocked: canonical.save_blocked,
+      save_blocked: !!(companyCanonical.company_save_blocked || canonical.save_blocked),
       placement_role_code: target.role,
       robot_pool_id: selectedRobot ? robotId(selectedRobot, select ? select.value : "") : "",
       model_code: selectedRobot ? detectModelCode(selectedRobot, optionText) : "",
@@ -402,7 +518,7 @@
       assignment_policy: "unlimited_system_use",
       quantity_consumption: false,
       selected_option_text: optionText || "",
-      preview_warning: canonical.save_blocked ? "target_id_local_only_save_blocked" : ""
+      preview_warning: companyCanonical.company_save_blocked ? "company_id_local_only_save_blocked" : (canonical.save_blocked ? "target_id_local_only_save_blocked" : "")
     };
   }
 
@@ -432,8 +548,11 @@
       row("role", payload.placement_role_code),
       row("robot", payload.robot_display_name + (payload.model_code ? " / " + payload.model_code : "")),
       row("nickname", payload.internal_nickname),
+      row("company", payload.company_id || payload.company_id_source),
       row("scope", payload.target_scope),
       row("target", payload.target_id || payload.target_id_source),
+      row("company status", payload.company_id_canonicalization_status),
+      row("target status", payload.target_id_canonicalization_status),
       row("status", payload.save_status),
       '</div>',
       '<details data-aicm-json-details="' + esc(target.role) + '"' + (detailsWasOpen ? ' open' : '') + '><summary>詳細JSONを表示</summary><pre>' + esc(JSON.stringify(payload, null, 2)) + '</pre></details>',
@@ -561,4 +680,4 @@
     };
   }
 }());
-/* AICM_COMPACT_PAYLOAD_PREVIEW_DETAILS_TOGGLE_REPAIR_V4_END */
+/* AICM_COMPANY_ID_CANONICALIZATION_PREVIEW_V5_END */
