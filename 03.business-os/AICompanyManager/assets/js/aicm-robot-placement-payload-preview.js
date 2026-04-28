@@ -1,10 +1,216 @@
 /* AICM_PAYLOAD_PREVIEW_STRICT_VALIDATION_V6 */
+/* AICM_FINAL_PAYLOAD_ROLE_MODEL_NORMALIZER_V13 */
 /* AICM_FINAL_PREVIEW_READINESS_ALIGNMENT_V8 */
 /* AICM_PREVIEW_EXISTING_ASSIGNMENT_RESOLVER_V9 */
 /* AICM_PREVIEW_ROLE_CANONICAL_ROBOT_RESOLVER_V10 */
 /* AICM_STRICT_ROLE_COMPATIBLE_ROBOT_RESOLVER_V11 */
 /* AICM_ROLE_ELIGIBILITY_SEGMENT_STRICT_RESOLVER_V12 */
 /* AICM_BUSINESSOS_DB_COMPANY_BINDING_PREVIEW_V7 */
+
+/* AICM_MANAGER_PAYLOAD_ROBOT_ROLE_GUARD_V12 */
+function aicmV12NormalizeRoleCode(input) {
+  var s = String(input || "").trim().toLowerCase();
+  s = s.replace(/[＿_\s\-]+/g, "_");
+  s = s.replace(/配置/g, "");
+  s = s.replace(/役割/g, "");
+  s = s.replace(/ロール/g, "");
+  if (s === "president" || s === "hd_r5p" || s === "社長" || s === "プレジデント") return "president";
+  if (s === "manager" || s === "hd_r5" || s === "マネージャー" || s === "manager_role") return "manager";
+  if (s === "leader" || s === "hd_r4" || s === "リーダー" || s === "leader_role") return "leader";
+  if (s === "worker" || s === "hd_r3" || s === "ワーカー" || s === "worker_role") return "worker";
+  if (s.indexOf("president") >= 0 || s.indexOf("プレジデント") >= 0) return "president";
+  if (s.indexOf("manager") >= 0 || s.indexOf("マネージャー") >= 0) return "manager";
+  if (s.indexOf("leader") >= 0 || s.indexOf("リーダー") >= 0) return "leader";
+  if (s.indexOf("worker") >= 0 || s.indexOf("ワーカー") >= 0) return "worker";
+  return s;
+}
+
+function aicmV12NormalizeText(input) {
+  return String(input || "")
+    .replace(/[－ー–—]/g, "-")
+    .replace(/[：]/g, ":")
+    .replace(/[／]/g, "/")
+    .replace(/[　]/g, " ")
+    .toLowerCase();
+}
+
+function aicmV12ContainsAny(source, list) {
+  for (var i = 0; i < list.length; i++) {
+    if (source.indexOf(list[i]) >= 0) return true;
+  }
+  return false;
+}
+
+function aicmV12HasExplicitRoleCode(source, roleCode) {
+  var role = aicmV12NormalizeRoleCode(roleCode);
+  var s = aicmV12NormalizeText(source).replace(/["'{}\[\],]/g, " ");
+  var needles = [
+    "role_code:" + role,
+    "rolecode:" + role,
+    "placement_role_code:" + role,
+    "assignment_role_code:" + role,
+    "target_role_code:" + role,
+    "selected_role_code:" + role,
+    "compatible_role_code:" + role,
+    "role_code " + role,
+    "rolecode " + role,
+    "placement_role_code " + role,
+    "assignment_role_code " + role,
+    "target_role_code " + role,
+    "selected_role_code " + role,
+    "compatible_role_code " + role
+  ];
+  return aicmV12ContainsAny(s, needles);
+}
+
+function aicmV12HasRoleLabel(source, roleCode) {
+  var role = aicmV12NormalizeRoleCode(roleCode);
+  var s = aicmV12NormalizeText(source);
+  if (role === "president") {
+    return aicmV12ContainsAny(s, ["president", "プレジデント", "社長", "hd-r5p", "hdr5p"]);
+  }
+  if (role === "manager") {
+    return aicmV12ContainsAny(s, ["manager", "マネージャー", "hd-r5", "hdr5"]);
+  }
+  if (role === "leader") {
+    return aicmV12ContainsAny(s, ["leader", "リーダー", "hd-r4", "hdr4"]);
+  }
+  if (role === "worker") {
+    return aicmV12ContainsAny(s, ["worker", "ワーカー", "hd-r3", "hdr3"]);
+  }
+  return false;
+}
+
+function aicmV12HasContradictingRobotLabel(source, expectedRole) {
+  var role = aicmV12NormalizeRoleCode(expectedRole);
+  var s = aicmV12NormalizeText(source);
+
+  var isPayloadLike =
+    s.indexOf("payload") >= 0 ||
+    s.indexOf("配置payload") >= 0 ||
+    s.indexOf("robot") >= 0 ||
+    s.indexOf("selectedrobot") >= 0 ||
+    s.indexOf("selected robot") >= 0;
+
+  if (!isPayloadLike) return false;
+
+  if (role === "manager") {
+    return aicmV12ContainsAny(s, [
+      "robot leader",
+      "robot: leader",
+      "robot leader / hd-r4",
+      "robot: leader / hd-r4",
+      "leader / hd-r4",
+      "leader/hd-r4",
+      "リーダー / hd-r4",
+      "リーダー/hd-r4"
+    ]);
+  }
+
+  if (role === "leader") {
+    return aicmV12ContainsAny(s, [
+      "robot manager",
+      "robot: manager",
+      "robot manager / hd-r5",
+      "robot: manager / hd-r5",
+      "manager / hd-r5",
+      "manager/hd-r5",
+      "マネージャー / hd-r5",
+      "マネージャー/hd-r5"
+    ]);
+  }
+
+  if (role === "worker") {
+    return aicmV12ContainsAny(s, [
+      "robot manager / hd-r5",
+      "robot leader / hd-r4",
+      "manager / hd-r5",
+      "leader / hd-r4"
+    ]);
+  }
+
+  return false;
+}
+
+function aicmV12TextSupportsExactRoleForTarget(text, targetRole) {
+  var expected = aicmV12NormalizeRoleCode(targetRole);
+  var source = aicmV12NormalizeText(text);
+
+  if (!expected) return false;
+
+  if (aicmV12HasContradictingRobotLabel(source, expected)) {
+    return false;
+  }
+
+  if (aicmV12HasExplicitRoleCode(source, expected)) {
+    return true;
+  }
+
+  return aicmV12HasRoleLabel(source, expected);
+}
+
+function aicmV12ResolveTargetRole(target) {
+  if (target == null) return "";
+  if (typeof target === "string") return aicmV12NormalizeRoleCode(target);
+  return aicmV12NormalizeRoleCode(
+    target.role_code ||
+    target.roleCode ||
+    target.placement_role_code ||
+    target.placementRoleCode ||
+    target.assignment_role_code ||
+    target.assignmentRoleCode ||
+    target.target_role_code ||
+    target.targetRoleCode ||
+    target.role ||
+    target.roleName ||
+    target.role_name ||
+    ""
+  );
+}
+
+function aicmV12IsRobotCompatibleWithTargetRole(robot, targetRole) {
+  var expected = aicmV12NormalizeRoleCode(targetRole);
+  if (!expected) return false;
+  if (!robot) return false;
+
+  var roleFields = [
+    robot.role_code,
+    robot.roleCode,
+    robot.placement_role_code,
+    robot.placementRoleCode,
+    robot.assignment_role_code,
+    robot.assignmentRoleCode,
+    robot.compatible_role_code,
+    robot.compatibleRoleCode,
+    robot.target_role_code,
+    robot.targetRoleCode,
+    robot.role,
+    robot.roleName,
+    robot.role_name
+  ];
+
+  for (var i = 0; i < roleFields.length; i++) {
+    if (aicmV12NormalizeRoleCode(roleFields[i]) === expected) return true;
+  }
+
+  var text = [
+    robot.display_label,
+    robot.displayLabel,
+    robot.label,
+    robot.name,
+    robot.model_name,
+    robot.modelName,
+    robot.model_no,
+    robot.modelNo,
+    robot.model_code,
+    robot.modelCode,
+    robot.series_name,
+    robot.seriesName
+  ].filter(Boolean).join(" / ");
+
+  return aicmV12TextSupportsExactRoleForTarget(text, expected);
+}
+
 (function () {
   "use strict";
 
@@ -644,42 +850,13 @@
   }
 
   function roleTokenMatch(text, word) {
-    var source = String(text || "");
-    var token = String(word || "");
-    var padded;
-
-    if (!token) return false;
-
-    source = source.replace(/AICompanyManager/g, "AICM");
-    padded = source
-      .replace(/[^A-Za-z0-9_]+/g, " ")
-      .replace(/([a-z])([A-Z])/g, "$1 $2")
-      .trim();
-
-    padded = " " + padded + " ";
-    return padded.indexOf(" " + token + " ") >= 0;
-  }
+  return aicmV12TextSupportsExactRoleForTarget(text, word);
+}
 
   function businessOsTextSupportsTargetRole(text, target) {
-    var source = String(text || "");
-    var rolePart = "";
-    var words = roleWordsForTarget(target);
-    var i;
-    var idx;
-
-    if (source.indexOf("BusinessOS DB") < 0) return false;
-
-    idx = source.indexOf("対応:");
-    if (idx < 0) return false;
-
-    rolePart = source.slice(idx).replace(/AICompanyManager/g, "AICM");
-
-    for (i = 0; i < words.length; i += 1) {
-      if (roleTokenMatch(rolePart, words[i])) return true;
-    }
-
-    return false;
-  }
+  var expected = aicmV12ResolveTargetRole(target);
+  return aicmV12TextSupportsExactRoleForTarget(text, expected);
+}
 
   function robotRowText(row) {
     var text = "";
@@ -891,12 +1068,164 @@
     };
   }
 
+  function aicmAllowedModelCodesForRole(role) {
+    if (role === "President") return ["HD-R5P", "BYD2-003"];
+    if (role === "Manager") return ["HD-R5", "BYD2-002", "BYD2-003"];
+    if (role === "Leader") return ["HD-R4", "BYD2-001", "BYD2-002"];
+    if (role === "Worker") return ["HD-R3", "BYD1-001", "BYD1-002", "BYD1-003", "MG-NORN-001", "MG-NORN-002", "MG-NORN-003"];
+    return [];
+  }
+
+  function aicmTextHasModelCode(text, modelCode) {
+    return String(text || "").indexOf(String(modelCode || "")) >= 0;
+  }
+
+  function aicmModelAllowedForRole(role, modelCode) {
+    var allowed = aicmAllowedModelCodesForRole(role);
+    var i;
+
+    for (i = 0; i < allowed.length; i += 1) {
+      if (String(modelCode || "") === allowed[i]) return true;
+    }
+
+    return false;
+  }
+
+  function aicmOptionTextAllowedForRole(role, text) {
+    var allowed = aicmAllowedModelCodesForRole(role);
+    var source = String(text || "");
+    var i;
+
+    if (source.indexOf("BusinessOS DB") < 0) return false;
+
+    for (i = 0; i < allowed.length; i += 1) {
+      if (aicmTextHasModelCode(source, allowed[i])) return true;
+    }
+
+    return false;
+  }
+
+  function aicmBuildRobotFromOption(option) {
+    var text = option ? option.textContent || "" : "";
+    var value = option ? option.value || "" : "";
+    var match;
+    var name = "";
+    var model = "";
+
+    match = text.match(/配置:\s*([^/]+)\s*\/\s*([^/]+)\s*\//);
+    if (!match) match = text.match(/^\s*([^/]+)\s*\/\s*([^/]+)\s*\//);
+
+    if (match) {
+      name = String(match[1] || "").trim();
+      model = String(match[2] || "").trim();
+    }
+
+    return {
+      id: value,
+      robot_pool_id: value,
+      business_robot_pool_id: value,
+      model_code: model,
+      robot_display_name: name,
+      display_name: name,
+      name: name,
+      option_text: text
+    };
+  }
+
+  function aicmFindRoleCompatibleOptionRobot(target, select) {
+    var i;
+    var option;
+    var row;
+
+    if (!select || !select.options) return null;
+
+    for (i = 0; i < select.options.length; i += 1) {
+      option = select.options[i];
+
+      if (!option || !isUuid(option.value)) continue;
+      if (!aicmOptionTextAllowedForRole(target.role, option.textContent || "")) continue;
+
+      row = findRobotById(option.value) || aicmBuildRobotFromOption(option);
+
+      return {
+        robot: row,
+        option_text: option.textContent || "",
+        source: "final_payload_role_model_option"
+      };
+    }
+
+    return null;
+  }
+
+  function aicmFindRoleCompatibleStateRobot(target) {
+    var i;
+    var row;
+    var rid;
+    var model;
+
+    if (!STATE || !STATE.robots || !STATE.robots.length) return null;
+
+    for (i = 0; i < STATE.robots.length; i += 1) {
+      row = STATE.robots[i];
+      rid = robotId(row, "");
+      model = detectModelCode(row, "");
+
+      if (!isUuid(rid)) continue;
+      if (!aicmModelAllowedForRole(target.role, model)) continue;
+
+      return {
+        robot: row,
+        option_text: target.role + "配置: " + displayName(row, "") + " / " + model + " / BusinessOS DB",
+        source: "final_payload_role_model_state"
+      };
+    }
+
+    return null;
+  }
+
+  function aicmNormalizeRobotForFinalPayload(target, card, select, resolvedRobot, optionText, robotResolveSource) {
+    var currentModel = resolvedRobot ? detectModelCode(resolvedRobot, optionText || "") : "";
+    var currentRobotId = resolvedRobot ? robotId(resolvedRobot, "") : "";
+    var optionMatch;
+    var stateMatch;
+
+    if (
+      resolvedRobot &&
+      isUuid(currentRobotId) &&
+      aicmModelAllowedForRole(target.role, currentModel) &&
+      aicmOptionTextAllowedForRole(target.role, optionText || "")
+    ) {
+      return {
+        robot: resolvedRobot,
+        option_text: optionText || "",
+        source: robotResolveSource || "final_payload_already_role_model_ok"
+      };
+    }
+
+    optionMatch = aicmFindRoleCompatibleOptionRobot(target, select);
+    if (optionMatch && optionMatch.robot) return optionMatch;
+
+    stateMatch = aicmFindRoleCompatibleStateRobot(target);
+    if (stateMatch && stateMatch.robot) return stateMatch;
+
+    return {
+      robot: resolvedRobot || null,
+      option_text: optionText || "",
+      source: robotResolveSource || "final_payload_no_role_model_replacement"
+    };
+  }
+
+
   function buildPayload(target, card) {
     var select = byId(target.selectId);
     var resolvedRobot = resolveRobotForPayload(target, card, select);
     var selectedRobot = resolvedRobot.robot;
     var optionText = resolvedRobot.option_text;
     var robotResolveSource = resolvedRobot.source;
+    var finalRobotResolution = aicmNormalizeRobotForFinalPayload(target, card, select, selectedRobot, optionText, robotResolveSource);
+    selectedRobot = finalRobotResolution.robot;
+    optionText = finalRobotResolution.option_text;
+    robotResolveSource = finalRobotResolution.source;
     var nickname = firstValue(target.nicknameIds);
     var canonical = canonicalizeTarget(target, card);
     var companyCanonical = canonicalCompany();
