@@ -29,14 +29,14 @@ function json(res, status, body) {
 
 function safeFile(urlPath) {
   const clean = decodeURIComponent((urlPath || "/").split("?")[0]);
-  const file = clean === "/" ? "index.html" : clean.replace(/^\/+/g, "");
+  const file = clean === "/" ? "index.html" : clean.replace(/^\/+/, "");
   const full = path.resolve(root, file);
   const base = path.resolve(root);
   if (!full.startsWith(base)) return null;
   return full;
 }
 
-function runPsqlJson() {
+function runPsqlJson(sql) {
   if (!dbUrl) {
     return {
       ok: false,
@@ -49,7 +49,80 @@ function runPsqlJson() {
     };
   }
 
-  const sql = `
+  const result = spawnSync("psql", [dbUrl], {
+    input: sql,
+    encoding: "utf8",
+    timeout: 20000,
+    maxBuffer: 1024 * 1024 * 12
+  });
+
+  if (result.error) {
+    return {
+      ok: false,
+      status: 500,
+      body: {
+        result: "error",
+        error_code: "PSQL_EXEC_ERROR",
+        message: result.error.message
+      }
+    };
+  }
+
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      status: 500,
+      body: {
+        result: "error",
+        error_code: "PSQL_FAILED",
+        psql_status: result.status,
+        stderr: result.stderr,
+        stdout_tail: String(result.stdout || "").slice(-3000)
+      }
+    };
+  }
+
+  const jsonLine = String(result.stdout || "")
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.startsWith("{") && line.endsWith("}"))
+    .pop();
+
+  if (!jsonLine) {
+    return {
+      ok: false,
+      status: 500,
+      body: {
+        result: "error",
+        error_code: "NO_JSON_FROM_PSQL",
+        stdout_tail: String(result.stdout || "").slice(-3000),
+        stderr: result.stderr
+      }
+    };
+  }
+
+  try {
+    return {
+      ok: true,
+      status: 200,
+      body: JSON.parse(jsonLine)
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 500,
+      body: {
+        result: "error",
+        error_code: "JSON_PARSE_FAILED",
+        message: error.message,
+        json_line_head: jsonLine.slice(0, 300)
+      }
+    };
+  }
+}
+
+function robotPoolSql() {
+  return `
 \\pset format unaligned
 \\pset tuples_only on
 \\set ON_ERROR_STOP on
@@ -83,77 +156,48 @@ FROM robot_pool_rows, role_catalog_rows;
 
 ROLLBACK;
 `;
+}
 
-  const result = spawnSync("psql", [dbUrl], {
-    input: sql,
-    encoding: "utf8",
-    timeout: 20000,
-    maxBuffer: 1024 * 1024 * 8
-  });
+function structureMapSql() {
+  return `
+\\pset format unaligned
+\\pset tuples_only on
+\\set ON_ERROR_STOP on
 
-  if (result.error) {
-    return {
-      ok: false,
-      status: 500,
-      body: {
-        result: "error",
-        error_code: "PSQL_EXEC_ERROR",
-        message: result.error.message
-      }
-    };
-  }
+BEGIN READ ONLY;
 
-  if (result.status !== 0) {
-    return {
-      ok: false,
-      status: 500,
-      body: {
-        result: "error",
-        error_code: "PSQL_FAILED",
-        psql_status: result.status,
-        stderr: result.stderr,
-        stdout_tail: String(result.stdout || "").slice(-2000)
-      }
-    };
-  }
+WITH
+company_rows AS (
+  SELECT coalesce(jsonb_agg(to_jsonb(c) ORDER BY to_jsonb(c)::text), '[]'::jsonb) AS rows
+  FROM business.aicm_company c
+),
+department_rows AS (
+  SELECT coalesce(jsonb_agg(to_jsonb(d) ORDER BY to_jsonb(d)::text), '[]'::jsonb) AS rows
+  FROM business.aicm_department d
+),
+organization_rows AS (
+  SELECT coalesce(jsonb_agg(to_jsonb(o) ORDER BY to_jsonb(o)::text), '[]'::jsonb) AS rows
+  FROM business.aicm_organization o
+)
+SELECT jsonb_build_object(
+  'result', 'ok',
+  'source', 'business_db_readonly',
+  'company_provider', 'business.aicm_company',
+  'department_provider', 'business.aicm_department',
+  'organization_provider', 'business.aicm_organization',
+  'companies', company_rows.rows,
+  'departments', department_rows.rows,
+  'organizations', organization_rows.rows,
+  'counts', jsonb_build_object(
+    'companies', jsonb_array_length(company_rows.rows),
+    'departments', jsonb_array_length(department_rows.rows),
+    'organizations', jsonb_array_length(organization_rows.rows)
+  )
+)::text
+FROM company_rows, department_rows, organization_rows;
 
-  const jsonLine = String(result.stdout || "")
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.startsWith("{") && line.endsWith("}"))
-    .pop();
-
-  if (!jsonLine) {
-    return {
-      ok: false,
-      status: 500,
-      body: {
-        result: "error",
-        error_code: "NO_JSON_FROM_PSQL",
-        stdout_tail: String(result.stdout || "").slice(-2000),
-        stderr: result.stderr
-      }
-    };
-  }
-
-  try {
-    return {
-      ok: true,
-      status: 200,
-      body: JSON.parse(jsonLine)
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      status: 500,
-      body: {
-        result: "error",
-        error_code: "JSON_PARSE_FAILED",
-        message: error.message,
-        json_line_head: jsonLine.slice(0, 300)
-      }
-    };
-  }
+ROLLBACK;
+`;
 }
 
 const server = http.createServer((req, res) => {
@@ -165,12 +209,20 @@ const server = http.createServer((req, res) => {
         result: "ok",
         service: "AICompanyManager local UI/API server",
         root,
-        api: ["/api/aicm/business-robot-pool"]
+        api: [
+          "/api/aicm/business-robot-pool",
+          "/api/aicm/structure-map"
+        ]
       });
     }
 
     if (req.method === "GET" && url.pathname === "/api/aicm/business-robot-pool") {
-      const psqlResult = runPsqlJson();
+      const psqlResult = runPsqlJson(robotPoolSql());
+      return json(res, psqlResult.status, psqlResult.body);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/aicm/structure-map") {
+      const psqlResult = runPsqlJson(structureMapSql());
       return json(res, psqlResult.status, psqlResult.body);
     }
 
@@ -204,4 +256,5 @@ server.listen(port, host, () => {
   console.log("AICompanyManager local UI/API server listening on http://" + host + ":" + port + "/");
   console.log("ROOT=" + root);
   console.log("API=/api/aicm/business-robot-pool");
+  console.log("API=/api/aicm/structure-map");
 });
