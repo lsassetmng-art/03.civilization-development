@@ -3,6 +3,7 @@
 /* AICM_PREVIEW_EXISTING_ASSIGNMENT_RESOLVER_V9 */
 /* AICM_PREVIEW_ROLE_CANONICAL_ROBOT_RESOLVER_V10 */
 /* AICM_STRICT_ROLE_COMPATIBLE_ROBOT_RESOLVER_V11 */
+/* AICM_ROLE_ELIGIBILITY_SEGMENT_STRICT_RESOLVER_V12 */
 /* AICM_BUSINESSOS_DB_COMPANY_BINDING_PREVIEW_V7 */
 (function () {
   "use strict";
@@ -661,17 +662,17 @@
 
   function businessOsTextSupportsTargetRole(text, target) {
     var source = String(text || "");
-    var rolePart = source;
+    var rolePart = "";
     var words = roleWordsForTarget(target);
     var i;
     var idx;
 
     if (source.indexOf("BusinessOS DB") < 0) return false;
 
-    if (source.indexOf(String(target.role || "") + "配置:") >= 0) return true;
-
     idx = source.indexOf("対応:");
-    if (idx >= 0) rolePart = source.slice(idx);
+    if (idx < 0) return false;
+
+    rolePart = source.slice(idx).replace(/AICompanyManager/g, "AICM");
 
     for (i = 0; i < words.length; i += 1) {
       if (roleTokenMatch(rolePart, words[i])) return true;

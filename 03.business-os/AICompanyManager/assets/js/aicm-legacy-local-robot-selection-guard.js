@@ -1,4 +1,5 @@
 /* AICM_LEGACY_LOCAL_ROBOT_SELECTION_GUARD_V1 */
+/* AICM_LEGACY_GUARD_ROLE_ELIGIBILITY_SEGMENT_STRICT_V2 */
 (function () {
   "use strict";
 
@@ -46,32 +47,51 @@
       t.indexOf("BusinessOS DB候補を選択") >= 0;
   }
 
-  function isValidBusinessOsSelection(select) {
+  function isValidBusinessOsSelection(select, target) {
     var text = selectedText(select);
+    var option;
+
     if (!select) return false;
     if (isPlaceholderText(text)) return false;
     if (!isUuid(select.value)) return false;
     if (text.indexOf("BusinessOS DB") < 0) return false;
+
+    option = select.options && select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+    if (!optionMatchesRole(option, target)) return false;
+
     return true;
   }
 
-  function isInvalidLegacySelection(select) {
+  function isInvalidLegacySelection(select, target) {
     var text = selectedText(select);
+
     if (!select) return false;
     if (isPlaceholderText(text)) return false;
-    if (isValidBusinessOsSelection(select)) return false;
+    if (isValidBusinessOsSelection(select, target)) return false;
+
     return true;
   }
 
   function optionMatchesRole(option, target) {
     var text = option ? option.textContent || "" : "";
+    var rolePart = "";
+    var idx;
     var i;
 
     if (!option || !isUuid(option.value)) return false;
     if (text.indexOf("BusinessOS DB") < 0) return false;
 
+    idx = text.indexOf("対応:");
+    if (idx < 0) return false;
+
+    rolePart = text.slice(idx)
+      .replace(/AICompanyManager/g, "AICM")
+      .replace(/[^A-Za-z0-9_]+/g, " ");
+
+    rolePart = " " + rolePart.trim() + " ";
+
     for (i = 0; i < target.roleWords.length; i += 1) {
-      if (text.indexOf(target.roleWords[i]) >= 0) return true;
+      if (rolePart.indexOf(" " + target.roleWords[i] + " ") >= 0) return true;
     }
 
     return false;
@@ -105,12 +125,12 @@
     if (!select) return { changed: false, reason: "select_not_found" };
     if (document.activeElement === select) return { changed: false, reason: "select_focused" };
 
-    if (isValidBusinessOsSelection(select)) {
+    if (isValidBusinessOsSelection(select, target)) {
       select.setAttribute("data-aicm-legacy-local-guard-status", "already_valid_businessos_db");
       return { changed: false, reason: "already_valid_businessos_db" };
     }
 
-    if (!isInvalidLegacySelection(select)) {
+    if (!isInvalidLegacySelection(select, target)) {
       return { changed: false, reason: "not_legacy_selection" };
     }
 
