@@ -1,4 +1,4 @@
-/* AICM_COMPANY_ID_CANONICALIZATION_PREVIEW_V5 */
+/* AICM_PAYLOAD_PREVIEW_STRICT_VALIDATION_V6 */
 (function () {
   "use strict";
 
@@ -480,6 +480,62 @@
     };
   }
 
+
+  function isPlaceholderOption(text) {
+    var t = String(text || "").trim();
+    return !t || t === "選択してください" || t.indexOf("候補を選択") >= 0 || t.indexOf("BusinessOS DB候補を選択") >= 0;
+  }
+
+  function validatePayloadForPreview(payload) {
+    var errors = [];
+    var warnings = [];
+
+    if (!isUuid(payload.company_id)) {
+      errors.push("company_id_not_canonical_uuid");
+    }
+
+    if (payload.company_id_source === "single_db_company_fallback") {
+      warnings.push("company_id_single_db_fallback_confirm_before_save");
+    }
+
+    if (payload.company_id_canonicalization_status && payload.company_id_canonicalization_status.indexOf("OK_") !== 0) {
+      errors.push("company_id_canonicalization_not_ok");
+    }
+
+    if (payload.target_id_canonicalization_status && payload.target_id_canonicalization_status.indexOf("OK_") !== 0) {
+      errors.push("target_id_canonicalization_not_ok");
+    }
+
+    if (payload.target_scope !== "company" && !isUuid(payload.target_id)) {
+      errors.push("target_id_not_canonical_uuid");
+    }
+
+    if (!payload.robot_pool_id) {
+      errors.push("robot_pool_id_required");
+    }
+
+    if (!payload.model_code) {
+      errors.push("model_code_required");
+    }
+
+    if (!payload.robot_display_name) {
+      errors.push("robot_display_name_required");
+    }
+
+    if (isPlaceholderOption(payload.selected_option_text)) {
+      errors.push("robot_not_selected");
+    }
+
+    return {
+      validation_errors: errors,
+      validation_warnings: warnings,
+      robot_selection_status: errors.indexOf("robot_not_selected") >= 0 || errors.indexOf("robot_pool_id_required") >= 0 ? "BLOCKED_ROBOT_NOT_SELECTED" : "OK_ROBOT_SELECTED",
+      company_mapping_warning: warnings.indexOf("company_id_single_db_fallback_confirm_before_save") >= 0 ? "CONFIRM_SINGLE_DB_COMPANY_FALLBACK" : "",
+      strict_validation_status: errors.length ? "BLOCKED_PREVIEW_VALIDATION_ERRORS" : "OK_STRICT_PREVIEW_VALIDATION",
+      strict_save_blocked: errors.length > 0
+    };
+  }
+
   function buildPayload(target, card) {
     var select = byId(target.selectId);
     var selectedRobot = findRobotBySelect(select);
@@ -490,10 +546,10 @@
 
     if (!nickname && selectedRobot) nickname = displayName(selectedRobot, optionText);
 
-    return {
+    var payload = {
       source: "AICompanyManager UI preview",
       operation: "company_robot_placement.preview_only",
-      save_status: (companyCanonical.company_save_blocked || canonical.save_blocked) ? "PREVIEW_ONLY_SAVE_BLOCKED_CANONICAL_ID" : "PREVIEW_ONLY_CANONICAL_OK",
+      save_status: "PREVIEW_VALIDATION_PENDING",
       api_write: false,
       db_write: false,
       company_id_input: companyCanonical.company_id_input,
@@ -520,6 +576,24 @@
       selected_option_text: optionText || "",
       preview_warning: companyCanonical.company_save_blocked ? "company_id_local_only_save_blocked" : (canonical.save_blocked ? "target_id_local_only_save_blocked" : "")
     };
+
+    var validation = validatePayloadForPreview(payload);
+
+    payload.validation_errors = validation.validation_errors;
+    payload.validation_warnings = validation.validation_warnings;
+    payload.robot_selection_status = validation.robot_selection_status;
+    payload.company_mapping_warning = validation.company_mapping_warning;
+    payload.strict_validation_status = validation.strict_validation_status;
+    payload.save_blocked = !!(payload.save_blocked || validation.strict_save_blocked);
+    payload.save_status = payload.save_blocked ? "PREVIEW_ONLY_SAVE_BLOCKED_VALIDATION" : "PREVIEW_ONLY_CANONICAL_OK";
+
+    if (validation.validation_errors.indexOf("robot_not_selected") >= 0 || validation.validation_errors.indexOf("robot_pool_id_required") >= 0) {
+      payload.preview_warning = "robot_not_selected_save_blocked";
+    } else if (payload.company_mapping_warning) {
+      payload.preview_warning = payload.company_mapping_warning;
+    }
+
+    return payload;
   }
 
   function row(label, value) {
@@ -553,6 +627,9 @@
       row("target", payload.target_id || payload.target_id_source),
       row("company status", payload.company_id_canonicalization_status),
       row("target status", payload.target_id_canonicalization_status),
+      row("robot status", payload.robot_selection_status),
+      row("validation", payload.strict_validation_status),
+      row("warning", payload.preview_warning || payload.company_mapping_warning || "-"),
       row("status", payload.save_status),
       '</div>',
       '<details data-aicm-json-details="' + esc(target.role) + '"' + (detailsWasOpen ? ' open' : '') + '><summary>詳細JSONを表示</summary><pre>' + esc(JSON.stringify(payload, null, 2)) + '</pre></details>',
@@ -680,4 +757,4 @@
     };
   }
 }());
-/* AICM_COMPANY_ID_CANONICALIZATION_PREVIEW_V5_END */
+/* AICM_PAYLOAD_PREVIEW_STRICT_VALIDATION_V6_END */
