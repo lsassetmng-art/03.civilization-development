@@ -1,5 +1,6 @@
 /* AICM_PAYLOAD_PREVIEW_STRICT_VALIDATION_V6 */
 /* AICM_FINAL_PREVIEW_READINESS_ALIGNMENT_V8 */
+/* AICM_PREVIEW_EXISTING_ASSIGNMENT_RESOLVER_V9 */
 /* AICM_BUSINESSOS_DB_COMPANY_BINDING_PREVIEW_V7 */
 (function () {
   "use strict";
@@ -541,7 +542,7 @@
 
     if (isPlaceholderOption(payload.selected_option_text)) {
       errors.push("robot_not_selected");
-    } else if (String(payload.selected_option_text || "").indexOf("BusinessOS DB") < 0) {
+    } else if (String(payload.selected_option_text || "").indexOf("BusinessOS DB") < 0 && String(payload.robot_resolve_source || "") !== "existing_assignment_visible") {
       errors.push("robot_selection_not_businessos_db");
     }
 
@@ -560,10 +561,112 @@
     };
   }
 
+
+  function existingAssignmentRegionText(target, card) {
+    var texts = [];
+    var body = "";
+    var roleMarker = "@" + target.role;
+    var pos;
+
+    if (card) texts.push(textOf(card));
+    if (card && card.parentElement) texts.push(textOf(card.parentElement));
+
+    body = textOf(document.body);
+    pos = body.indexOf(roleMarker);
+    if (pos >= 0) {
+      texts.push(body.slice(Math.max(0, pos - 420), Math.min(body.length, pos + 760)));
+    }
+
+    if (target.role === "President") {
+      pos = body.indexOf("Presidentロボット");
+      if (pos >= 0) texts.push(body.slice(pos, Math.min(body.length, pos + 1200)));
+    }
+
+    if (target.role === "Manager") {
+      pos = body.indexOf("Managerロボット");
+      if (pos >= 0) texts.push(body.slice(pos, Math.min(body.length, pos + 1200)));
+    }
+
+    if (target.role === "Leader") {
+      pos = body.indexOf("Leaderロボット");
+      if (pos >= 0) texts.push(body.slice(pos, Math.min(body.length, pos + 1200)));
+    }
+
+    if (target.role === "Worker") {
+      pos = body.indexOf("Workerロボット");
+      if (pos >= 0) texts.push(body.slice(pos, Math.min(body.length, pos + 1200)));
+    }
+
+    return texts.join("\n---\n");
+  }
+
+  function existingAssignmentRobotPoolId(target, card) {
+    var text = existingAssignmentRegionText(target, card);
+    var match;
+
+    match = text.match(/Business側ロボットプール[:：]\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    if (match && match[1]) return match[1];
+
+    match = text.match(/robot_pool_id["\s:：]*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    if (match && match[1]) return match[1];
+
+    return "";
+  }
+
+  function findRobotById(robotPoolId) {
+    var i;
+    var row;
+    var rid;
+
+    if (!robotPoolId) return null;
+
+    for (i = 0; i < STATE.robots.length; i += 1) {
+      row = STATE.robots[i];
+      rid = robotId(row, "");
+      if (rid === robotPoolId) return row;
+    }
+
+    return null;
+  }
+
+  function resolveRobotForPayload(target, card, select) {
+    var optionText = selectedText(select);
+    var selectedRobot = findRobotBySelect(select);
+    var existingRobotPoolId;
+    var existingRobot;
+
+    if (selectedRobot && robotId(selectedRobot, select ? select.value : "")) {
+      return {
+        robot: selectedRobot,
+        option_text: optionText,
+        source: "select"
+      };
+    }
+
+    existingRobotPoolId = existingAssignmentRobotPoolId(target, card);
+    existingRobot = findRobotById(existingRobotPoolId);
+
+    if (existingRobot) {
+      return {
+        robot: existingRobot,
+        option_text: target.role + " existing assignment: " + displayName(existingRobot, "") + " / " + detectModelCode(existingRobot, "") + " / BusinessOS DB",
+        source: "existing_assignment_visible"
+      };
+    }
+
+    return {
+      robot: selectedRobot,
+      option_text: optionText,
+      source: "none"
+    };
+  }
+
   function buildPayload(target, card) {
     var select = byId(target.selectId);
-    var selectedRobot = findRobotBySelect(select);
-    var optionText = selectedText(select);
+    var resolvedRobot = resolveRobotForPayload(target, card, select);
+    var selectedRobot = resolvedRobot.robot;
+    var optionText = resolvedRobot.option_text;
+    var robotResolveSource = resolvedRobot.source;
     var nickname = firstValue(target.nicknameIds);
     var canonical = canonicalizeTarget(target, card);
     var companyCanonical = canonicalCompany();
@@ -598,6 +701,7 @@
       assignment_policy: "unlimited_system_use",
       quantity_consumption: false,
       selected_option_text: optionText || "",
+      robot_resolve_source: robotResolveSource || "",
       preview_warning: companyCanonical.company_save_blocked ? "company_id_local_only_save_blocked" : (canonical.save_blocked ? "target_id_local_only_save_blocked" : "")
     };
 
