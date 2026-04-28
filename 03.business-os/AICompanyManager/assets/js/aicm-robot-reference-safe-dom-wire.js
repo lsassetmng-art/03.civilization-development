@@ -1,9 +1,9 @@
-/* AICM_ROBOT_REFERENCE_SAFE_SEPARATE_FILE_WIRE_V1 */
+/* AICM_ROBOT_REFERENCE_DECLUTTER_WIRE_V3 */
 (function () {
   "use strict";
 
-  var AICM_REFERENCE_CACHE = {"generated_at":"2026-04-28T08:17:46.837Z","assignment_policy":"unlimited_system_use","quantity_consumption":false,"counts":{"business.robot_pool":44,"business.robot_placement_role_catalog":16,"aiworker.robot_model_personality_profile":44,"aiworker.robot_model_public_profile":27,"cx22073jw.vw_robot_model_full_reference_v3":31},"reference_status":{"role_catalog":true,"model_pool":true,"personality":true,"public_profile":true,"cx_full_reference":true},"errors":[]};
-  var STYLE_ID = "aicm-robot-reference-safe-file-style-v1";
+  var CACHE = {"generated_at":"2026-04-28T08:17:46.837Z","assignment_policy":"unlimited_system_use","quantity_consumption":false,"counts":{"business.robot_pool":44,"business.robot_placement_role_catalog":16,"aiworker.robot_model_personality_profile":44,"aiworker.robot_model_public_profile":27,"cx22073jw.vw_robot_model_full_reference_v3":31},"reference_status":{"role_catalog":true,"model_pool":true,"personality":true,"public_profile":true,"cx_full_reference":true},"errors":[]};
+  var STYLE_ID = "aicm-robot-reference-declutter-style-v3";
   var TIMER = null;
 
   function esc(value) {
@@ -16,101 +16,141 @@
 
   function injectStyle() {
     if (document.getElementById(STYLE_ID)) return;
+
     var style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = [
-      ".aicm-ref-safe-card{border:1px solid #d9e1ec;border-radius:12px;background:#fbfdff;padding:12px;margin-top:12px;}",
-      ".aicm-ref-safe-card h3{font-size:15px;margin:0 0 8px;}",
-      ".aicm-ref-safe-card p{margin:6px 0;}",
-      ".aicm-ref-safe-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#e8f2ff;color:#0b63ce;font-weight:700;font-size:12px;margin:2px;}",
-      ".aicm-ref-safe-badge-ok{background:#e8fff2;color:#087443;}",
-      ".aicm-ref-safe-badge-warn{background:#fff7e8;color:#9a5b00;}"
+      ".aicm-ref-compact{border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;padding:10px;margin-top:10px;font-size:13px;}",
+      ".aicm-ref-compact strong{display:block;margin-bottom:6px;}",
+      ".aicm-ref-compact-badge{display:inline-block;padding:3px 7px;border-radius:999px;background:#e8f2ff;color:#0b63ce;font-weight:700;font-size:11px;margin:2px;}",
+      ".aicm-ref-compact-ok{background:#e8fff2;color:#087443;}",
+      ".aicm-ref-compact-warn{background:#fff7e8;color:#9a5b00;}",
+      ".aicm-ref-compact-muted{color:#667085;margin-top:5px;}"
     ].join("\n");
+
     document.head.appendChild(style);
   }
 
   function badge(ok, label) {
-    return '<span class="aicm-ref-safe-badge ' + (ok ? "aicm-ref-safe-badge-ok" : "aicm-ref-safe-badge-warn") + '">' +
+    return '<span class="aicm-ref-compact-badge ' + (ok ? "aicm-ref-compact-ok" : "aicm-ref-compact-warn") + '">' +
       esc(label + ": " + (ok ? "OK" : "未検出")) +
       '</span>';
   }
 
-  function referenceHtml(role) {
-    var cache = AICM_REFERENCE_CACHE || {};
-    var status = cache.reference_status || {};
-    var counts = cache.counts || {};
-    var errors = cache.errors || [];
-
+  function compactHtml() {
+    var status = CACHE.reference_status || {};
+    var counts = CACHE.counts || {};
     return [
-      '<div class="aicm-ref-safe-card" data-aicm-ref-role="' + esc(role) + '">',
-      '<h3>ロボット参照情報: ' + esc(role) + '</h3>',
-      '<p>',
-      badge(!!status.role_catalog, "role catalog"),
-      badge(!!status.model_pool, "model / robot pool"),
+      '<div class="aicm-ref-compact" data-aicm-ref-compact="robot-reference-status">',
+      '<strong>ロボット参照状態</strong>',
+      '<div>',
+      badge(!!status.role_catalog, "role"),
+      badge(!!status.model_pool, "model"),
       badge(!!status.personality, "personality"),
-      badge(!!status.public_profile, "public profile"),
-      badge(!!status.cx_full_reference, "CX full reference"),
-      '</p>',
-      '<p class="aicm-muted">robot_pool: ' + esc(counts["business.robot_pool"] || 0) +
-        ' / role_catalog: ' + esc(counts["business.robot_placement_role_catalog"] || 0) +
-        ' / personality: ' + esc(counts["aiworker.robot_model_personality_profile"] || 0) +
-        ' / public_profile: ' + esc(counts["aiworker.robot_model_public_profile"] || 0) +
-        ' / cx_full_reference: ' + esc(counts["cx22073jw.vw_robot_model_full_reference_v3"] || 0) + '</p>',
-      '<p class="aicm-muted">AICompanyManagerはシステム用のため、数量消費なし・無制限割当です。</p>',
-      errors.length ? '<p class="aicm-muted">参照warning: ' + esc(errors.length) + '件</p>' : '',
+      badge(!!status.public_profile, "profile"),
+      badge(!!status.cx_full_reference, "CX"),
+      '</div>',
+      '<div class="aicm-ref-compact-muted">pool=' + esc(counts["business.robot_pool"] || 0) +
+        ' / role=' + esc(counts["business.robot_placement_role_catalog"] || 0) +
+        ' / profile=' + esc(counts["aiworker.robot_model_public_profile"] || 0) +
+        ' / cx=' + esc(counts["cx22073jw.vw_robot_model_full_reference_v3"] || 0) +
+        ' / 数量消費なし</div>',
       '</div>'
     ].join("");
   }
 
-  function cardText(card) {
-    return (card && card.textContent ? card.textContent : "").replace(/\s+/g, " ");
+  function textOf(el) {
+    return (el && el.textContent ? el.textContent : "").replace(/\s+/g, " ");
   }
 
-  function targetRole(text) {
-    if (text.indexOf("Presidentロボット") >= 0) return "President";
-    if (text.indexOf("Managerロボット設定") >= 0 || text.indexOf("Managerロボット") >= 0) return "Manager";
-    if (text.indexOf("Leaderロボット設定") >= 0 || text.indexOf("Leaderロボット") >= 0) return "Leader";
-    if (text.indexOf("Workerロボット配置") >= 0 || text.indexOf("配置済みWorker") >= 0) return "Worker";
-    return "";
+  function isRobotReferenceOwner(cardText) {
+    if (cardText.indexOf("BusinessOS AIWorker ロボット設定") >= 0) return true;
+    if (cardText.indexOf("AICompanyManager ロボット設定導線") >= 0) return true;
+    if (cardText.indexOf("画面別ロボット配置フィルタ") >= 0) return true;
+    if (cardText.indexOf("保存済みロボット配置") >= 0) return true;
+    return false;
   }
 
-  function applyReferenceCards() {
+  function shouldNeverInject(cardText) {
+    if (cardText.indexOf("Presidentロボット") >= 0) return true;
+    if (cardText.indexOf("Managerロボット設定") >= 0) return true;
+    if (cardText.indexOf("Leaderロボット設定") >= 0) return true;
+    if (cardText.indexOf("Workerロボット配置") >= 0) return true;
+    if (cardText.indexOf("会社事業方針") >= 0) return true;
+    if (cardText.indexOf("会社共通ルール") >= 0) return true;
+    return false;
+  }
+
+  function removeOldReferenceCards() {
+    Array.prototype.slice.call(document.querySelectorAll(
+      "[data-aicm-ref-role], .aicm-ref-safe-card, .aicm-ref-persist-card"
+    )).forEach(function (node) {
+      if (node && node.parentNode) node.parentNode.removeChild(node);
+    });
+  }
+
+  function apply() {
     try {
       injectStyle();
+      removeOldReferenceCards();
+
       Array.prototype.slice.call(document.querySelectorAll(".aicm-card")).forEach(function (card) {
-        var role = targetRole(cardText(card));
-        if (!role) return;
-        if (card.querySelector('[data-aicm-ref-role="' + role + '"]')) return;
-        card.insertAdjacentHTML("beforeend", referenceHtml(role));
+        var text = textOf(card);
+        if (shouldNeverInject(text)) return;
+        if (!isRobotReferenceOwner(text)) return;
+        if (card.querySelector("[data-aicm-ref-compact='robot-reference-status']")) return;
+        card.insertAdjacentHTML("beforeend", compactHtml());
       });
+
+      window.AICM_ROBOT_REFERENCE_WIRE_STATUS = {
+        ok: true,
+        mode: "decluttered_compact_owner_only",
+        generated_at: CACHE.generated_at,
+        quantity_consumption: false,
+        assignment_policy: "unlimited_system_use"
+      };
     } catch (error) {
-      if (window && window.console && window.console.warn) {
-        window.console.warn("[AICM] robot reference separate wire skipped:", error && error.message ? error.message : error);
+      window.AICM_ROBOT_REFERENCE_WIRE_STATUS = {
+        ok: false,
+        error: error && error.message ? error.message : String(error)
+      };
+      if (window.console && window.console.warn) {
+        window.console.warn("[AICM] robot reference declutter wire skipped:", error);
       }
     }
   }
 
-  function scheduleApply() {
+  function schedule() {
     window.clearTimeout(TIMER);
-    TIMER = window.setTimeout(applyReferenceCards, 100);
+    TIMER = window.setTimeout(apply, 120);
   }
 
   try {
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", applyReferenceCards);
+      document.addEventListener("DOMContentLoaded", apply);
     } else {
-      applyReferenceCards();
+      apply();
     }
 
-    if (document.body && window.MutationObserver) {
-      new MutationObserver(scheduleApply).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("load", apply);
+    window.addEventListener("focus", apply);
+    document.addEventListener("visibilitychange", apply);
+    document.addEventListener("click", function () { window.setTimeout(apply, 180); }, true);
+
+    if (window.MutationObserver) {
+      var startObserver = function () {
+        if (!document.body) return;
+        new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+      };
+      if (document.body) startObserver();
+      else document.addEventListener("DOMContentLoaded", startObserver);
     }
 
-    window.setInterval(applyReferenceCards, 2000);
+    window.setInterval(apply, 1500);
   } catch (error) {
-    if (window && window.console && window.console.warn) {
-      window.console.warn("[AICM] robot reference separate wire init skipped:", error && error.message ? error.message : error);
+    if (window.console && window.console.warn) {
+      window.console.warn("[AICM] robot reference declutter wire init skipped:", error);
     }
   }
 }());
-/* AICM_ROBOT_REFERENCE_SAFE_SEPARATE_FILE_WIRE_V1_END */
+/* AICM_ROBOT_REFERENCE_DECLUTTER_WIRE_V3_END */
