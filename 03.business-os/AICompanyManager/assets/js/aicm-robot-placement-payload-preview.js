@@ -2,6 +2,7 @@
 /* AICM_FINAL_PREVIEW_READINESS_ALIGNMENT_V8 */
 /* AICM_PREVIEW_EXISTING_ASSIGNMENT_RESOLVER_V9 */
 /* AICM_PREVIEW_ROLE_CANONICAL_ROBOT_RESOLVER_V10 */
+/* AICM_STRICT_ROLE_COMPATIBLE_ROBOT_RESOLVER_V11 */
 /* AICM_BUSINESSOS_DB_COMPANY_BINDING_PREVIEW_V7 */
 (function () {
   "use strict";
@@ -641,21 +642,89 @@
     return [role];
   }
 
-  function robotRowText(row) {
-    var text = "";
-    try {
-      text = JSON.stringify(row || {});
-    } catch (error) {
-      text = "";
+  function roleTokenMatch(text, word) {
+    var source = String(text || "");
+    var token = String(word || "");
+    var padded;
+
+    if (!token) return false;
+
+    source = source.replace(/AICompanyManager/g, "AICM");
+    padded = source
+      .replace(/[^A-Za-z0-9_]+/g, " ")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .trim();
+
+    padded = " " + padded + " ";
+    return padded.indexOf(" " + token + " ") >= 0;
+  }
+
+  function businessOsTextSupportsTargetRole(text, target) {
+    var source = String(text || "");
+    var rolePart = source;
+    var words = roleWordsForTarget(target);
+    var i;
+    var idx;
+
+    if (source.indexOf("BusinessOS DB") < 0) return false;
+
+    if (source.indexOf(String(target.role || "") + "配置:") >= 0) return true;
+
+    idx = source.indexOf("対応:");
+    if (idx >= 0) rolePart = source.slice(idx);
+
+    for (i = 0; i < words.length; i += 1) {
+      if (roleTokenMatch(rolePart, words[i])) return true;
     }
 
-    try {
-      text += " " + displayName(row, "");
-    } catch (error) {}
+    return false;
+  }
 
-    try {
-      text += " " + detectModelCode(row, "");
-    } catch (error) {}
+  function robotRowText(row) {
+    var text = "";
+    var keys = [
+      "role_code",
+      "role_codes",
+      "supported_role_codes",
+      "eligible_role_codes",
+      "placement_role_code",
+      "placement_role_codes",
+      "role_slot_1",
+      "role_slot_2",
+      "role_slot_3",
+      "role_name",
+      "role_name_en",
+      "roles",
+      "role_labels",
+      "role_label"
+    ];
+    var i;
+    var v;
+
+    for (i = 0; i < keys.length; i += 1) {
+      v = row && row[keys[i]];
+      if (v == null) continue;
+
+      if (Array.isArray(v)) {
+        text += " " + v.join(" ");
+      } else if (typeof v === "object") {
+        try {
+          text += " " + JSON.stringify(v);
+        } catch (error) {}
+      } else {
+        text += " " + String(v);
+      }
+    }
+
+    if (!text) {
+      try {
+        text = JSON.stringify(row || {});
+      } catch (error) {
+        text = "";
+      }
+    }
+
+    text = text.replace(/AICompanyManager/g, "AICM");
 
     return text;
   }
@@ -666,7 +735,7 @@
     var i;
 
     for (i = 0; i < words.length; i += 1) {
-      if (words[i] && text.indexOf(words[i]) >= 0) return true;
+      if (roleTokenMatch(text, words[i])) return true;
     }
 
     return false;
@@ -679,7 +748,7 @@
     var i;
 
     for (i = 0; i < words.length; i += 1) {
-      if (text.indexOf(words[i]) >= 0) {
+      if (roleTokenMatch(text, words[i])) {
         roleText = roleText ? roleText + "・" + words[i] : words[i];
       }
     }
@@ -689,15 +758,66 @@
     return target.role + "配置: " + displayName(row, "") + " / " + detectModelCode(row, "") + " / 対応: " + roleText + " / BusinessOS DB";
   }
 
-  function selectedRobotIsCanonicalBusinessOs(row, select, optionText) {
+  function selectedRobotIsCanonicalBusinessOs(row, select, optionText, target) {
     var rid = row ? robotId(row, select ? select.value : "") : "";
     var text = String(optionText || "");
 
     if (!row) return false;
     if (!isUuid(rid)) return false;
     if (text.indexOf("BusinessOS DB") < 0) return false;
+    if (!businessOsTextSupportsTargetRole(text, target)) return false;
 
     return true;
+  }
+
+  function buildRobotFromOption(option) {
+    var text = option ? option.textContent || "" : "";
+    var value = option ? option.value || "" : "";
+    var match;
+    var name = "";
+    var model = "";
+
+    match = text.match(/配置:\s*([^/]+)\s*\/\s*([^/]+)\s*\//);
+    if (match) {
+      name = String(match[1] || "").trim();
+      model = String(match[2] || "").trim();
+    }
+
+    return {
+      id: value,
+      robot_pool_id: value,
+      business_robot_pool_id: value,
+      model_code: model,
+      robot_display_name: name,
+      display_name: name,
+      name: name,
+      option_text: text
+    };
+  }
+
+  function firstBusinessOsOptionForTarget(select, target) {
+    var i;
+    var option;
+    var row;
+
+    if (!select || !select.options) return null;
+
+    for (i = 0; i < select.options.length; i += 1) {
+      option = select.options[i];
+
+      if (!option || !isUuid(option.value)) continue;
+      if (!businessOsTextSupportsTargetRole(option.textContent || "", target)) continue;
+
+      row = findRobotById(option.value) || buildRobotFromOption(option);
+
+      return {
+        robot: row,
+        option_text: option.textContent || "",
+        source: "select_role_businessos_db_option"
+      };
+    }
+
+    return null;
   }
 
   function firstBusinessOsRobotForTarget(target) {
@@ -723,11 +843,12 @@
   function resolveRobotForPayload(target, card, select) {
     var optionText = selectedText(select);
     var selectedRobot = findRobotBySelect(select);
+    var optionSelection;
     var existingRobotPoolId;
     var existingRobot;
     var roleRobot;
 
-    if (selectedRobotIsCanonicalBusinessOs(selectedRobot, select, optionText)) {
+    if (selectedRobotIsCanonicalBusinessOs(selectedRobot, select, optionText, target)) {
       return {
         robot: selectedRobot,
         option_text: optionText,
@@ -735,10 +856,16 @@
       };
     }
 
+    optionSelection = firstBusinessOsOptionForTarget(select, target);
+
+    if (optionSelection && optionSelection.robot) {
+      return optionSelection;
+    }
+
     existingRobotPoolId = existingAssignmentRobotPoolId(target, card);
     existingRobot = findRobotById(existingRobotPoolId);
 
-    if (existingRobot && isUuid(robotId(existingRobot, ""))) {
+    if (existingRobot && isUuid(robotId(existingRobot, "")) && robotSupportsTargetRole(existingRobot, target)) {
       return {
         robot: existingRobot,
         option_text: businessOsRobotOptionText(target, existingRobot),
