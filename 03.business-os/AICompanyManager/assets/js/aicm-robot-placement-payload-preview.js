@@ -1,4 +1,5 @@
 /* AICM_PAYLOAD_PREVIEW_STRICT_VALIDATION_V6 */
+/* AICM_BUSINESSOS_DB_COMPANY_BINDING_PREVIEW_V7 */
 (function () {
   "use strict";
 
@@ -152,7 +153,7 @@
   }
 
   function companyId() {
-    return firstValue(["company-select", "edit-company-select", "aicm-company-id", "company-id"]) ||
+    return firstValue(["aicm-db-company-binding-select", "company-select", "edit-company-select", "aicm-company-id", "company-id"]) ||
       "00000000-0000-4000-8000-1db11893cb24";
   }
 
