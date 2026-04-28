@@ -1,4 +1,4 @@
-/* AICM_COMPACT_PAYLOAD_PREVIEW_REPAIR_V3 */
+/* AICM_COMPACT_PAYLOAD_PREVIEW_DETAILS_TOGGLE_REPAIR_V4 */
 (function () {
   "use strict";
 
@@ -412,12 +412,13 @@
 
   function renderPreview(target) {
     var card = cardForTarget(target);
-    var payload, existing, html, statusClass;
+    var payload, existing, html, statusClass, detailsWasOpen;
 
     if (!card) return;
 
     existing = card.querySelector("[data-aicm-placement-payload-preview='" + target.role + "']");
     payload = buildPayload(target, card);
+    detailsWasOpen = !!(existing && existing.querySelector("details") && existing.querySelector("details").open);
     statusClass = payload.save_blocked ? " aicm-preview-danger" : "";
 
     html = [
@@ -435,7 +436,7 @@
       row("target", payload.target_id || payload.target_id_source),
       row("status", payload.save_status),
       '</div>',
-      '<details><summary>詳細JSONを表示</summary><pre>' + esc(JSON.stringify(payload, null, 2)) + '</pre></details>',
+      '<details data-aicm-json-details="' + esc(target.role) + '"' + (detailsWasOpen ? ' open' : '') + '><summary>詳細JSONを表示</summary><pre>' + esc(JSON.stringify(payload, null, 2)) + '</pre></details>',
       '</div>'
     ].join("");
 
@@ -548,7 +549,9 @@
       })) schedule();
     }, true);
 
-    document.addEventListener("click", function () {
+    document.addEventListener("click", function (event) {
+      var node = event.target;
+      if (node && node.closest && node.closest("[data-aicm-placement-payload-preview]")) return;
       window.setTimeout(schedule, 250);
     }, true);
   } catch (error) {
@@ -558,4 +561,4 @@
     };
   }
 }());
-/* AICM_COMPACT_PAYLOAD_PREVIEW_REPAIR_V3_END */
+/* AICM_COMPACT_PAYLOAD_PREVIEW_DETAILS_TOGGLE_REPAIR_V4_END */
