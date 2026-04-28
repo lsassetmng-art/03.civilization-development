@@ -1,17 +1,17 @@
-/* AICM_BUSINESSOS_DB_ROBOT_POOL_WIRE_V1 */
+/* AICM_BUSINESSOS_DB_ROBOT_POOL_STABLE_WIRE_V2 */
 (function () {
   "use strict";
 
-  var TIMER = null;
   var API_URL = "./api/aicm/business-robot-pool";
   var STATE = {
+    api_ok: false,
     loaded: false,
     loading: false,
-    api_ok: false,
     robots: [],
     role_catalog: [],
+    counts: {},
     last_error: "",
-    counts: {}
+    last_apply_at: 0
   };
 
   var REMOVE_PANEL_TITLES = [
@@ -22,19 +22,11 @@
   ];
 
   var SELECT_TARGETS = [
-    { id: "company-president-robot", role: "President", label: "President" },
-    { id: "department-manager-robot", role: "Manager", label: "Manager" },
-    { id: "section-leader-robot", role: "Leader", label: "Leader" },
-    { id: "section-worker-robot-select", role: "Worker", label: "Worker" }
+    { id: "company-president-robot", role: "President" },
+    { id: "department-manager-robot", role: "Manager" },
+    { id: "section-leader-robot", role: "Leader" },
+    { id: "section-worker-robot-select", role: "Worker" }
   ];
-
-  function esc(value) {
-    return String(value == null ? "" : value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
 
   function textOf(el) {
     return (el && el.textContent ? el.textContent : "").replace(/\s+/g, " ").trim();
@@ -44,12 +36,7 @@
     Array.prototype.slice.call(document.querySelectorAll(".aicm-card, section, article")).forEach(function (node) {
       var text = textOf(node);
       var hit = REMOVE_PANEL_TITLES.some(function (title) { return text.indexOf(title) >= 0; });
-
-      if (!hit) return;
-
-      if (node && node.parentNode) {
-        node.parentNode.removeChild(node);
-      }
+      if (hit && node.parentNode) node.parentNode.removeChild(node);
     });
   }
 
@@ -59,6 +46,12 @@
       if (row && row[keys[i]] != null && row[keys[i]] !== "") return row[keys[i]];
     }
     return "";
+  }
+
+  function asText(value) {
+    if (value == null) return "";
+    if (typeof value === "string") return value;
+    try { return JSON.stringify(value); } catch (error) { return String(value); }
   }
 
   function asArray(value) {
@@ -72,18 +65,6 @@
       return value.split(/[ ,/|]+/).filter(Boolean);
     }
     return [value];
-  }
-
-  function normalizeRole(value) {
-    return String(value || "").trim();
-  }
-
-  function rowString(row) {
-    try {
-      return JSON.stringify(row || {});
-    } catch (error) {
-      return "";
-    }
   }
 
   function robotId(row) {
@@ -126,7 +107,6 @@
 
   function directRoles(row) {
     var roles = [];
-
     [
       "role_code",
       "aicm_role",
@@ -137,31 +117,33 @@
       "role_codes",
       "assignable_roles",
       "assignable_role_codes",
-      "eligible_roles"
+      "eligible_roles",
+      "role_name",
+      "role_layer_name_ja"
     ].forEach(function (key) {
       asArray(row && row[key]).forEach(function (role) {
-        role = normalizeRole(role);
+        role = String(role || "").trim();
         if (role && roles.indexOf(role) < 0) roles.push(role);
       });
     });
-
     return roles;
   }
 
-  function catalogRolesForRobot(robot, catalog) {
+  function catalogRolesForRobot(robot) {
     var roles = [];
     var rid = robotId(robot);
     var model = modelCode(robot);
-    var rText = rowString(robot);
+    var rText = asText(robot);
 
-    catalog.forEach(function (row) {
-      var cRole = normalizeRole(pick(row, [
+    STATE.role_catalog.forEach(function (row) {
+      var cRole = String(pick(row, [
         "role_code",
         "placement_role_code",
         "aicm_role",
         "role",
-        "role_name"
-      ]));
+        "role_name",
+        "role_layer_name_ja"
+      ]) || "").trim();
 
       if (!cRole) return;
 
@@ -173,7 +155,7 @@
         "aiworker_robot_id",
         "model_id",
         "id"
-      ]));
+      ]) || "");
 
       var cModel = String(pick(row, [
         "model_code",
@@ -181,9 +163,9 @@
         "aiworker_model_code",
         "model_no",
         "model_number"
-      ]));
+      ]) || "");
 
-      var cText = rowString(row);
+      var cText = asText(row);
       var match = false;
 
       if (rid && cRobotId && rid === cRobotId) match = true;
@@ -200,51 +182,98 @@
 
   function rolesForRobot(robot) {
     var roles = directRoles(robot);
-    catalogRolesForRobot(robot, STATE.role_catalog).forEach(function (role) {
+    catalogRolesForRobot(robot).forEach(function (role) {
       if (roles.indexOf(role) < 0) roles.push(role);
     });
     return roles;
   }
 
+  function normalizeRoleText(text) {
+    return String(text || "").toLowerCase();
+  }
+
   function robotMatchesRole(robot, wantedRole) {
     var roles = rolesForRobot(robot);
-    var text = rowString(robot);
+    var text = normalizeRoleText(asText(robot) + " " + roles.join(" ") + " " + modelCode(robot) + " " + displayName(robot));
 
     if (roles.indexOf(wantedRole) >= 0) return true;
 
     if (wantedRole === "President") {
-      return roles.indexOf("ExecutiveManager") < 0 && text.indexOf("HD-R5P") >= 0;
+      return text.indexOf("president") >= 0 || text.indexOf("hd-r5p") >= 0 || text.indexOf("プレジデント") >= 0;
     }
 
     if (wantedRole === "Manager") {
-      return roles.indexOf("ExecutiveManager") >= 0 || roles.indexOf("Manager") >= 0;
+      return text.indexOf("manager") >= 0 || text.indexOf("executivemanager") >= 0 || text.indexOf("hd-r5") >= 0 || text.indexOf("マネージャー") >= 0;
+    }
+
+    if (wantedRole === "Leader") {
+      return text.indexOf("leader") >= 0 || text.indexOf("hd-r4") >= 0 || text.indexOf("リーダー") >= 0;
+    }
+
+    if (wantedRole === "Worker") {
+      return text.indexOf("worker") >= 0 || text.indexOf("hd-r3") >= 0 || text.indexOf("ワーカー") >= 0;
     }
 
     return false;
   }
 
-  function optionLabel(robot, role) {
-    var name = displayName(robot);
+  function optionLabel(robot) {
+    var name = displayName(robot) || robotId(robot);
     var model = modelCode(robot);
     var roles = rolesForRobot(robot);
-    var suffix = [];
+    var parts = [];
+    if (model) parts.push(model);
+    if (roles.length) parts.push(roles.join("/"));
+    parts.push("BusinessOS DB");
+    return name + " / " + parts.join(" / ");
+  }
 
-    if (model) suffix.push(model);
-    if (roles.length) suffix.push(roles.join("/"));
-
-    return name + (suffix.length ? " / " + suffix.join(" / ") : "") + " / BusinessOS DB";
+  function isSelectBusy(select) {
+    return document.activeElement === select;
   }
 
   function populateSelect(select, role) {
-    var selected = select.value || "";
+    if (!select) return;
+    if (isSelectBusy(select)) return;
+
+    var current = select.value || "";
+    var previousText = "";
+    if (select.selectedIndex >= 0 && select.options[select.selectedIndex]) {
+      previousText = select.options[select.selectedIndex].textContent || "";
+    }
+
     var candidates = STATE.robots.filter(function (robot) {
       return robotMatchesRole(robot, role);
     });
 
     select.setAttribute("data-aicm-businessos-db-backed", STATE.api_ok ? "true" : "false");
     select.setAttribute("data-aicm-role-filter", role);
+    select.setAttribute("data-aicm-businessos-db-candidate-count", String(candidates.length));
 
-    if (!STATE.api_ok) {
+    if (!STATE.api_ok) return;
+
+    /*
+     * Do not destroy local value if DB candidates are empty.
+     * This avoids BusinessOS DB候補なし overwriting accepted local state.
+     */
+    if (!candidates.length) {
+      if (!select.querySelector("option[data-aicm-db-empty='true']")) {
+        var exists = Array.prototype.slice.call(select.options).some(function (opt) {
+          return opt.value === current;
+        });
+        if (!exists && current) {
+          var keep = document.createElement("option");
+          keep.value = current;
+          keep.textContent = previousText || current + " / local保持";
+          keep.selected = true;
+          select.appendChild(keep);
+        }
+      }
+      return;
+    }
+
+    var signature = candidates.map(function (r) { return robotId(r); }).join("|");
+    if (select.getAttribute("data-aicm-db-signature") === signature && select.getAttribute("data-aicm-db-role") === role) {
       return;
     }
 
@@ -252,72 +281,76 @@
 
     var empty = document.createElement("option");
     empty.value = "";
-    empty.textContent = candidates.length ? "BusinessOS DB候補を選択" : "BusinessOS DB候補なし";
+    empty.textContent = "BusinessOS DB候補を選択";
     select.appendChild(empty);
 
     candidates.forEach(function (robot) {
       var opt = document.createElement("option");
       opt.value = robotId(robot);
-      opt.textContent = optionLabel(robot, role);
-      if (selected && selected === opt.value) opt.selected = true;
+      opt.textContent = optionLabel(robot);
+      if (current && current === opt.value) opt.selected = true;
       select.appendChild(opt);
     });
+
+    select.setAttribute("data-aicm-db-signature", signature);
+    select.setAttribute("data-aicm-db-role", role);
   }
 
   function populateAllSelects() {
     SELECT_TARGETS.forEach(function (target) {
-      var select = document.getElementById(target.id);
-      if (!select) return;
-      populateSelect(select, target.role);
+      populateSelect(document.getElementById(target.id), target.role);
     });
   }
 
-  function statusLine() {
-    return "BusinessOS DB robot_pool 接続: " +
-      (STATE.api_ok ? "OK" : "未接続") +
-      " / robot_pool=" + String(STATE.counts.robot_pool || STATE.robots.length || 0) +
-      " / role_catalog=" + String(STATE.counts.role_catalog || STATE.role_catalog.length || 0) +
-      " / 数量消費なし";
-  }
+  function updateStatusLines() {
+    Array.prototype.slice.call(document.querySelectorAll("[data-aicm-db-robot-pool-status]")).forEach(function (node) {
+      node.parentNode.removeChild(node);
+    });
 
-  function placeSmallStatus() {
-    Array.prototype.slice.call(document.querySelectorAll(".aicm-card")).forEach(function (card) {
-      var text = textOf(card);
+    ["AI企業設定", "部門詳細", "課詳細"].forEach(function (title) {
+      Array.prototype.slice.call(document.querySelectorAll(".aicm-card")).forEach(function (card) {
+        var text = textOf(card);
+        if (text.indexOf(title) < 0) return;
+        if (card.querySelector("[data-aicm-db-robot-pool-status]")) return;
 
-      if (text.indexOf("AI企業設定") < 0 && text.indexOf("部門詳細") < 0 && text.indexOf("課詳細") < 0) return;
-      if (card.querySelector("[data-aicm-db-robot-pool-status]")) return;
-
-      var p = document.createElement("p");
-      p.className = "aicm-muted";
-      p.setAttribute("data-aicm-db-robot-pool-status", "true");
-      p.textContent = statusLine();
-      card.appendChild(p);
+        var p = document.createElement("p");
+        p.className = "aicm-muted";
+        p.setAttribute("data-aicm-db-robot-pool-status", "true");
+        p.textContent = "BusinessOS DB robot_pool: " +
+          (STATE.api_ok ? "接続OK" : "未接続") +
+          " / robots=" + String(STATE.counts.robot_pool || STATE.robots.length || 0) +
+          " / roles=" + String(STATE.counts.role_catalog || STATE.role_catalog.length || 0) +
+          " / 数量消費なし";
+        card.appendChild(p);
+      });
     });
   }
 
   function applyUi() {
     try {
+      var now = Date.now();
+      if (now - STATE.last_apply_at < 250) return;
+      STATE.last_apply_at = now;
+
       removeBusinessOsPanels();
       populateAllSelects();
-      placeSmallStatus();
+      updateStatusLines();
 
       window.AICM_BUSINESSOS_DB_ROBOT_POOL_WIRE_STATUS = {
         ok: true,
+        mode: "stable_one_shot_no_focus_rewrite",
         api_ok: STATE.api_ok,
         robot_count: STATE.robots.length,
         role_catalog_count: STATE.role_catalog.length,
+        last_error: STATE.last_error,
         quantity_consumption: false,
-        assignment_policy: "unlimited_system_use",
-        last_error: STATE.last_error
+        assignment_policy: "unlimited_system_use"
       };
     } catch (error) {
       window.AICM_BUSINESSOS_DB_ROBOT_POOL_WIRE_STATUS = {
         ok: false,
         error: error && error.message ? error.message : String(error)
       };
-      if (window.console && window.console.warn) {
-        window.console.warn("[AICM] BusinessOS DB robot_pool wire skipped:", error);
-      }
     }
   }
 
@@ -355,44 +388,42 @@
       });
   }
 
-  function schedule() {
-    window.clearTimeout(TIMER);
-    TIMER = window.setTimeout(function () {
-      if (!STATE.loaded) fetchPool();
-      else applyUi();
-    }, 100);
+  function scheduleLightApply() {
+    window.clearTimeout(window.AICM_DB_ROBOT_POOL_WIRE_TIMER);
+    window.AICM_DB_ROBOT_POOL_WIRE_TIMER = window.setTimeout(function () {
+      if (STATE.loaded) applyUi();
+      else fetchPool();
+    }, 200);
   }
 
   try {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", function () {
-        fetchPool().then(applyUi);
+        fetchPool();
       });
     } else {
-      fetchPool().then(applyUi);
+      fetchPool();
     }
 
-    window.addEventListener("load", schedule);
-    window.addEventListener("focus", schedule);
-    document.addEventListener("visibilitychange", schedule);
-    document.addEventListener("click", function () { window.setTimeout(schedule, 150); }, true);
+    window.addEventListener("load", scheduleLightApply);
+    window.addEventListener("focus", scheduleLightApply);
 
-    if (window.MutationObserver) {
-      var startObserver = function () {
-        if (!document.body) return;
-        new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
-      };
-      if (document.body) startObserver();
-      else document.addEventListener("DOMContentLoaded", startObserver);
-    }
+    document.addEventListener("click", function (event) {
+      var target = event.target;
+      if (target && target.tagName && String(target.tagName).toLowerCase() === "select") return;
+      window.setTimeout(scheduleLightApply, 250);
+    }, true);
 
-    window.setInterval(function () {
-      fetchPool().then(applyUi);
-    }, 5000);
+    /*
+     * No interval polling.
+     * No MutationObserver loop.
+     * Avoids Android Chrome select blink/freeze.
+     */
   } catch (error) {
-    if (window.console && window.console.warn) {
-      window.console.warn("[AICM] BusinessOS DB robot_pool wire init skipped:", error);
-    }
+    window.AICM_BUSINESSOS_DB_ROBOT_POOL_WIRE_STATUS = {
+      ok: false,
+      error: error && error.message ? error.message : String(error)
+    };
   }
 }());
-/* AICM_BUSINESSOS_DB_ROBOT_POOL_WIRE_V1_END */
+/* AICM_BUSINESSOS_DB_ROBOT_POOL_STABLE_WIRE_V2_END */
