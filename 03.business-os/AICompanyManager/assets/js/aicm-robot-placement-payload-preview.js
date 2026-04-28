@@ -1,6 +1,7 @@
 /* AICM_PAYLOAD_PREVIEW_STRICT_VALIDATION_V6 */
 /* AICM_FINAL_PREVIEW_READINESS_ALIGNMENT_V8 */
 /* AICM_PREVIEW_EXISTING_ASSIGNMENT_RESOLVER_V9 */
+/* AICM_PREVIEW_ROLE_CANONICAL_ROBOT_RESOLVER_V10 */
 /* AICM_BUSINESSOS_DB_COMPANY_BINDING_PREVIEW_V7 */
 (function () {
   "use strict";
@@ -629,33 +630,134 @@
     return null;
   }
 
+  function roleWordsForTarget(target) {
+    var role = String(target && target.role ? target.role : "");
+
+    if (role === "President") return ["President"];
+    if (role === "Manager") return ["Manager", "ExecutiveManager"];
+    if (role === "Leader") return ["Leader"];
+    if (role === "Worker") return ["Worker"];
+
+    return [role];
+  }
+
+  function robotRowText(row) {
+    var text = "";
+    try {
+      text = JSON.stringify(row || {});
+    } catch (error) {
+      text = "";
+    }
+
+    try {
+      text += " " + displayName(row, "");
+    } catch (error) {}
+
+    try {
+      text += " " + detectModelCode(row, "");
+    } catch (error) {}
+
+    return text;
+  }
+
+  function robotSupportsTargetRole(row, target) {
+    var words = roleWordsForTarget(target);
+    var text = robotRowText(row);
+    var i;
+
+    for (i = 0; i < words.length; i += 1) {
+      if (words[i] && text.indexOf(words[i]) >= 0) return true;
+    }
+
+    return false;
+  }
+
+  function businessOsRobotOptionText(target, row) {
+    var roleText = "";
+    var text = robotRowText(row);
+    var words = roleWordsForTarget(target);
+    var i;
+
+    for (i = 0; i < words.length; i += 1) {
+      if (text.indexOf(words[i]) >= 0) {
+        roleText = roleText ? roleText + "・" + words[i] : words[i];
+      }
+    }
+
+    if (!roleText) roleText = target.role;
+
+    return target.role + "配置: " + displayName(row, "") + " / " + detectModelCode(row, "") + " / 対応: " + roleText + " / BusinessOS DB";
+  }
+
+  function selectedRobotIsCanonicalBusinessOs(row, select, optionText) {
+    var rid = row ? robotId(row, select ? select.value : "") : "";
+    var text = String(optionText || "");
+
+    if (!row) return false;
+    if (!isUuid(rid)) return false;
+    if (text.indexOf("BusinessOS DB") < 0) return false;
+
+    return true;
+  }
+
+  function firstBusinessOsRobotForTarget(target) {
+    var i;
+    var row;
+    var rid;
+
+    if (!STATE || !STATE.robots || !STATE.robots.length) return null;
+
+    for (i = 0; i < STATE.robots.length; i += 1) {
+      row = STATE.robots[i];
+      rid = robotId(row, "");
+
+      if (!isUuid(rid)) continue;
+      if (!robotSupportsTargetRole(row, target)) continue;
+
+      return row;
+    }
+
+    return null;
+  }
+
   function resolveRobotForPayload(target, card, select) {
     var optionText = selectedText(select);
     var selectedRobot = findRobotBySelect(select);
     var existingRobotPoolId;
     var existingRobot;
+    var roleRobot;
 
-    if (selectedRobot && robotId(selectedRobot, select ? select.value : "")) {
+    if (selectedRobotIsCanonicalBusinessOs(selectedRobot, select, optionText)) {
       return {
         robot: selectedRobot,
         option_text: optionText,
-        source: "select"
+        source: "select_businessos_db"
       };
     }
 
     existingRobotPoolId = existingAssignmentRobotPoolId(target, card);
     existingRobot = findRobotById(existingRobotPoolId);
 
-    if (existingRobot) {
+    if (existingRobot && isUuid(robotId(existingRobot, ""))) {
       return {
         robot: existingRobot,
-        option_text: target.role + " existing assignment: " + displayName(existingRobot, "") + " / " + detectModelCode(existingRobot, "") + " / BusinessOS DB",
+        option_text: businessOsRobotOptionText(target, existingRobot),
         source: "existing_assignment_visible"
       };
     }
 
+    roleRobot = firstBusinessOsRobotForTarget(target);
+
+    if (roleRobot) {
+      return {
+        robot: roleRobot,
+        option_text: businessOsRobotOptionText(target, roleRobot),
+        source: "role_businessos_db_fallback"
+      };
+    }
+
     return {
-      robot: selectedRobot,
+      robot: null,
       option_text: optionText,
       source: "none"
     };
