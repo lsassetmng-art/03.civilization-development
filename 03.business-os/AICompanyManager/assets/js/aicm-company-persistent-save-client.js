@@ -1,15 +1,16 @@
-/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V1 */
+/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V2_CAPTURE */
 (function () {
   "use strict";
 
   var API_BASE = "http://127.0.0.1:8796";
-  var BOUND_ATTR = "data-aicm-company-save-bound-v1";
-  var STATUS_CLASS = "aicm-company-save-status-v1";
-  var COMPANY_ID_STATUS_CLASS = "aicm-company-db-id-status-v1";
+  var STATUS_CLASS = "aicm-company-save-status-v2";
+  var COMPANY_ID_STATUS_CLASS = "aicm-company-db-id-status-v2";
   var UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
   function textOf(node) {
-    return node ? String(node.textContent || "") : "";
+    if (!node) return "";
+    if (node.tagName === "INPUT" || node.tagName === "TEXTAREA") return String(node.value || "");
+    return String(node.textContent || node.value || node.getAttribute("aria-label") || "");
   }
 
   function valueOf(node) {
@@ -20,61 +21,184 @@
     return String(value || "").replace(/\s+/g, " ").trim();
   }
 
-  function isCompanyButton(button) {
-    var label = normalizeText(button.textContent);
-    return label === "会社を追加" || label === "会社を変更";
+  function visibleText(node) {
+    return normalizeText(textOf(node));
   }
 
   function cleanupGenericDbSaveButtons() {
-    Array.prototype.slice.call(document.querySelectorAll("button")).forEach(function (button) {
-      if (normalizeText(button.textContent) === "DB本保存") {
-        button.remove();
+    Array.prototype.slice.call(document.querySelectorAll("button,input,a,[role='button']")).forEach(function (el) {
+      if (normalizeText(textOf(el)) === "DB本保存") {
+        el.remove();
       }
     });
   }
 
-  function nearestCompanyRoot(button) {
-    var node = button;
-    var best = null;
+  function clickableFromEvent(event) {
+    var node = event.target;
+
+    while (node && node !== document.body) {
+      var tag = String(node.tagName || "").toLowerCase();
+      var role = String(node.getAttribute ? node.getAttribute("role") || "" : "").toLowerCase();
+
+      if (
+        tag === "button" ||
+        tag === "a" ||
+        role === "button" ||
+        (tag === "input" && ["button", "submit"].indexOf(String(node.type || "").toLowerCase()) >= 0)
+      ) {
+        return node;
+      }
+
+      node = node.parentElement;
+    }
+
+    return null;
+  }
+
+  function areaTextAround(el) {
+    var node = el;
+    var texts = [];
     var guard = 0;
 
-    while (node && node !== document.body && guard < 14) {
-      var text = textOf(node);
-      if (
-        (text.indexOf("会社名") >= 0 || text.indexOf("AI企業") >= 0 || text.indexOf("会社 変更・削除") >= 0) &&
-        (text.indexOf("会社を追加") >= 0 || text.indexOf("会社を変更") >= 0)
-      ) {
-        best = node;
-        break;
-      }
+    while (node && node !== document.body && guard < 8) {
+      texts.push(visibleText(node));
       node = node.parentElement;
       guard += 1;
     }
 
-    return best || button.parentElement || document.body;
+    return normalizeText(texts.join(" "));
   }
 
-  function collectTextInputs(root) {
-    return Array.prototype.slice.call(root.querySelectorAll("input, textarea")).filter(function (input) {
-      var type = String(input.type || "text").toLowerCase();
-      var value = valueOf(input);
+  function isCompanyArea(text) {
+    return (
+      text.indexOf("AI企業") >= 0 ||
+      text.indexOf("会社") >= 0 ||
+      text.indexOf("会社名") >= 0 ||
+      text.indexOf("事業領域") >= 0 ||
+      text.indexOf("会社 変更・削除") >= 0 ||
+      text.indexOf("AI企業新規追加") >= 0
+    );
+  }
 
-      if (type === "file" || type === "button" || type === "submit" || type === "hidden") return false;
-      if (!value) return false;
+  function detectCompanyAction(el) {
+    var label = visibleText(el);
+    var area = areaTextAround(el);
+
+    if (!label) return "";
+
+    if (label.indexOf("会社を追加") >= 0 || label.indexOf("会社追加") >= 0 || label.indexOf("AI企業を追加") >= 0) {
+      return "create";
+    }
+
+    if (label.indexOf("会社を変更") >= 0 || label.indexOf("会社変更") >= 0 || label.indexOf("AI企業を変更") >= 0) {
+      return "update";
+    }
+
+    if ((label === "追加" || label.indexOf("追加") >= 0) && isCompanyArea(area)) {
+      return "create";
+    }
+
+    if ((label === "変更" || label.indexOf("変更") >= 0) && isCompanyArea(area)) {
+      return "update";
+    }
+
+    return "";
+  }
+
+  function nearestCompanyRoot(el) {
+    var node = el;
+    var best = null;
+    var guard = 0;
+
+    while (node && node !== document.body && guard < 14) {
+      var text = visibleText(node);
+      var hasCompany = isCompanyArea(text);
+      var hasFields = text.indexOf("会社名") >= 0 || text.indexOf("事業領域") >= 0 || text.indexOf("会社を追加") >= 0 || text.indexOf("会社を変更") >= 0;
+
+      if (hasCompany && hasFields) {
+        best = node;
+        break;
+      }
+
+      node = node.parentElement;
+      guard += 1;
+    }
+
+    return best || el.parentElement || document.body;
+  }
+
+  function allInputs(root) {
+    return Array.prototype.slice.call(root.querySelectorAll("input,textarea,select")).filter(function (el) {
+      var tag = String(el.tagName || "").toLowerCase();
+      var type = String(el.type || "").toLowerCase();
+
+      if (tag === "select") return true;
+      if (["button", "submit", "file", "hidden", "checkbox", "radio"].indexOf(type) >= 0) return false;
       return true;
     });
   }
 
-  function inferCompanyName(root) {
-    var inputs = collectTextInputs(root);
+  function labelTextForInput(input) {
+    var id = String(input.id || "");
+    var label;
+    var text = "";
+
+    if (id) {
+      label = document.querySelector("label[for='" + id.replace(/'/g, "\\'") + "']");
+      if (label) text += " " + visibleText(label);
+    }
+
+    if (input.parentElement) text += " " + visibleText(input.parentElement);
+    text += " " + String(input.name || "");
+    text += " " + String(input.id || "");
+    text += " " + String(input.placeholder || "");
+    text += " " + String(input.getAttribute("aria-label") || "");
+
+    return normalizeText(text);
+  }
+
+  function fieldByKeywords(root, keywords) {
+    var inputs = allInputs(root);
     var i;
+    var j;
+
+    for (i = 0; i < inputs.length; i += 1) {
+      var label = labelTextForInput(inputs[i]);
+      var value = normalizeText(valueOf(inputs[i]));
+
+      if (!value) continue;
+
+      for (j = 0; j < keywords.length; j += 1) {
+        if (label.indexOf(keywords[j]) >= 0) {
+          return inputs[i];
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function inferCompanyName(root) {
+    var field = fieldByKeywords(root, ["会社名", "AI企業名", "company_name", "companyName", "name"]);
+    var inputs;
+    var i;
+
+    if (field && normalizeText(valueOf(field))) {
+      return normalizeText(valueOf(field));
+    }
+
+    inputs = allInputs(root);
 
     for (i = 0; i < inputs.length; i += 1) {
       var value = normalizeText(valueOf(inputs[i]));
+      var label = labelTextForInput(inputs[i]);
+
       if (!value) continue;
       if (UUID_RE.test(value)) continue;
       if (value.indexOf("候補") >= 0) continue;
-      if (value.length > 100) continue;
+      if (value.length > 120) continue;
+      if (label.indexOf("事業") >= 0 || label.indexOf("方針") >= 0 || label.indexOf("ルール") >= 0) continue;
+
       return value;
     }
 
@@ -82,9 +206,15 @@
   }
 
   function inferBusinessDomain(root, companyName) {
-    var inputs = collectTextInputs(root);
-    var values = [];
+    var field = fieldByKeywords(root, ["事業領域", "事業内容", "business_domain", "businessDomain", "business_area", "description"]);
+    var inputs;
     var i;
+
+    if (field && normalizeText(valueOf(field))) {
+      return normalizeText(valueOf(field));
+    }
+
+    inputs = allInputs(root);
 
     for (i = 0; i < inputs.length; i += 1) {
       var value = normalizeText(valueOf(inputs[i]));
@@ -92,32 +222,33 @@
       if (value === companyName) continue;
       if (UUID_RE.test(value)) continue;
       if (value.indexOf("候補") >= 0) continue;
-      values.push(value);
+      return value;
     }
 
-    return values[0] || "";
+    return "";
   }
 
   function inferCompanyId(root) {
-    var text = textOf(root);
-    var match = text.match(UUID_RE);
-    if (match) return match[0];
+    var rootMatch = visibleText(root).match(UUID_RE);
+    var bodyMatch;
 
-    match = textOf(document.body).match(UUID_RE);
-    return match ? match[0] : "";
+    if (rootMatch) return rootMatch[0];
+
+    bodyMatch = visibleText(document.body).match(UUID_RE);
+    return bodyMatch ? bodyMatch[0] : "";
   }
 
-  function buildPayload(button) {
-    var root = nearestCompanyRoot(button);
+  function buildPayload(el, action) {
+    var root = nearestCompanyRoot(el);
     var companyName = inferCompanyName(root);
     var businessDomain = inferBusinessDomain(root, companyName);
-    var companyId = inferCompanyId(root);
-    var label = normalizeText(button.textContent);
+    var companyId = action === "update" ? inferCompanyId(root) : "";
 
     if (!companyName) {
       return {
         ok: false,
-        reason: "company_name_required"
+        reason: "company_name_required",
+        root: root
       };
     }
 
@@ -125,8 +256,8 @@
       ok: true,
       root: root,
       payload: {
-        source: "AICompanyManager company UI",
-        operation: label === "会社を追加" ? "company.create_or_save" : "company.update_or_save",
+        source: "AICompanyManager company UI capture client",
+        operation: action === "create" ? "company.create_or_save" : "company.update_or_save",
         save_status: "COMPANY_SAVE_REQUESTED",
         company_id_input: companyId,
         company_id: companyId,
@@ -138,8 +269,8 @@
     };
   }
 
-  function createStatus(button) {
-    var parent = button.parentElement || document.body;
+  function createStatus(el) {
+    var parent = el.parentElement || document.body;
     var status = parent.querySelector(":scope > ." + STATUS_CLASS);
 
     if (!status) {
@@ -156,8 +287,8 @@
     return status;
   }
 
-  function setStatus(button, message, ok) {
-    var status = createStatus(button);
+  function setStatus(el, message, ok) {
+    var status = createStatus(el);
 
     status.textContent = message;
     status.style.background = ok ? "#e8fff1" : "#fff1f1";
@@ -182,6 +313,7 @@
 
     status.textContent = "BusinessOS DB会社ID: " + companyId + (tableName ? " / table: " + tableName : "");
     root.setAttribute("data-aicm-db-company-id", companyId);
+    document.documentElement.setAttribute("data-aicm-current-company-id", companyId);
   }
 
   function extractCompanyId(stdout) {
@@ -194,23 +326,25 @@
     return match ? match[1] : "";
   }
 
-  function originalButtonText(button) {
-    return button.getAttribute("data-aicm-original-text") || normalizeText(button.textContent);
+  function originalText(el) {
+    return el.getAttribute("data-aicm-original-text") || visibleText(el) || "保存";
   }
 
-  function setButtonBusy(button, busy) {
+  function setBusy(el, busy) {
     if (busy) {
-      button.setAttribute("data-aicm-original-text", originalButtonText(button));
-      button.disabled = true;
-      button.textContent = "保存中...";
+      el.setAttribute("data-aicm-original-text", originalText(el));
+      if ("disabled" in el) el.disabled = true;
+      if (el.tagName === "INPUT") el.value = "保存中...";
+      else el.textContent = "保存中...";
     } else {
-      button.disabled = false;
-      button.textContent = originalButtonText(button);
+      if ("disabled" in el) el.disabled = false;
+      if (el.tagName === "INPUT") el.value = originalText(el);
+      else el.textContent = originalText(el);
     }
   }
 
-  async function saveCompany(button) {
-    var built = buildPayload(button);
+  async function saveCompany(el, action) {
+    var built = buildPayload(el, action);
     var response;
     var result;
     var companyId;
@@ -219,7 +353,8 @@
     cleanupGenericDbSaveButtons();
 
     if (!built.ok) {
-      setStatus(button, "会社保存不可: " + built.reason, false);
+      setStatus(el, "会社保存不可: 会社名を入力してください。", false);
+      window.alert("会社名を入力してください。");
       return;
     }
 
@@ -235,15 +370,15 @@
       return;
     }
 
-    setButtonBusy(button, true);
-    setStatus(button, "保存中: BusinessOS DBへ会社を保存しています。", true);
+    setBusy(el, true);
+    setStatus(el, "保存中: BusinessOS DBへ会社を保存しています。", true);
 
     try {
       response = await fetch(API_BASE + "/api/aicm/company/save", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          source: "AICompanyManager company browser UI",
+          source: "AICompanyManager company browser UI capture",
           rollback_only: false,
           payload: built.payload
         })
@@ -258,7 +393,7 @@
       companyId = extractCompanyId(result.stdout);
       companyTable = extractCompanyTable(result.stdout);
 
-      setStatus(button, "保存OK: 会社をBusinessOS DBへ保存しました。company_idを確定しました。", true);
+      setStatus(el, "保存OK: 会社をBusinessOS DBへ保存しました。company_idを確定しました。", true);
 
       if (companyId) {
         displayCompanyId(built.root, companyId, companyTable);
@@ -269,46 +404,71 @@
         window.location.href = base + "?v=" + Date.now();
       }, 900);
     } catch (error) {
-      setStatus(button, "保存失敗: " + String(error && error.message ? error.message : error), false);
+      setStatus(el, "保存失敗: " + String(error && error.message ? error.message : error), false);
     } finally {
-      setButtonBusy(button, false);
+      setBusy(el, false);
     }
   }
 
-  function bindButton(button) {
-    if (!isCompanyButton(button)) return;
-    if (button.getAttribute(BOUND_ATTR) === "1") return;
+  function captureClick(event) {
+    var clickable = clickableFromEvent(event);
+    var action;
 
-    button.setAttribute(BOUND_ATTR, "1");
-    button.addEventListener("click", function () {
-      window.setTimeout(function () {
-        saveCompany(button);
-      }, 200);
-    });
+    if (!clickable) return;
+
+    action = detectCompanyAction(clickable);
+    if (!action) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+
+    saveCompany(clickable, action);
   }
 
-  function enhance() {
-    cleanupGenericDbSaveButtons();
+  function addDebugBadge() {
+    var id = "aicm-company-save-client-debug-badge";
+    var old = document.getElementById(id);
+    var badge;
 
-    Array.prototype.slice.call(document.querySelectorAll("button")).forEach(function (button) {
-      bindButton(button);
-    });
+    if (old) return;
 
-    window.AICM_COMPANY_PERSISTENT_SAVE_CLIENT_STATUS = {
-      marker: "AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V1",
-      api_base: API_BASE,
-      loaded: true,
-      bound_company_button_count: document.querySelectorAll("button[" + BOUND_ATTR + "='1']").length
-    };
+    badge = document.createElement("div");
+    badge.id = id;
+    badge.textContent = "company save client: ON";
+    badge.style.position = "fixed";
+    badge.style.right = "8px";
+    badge.style.bottom = "8px";
+    badge.style.zIndex = "99999";
+    badge.style.fontSize = "11px";
+    badge.style.padding = "6px 8px";
+    badge.style.borderRadius = "999px";
+    badge.style.background = "#eef6ff";
+    badge.style.color = "#15466f";
+    badge.style.fontWeight = "800";
+    document.body.appendChild(badge);
   }
 
   function start() {
-    enhance();
+    cleanupGenericDbSaveButtons();
+    document.addEventListener("click", captureClick, true);
+
+    window.AICM_COMPANY_PERSISTENT_SAVE_CLIENT_STATUS = {
+      marker: "AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V2_CAPTURE",
+      api_base: API_BASE,
+      loaded: true,
+      capture_click: true
+    };
+
+    addDebugBadge();
 
     var timer = null;
     var observer = new MutationObserver(function () {
       window.clearTimeout(timer);
-      timer = window.setTimeout(enhance, 250);
+      timer = window.setTimeout(function () {
+        cleanupGenericDbSaveButtons();
+        addDebugBadge();
+      }, 250);
     });
 
     observer.observe(document.documentElement, {
