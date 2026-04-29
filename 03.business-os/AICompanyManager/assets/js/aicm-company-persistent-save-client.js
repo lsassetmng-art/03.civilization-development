@@ -1,11 +1,16 @@
-/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V4_FINAL_FORM_SUBMIT */
+/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V5_EVENT_HARD_CAPTURE */
 (function () {
   "use strict";
 
   var API_BASE = "http://127.0.0.1:8796";
-  var STATUS_CLASS = "aicm-company-save-status-v4";
-  var COMPANY_ID_STATUS_CLASS = "aicm-company-db-id-status-v4";
+  var STATUS_CLASS = "aicm-company-save-status-v5";
+  var COMPANY_ID_STATUS_CLASS = "aicm-company-db-id-status-v5";
+  var BADGE_ID = "aicm-company-save-client-debug-badge";
   var UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+  var lastHandledKey = "";
+  var lastHandledAt = 0;
+  var lastDebug = "loaded";
 
   function textOf(node) {
     if (!node) return "";
@@ -29,6 +34,10 @@
     return normalizeText(textOf(node));
   }
 
+  function tagName(node) {
+    return String(node && node.tagName ? node.tagName : "").toLowerCase();
+  }
+
   function cleanupGenericDbSaveButtons() {
     Array.prototype.slice.call(document.querySelectorAll("button,input,a,[role='button']")).forEach(function (el) {
       if (normalizeText(textOf(el)) === "DB本保存") {
@@ -37,45 +46,41 @@
     });
   }
 
-  function clickableFromEvent(event) {
-    var node = event.target;
+  function nearestClickable(start) {
+    var node = start;
+    var guard = 0;
 
-    while (node && node !== document.body) {
-      var tag = String(node.tagName || "").toLowerCase();
+    while (node && node !== document.body && guard < 8) {
+      var tag = tagName(node);
       var role = String(node.getAttribute ? node.getAttribute("role") || "" : "").toLowerCase();
+      var onclick = node.getAttribute ? node.getAttribute("onclick") : "";
+      var text = visibleText(node);
 
       if (
         tag === "button" ||
         tag === "a" ||
         role === "button" ||
+        onclick ||
         (tag === "input" && ["button", "submit"].indexOf(String(node.type || "").toLowerCase()) >= 0)
       ) {
         return node;
       }
 
-      node = node.parentElement;
-    }
+      if (text && text.length <= 40 && guard <= 3) {
+        var style = window.getComputedStyle ? window.getComputedStyle(node) : null;
+        if (style && (style.cursor === "pointer" || role === "button")) return node;
+      }
 
-    return null;
-  }
-
-  function areaTextAround(el) {
-    var node = el;
-    var texts = [];
-    var guard = 0;
-
-    while (node && node !== document.body && guard < 10) {
-      texts.push(visibleText(node));
       node = node.parentElement;
       guard += 1;
     }
 
-    return normalizeText(texts.join(" "));
+    return start && start.nodeType === 1 ? start : null;
   }
 
   function allInputs(root) {
     return Array.prototype.slice.call(root.querySelectorAll("input,textarea,select")).filter(function (el) {
-      var tag = String(el.tagName || "").toLowerCase();
+      var tag = tagName(el);
       var type = String(el.type || "").toLowerCase();
 
       if (tag === "select") return true;
@@ -112,11 +117,17 @@
       var label = labelTextForInput(inputs[i]);
       var value = normalizeText(valueOf(inputs[i]));
 
-      if (!value) continue;
-
       for (j = 0; j < keywords.length; j += 1) {
         if (label.indexOf(keywords[j]) >= 0) {
           return inputs[i];
+        }
+      }
+
+      if (value) {
+        for (j = 0; j < keywords.length; j += 1) {
+          if (visibleText(root).indexOf(keywords[j]) >= 0 && label.indexOf("事業") < 0) {
+            return inputs[i];
+          }
         }
       }
     }
@@ -124,22 +135,25 @@
     return null;
   }
 
-  function nearestCandidateRoot(el) {
-    var node = el;
+  function rootHasCompanyFormSignal(root) {
+    var text = visibleText(root);
+    var nameField = fieldByKeywords(root, ["会社名", "AI企業名", "company_name", "companyName"]);
+    var inputs = allInputs(root);
+
+    if (nameField) return true;
+    if (text.indexOf("会社名") >= 0) return true;
+    if (text.indexOf("AI企業名") >= 0) return true;
+
+    return inputs.length >= 1 && text.indexOf("事業領域") >= 0;
+  }
+
+  function nearestCompanyFormRoot(start) {
+    var node = start;
     var best = null;
     var guard = 0;
 
-    while (node && node !== document.body && guard < 14) {
-      var text = visibleText(node);
-      var hasCompanyWord =
-        text.indexOf("会社") >= 0 ||
-        text.indexOf("AI企業") >= 0 ||
-        text.indexOf("会社名") >= 0 ||
-        text.indexOf("事業領域") >= 0;
-
-      var hasInput = node.querySelector && node.querySelector("input,textarea");
-
-      if (hasCompanyWord && hasInput) {
+    while (node && node !== document.body && guard < 16) {
+      if (node.querySelector && rootHasCompanyFormSignal(node)) {
         best = node;
         break;
       }
@@ -148,49 +162,22 @@
       guard += 1;
     }
 
-    return best || el.parentElement || document.body;
+    if (best) return best;
+
+    var forms = Array.prototype.slice.call(document.querySelectorAll("form,section,article,div"));
+    for (var i = 0; i < forms.length; i += 1) {
+      if (rootHasCompanyFormSignal(forms[i])) return forms[i];
+    }
+
+    return null;
   }
 
-  function rootHasCompanyNameField(root) {
-    var text = visibleText(root);
-    var byLabel = fieldByKeywords(root, ["会社名", "AI企業名", "company_name", "companyName", "name"]);
-
-    if (byLabel) return true;
-
-    return text.indexOf("会社名") >= 0 || text.indexOf("AI企業名") >= 0;
-  }
-
-  function rootLooksLikeFinalCompanyForm(root) {
-    var text = visibleText(root);
-    var inputs = allInputs(root);
-    var hasCompanyName = rootHasCompanyNameField(root);
-    var hasEditableInput = inputs.some(function (input) {
-      var value = normalizeText(valueOf(input));
-      return value && !UUID_RE.test(value) && value.indexOf("候補") < 0;
-    });
-
-    var looksLikeNavigationList =
-      text.indexOf("AI企業ダッシュボード") >= 0 &&
-      text.indexOf("会社名") < 0 &&
-      text.indexOf("事業領域") < 0;
-
-    if (looksLikeNavigationList) return false;
-
-    return hasCompanyName && hasEditableInput;
-  }
-
-  function detectCompanyAction(el) {
-    var label = visibleText(el);
+  function looksLikeNavigation(label) {
     var compact = compactText(label);
-    var root = nearestCandidateRoot(el);
-    var rootIsForm = rootLooksLikeFinalCompanyForm(root);
 
-    if (!compact) return "";
+    if (!compact) return true;
 
-    /*
-     * Always excluded navigation / non-save buttons.
-     */
-    if (
+    return (
       compact.indexOf("新規追加") >= 0 ||
       compact.indexOf("AI企業新規追加") >= 0 ||
       compact.indexOf("追加する会社") >= 0 ||
@@ -201,14 +188,19 @@
       compact.indexOf("戻る") >= 0 ||
       compact.indexOf("一覧") >= 0 ||
       compact.indexOf("選択") >= 0 ||
-      compact.indexOf("削除") >= 0
-    ) {
-      return "";
-    }
+      compact.indexOf("削除") >= 0 ||
+      compact.indexOf("ダッシュボード") >= 0 ||
+      compact.indexOf("タスク台帳") >= 0 ||
+      compact.indexOf("レビュー") >= 0
+    );
+  }
 
-    /*
-     * Explicit final submit labels.
-     */
+  function inferActionFromLabel(label, root) {
+    var compact = compactText(label);
+    var rootOk = !!root && rootHasCompanyFormSignal(root);
+
+    if (looksLikeNavigation(label)) return "";
+
     if (
       compact === "会社を追加" ||
       compact === "会社追加" ||
@@ -229,23 +221,31 @@
       return "update";
     }
 
-    /*
-     * Bare add/change is allowed only inside the final company form.
-     * This fixes forms whose submit button is simply "追加".
-     */
-    if ((compact === "追加" || compact === "登録" || compact === "保存") && rootIsForm) {
+    if (rootOk && (compact === "追加" || compact === "登録" || compact === "保存" || compact === "作成")) {
       return "create";
     }
 
-    if ((compact === "変更" || compact === "更新") && rootIsForm) {
+    if (rootOk && (compact === "変更" || compact === "更新" || compact === "保存変更")) {
       return "update";
     }
 
     return "";
   }
 
+  function inferActionFromSubmit(event, formRoot) {
+    var submitter = event.submitter || document.activeElement;
+    var label = visibleText(submitter);
+    var action = inferActionFromLabel(label, formRoot);
+
+    if (action) return action;
+
+    var text = visibleText(formRoot);
+    if (text.indexOf("会社を変更") >= 0 || text.indexOf("変更対象") >= 0) return "update";
+    return "create";
+  }
+
   function inferCompanyName(root) {
-    var field = fieldByKeywords(root, ["会社名", "AI企業名", "company_name", "companyName", "name"]);
+    var field = fieldByKeywords(root, ["会社名", "AI企業名", "company_name", "companyName"]);
     var inputs;
     var i;
 
@@ -304,8 +304,7 @@
     return bodyMatch ? bodyMatch[0] : "";
   }
 
-  function buildPayload(el, action) {
-    var root = nearestCandidateRoot(el);
+  function buildPayload(root, action) {
     var companyName = inferCompanyName(root);
     var businessDomain = inferBusinessDomain(root, companyName);
     var companyId = action === "update" ? inferCompanyId(root) : "";
@@ -313,16 +312,14 @@
     if (!companyName) {
       return {
         ok: false,
-        reason: "company_name_required",
-        root: root
+        reason: "company_name_required"
       };
     }
 
     return {
       ok: true,
-      root: root,
       payload: {
-        source: "AICompanyManager company UI final form submit client",
+        source: "AICompanyManager company UI event hard capture",
         operation: action === "create" ? "company.create_or_save" : "company.update_or_save",
         save_status: "COMPANY_SAVE_REQUESTED",
         company_id_input: companyId,
@@ -335,8 +332,8 @@
     };
   }
 
-  function createStatus(el) {
-    var parent = el.parentElement || document.body;
+  function createStatus(anchor) {
+    var parent = anchor && anchor.parentElement ? anchor.parentElement : document.body;
     var status = parent.querySelector(":scope > ." + STATUS_CLASS);
 
     if (!status) {
@@ -353,8 +350,8 @@
     return status;
   }
 
-  function setStatus(el, message, ok) {
-    var status = createStatus(el);
+  function setStatus(anchor, message, ok) {
+    var status = createStatus(anchor);
 
     status.textContent = message;
     status.style.background = ok ? "#e8fff1" : "#fff1f1";
@@ -397,6 +394,8 @@
   }
 
   function setBusy(el, busy) {
+    if (!el) return;
+
     if (busy) {
       el.setAttribute("data-aicm-original-text", originalText(el));
       if ("disabled" in el) el.disabled = true;
@@ -409,8 +408,42 @@
     }
   }
 
-  async function saveCompany(el, action) {
-    var built = buildPayload(el, action);
+  function shouldSkipDuplicate(key) {
+    var now = Date.now();
+
+    if (key === lastHandledKey && now - lastHandledAt < 900) {
+      return true;
+    }
+
+    lastHandledKey = key;
+    lastHandledAt = now;
+    return false;
+  }
+
+  function updateBadge() {
+    var badge = document.getElementById(BADGE_ID);
+
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.id = BADGE_ID;
+      badge.style.position = "fixed";
+      badge.style.right = "8px";
+      badge.style.bottom = "8px";
+      badge.style.zIndex = "99999";
+      badge.style.fontSize = "11px";
+      badge.style.padding = "6px 8px";
+      badge.style.borderRadius = "999px";
+      badge.style.background = "#eef6ff";
+      badge.style.color = "#15466f";
+      badge.style.fontWeight = "800";
+      document.body.appendChild(badge);
+    }
+
+    badge.textContent = "company save client v5: " + lastDebug;
+  }
+
+  async function runSave(anchor, root, action) {
+    var built = buildPayload(root, action);
     var response;
     var result;
     var companyId;
@@ -419,7 +452,7 @@
     cleanupGenericDbSaveButtons();
 
     if (!built.ok) {
-      setStatus(el, "会社保存不可: 会社名を入力してください。", false);
+      setStatus(anchor, "会社保存不可: 会社名を入力してください。", false);
       window.alert("会社名を入力してください。");
       return;
     }
@@ -436,15 +469,15 @@
       return;
     }
 
-    setBusy(el, true);
-    setStatus(el, "保存中: BusinessOS DBへ会社を保存しています。", true);
+    setBusy(anchor, true);
+    setStatus(anchor, "保存中: BusinessOS DBへ会社を保存しています。", true);
 
     try {
       response = await fetch(API_BASE + "/api/aicm/company/save", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          source: "AICompanyManager company browser UI final form submit",
+          source: "AICompanyManager company browser UI event hard capture",
           rollback_only: false,
           payload: built.payload
         })
@@ -459,10 +492,10 @@
       companyId = extractCompanyId(result.stdout);
       companyTable = extractCompanyTable(result.stdout);
 
-      setStatus(el, "保存OK: 会社をBusinessOS DBへ保存しました。company_idを確定しました。", true);
+      setStatus(anchor, "保存OK: 会社をBusinessOS DBへ保存しました。company_idを確定しました。", true);
 
       if (companyId) {
-        displayCompanyId(built.root, companyId, companyTable);
+        displayCompanyId(root, companyId, companyTable);
       }
 
       window.setTimeout(function () {
@@ -470,74 +503,117 @@
         window.location.href = base + "?v=" + Date.now();
       }, 900);
     } catch (error) {
-      setStatus(el, "保存失敗: " + String(error && error.message ? error.message : error), false);
+      setStatus(anchor, "保存失敗: " + String(error && error.message ? error.message : error), false);
     } finally {
-      setBusy(el, false);
+      setBusy(anchor, false);
     }
   }
 
-  function captureClick(event) {
-    var clickable = clickableFromEvent(event);
-    var action;
+  function handleIntent(eventName, event, anchor, root, action) {
+    var key = eventName + ":" + action + ":" + visibleText(anchor).slice(0, 30);
 
-    if (!clickable) return;
+    if (shouldSkipDuplicate(key)) return;
 
-    action = detectCompanyAction(clickable);
-    if (!action) return;
+    lastDebug = eventName + " / " + action + " / " + (visibleText(anchor) || "submit").slice(0, 16);
+    updateBadge();
 
     event.preventDefault();
     event.stopPropagation();
     if (event.stopImmediatePropagation) event.stopImmediatePropagation();
 
-    saveCompany(clickable, action);
+    runSave(anchor, root, action);
   }
 
-  function addDebugBadge() {
-    var id = "aicm-company-save-client-debug-badge";
-    var old = document.getElementById(id);
-    var badge;
+  function capturePointerLike(eventName, event) {
+    var anchor = nearestClickable(event.target);
+    var root;
+    var action;
+    var label;
 
-    if (old) {
-      old.textContent = "company save client: final form ON";
+    if (!anchor) return;
+
+    label = visibleText(anchor);
+    if (looksLikeNavigation(label)) {
+      lastDebug = eventName + " nav ignored: " + label.slice(0, 14);
+      updateBadge();
       return;
     }
 
-    badge = document.createElement("div");
-    badge.id = id;
-    badge.textContent = "company save client: final form ON";
-    badge.style.position = "fixed";
-    badge.style.right = "8px";
-    badge.style.bottom = "8px";
-    badge.style.zIndex = "99999";
-    badge.style.fontSize = "11px";
-    badge.style.padding = "6px 8px";
-    badge.style.borderRadius = "999px";
-    badge.style.background = "#eef6ff";
-    badge.style.color = "#15466f";
-    badge.style.fontWeight = "800";
-    document.body.appendChild(badge);
+    root = nearestCompanyFormRoot(anchor);
+    if (!root) {
+      lastDebug = eventName + " no company form: " + label.slice(0, 14);
+      updateBadge();
+      return;
+    }
+
+    action = inferActionFromLabel(label, root);
+    if (!action) {
+      lastDebug = eventName + " no action: " + label.slice(0, 14);
+      updateBadge();
+      return;
+    }
+
+    handleIntent(eventName, event, anchor, root, action);
+  }
+
+  function captureSubmit(event) {
+    var formRoot = event.target;
+    var root = nearestCompanyFormRoot(formRoot);
+    var anchor = event.submitter || document.activeElement || formRoot;
+    var action;
+
+    if (!root) {
+      lastDebug = "submit no company form";
+      updateBadge();
+      return;
+    }
+
+    action = inferActionFromSubmit(event, root);
+    if (!action) {
+      lastDebug = "submit no action";
+      updateBadge();
+      return;
+    }
+
+    handleIntent("submit", event, anchor, root, action);
   }
 
   function start() {
     cleanupGenericDbSaveButtons();
-    document.addEventListener("click", captureClick, true);
+
+    document.addEventListener("click", function (event) {
+      capturePointerLike("click", event);
+    }, true);
+
+    document.addEventListener("pointerup", function (event) {
+      capturePointerLike("pointerup", event);
+    }, true);
+
+    document.addEventListener("touchend", function (event) {
+      capturePointerLike("touchend", event);
+    }, true);
+
+    document.addEventListener("submit", captureSubmit, true);
 
     window.AICM_COMPANY_PERSISTENT_SAVE_CLIENT_STATUS = {
-      marker: "AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V4_FINAL_FORM_SUBMIT",
+      marker: "AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V5_EVENT_HARD_CAPTURE",
       api_base: API_BASE,
       loaded: true,
       capture_click: true,
-      bare_add_allowed_only_in_company_form: true
+      capture_pointerup: true,
+      capture_touchend: true,
+      capture_submit: true
     };
 
-    addDebugBadge();
+    lastDebug = "ON";
+    updateBadge();
 
     var timer = null;
     var observer = new MutationObserver(function () {
       window.clearTimeout(timer);
       timer = window.setTimeout(function () {
         cleanupGenericDbSaveButtons();
-        addDebugBadge();
+        updateBadge();
       }, 250);
     });
 
