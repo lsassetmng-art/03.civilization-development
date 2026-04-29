@@ -1,10 +1,20 @@
-/* AICM_ROBOT_PLACEMENT_PERSISTENT_SAVE_CLIENT_V1 */
+/* AICM_PRODUCTION_ROLE_BUTTON_SAVE_ROUTE_V1 */
 (function () {
   "use strict";
 
   var API_BASE = "http://127.0.0.1:8795";
-  var BUTTON_CLASS = "aicm-db-save-button-v1";
-  var STATUS_CLASS = "aicm-db-save-status-v1";
+  var STATUS_CLASS = "aicm-role-save-status-v1";
+  var BOUND_ATTR = "data-aicm-role-save-bound";
+  var OLD_SAVE_SELECTOR =
+    ".aicm-db-save-button-v1,.aicm-db-save-status-v1,.aicm-db-save-button-v2,.aicm-db-save-status-v2,.aicm-db-save-button-v3,.aicm-db-save-status-v3";
+
+  var ROLE_BUTTONS = [
+    { label: "Presidentを設定", role: "President" },
+    { label: "Managerを設定", role: "Manager" },
+    { label: "Leaderを設定", role: "Leader" },
+    { label: "Workerを追加", role: "Worker" },
+    { label: "この配置を変更", role: "Worker" }
+  ];
 
   function textOf(node) {
     return node ? String(node.textContent || "") : "";
@@ -14,184 +24,294 @@
     return String(value || "").replace(/\s+/g, " ").trim();
   }
 
-  function parseJsonFromCard(card) {
-    var candidates = [];
-    var preLike = card.querySelectorAll("pre, code, textarea");
-
-    preLike.forEach(function (node) {
-      var text = textOf(node);
-      if (text.indexOf("{") >= 0 && text.indexOf("operation") >= 0) {
-        candidates.push(text);
-      }
+  function cleanupGenericDbSaveButtons() {
+    document.querySelectorAll(OLD_SAVE_SELECTOR).forEach(function (node) {
+      node.remove();
     });
 
-    if (candidates.length === 0) {
-      var all = textOf(card);
-      var first = all.indexOf("{");
-      var last = all.lastIndexOf("}");
-      if (first >= 0 && last > first) candidates.push(all.slice(first, last + 1));
-    }
+    Array.prototype.slice.call(document.querySelectorAll("button")).forEach(function (button) {
+      if (normalizeText(button.textContent) === "DB本保存") {
+        button.remove();
+      }
+    });
+  }
 
-    for (var i = 0; i < candidates.length; i += 1) {
+  function tryParseJson(text) {
+    var raw = String(text || "");
+    var first = raw.indexOf("{");
+    var last = raw.lastIndexOf("}");
+    var sliced;
+
+    if (first < 0 || last <= first) return null;
+
+    sliced = raw.slice(first, last + 1);
+
+    try {
+      return JSON.parse(sliced);
+    } catch (error) {
       try {
-        return JSON.parse(candidates[i]);
-      } catch (error) {
-        try {
-          return JSON.parse(candidates[i].replace(/\u00a0/g, " "));
-        } catch (ignored) {}
+        return JSON.parse(sliced.replace(/\u00a0/g, " "));
+      } catch (ignored) {
+        return null;
       }
     }
-
-    return null;
   }
 
-  function isPayloadCard(card) {
-    var text = textOf(card);
-    return text.indexOf("配置payload") >= 0 || text.indexOf("placement.preview_only") >= 0 || text.indexOf("company_robot_placement.preview_only") >= 0;
-  }
-
-  function findPayloadCards() {
-    var all = Array.prototype.slice.call(document.querySelectorAll("section, article, div, form"));
-    return all.filter(function (node) {
-      if (!isPayloadCard(node)) return false;
-      if (node.querySelector("." + BUTTON_CLASS)) return false;
-      return true;
-    });
-  }
-
-  function payloadIsSavable(payload) {
+  function isPlacementPayload(payload) {
     if (!payload) return false;
+
+    return (
+      String(payload.operation || "").indexOf("company_robot_placement.preview_only") >= 0 &&
+      !!payload.company_id &&
+      !!payload.placement_role_code &&
+      !!payload.robot_pool_id &&
+      (!!payload.model_code || !!payload.aiworker_model_code)
+    );
+  }
+
+  function payloadIsSavable(payload, role) {
+    if (!isPlacementPayload(payload)) return false;
+    if (role && String(payload.placement_role_code || "") !== role) return false;
     if (payload.save_blocked === true) return false;
     if (String(payload.strict_validation_status || "").indexOf("OK") !== 0) return false;
-    if (!payload.company_id || !payload.placement_role_code || !payload.robot_pool_id) return false;
-    if (!payload.model_code && !payload.aiworker_model_code) return false;
     if (String(payload.robot_selection_status || "").indexOf("BLOCKED") >= 0) return false;
     return true;
   }
 
-  function setStatus(card, message, ok) {
-    var status = card.querySelector("." + STATUS_CLASS);
+  function parsePayloadFromNode(node) {
+    var parsed = tryParseJson(textOf(node));
+    if (isPlacementPayload(parsed)) return parsed;
+    return null;
+  }
+
+  function allPayloadCandidates(role) {
+    var nodes = Array.prototype.slice.call(document.querySelectorAll("details,pre,code,textarea,section,article,div"));
+    var payloads = [];
+
+    nodes.forEach(function (node) {
+      var payload = parsePayloadFromNode(node);
+      if (!payloadIsSavable(payload, role)) return;
+
+      payloads.push({
+        node: node,
+        payload: payload
+      });
+    });
+
+    return payloads;
+  }
+
+  function distanceBetween(a, b) {
+    var ar;
+    var br;
+    var ay;
+    var by;
+
+    try {
+      ar = a.getBoundingClientRect();
+      br = b.getBoundingClientRect();
+      ay = ar.top + window.scrollY;
+      by = br.top + window.scrollY;
+      return Math.abs(ay - by);
+    } catch (error) {
+      return 999999;
+    }
+  }
+
+  function findNearestPayload(button, role) {
+    var candidates = allPayloadCandidates(role);
+    var best = null;
+
+    candidates.forEach(function (entry) {
+      var score = distanceBetween(button, entry.node);
+
+      if (!best || score < best.score) {
+        best = {
+          score: score,
+          payload: entry.payload,
+          node: entry.node
+        };
+      }
+    });
+
+    return best ? best.payload : null;
+  }
+
+  function createStatus(button) {
+    var parent = button.parentElement || document.body;
+    var status = parent.querySelector(":scope > ." + STATUS_CLASS);
+
     if (!status) {
       status = document.createElement("div");
       status.className = STATUS_CLASS;
-      status.style.marginTop = "12px";
+      status.style.marginTop = "10px";
       status.style.padding = "10px";
       status.style.borderRadius = "12px";
-      status.style.fontWeight = "700";
-      card.appendChild(status);
+      status.style.fontWeight = "800";
+      status.style.lineHeight = "1.5";
+      parent.appendChild(status);
     }
+
+    return status;
+  }
+
+  function setStatus(button, message, ok) {
+    var status = createStatus(button);
+
     status.textContent = message;
     status.style.background = ok ? "#e8fff1" : "#fff1f1";
     status.style.color = ok ? "#087443" : "#a51616";
   }
 
-  function createSaveButton(card) {
-    var payload = parseJsonFromCard(card);
+  function originalButtonText(button) {
+    return button.getAttribute("data-aicm-original-text") || normalizeText(button.textContent);
+  }
 
-    if (!payloadIsSavable(payload)) {
+  function setButtonBusy(button, busy) {
+    if (busy) {
+      button.setAttribute("data-aicm-original-text", originalButtonText(button));
+      button.disabled = true;
+      button.textContent = "保存中...";
+    } else {
+      button.disabled = false;
+      button.textContent = originalButtonText(button);
+    }
+  }
+
+  function roleFromButton(button) {
+    var label = normalizeText(button.textContent);
+    var i;
+
+    for (i = 0; i < ROLE_BUTTONS.length; i += 1) {
+      if (label === ROLE_BUTTONS[i].label) return ROLE_BUTTONS[i].role;
+    }
+
+    return "";
+  }
+
+  async function savePayload(button, role, payload) {
+    var response;
+    var result;
+
+    if (!payloadIsSavable(payload, role)) {
+      setStatus(button, "保存不可: ロボット配置payloadが未作成、またはvalidationがOKではありません。", false);
       return;
     }
 
-    var button = document.createElement("button");
-    button.type = "button";
-    button.className = BUTTON_CLASS;
-    button.textContent = "DB本保存";
-    button.style.marginTop = "12px";
-    button.style.marginRight = "8px";
-    button.style.padding = "10px 14px";
-    button.style.borderRadius = "12px";
-    button.style.border = "0";
-    button.style.background = "#16803c";
-    button.style.color = "#fff";
-    button.style.fontWeight = "800";
+    response = await fetch(API_BASE + "/api/aicm/company-robot-placement/save", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        source: "AICompanyManager role button save",
+        rollback_only: false,
+        payload: payload
+      })
+    });
 
-    button.addEventListener("click", async function () {
-      var freshPayload = parseJsonFromCard(card) || payload;
-      var role = freshPayload.placement_role_code || freshPayload.role_code || "";
-      var robot = freshPayload.robot_display_name || freshPayload.model_code || freshPayload.aiworker_model_code || "";
-      var target = freshPayload.target_scope || freshPayload.target_level_code || "";
+    result = await response.json();
 
-      if (!payloadIsSavable(freshPayload)) {
-        setStatus(card, "保存不可: payload validation がOKではありません。", false);
-        return;
-      }
+    if (!response.ok || !result.ok) {
+      throw new Error(normalizeText(result.stderr || result.error || "unknown save error"));
+    }
 
-      var confirmed = window.confirm(
-        "BusinessOS DBへ本保存します。\n\nrole: " +
-          role +
-          "\nrobot: " +
-          robot +
-          "\ntarget: " +
-          target +
-          "\n\n続行しますか？"
-      );
+    setStatus(
+      button,
+      "保存OK: " + role + "配置を BusinessOS DB company_robot_placement に保存しました。画面更新で確認できます。",
+      true
+    );
+  }
 
-      if (!confirmed) return;
+  function bindRoleButton(button) {
+    var role;
 
-      button.disabled = true;
-      button.textContent = "保存中...";
-      setStatus(card, "保存中: BusinessOS DBへ送信しています。", true);
+    if (button.getAttribute(BOUND_ATTR) === "1") return;
 
-      try {
-        var response = await fetch(API_BASE + "/api/aicm/company-robot-placement/save", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json"
-          },
-          body: JSON.stringify({
-            source: "AICompanyManager browser UI",
-            rollback_only: false,
-            payload: freshPayload
-          })
-        });
+    role = roleFromButton(button);
+    if (!role) return;
 
-        var result = await response.json();
+    button.setAttribute(BOUND_ATTR, "1");
+    button.setAttribute("data-aicm-placement-role", role);
 
-        if (!response.ok || !result.ok) {
-          setStatus(card, "保存失敗: " + normalizeText(result.stderr || result.error || "unknown error"), false);
-          button.disabled = false;
-          button.textContent = "DB本保存";
+    button.addEventListener("click", function () {
+      var currentRole = role;
+
+      window.setTimeout(async function () {
+        var payload;
+
+        cleanupGenericDbSaveButtons();
+
+        payload = findNearestPayload(button, currentRole);
+
+        if (!payloadIsSavable(payload, currentRole)) {
+          setStatus(
+            button,
+            currentRole + "配置payloadがまだ保存可能状態ではありません。候補選択後、もう一度このボタンを押してください。",
+            false
+          );
           return;
         }
 
-        setStatus(card, "保存OK: BusinessOS DB company_robot_placement に反映しました。画面を更新して確認してください。", true);
-        button.textContent = "保存OK";
-      } catch (error) {
-        setStatus(card, "保存失敗: " + String(error && error.message ? error.message : error), false);
-        button.disabled = false;
-        button.textContent = "DB本保存";
-      }
+        if (
+          !window.confirm(
+            currentRole +
+              "配置をBusinessOS DBへ保存します。\n\nrobot: " +
+              (payload.robot_display_name || payload.model_code || payload.aiworker_model_code || "-") +
+              "\ntarget: " +
+              (payload.target_scope || payload.target_level_code || "-") +
+              "\n\n続行しますか？"
+          )
+        ) {
+          return;
+        }
+
+        try {
+          setButtonBusy(button, true);
+          setStatus(button, "保存中: BusinessOS DBへ送信しています。", true);
+          await savePayload(button, currentRole, payload);
+        } catch (error) {
+          setStatus(button, "保存失敗: " + String(error && error.message ? error.message : error), false);
+        } finally {
+          setButtonBusy(button, false);
+        }
+      }, 450);
     });
-
-    var note = document.createElement("p");
-    note.textContent = "このボタンは BusinessOS DB の company_robot_placement へ保存します。数量消費なし。";
-    note.style.fontSize = "13px";
-    note.style.opacity = "0.75";
-
-    card.appendChild(button);
-    card.appendChild(note);
   }
 
   function enhance() {
-    findPayloadCards().forEach(createSaveButton);
+    cleanupGenericDbSaveButtons();
+
+    Array.prototype.slice.call(document.querySelectorAll("button")).forEach(function (button) {
+      bindRoleButton(button);
+    });
+
+    window.AICM_PRODUCTION_ROLE_BUTTON_SAVE_ROUTE_STATUS = {
+      marker: "AICM_PRODUCTION_ROLE_BUTTON_SAVE_ROUTE_V1",
+      api_base: API_BASE,
+      loaded: true,
+      bound_button_count: document.querySelectorAll("button[" + BOUND_ATTR + "='1']").length,
+      generic_db_save_button_count: Array.prototype.slice
+        .call(document.querySelectorAll("button"))
+        .filter(function (button) {
+          return normalizeText(button.textContent) === "DB本保存";
+        }).length
+    };
   }
 
   function start() {
     enhance();
+
+    var timer = null;
     var observer = new MutationObserver(function () {
-      window.clearTimeout(observer._timer);
-      observer._timer = window.setTimeout(enhance, 150);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(enhance, 250);
     });
+
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true
     });
-
-    window.AICM_ROBOT_PLACEMENT_PERSISTENT_SAVE_CLIENT_STATUS = {
-      marker: "AICM_ROBOT_PLACEMENT_PERSISTENT_SAVE_CLIENT_V1",
-      api_base: API_BASE,
-      loaded: true
-    };
   }
 
   if (document.readyState === "loading") {
