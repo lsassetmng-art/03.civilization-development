@@ -1,16 +1,17 @@
-/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V5_EVENT_HARD_CAPTURE */
+/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V6_FIELD_DEDUP_LIST_SYNC */
 (function () {
   "use strict";
 
   var API_BASE = "http://127.0.0.1:8796";
-  var STATUS_CLASS = "aicm-company-save-status-v5";
-  var COMPANY_ID_STATUS_CLASS = "aicm-company-db-id-status-v5";
+  var STATUS_CLASS = "aicm-company-save-status-v6";
+  var COMPANY_ID_STATUS_CLASS = "aicm-company-db-id-status-v6";
   var BADGE_ID = "aicm-company-save-client-debug-badge";
+  var STORAGE_KEY = "aicm.savedCompanies.v1";
   var UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
-  var lastHandledKey = "";
-  var lastHandledAt = 0;
-  var lastDebug = "loaded";
+  var intentLocked = false;
+  var intentUnlockTimer = null;
+  var lastDebug = "ON";
 
   function textOf(node) {
     if (!node) return "";
@@ -68,7 +69,7 @@
 
       if (text && text.length <= 40 && guard <= 3) {
         var style = window.getComputedStyle ? window.getComputedStyle(node) : null;
-        if (style && (style.cursor === "pointer" || role === "button")) return node;
+        if (style && style.cursor === "pointer") return node;
       }
 
       node = node.parentElement;
@@ -78,28 +79,58 @@
     return start && start.nodeType === 1 ? start : null;
   }
 
-  function allInputs(root) {
-    return Array.prototype.slice.call(root.querySelectorAll("input,textarea,select")).filter(function (el) {
+  function editableCompanyInputs(root) {
+    return Array.prototype.slice.call(root.querySelectorAll("input,textarea")).filter(function (el) {
       var tag = tagName(el);
-      var type = String(el.type || "").toLowerCase();
+      var type = String(el.type || "text").toLowerCase();
 
-      if (tag === "select") return true;
-      if (["button", "submit", "file", "hidden", "checkbox", "radio"].indexOf(type) >= 0) return false;
+      if (tag === "textarea") return true;
+      if (["button", "submit", "file", "hidden", "checkbox", "radio", "password"].indexOf(type) >= 0) return false;
       return true;
     });
   }
 
   function labelTextForInput(input) {
     var id = String(input.id || "");
-    var label;
     var text = "";
+    var label;
+    var prev;
+    var parent;
+    var guard;
 
     if (id) {
-      label = document.querySelector("label[for='" + id.replace(/'/g, "\\'") + "']");
+      try {
+        label = document.querySelector("label[for=\"" + id.replace(/"/g, "\\\"") + "\"]");
+        if (label) text += " " + visibleText(label);
+      } catch (error) {
+        /* ignore */
+      }
+    }
+
+    if (input.closest) {
+      label = input.closest("label");
       if (label) text += " " + visibleText(label);
     }
 
-    if (input.parentElement) text += " " + visibleText(input.parentElement);
+    prev = input.previousElementSibling;
+    guard = 0;
+    while (prev && guard < 3) {
+      text += " " + visibleText(prev);
+      prev = prev.previousElementSibling;
+      guard += 1;
+    }
+
+    parent = input.parentElement;
+    if (parent) {
+      prev = parent.previousElementSibling;
+      guard = 0;
+      while (prev && guard < 3) {
+        text += " " + visibleText(prev);
+        prev = prev.previousElementSibling;
+        guard += 1;
+      }
+    }
+
     text += " " + String(input.name || "");
     text += " " + String(input.id || "");
     text += " " + String(input.placeholder || "");
@@ -108,43 +139,98 @@
     return normalizeText(text);
   }
 
-  function fieldByKeywords(root, keywords) {
-    var inputs = allInputs(root);
+  function isNonCompanyValue(value) {
+    var v = normalizeText(value);
+    if (!v) return true;
+    if (UUID_RE.test(v)) return true;
+    if (v.indexOf("候補") >= 0) return true;
+    if (v.length > 160) return true;
+    return false;
+  }
+
+  function companyInputValues(root) {
+    var inputs = editableCompanyInputs(root);
+    var rows = [];
     var i;
-    var j;
 
     for (i = 0; i < inputs.length; i += 1) {
-      var label = labelTextForInput(inputs[i]);
       var value = normalizeText(valueOf(inputs[i]));
+      var label = labelTextForInput(inputs[i]);
 
-      for (j = 0; j < keywords.length; j += 1) {
-        if (label.indexOf(keywords[j]) >= 0) {
-          return inputs[i];
-        }
-      }
+      if (isNonCompanyValue(value)) continue;
 
-      if (value) {
-        for (j = 0; j < keywords.length; j += 1) {
-          if (visibleText(root).indexOf(keywords[j]) >= 0 && label.indexOf("事業") < 0) {
-            return inputs[i];
-          }
-        }
+      rows.push({
+        node: inputs[i],
+        value: value,
+        label: label
+      });
+    }
+
+    return rows;
+  }
+
+  function findCompanyName(root) {
+    var rows = companyInputValues(root);
+    var i;
+
+    for (i = 0; i < rows.length; i += 1) {
+      var label = rows[i].label;
+      if (
+        (label.indexOf("会社名") >= 0 || label.indexOf("AI企業名") >= 0 || label.indexOf("company_name") >= 0 || label.indexOf("companyName") >= 0) &&
+        label.indexOf("事業") < 0 &&
+        label.indexOf("方針") < 0 &&
+        label.indexOf("ルール") < 0
+      ) {
+        return rows[i].value;
       }
     }
 
-    return null;
+    return rows[0] ? rows[0].value : "";
+  }
+
+  function findBusinessDomain(root, companyName) {
+    var rows = companyInputValues(root);
+    var i;
+
+    for (i = 0; i < rows.length; i += 1) {
+      var label = rows[i].label;
+      if (
+        label.indexOf("事業領域") >= 0 ||
+        label.indexOf("事業内容") >= 0 ||
+        label.indexOf("業務領域") >= 0 ||
+        label.indexOf("business_domain") >= 0 ||
+        label.indexOf("businessDomain") >= 0 ||
+        label.indexOf("business_area") >= 0 ||
+        label.indexOf("description") >= 0
+      ) {
+        return rows[i].value;
+      }
+    }
+
+    /*
+     * Strong fallback:
+     * company form layout is company_name first, business_domain second.
+     * This prevents business_domain from becoming company_name.
+     */
+    for (i = 0; i < rows.length; i += 1) {
+      if (rows[i].value !== companyName) {
+        return rows[i].value;
+      }
+    }
+
+    return rows[1] ? rows[1].value : "";
   }
 
   function rootHasCompanyFormSignal(root) {
     var text = visibleText(root);
-    var nameField = fieldByKeywords(root, ["会社名", "AI企業名", "company_name", "companyName"]);
-    var inputs = allInputs(root);
+    var rows = companyInputValues(root);
 
-    if (nameField) return true;
-    if (text.indexOf("会社名") >= 0) return true;
-    if (text.indexOf("AI企業名") >= 0) return true;
+    if (text.indexOf("会社名") >= 0 && rows.length >= 1) return true;
+    if (text.indexOf("AI企業名") >= 0 && rows.length >= 1) return true;
+    if (text.indexOf("事業領域") >= 0 && rows.length >= 1) return true;
+    if (rows.length >= 2) return true;
 
-    return inputs.length >= 1 && text.indexOf("事業領域") >= 0;
+    return false;
   }
 
   function nearestCompanyFormRoot(start) {
@@ -164,9 +250,9 @@
 
     if (best) return best;
 
-    var forms = Array.prototype.slice.call(document.querySelectorAll("form,section,article,div"));
-    for (var i = 0; i < forms.length; i += 1) {
-      if (rootHasCompanyFormSignal(forms[i])) return forms[i];
+    var blocks = Array.prototype.slice.call(document.querySelectorAll("form,section,article,div"));
+    for (var i = 0; i < blocks.length; i += 1) {
+      if (rootHasCompanyFormSignal(blocks[i])) return blocks[i];
     }
 
     return null;
@@ -244,56 +330,6 @@
     return "create";
   }
 
-  function inferCompanyName(root) {
-    var field = fieldByKeywords(root, ["会社名", "AI企業名", "company_name", "companyName"]);
-    var inputs;
-    var i;
-
-    if (field && normalizeText(valueOf(field))) {
-      return normalizeText(valueOf(field));
-    }
-
-    inputs = allInputs(root);
-
-    for (i = 0; i < inputs.length; i += 1) {
-      var value = normalizeText(valueOf(inputs[i]));
-      var label = labelTextForInput(inputs[i]);
-
-      if (!value) continue;
-      if (UUID_RE.test(value)) continue;
-      if (value.indexOf("候補") >= 0) continue;
-      if (value.length > 120) continue;
-      if (label.indexOf("事業") >= 0 || label.indexOf("方針") >= 0 || label.indexOf("ルール") >= 0) continue;
-
-      return value;
-    }
-
-    return "";
-  }
-
-  function inferBusinessDomain(root, companyName) {
-    var field = fieldByKeywords(root, ["事業領域", "事業内容", "business_domain", "businessDomain", "business_area", "description"]);
-    var inputs;
-    var i;
-
-    if (field && normalizeText(valueOf(field))) {
-      return normalizeText(valueOf(field));
-    }
-
-    inputs = allInputs(root);
-
-    for (i = 0; i < inputs.length; i += 1) {
-      var value = normalizeText(valueOf(inputs[i]));
-      if (!value) continue;
-      if (value === companyName) continue;
-      if (UUID_RE.test(value)) continue;
-      if (value.indexOf("候補") >= 0) continue;
-      return value;
-    }
-
-    return "";
-  }
-
   function inferCompanyId(root) {
     var rootMatch = visibleText(root).match(UUID_RE);
     var bodyMatch;
@@ -305,8 +341,8 @@
   }
 
   function buildPayload(root, action) {
-    var companyName = inferCompanyName(root);
-    var businessDomain = inferBusinessDomain(root, companyName);
+    var companyName = findCompanyName(root);
+    var businessDomain = findBusinessDomain(root, companyName);
     var companyId = action === "update" ? inferCompanyId(root) : "";
 
     if (!companyName) {
@@ -319,7 +355,7 @@
     return {
       ok: true,
       payload: {
-        source: "AICompanyManager company UI event hard capture",
+        source: "AICompanyManager company UI v6 field dedup list sync",
         operation: action === "create" ? "company.create_or_save" : "company.update_or_save",
         save_status: "COMPANY_SAVE_REQUESTED",
         company_id_input: companyId,
@@ -389,6 +425,84 @@
     return match ? match[1] : "";
   }
 
+  function readSavedCompanies() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function writeSavedCompanies(rows) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(rows.slice(0, 50)));
+    } catch (error) {
+      /* ignore */
+    }
+  }
+
+  function rememberSavedCompany(company) {
+    if (!company || !company.company_id || !company.company_name) return;
+
+    var rows = readSavedCompanies().filter(function (row) {
+      return row.company_id !== company.company_id && row.company_name !== company.company_name;
+    });
+
+    rows.unshift({
+      company_id: company.company_id,
+      company_name: company.company_name,
+      business_domain: company.business_domain || "",
+      saved_at: new Date().toISOString()
+    });
+
+    writeSavedCompanies(rows);
+  }
+
+  function selectLooksLikeCompanySelector(select) {
+    var text = "";
+    var node = select;
+    var guard = 0;
+
+    while (node && node !== document.body && guard < 6) {
+      text += " " + visibleText(node);
+      node = node.parentElement;
+      guard += 1;
+    }
+
+    return (
+      text.indexOf("AI企業選択") >= 0 ||
+      text.indexOf("変更対象") >= 0 ||
+      text.indexOf("BusinessOS DB会社") >= 0 ||
+      text.indexOf("会社選択") >= 0 ||
+      text.indexOf("会社") >= 0
+    );
+  }
+
+  function syncSavedCompaniesToSelects() {
+    var rows = readSavedCompanies();
+    var selects = Array.prototype.slice.call(document.querySelectorAll("select"));
+
+    selects.forEach(function (select) {
+      if (!selectLooksLikeCompanySelector(select)) return;
+
+      rows.slice().reverse().forEach(function (company) {
+        var exists = Array.prototype.slice.call(select.options).some(function (option) {
+          return option.value === company.company_id || visibleText(option) === company.company_name;
+        });
+
+        if (exists) return;
+
+        var option = document.createElement("option");
+        option.value = company.company_id;
+        option.textContent = company.company_name;
+        option.setAttribute("data-aicm-local-saved-company", "1");
+        select.appendChild(option);
+      });
+    });
+  }
+
   function originalText(el) {
     return el.getAttribute("data-aicm-original-text") || visibleText(el) || "保存";
   }
@@ -408,16 +522,19 @@
     }
   }
 
-  function shouldSkipDuplicate(key) {
-    var now = Date.now();
+  function lockIntent() {
+    intentLocked = true;
+    window.clearTimeout(intentUnlockTimer);
+    intentUnlockTimer = window.setTimeout(function () {
+      intentLocked = false;
+    }, 1600);
+  }
 
-    if (key === lastHandledKey && now - lastHandledAt < 900) {
-      return true;
-    }
-
-    lastHandledKey = key;
-    lastHandledAt = now;
-    return false;
+  function unlockIntentLater() {
+    window.clearTimeout(intentUnlockTimer);
+    intentUnlockTimer = window.setTimeout(function () {
+      intentLocked = false;
+    }, 1200);
   }
 
   function updateBadge() {
@@ -439,7 +556,7 @@
       document.body.appendChild(badge);
     }
 
-    badge.textContent = "company save client v5: " + lastDebug;
+    badge.textContent = "company save client v6: " + lastDebug;
   }
 
   async function runSave(anchor, root, action) {
@@ -454,8 +571,11 @@
     if (!built.ok) {
       setStatus(anchor, "会社保存不可: 会社名を入力してください。", false);
       window.alert("会社名を入力してください。");
+      unlockIntentLater();
       return;
     }
+
+    lockIntent();
 
     if (
       !window.confirm(
@@ -466,6 +586,9 @@
           "\n\n続行しますか？"
       )
     ) {
+      lastDebug = "cancelled";
+      updateBadge();
+      unlockIntentLater();
       return;
     }
 
@@ -477,7 +600,7 @@
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          source: "AICompanyManager company browser UI event hard capture",
+          source: "AICompanyManager company browser UI v6",
           rollback_only: false,
           payload: built.payload
         })
@@ -492,35 +615,50 @@
       companyId = extractCompanyId(result.stdout);
       companyTable = extractCompanyTable(result.stdout);
 
-      setStatus(anchor, "保存OK: 会社をBusinessOS DBへ保存しました。company_idを確定しました。", true);
+      setStatus(anchor, "保存OK: 会社をBusinessOS DBへ保存しました。変更対象にも反映しました。", true);
 
       if (companyId) {
         displayCompanyId(root, companyId, companyTable);
+        rememberSavedCompany({
+          company_id: companyId,
+          company_name: built.payload.company_name,
+          business_domain: built.payload.business_domain
+        });
+        syncSavedCompaniesToSelects();
       }
 
-      window.setTimeout(function () {
-        var base = window.location.href.split("#")[0].split("?")[0];
-        window.location.href = base + "?v=" + Date.now();
-      }, 900);
+      lastDebug = "saved " + built.payload.company_name;
+      updateBadge();
     } catch (error) {
       setStatus(anchor, "保存失敗: " + String(error && error.message ? error.message : error), false);
+      lastDebug = "save failed";
+      updateBadge();
     } finally {
       setBusy(anchor, false);
+      unlockIntentLater();
     }
   }
 
-  function handleIntent(eventName, event, anchor, root, action) {
-    var key = eventName + ":" + action + ":" + visibleText(anchor).slice(0, 30);
-
-    if (shouldSkipDuplicate(key)) return;
-
-    lastDebug = eventName + " / " + action + " / " + (visibleText(anchor) || "submit").slice(0, 16);
-    updateBadge();
-
+  function stopEvent(event) {
     event.preventDefault();
     event.stopPropagation();
     if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+  }
 
+  function handleIntent(eventName, event, anchor, root, action) {
+    if (intentLocked) {
+      stopEvent(event);
+      lastDebug = eventName + " duplicate ignored";
+      updateBadge();
+      return;
+    }
+
+    stopEvent(event);
+
+    lastDebug = eventName + " / " + action;
+    updateBadge();
+
+    lockIntent();
     runSave(anchor, root, action);
   }
 
@@ -533,6 +671,7 @@
     if (!anchor) return;
 
     label = visibleText(anchor);
+
     if (looksLikeNavigation(label)) {
       lastDebug = eventName + " nav ignored: " + label.slice(0, 14);
       updateBadge();
@@ -580,6 +719,7 @@
 
   function start() {
     cleanupGenericDbSaveButtons();
+    syncSavedCompaniesToSelects();
 
     document.addEventListener("click", function (event) {
       capturePointerLike("click", event);
@@ -596,13 +736,12 @@
     document.addEventListener("submit", captureSubmit, true);
 
     window.AICM_COMPANY_PERSISTENT_SAVE_CLIENT_STATUS = {
-      marker: "AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V5_EVENT_HARD_CAPTURE",
+      marker: "AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V6_FIELD_DEDUP_LIST_SYNC",
       api_base: API_BASE,
       loaded: true,
-      capture_click: true,
-      capture_pointerup: true,
-      capture_touchend: true,
-      capture_submit: true
+      field_mapping: "company_name_first_business_domain_second",
+      duplicate_confirm_lock: true,
+      saved_company_selector_sync: true
     };
 
     lastDebug = "ON";
@@ -613,6 +752,7 @@
       window.clearTimeout(timer);
       timer = window.setTimeout(function () {
         cleanupGenericDbSaveButtons();
+        syncSavedCompaniesToSelects();
         updateBadge();
       }, 250);
     });
