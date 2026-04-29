@@ -1,11 +1,11 @@
-/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V3_STRICT_SUBMIT */
+/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V4_FINAL_FORM_SUBMIT */
 (function () {
   "use strict";
 
   var API_BASE = "http://127.0.0.1:8796";
-  var STATUS_CLASS = "aicm-company-save-status-v2";
-  var COMPANY_ID_STATUS_CLASS = "aicm-company-db-id-status-v2";
-  var UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  var STATUS_CLASS = "aicm-company-save-status-v4";
+  var COMPANY_ID_STATUS_CLASS = "aicm-company-db-id-status-v4";
+  var UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
   function textOf(node) {
     if (!node) return "";
@@ -19,6 +19,10 @@
 
   function normalizeText(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function compactText(value) {
+    return normalizeText(value).replace(/\s+/g, "");
   }
 
   function visibleText(node) {
@@ -60,100 +64,13 @@
     var texts = [];
     var guard = 0;
 
-    while (node && node !== document.body && guard < 8) {
+    while (node && node !== document.body && guard < 10) {
       texts.push(visibleText(node));
       node = node.parentElement;
       guard += 1;
     }
 
     return normalizeText(texts.join(" "));
-  }
-
-  function isCompanyArea(text) {
-    return (
-      text.indexOf("AI企業") >= 0 ||
-      text.indexOf("会社") >= 0 ||
-      text.indexOf("会社名") >= 0 ||
-      text.indexOf("事業領域") >= 0 ||
-      text.indexOf("会社 変更・削除") >= 0 ||
-      text.indexOf("AI企業新規追加") >= 0
-    );
-  }
-
-  function detectCompanyAction(el) {
-    var label = visibleText(el);
-    var compact = normalizeText(label).replace(/\\s+/g, "");
-    var area = areaTextAround(el);
-
-    if (!compact) return "";
-
-    /*
-     * Strict production rule:
-     * - navigation/open buttons must never trigger DB save
-     * - only final submit labels trigger company save
-     */
-    if (
-      compact.indexOf("新規追加") >= 0 ||
-      compact.indexOf("追加する会社") >= 0 ||
-      compact.indexOf("AI企業を表示") >= 0 ||
-      compact.indexOf("表示") >= 0 ||
-      compact.indexOf("読み込み") >= 0 ||
-      compact.indexOf("読込") >= 0 ||
-      compact.indexOf("戻る") >= 0 ||
-      compact.indexOf("一覧") >= 0 ||
-      compact.indexOf("選択") >= 0 ||
-      compact.indexOf("削除") >= 0
-    ) {
-      return "";
-    }
-
-    if (
-      compact === "会社を追加" ||
-      compact === "会社追加" ||
-      compact === "AI企業を追加" ||
-      compact === "AI企業追加" ||
-      compact === "この会社を追加"
-    ) {
-      return "create";
-    }
-
-    if (
-      compact === "会社を変更" ||
-      compact === "会社変更" ||
-      compact === "AI企業を変更" ||
-      compact === "AI企業変更" ||
-      compact === "この会社を変更"
-    ) {
-      return "update";
-    }
-
-    /*
-     * Do not treat bare "追加" / "変更" as save.
-     * Those can be navigation buttons in dashboard cards.
-     */
-    return "";
-  }
-
-  function nearestCompanyRoot(el) {
-    var node = el;
-    var best = null;
-    var guard = 0;
-
-    while (node && node !== document.body && guard < 14) {
-      var text = visibleText(node);
-      var hasCompany = isCompanyArea(text);
-      var hasFields = text.indexOf("会社名") >= 0 || text.indexOf("事業領域") >= 0 || text.indexOf("会社を追加") >= 0 || text.indexOf("会社を変更") >= 0;
-
-      if (hasCompany && hasFields) {
-        best = node;
-        break;
-      }
-
-      node = node.parentElement;
-      guard += 1;
-    }
-
-    return best || el.parentElement || document.body;
   }
 
   function allInputs(root) {
@@ -205,6 +122,126 @@
     }
 
     return null;
+  }
+
+  function nearestCandidateRoot(el) {
+    var node = el;
+    var best = null;
+    var guard = 0;
+
+    while (node && node !== document.body && guard < 14) {
+      var text = visibleText(node);
+      var hasCompanyWord =
+        text.indexOf("会社") >= 0 ||
+        text.indexOf("AI企業") >= 0 ||
+        text.indexOf("会社名") >= 0 ||
+        text.indexOf("事業領域") >= 0;
+
+      var hasInput = node.querySelector && node.querySelector("input,textarea");
+
+      if (hasCompanyWord && hasInput) {
+        best = node;
+        break;
+      }
+
+      node = node.parentElement;
+      guard += 1;
+    }
+
+    return best || el.parentElement || document.body;
+  }
+
+  function rootHasCompanyNameField(root) {
+    var text = visibleText(root);
+    var byLabel = fieldByKeywords(root, ["会社名", "AI企業名", "company_name", "companyName", "name"]);
+
+    if (byLabel) return true;
+
+    return text.indexOf("会社名") >= 0 || text.indexOf("AI企業名") >= 0;
+  }
+
+  function rootLooksLikeFinalCompanyForm(root) {
+    var text = visibleText(root);
+    var inputs = allInputs(root);
+    var hasCompanyName = rootHasCompanyNameField(root);
+    var hasEditableInput = inputs.some(function (input) {
+      var value = normalizeText(valueOf(input));
+      return value && !UUID_RE.test(value) && value.indexOf("候補") < 0;
+    });
+
+    var looksLikeNavigationList =
+      text.indexOf("AI企業ダッシュボード") >= 0 &&
+      text.indexOf("会社名") < 0 &&
+      text.indexOf("事業領域") < 0;
+
+    if (looksLikeNavigationList) return false;
+
+    return hasCompanyName && hasEditableInput;
+  }
+
+  function detectCompanyAction(el) {
+    var label = visibleText(el);
+    var compact = compactText(label);
+    var root = nearestCandidateRoot(el);
+    var rootIsForm = rootLooksLikeFinalCompanyForm(root);
+
+    if (!compact) return "";
+
+    /*
+     * Always excluded navigation / non-save buttons.
+     */
+    if (
+      compact.indexOf("新規追加") >= 0 ||
+      compact.indexOf("AI企業新規追加") >= 0 ||
+      compact.indexOf("追加する会社") >= 0 ||
+      compact.indexOf("AI企業を表示") >= 0 ||
+      compact === "表示" ||
+      compact.indexOf("読み込み") >= 0 ||
+      compact.indexOf("読込") >= 0 ||
+      compact.indexOf("戻る") >= 0 ||
+      compact.indexOf("一覧") >= 0 ||
+      compact.indexOf("選択") >= 0 ||
+      compact.indexOf("削除") >= 0
+    ) {
+      return "";
+    }
+
+    /*
+     * Explicit final submit labels.
+     */
+    if (
+      compact === "会社を追加" ||
+      compact === "会社追加" ||
+      compact === "AI企業を追加" ||
+      compact === "AI企業追加" ||
+      compact === "この会社を追加"
+    ) {
+      return "create";
+    }
+
+    if (
+      compact === "会社を変更" ||
+      compact === "会社変更" ||
+      compact === "AI企業を変更" ||
+      compact === "AI企業変更" ||
+      compact === "この会社を変更"
+    ) {
+      return "update";
+    }
+
+    /*
+     * Bare add/change is allowed only inside the final company form.
+     * This fixes forms whose submit button is simply "追加".
+     */
+    if ((compact === "追加" || compact === "登録" || compact === "保存") && rootIsForm) {
+      return "create";
+    }
+
+    if ((compact === "変更" || compact === "更新") && rootIsForm) {
+      return "update";
+    }
+
+    return "";
   }
 
   function inferCompanyName(root) {
@@ -268,7 +305,7 @@
   }
 
   function buildPayload(el, action) {
-    var root = nearestCompanyRoot(el);
+    var root = nearestCandidateRoot(el);
     var companyName = inferCompanyName(root);
     var businessDomain = inferBusinessDomain(root, companyName);
     var companyId = action === "update" ? inferCompanyId(root) : "";
@@ -285,7 +322,7 @@
       ok: true,
       root: root,
       payload: {
-        source: "AICompanyManager company UI capture client",
+        source: "AICompanyManager company UI final form submit client",
         operation: action === "create" ? "company.create_or_save" : "company.update_or_save",
         save_status: "COMPANY_SAVE_REQUESTED",
         company_id_input: companyId,
@@ -407,7 +444,7 @@
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          source: "AICompanyManager company browser UI capture",
+          source: "AICompanyManager company browser UI final form submit",
           rollback_only: false,
           payload: built.payload
         })
@@ -416,7 +453,7 @@
       result = await response.json();
 
       if (!response.ok || !result.ok) {
-        throw new Error(normalizeText(result.stderr || result.error || "unknown company save error"));
+        throw new Error(String(result.stderr || result.error || "unknown company save error").replace(/\s+/g, " ").trim());
       }
 
       companyId = extractCompanyId(result.stdout);
@@ -460,11 +497,14 @@
     var old = document.getElementById(id);
     var badge;
 
-    if (old) return;
+    if (old) {
+      old.textContent = "company save client: final form ON";
+      return;
+    }
 
     badge = document.createElement("div");
     badge.id = id;
-    badge.textContent = "company save client: strict submit ON";
+    badge.textContent = "company save client: final form ON";
     badge.style.position = "fixed";
     badge.style.right = "8px";
     badge.style.bottom = "8px";
@@ -483,10 +523,11 @@
     document.addEventListener("click", captureClick, true);
 
     window.AICM_COMPANY_PERSISTENT_SAVE_CLIENT_STATUS = {
-      marker: "AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V2_CAPTURE",
+      marker: "AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V4_FINAL_FORM_SUBMIT",
       api_base: API_BASE,
       loaded: true,
-      capture_click: true
+      capture_click: true,
+      bare_add_allowed_only_in_company_form: true
     };
 
     addDebugBadge();
