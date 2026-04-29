@@ -1,4 +1,4 @@
-/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V2_CAPTURE */
+/* AICM_COMPANY_PERSISTENT_SAVE_CLIENT_V3_STRICT_SUBMIT */
 (function () {
   "use strict";
 
@@ -82,26 +82,55 @@
 
   function detectCompanyAction(el) {
     var label = visibleText(el);
+    var compact = normalizeText(label).replace(/\\s+/g, "");
     var area = areaTextAround(el);
 
-    if (!label) return "";
+    if (!compact) return "";
 
-    if (label.indexOf("会社を追加") >= 0 || label.indexOf("会社追加") >= 0 || label.indexOf("AI企業を追加") >= 0) {
+    /*
+     * Strict production rule:
+     * - navigation/open buttons must never trigger DB save
+     * - only final submit labels trigger company save
+     */
+    if (
+      compact.indexOf("新規追加") >= 0 ||
+      compact.indexOf("追加する会社") >= 0 ||
+      compact.indexOf("AI企業を表示") >= 0 ||
+      compact.indexOf("表示") >= 0 ||
+      compact.indexOf("読み込み") >= 0 ||
+      compact.indexOf("読込") >= 0 ||
+      compact.indexOf("戻る") >= 0 ||
+      compact.indexOf("一覧") >= 0 ||
+      compact.indexOf("選択") >= 0 ||
+      compact.indexOf("削除") >= 0
+    ) {
+      return "";
+    }
+
+    if (
+      compact === "会社を追加" ||
+      compact === "会社追加" ||
+      compact === "AI企業を追加" ||
+      compact === "AI企業追加" ||
+      compact === "この会社を追加"
+    ) {
       return "create";
     }
 
-    if (label.indexOf("会社を変更") >= 0 || label.indexOf("会社変更") >= 0 || label.indexOf("AI企業を変更") >= 0) {
+    if (
+      compact === "会社を変更" ||
+      compact === "会社変更" ||
+      compact === "AI企業を変更" ||
+      compact === "AI企業変更" ||
+      compact === "この会社を変更"
+    ) {
       return "update";
     }
 
-    if ((label === "追加" || label.indexOf("追加") >= 0) && isCompanyArea(area)) {
-      return "create";
-    }
-
-    if ((label === "変更" || label.indexOf("変更") >= 0) && isCompanyArea(area)) {
-      return "update";
-    }
-
+    /*
+     * Do not treat bare "追加" / "変更" as save.
+     * Those can be navigation buttons in dashboard cards.
+     */
     return "";
   }
 
@@ -435,7 +464,7 @@
 
     badge = document.createElement("div");
     badge.id = id;
-    badge.textContent = "company save client: ON";
+    badge.textContent = "company save client: strict submit ON";
     badge.style.position = "fixed";
     badge.style.right = "8px";
     badge.style.bottom = "8px";
