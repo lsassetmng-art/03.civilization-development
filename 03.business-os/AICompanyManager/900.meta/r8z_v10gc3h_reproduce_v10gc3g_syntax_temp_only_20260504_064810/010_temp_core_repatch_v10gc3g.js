@@ -12678,7 +12678,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
       }
     }
 
-    function renderConfirm(row, mode, id) {
+    function aicmR8zV10gc3gInsertReviewDecisionAction(renderConfirm(row, mode, id), row) {
       var isApprove = mode === "approve";
       var title = isApprove ? "承認前の最終確認" : "差し戻し前の最終確認";
       var nextStatus = isApprove ? "approved" : "returned";
@@ -12690,7 +12690,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         '<section class="aicm-core-card" style="border:3px solid ' + border + ';background:' + bg + ';">',
         '  <p class="aicm-eyebrow">V10F / DB更新前確認</p>',
         '  <h2>' + esc(title) + '</h2>',
-        '  <p class="aicm-selected-note">この確認画面で内容を確認し、問題なければDB更新を実行します。</p>',
+        '  <p class="aicm-selected-note">まだDB更新は実行しません。次工程V10GでAPI rollback smokeを行ってから本実行します。</p>',
         '  <dl class="aicm-core-detail-list">',
         field("操作予定", operation),
         field("status遷移予定", "pending → " + nextStatus),
@@ -12704,11 +12704,11 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         '  </dl>',
         '  <div class="aicm-core-card" style="background:#ffffff;">',
         '    <p class="aicm-eyebrow">確認事項</p>',
-        '    <p class="aicm-selected-note">成果物内容・AIレビュー・未解決事項を確認したうえで、下のボタンからDB更新を実行します。</p>',
+        '    <p class="aicm-selected-note">成果物内容・AIレビュー・未解決事項を確認したうえで、次工程でDB更新を実行します。</p>',
         '  </div>',
         '  <div class="aicm-dashboard-action-row">',
         '    <button type="button" data-core-action="review-v10f-cancel-confirm" data-review-id="' + esc(id) + '">確認を閉じる</button>',
-        '    <button type="button" class="aicm-primary-button" data-core-action="review-decision-execute" data-review-decision="' + esc(nextStatus) + '" data-review-item-id="' + esc(id) + '" data-owner-civilization-id="' + esc(row.owner_civilization_id || row.ownerCivilizationId || row.owner_id || row.ownerId || "") + '" data-human-reviewer-label="' + esc(row.human_reviewer_label || row.humanReviewerLabel || row.reviewer_label || row.reviewerLabel || "user") + '">' + esc(operation) + 'を実行する</button>',
+        '    <button type="button" disabled title="V10Gで有効化予定">' + esc(operation) + 'を実行する（次工程）</button>',
         '  </div>',
         '</section>'
       ].join("");
@@ -13229,29 +13229,110 @@ if (action === "review-v10f-cancel-confirm") {
 // AICM_R8Z_V10F3_REVIEW_CONFIRM_BACK_BUTTON_APPLIED
 
 
-// AICM_R8Z_V10GC3I_RENDERCONFIRM_DIRECT_BUTTON_CANON_START
-// Canonical review decision handler for renderConfirm(row, mode, id).
-// No DOM post-render normalization, no observer, no hardcoded owner fallback.
-function aicmR8zV10gc3iText(value) {
+// AICM_R8Z_V10GC3G_EXACT_RENDERCONFIRM_CALL_PATCH_START
+// Canonical review decision patch through the confirmed single renderConfirm(...) call.
+// No MutationObserver, no interval, no hardcoded owner fallback.
+function aicmR8zV10gc3gText(value) {
   return String(value === undefined || value === null ? "" : value).trim();
 }
 
-function aicmR8zV10gc3iApp() {
+function aicmR8zV10gc3gAttr(value) {
+  return aicmR8zV10gc3gText(value)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function aicmR8zV10gc3gPick(row, keys) {
+  if (!row || typeof row !== "object") return "";
+
+  for (var i = 0; i < keys.length; i += 1) {
+    var key = keys[i];
+    if (row[key] !== undefined && row[key] !== null && aicmR8zV10gc3gText(row[key]) !== "") {
+      return aicmR8zV10gc3gText(row[key]);
+    }
+  }
+
+  return "";
+}
+
+function aicmR8zV10gc3gDecisionFromHtml(html) {
+  var s = String(html || "");
+
+  if (s.indexOf("差し戻し前の最終確認") >= 0) return "returned";
+  if (s.indexOf("承認前の最終確認") >= 0) return "approved";
+
+  return "";
+}
+
+function aicmR8zV10gc3gReviewDecisionActionHtml(row, decision) {
+  var reviewId = aicmR8zV10gc3gPick(row, [
+    "aicm_human_review_item_id",
+    "review_item_id",
+    "review_id",
+    "id"
+  ]);
+
+  var ownerId = aicmR8zV10gc3gPick(row, [
+    "owner_civilization_id",
+    "ownerCivilizationId",
+    "owner_id",
+    "ownerId"
+  ]);
+
+  var reviewerLabel = aicmR8zV10gc3gPick(row, [
+    "human_reviewer_label",
+    "humanReviewerLabel",
+    "reviewer_label",
+    "reviewerLabel"
+  ]) || "user";
+
+  var label = decision === "returned" ? "差し戻しを実行する" : "承認を実行する";
+
+  return [
+    '<section class="aicm-core-card" data-aicm-v10gc3g-review-decision-actions="true">',
+    '  <p class="aicm-eyebrow">最終実行</p>',
+    '  <p class="aicm-selected-note">このボタンを押すとレビュー状態を更新します。</p>',
+    '  <button type="button" class="aicm-primary-button"',
+    '    data-core-action="review-decision-execute"',
+    '    data-review-decision="' + aicmR8zV10gc3gAttr(decision) + '"',
+    '    data-review-item-id="' + aicmR8zV10gc3gAttr(reviewId) + '"',
+    '    data-owner-civilization-id="' + aicmR8zV10gc3gAttr(ownerId) + '"',
+    '    data-human-reviewer-label="' + aicmR8zV10gc3gAttr(reviewerLabel) + '">',
+    '    ' + aicmR8zV10gc3gAttr(label),
+    '  </button>',
+    '</section>'
+  ].join("");
+}
+
+function aicmR8zV10gc3gInsertReviewDecisionAction(html, row) {
+  var s = String(html || "");
+
+  if (s.indexOf('data-aicm-v10gc3g-review-decision-actions="true"') >= 0) return s;
+
+  var decision = aicmR8zV10gc3gDecisionFromHtml(s);
+  if (!decision) return s;
+
+  return s + aicmR8zV10gc3gReviewDecisionActionHtml(row, decision);
+}
+
+function aicmR8zV10gc3gApp() {
   if (typeof state !== "undefined" && state && typeof state === "object") return state;
   if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
   return {};
 }
 
-function aicmR8zV10gc3iNoteValue() {
+function aicmR8zV10gc3gNoteValue() {
   try {
     var node = document.querySelector('[data-aicm-review-decision-note], textarea[name="human_review_note"], textarea[name="review_decision_note"], textarea[name="return_reason"]');
-    return node ? aicmR8zV10gc3iText(node.value) : "";
+    return node ? aicmR8zV10gc3gText(node.value) : "";
   } catch (_) {
     return "";
   }
 }
 
-function aicmR8zV10gc3iSetMessage(kind, value) {
+function aicmR8zV10gc3gSetMessage(kind, value) {
   try {
     if (typeof setMessage === "function") {
       setMessage(kind, value);
@@ -13260,33 +13341,33 @@ function aicmR8zV10gc3iSetMessage(kind, value) {
   } catch (_) {}
 
   try {
-    var s = aicmR8zV10gc3iApp();
+    var s = aicmR8zV10gc3gApp();
     s.messageKind = kind;
     s.messageText = value;
   } catch (_) {}
 }
 
-function aicmR8zV10gc3iBuildPayload(button) {
+function aicmR8zV10gc3gBuildPayload(button) {
   return {
-    aicm_human_review_item_id: aicmR8zV10gc3iText(button.getAttribute("data-review-item-id") || ""),
-    owner_civilization_id: aicmR8zV10gc3iText(button.getAttribute("data-owner-civilization-id") || ""),
-    human_reviewer_label: aicmR8zV10gc3iText(button.getAttribute("data-human-reviewer-label") || "user") || "user",
-    human_review_note: aicmR8zV10gc3iNoteValue()
+    aicm_human_review_item_id: aicmR8zV10gc3gText(button.getAttribute("data-review-item-id") || ""),
+    owner_civilization_id: aicmR8zV10gc3gText(button.getAttribute("data-owner-civilization-id") || ""),
+    human_reviewer_label: aicmR8zV10gc3gText(button.getAttribute("data-human-reviewer-label") || "user") || "user",
+    human_review_note: aicmR8zV10gc3gNoteValue()
   };
 }
 
-function aicmR8zV10gc3iMissingPayloadKeys(payload) {
+function aicmR8zV10gc3gMissingPayloadKeys(payload) {
   return ["aicm_human_review_item_id", "owner_civilization_id", "human_reviewer_label"].filter(function(key) {
-    return !aicmR8zV10gc3iText(payload[key]);
+    return !aicmR8zV10gc3gText(payload[key]);
   });
 }
 
-function aicmR8zV10gc3iRoute(decision) {
+function aicmR8zV10gc3gRoute(decision) {
   return decision === "returned" ? "/api/aicm/v2/human-review/return" : "/api/aicm/v2/human-review/approve";
 }
 
-async function aicmR8zV10gc3iPostDecision(decision, payload) {
-  var response = await fetch(aicmR8zV10gc3iRoute(decision), {
+async function aicmR8zV10gc3gPostDecision(decision, payload) {
+  var response = await fetch(aicmR8zV10gc3gRoute(decision), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -13302,14 +13383,13 @@ async function aicmR8zV10gc3iPostDecision(decision, payload) {
   return json || { result: "ok" };
 }
 
-function aicmR8zV10gc3iRemoveReviewFromState(reviewId) {
-  var s = aicmR8zV10gc3iApp();
-  var id = aicmR8zV10gc3iText(reviewId);
+function aicmR8zV10gc3gRemoveReviewFromState(reviewId) {
+  var s = aicmR8zV10gc3gApp();
+  var id = aicmR8zV10gc3gText(reviewId);
 
   function same(row) {
-    return aicmR8zV10gc3iText(row && (
+    return aicmR8zV10gc3gText(row && (
       row.aicm_human_review_item_id ||
-      row.human_review_item_id ||
       row.review_item_id ||
       row.review_id ||
       row.id ||
@@ -13327,11 +13407,7 @@ function aicmR8zV10gc3iRemoveReviewFromState(reviewId) {
     s.reviewRows = filterRows(s.reviewRows);
 
     if (s.context && typeof s.context === "object") {
-      Object.keys(s.context).forEach(function(key) {
-        if (Array.isArray(s.context[key])) {
-          s.context[key] = filterRows(s.context[key]);
-        }
-      });
+      s.context.review_wait_items = filterRows(s.context.review_wait_items);
     }
 
     s.aicmR8zV10fReviewConfirm = null;
@@ -13344,12 +13420,12 @@ function aicmR8zV10gc3iRemoveReviewFromState(reviewId) {
   } catch (_) {}
 }
 
-async function aicmR8zV10gc3iRefreshReviewList(reviewId) {
-  aicmR8zV10gc3iRemoveReviewFromState(reviewId);
+async function aicmR8zV10gc3gRefreshReviewList(reviewId) {
+  aicmR8zV10gc3gRemoveReviewFromState(reviewId);
 
   try {
     if (typeof aicmR8zV9ReviewListScriptHydrate === "function") {
-      aicmR8zV9ReviewListScriptHydrate(aicmR8zV10gc3iApp());
+      aicmR8zV9ReviewListScriptHydrate(aicmR8zV10gc3gApp());
     }
   } catch (_) {}
 
@@ -13358,21 +13434,21 @@ async function aicmR8zV10gc3iRefreshReviewList(reviewId) {
   } catch (_) {}
 }
 
-async function aicmR8zV10gc3iExecuteReviewDecision(button) {
-  var decision = aicmR8zV10gc3iText(button.getAttribute("data-review-decision") || "");
-  var payload = aicmR8zV10gc3iBuildPayload(button);
-  var missing = aicmR8zV10gc3iMissingPayloadKeys(payload);
+async function aicmR8zV10gc3gExecuteReviewDecision(button) {
+  var decision = aicmR8zV10gc3gText(button.getAttribute("data-review-decision") || "");
+  var payload = aicmR8zV10gc3gBuildPayload(button);
+  var missing = aicmR8zV10gc3gMissingPayloadKeys(payload);
 
   if (decision !== "approved" && decision !== "returned") {
-    aicmR8zV10gc3iSetMessage("error", "レビュー操作種別が不明です。");
+    aicmR8zV10gc3gSetMessage("error", "レビュー操作種別が不明です。");
     return;
   }
 
   if (missing.length > 0) {
-    aicmR8zV10gc3iSetMessage("error", "レビュー更新に必要な値が不足しています: " + missing.join(", "));
+    aicmR8zV10gc3gSetMessage("error", "レビュー更新に必要な値が不足しています: " + missing.join(", "));
     try {
       if (typeof window !== "undefined") {
-        window.aicmR8zV10gc3iLastMissingPayload = payload;
+        window.aicmR8zV10gc3gLastMissingPayload = payload;
       }
     } catch (_) {}
     if (typeof render === "function") render();
@@ -13381,16 +13457,16 @@ async function aicmR8zV10gc3iExecuteReviewDecision(button) {
 
   try {
     button.disabled = true;
-    aicmR8zV10gc3iSetMessage("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+    aicmR8zV10gc3gSetMessage("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
 
-    await aicmR8zV10gc3iPostDecision(decision, payload);
+    await aicmR8zV10gc3gPostDecision(decision, payload);
 
-    aicmR8zV10gc3iSetMessage("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+    aicmR8zV10gc3gSetMessage("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
 
-    await aicmR8zV10gc3iRefreshReviewList(payload.aicm_human_review_item_id);
+    await aicmR8zV10gc3gRefreshReviewList(payload.aicm_human_review_item_id);
   } catch (error) {
     button.disabled = false;
-    aicmR8zV10gc3iSetMessage("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+    aicmR8zV10gc3gSetMessage("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
     if (typeof render === "function") render();
   }
 }
@@ -13405,11 +13481,11 @@ if (typeof document !== "undefined") {
     try { event.stopPropagation(); } catch (_) {}
     try { event.stopImmediatePropagation(); } catch (_) {}
 
-    aicmR8zV10gc3iExecuteReviewDecision(button);
+    aicmR8zV10gc3gExecuteReviewDecision(button);
   }, true);
 }
 
 if (typeof window !== "undefined") {
-  window.aicmR8zV10gc3iExecuteReviewDecision = aicmR8zV10gc3iExecuteReviewDecision;
+  window.aicmR8zV10gc3gExecuteReviewDecision = aicmR8zV10gc3gExecuteReviewDecision;
 }
-// AICM_R8Z_V10GC3I_RENDERCONFIRM_DIRECT_BUTTON_CANON_END
+// AICM_R8Z_V10GC3G_EXACT_RENDERCONFIRM_CALL_PATCH_END

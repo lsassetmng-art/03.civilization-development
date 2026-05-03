@@ -1,0 +1,148 @@
+APPROVE_ROUTE=/api/aicm/v2/human-review/approve
+RETURN_ROUTE=/api/aicm/v2/human-review/return
+APPROVE_HIT_COUNT=2
+RETURN_HIT_COUNT=2
+
+---- APPROVE HITS ----
+LINE=572 ROUTES=
+    "    " + aicmHumanReviewTextSql(body.main_changes_text) + ",",
+    "    " + aicmHumanReviewTextSql(body.ai_review_result_text) + ",",
+    "    " + aicmHumanReviewTextSql(body.unresolved_issues_text) + ",",
+    "    " + aicmHumanReviewTextSql(body.artifact_link) + ",",
+    "    " + aicmHumanReviewTextSql(body.responsible_ai_label) + ",",
+    "    " + aicmHumanReviewTextSql(body.requested_by_ai_label) + ",",
+    "    'pending',",
+    "    " + sqlLiteral(aicmHumanReviewPriority(body.priority_code)) + ",",
+    "    " + aicmHumanReviewOptionalDateSql(body.due_date) + ",",
+    "    COALESCE(NULLIF(" + sqlLiteral(String(body.display_order || "")) + ", '')::integer, 100),",
+    "    '{}'::jsonb",
+    "  )",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', 'ok',",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'human_review_item', to_jsonb(inserted)",
+    ")::text",
+    "FROM inserted;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+function approveHumanReviewItem(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_human_review_item",
+    "  SET human_review_status_code = 'approved',",
+
+LINE=2127 ROUTES=/api/aicm/v2/manager-major/archive,/api/aicm/v2/manager-major/import-csv,/api/aicm/v2/human-review/create,/api/aicm/v2/human-review/approve,/api/aicm/v2/human-review/return
+      sendJson(res, 200, runLeaderAutoDecomposition(body));
+      return true;
+    }
+if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, archiveManagerMajorItem(body));
+      return true;
+    }
+
+// AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+    if (route === "/api/aicm/v2/manager-major/import-csv" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, importManagerMajorItemsCsv(body));
+      return true;
+    }
+
+
+    if (route === "/api/aicm/v2/human-review/create" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, createHumanReviewItem(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/human-review/approve" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, approveHumanReviewItem(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/human-review/return" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, returnHumanReviewItem(body));
+      return true;
+
+
+---- RETURN HITS ----
+LINE=598 ROUTES=
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_human_review_item",
+    "  SET human_review_status_code = 'approved',",
+    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+    "      reviewed_at = now(),",
+    "      updated_at = now()",
+    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+function returnHumanReviewItem(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_human_review_item",
+    "  SET human_review_status_code = 'returned',",
+
+LINE=2133 ROUTES=/api/aicm/v2/manager-major/import-csv,/api/aicm/v2/human-review/create,/api/aicm/v2/human-review/approve,/api/aicm/v2/human-review/return,/api/aicm/v2/company/update
+      return true;
+    }
+
+// AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+    if (route === "/api/aicm/v2/manager-major/import-csv" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, importManagerMajorItemsCsv(body));
+      return true;
+    }
+
+
+    if (route === "/api/aicm/v2/human-review/create" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, createHumanReviewItem(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/human-review/approve" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, approveHumanReviewItem(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/human-review/return" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, returnHumanReviewItem(body));
+      return true;
+    }
+
+
+    if (route === "/api/aicm/v2/company/update" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, updateCompany(body));
+

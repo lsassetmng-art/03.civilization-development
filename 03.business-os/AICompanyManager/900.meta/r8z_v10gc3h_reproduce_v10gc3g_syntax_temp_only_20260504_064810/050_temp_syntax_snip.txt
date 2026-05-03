@@ -1,0 +1,82 @@
+SYNTAX_LINE=12681
+      12646: 
+      12647:     function reviewId(row) {
+      12648:       return text(row && (
+      12649:         row.aicm_human_review_item_id ||
+      12650:         row.human_review_item_id ||
+      12651:         row.review_id ||
+      12652:         row.id ||
+      12653:         ""
+      12654:       ));
+      12655:     }
+      12656: 
+      12657:     function findRowById(id) {
+      12658:       id = text(id);
+      12659:       var rows = fetchRows();
+      12660: 
+      12661:       for (var i = 0; i < rows.length; i += 1) {
+      12662:         if (reviewId(rows[i]) === id) return rows[i];
+      12663:       }
+      12664: 
+      12665:       return null;
+      12666:     }
+      12667: 
+      12668:     function field(label, value) {
+      12669:       return '<dt>' + esc(label) + '</dt><dd>' + esc(text(value) || "-") + '</dd>';
+      12670:     }
+      12671: 
+      12672:     function removeExistingConfirm() {
+      12673:       if (typeof document === "undefined") return;
+      12674: 
+      12675:       var nodes = document.querySelectorAll('[data-aicm-v10f-confirm="true"]');
+      12676:       for (var i = 0; i < nodes.length; i += 1) {
+      12677:         if (nodes[i] && nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
+      12678:       }
+      12679:     }
+      12680: 
+ >>>  12681:     function aicmR8zV10gc3gInsertReviewDecisionAction(renderConfirm(row, mode, id), row) {
+      12682:       var isApprove = mode === "approve";
+      12683:       var title = isApprove ? "承認前の最終確認" : "差し戻し前の最終確認";
+      12684:       var nextStatus = isApprove ? "approved" : "returned";
+      12685:       var operation = isApprove ? "承認" : "差し戻し";
+      12686:       var border = isApprove ? "#22c55e" : "#f97316";
+      12687:       var bg = isApprove ? "#f0fdf4" : "#fff7ed";
+      12688: 
+      12689:       return [
+      12690:         '<section class="aicm-core-card" style="border:3px solid ' + border + ';background:' + bg + ';">',
+      12691:         '  <p class="aicm-eyebrow">V10F / DB更新前確認</p>',
+      12692:         '  <h2>' + esc(title) + '</h2>',
+      12693:         '  <p class="aicm-selected-note">まだDB更新は実行しません。次工程V10GでAPI rollback smokeを行ってから本実行します。</p>',
+      12694:         '  <dl class="aicm-core-detail-list">',
+      12695:         field("操作予定", operation),
+      12696:         field("status遷移予定", "pending → " + nextStatus),
+      12697:         field("review_id", id),
+      12698:         field("レビュー", row.review_title || row.title || "レビュー項目"),
+      12699:         field("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+      12700:         field("優先度", row.priority_code),
+      12701:         field("依頼日時", row.requested_at || row.created_at),
+      12702:         field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+      12703:         field("会社", row.company_name),
+      12704:         '  </dl>',
+      12705:         '  <div class="aicm-core-card" style="background:#ffffff;">',
+      12706:         '    <p class="aicm-eyebrow">確認事項</p>',
+      12707:         '    <p class="aicm-selected-note">成果物内容・AIレビュー・未解決事項を確認したうえで、次工程でDB更新を実行します。</p>',
+      12708:         '  </div>',
+      12709:         '  <div class="aicm-dashboard-action-row">',
+      12710:         '    <button type="button" data-core-action="review-v10f-cancel-confirm" data-review-id="' + esc(id) + '">確認を閉じる</button>',
+      12711:         '    <button type="button" disabled title="V10Gで有効化予定">' + esc(operation) + 'を実行する（次工程）</button>',
+      12712:         '  </div>',
+      12713:         '</section>'
+      12714:       ].join("");
+      12715:     }
+      12716: 
+
+============================================================
+renderConfirm wrap hits
+============================================================
+ 12681:     function aicmR8zV10gc3gInsertReviewDecisionAction(renderConfirm(row, mode, id), row) {
+ 12787:       wrap.innerHTML = renderConfirm(row, mode, id);
+ 13232: // AICM_R8Z_V10GC3G_EXACT_RENDERCONFIRM_CALL_PATCH_START
+ 13233: // Canonical review decision patch through the confirmed single renderConfirm(...) call.
+ 13309: function aicmR8zV10gc3gInsertReviewDecisionAction(html, row) {
+ 13491: // AICM_R8Z_V10GC3G_EXACT_RENDERCONFIRM_CALL_PATCH_END

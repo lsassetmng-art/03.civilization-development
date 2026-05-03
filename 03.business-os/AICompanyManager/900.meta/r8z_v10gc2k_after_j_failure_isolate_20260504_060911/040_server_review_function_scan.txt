@@ -1,0 +1,247 @@
+SERVER_APPROVE_FUNCTION_COUNT=1
+SERVER_RETURN_FUNCTION_COUNT=1
+SERVER_APPROVE_ROUTE_COUNT=1
+SERVER_RETURN_ROUTE_COUNT=1
+SERVER_REQUIRES_OWNER_COUNT=108
+SERVER_REQUIRES_REVIEWER_COUNT=4
+SERVER_REQUIRES_REVIEW_ITEM_ID_COUNT=6
+
+============================================================
+approveHumanReviewItem around
+============================================================
+---- hit line 572 pattern=function approveHumanReviewItem ----
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+function approveHumanReviewItem(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_human_review_item",
+    "  SET human_review_status_code = 'approved',",
+    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+    "      reviewed_at = now(),",
+    "      updated_at = now()",
+    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+function returnHumanReviewItem(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_human_review_item",
+    "  SET human_review_status_code = 'returned',",
+    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+    "      reviewed_at = now(),",
+    "      updated_at = now()",
+    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+
+
+// AICM_COMPANY_DEPT_SECTION_UPDATE_ARU_ARX_V1
+// Company / Department / Section update functions.
+// Uses existing SQL-array + runPsqlJson(sql) pattern only.
+// No new Pool, no new DB helper, no new connection path.
+
+function aicmOrgUpdateOptionalText(value) {
+  return String(value || "").trim();
+}
+
+function aicmOrgUpdateTextSql(value) {
+  return sqlLiteral(String(value || ""));
+}
+
+function aicmOrgUpdateStatus(value, allowed, fallback) {
+  const text = String(value || fallback).trim();
+  return allowed.includes(text) ? text : fallback;
+}
+
+function updateCompany(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+  const name = requiredText(body.company_name || body.companyName, "company_name");
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_user_company",
+
+============================================================
+returnHumanReviewItem around
+============================================================
+---- hit line 598 pattern=function returnHumanReviewItem ----
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+function returnHumanReviewItem(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_human_review_item",
+    "  SET human_review_status_code = 'returned',",
+    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+    "      reviewed_at = now(),",
+    "      updated_at = now()",
+    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+
+
+// AICM_COMPANY_DEPT_SECTION_UPDATE_ARU_ARX_V1
+// Company / Department / Section update functions.
+// Uses existing SQL-array + runPsqlJson(sql) pattern only.
+// No new Pool, no new DB helper, no new connection path.
+
+function aicmOrgUpdateOptionalText(value) {
+  return String(value || "").trim();
+}
+
+function aicmOrgUpdateTextSql(value) {
+  return sqlLiteral(String(value || ""));
+}
+
+function aicmOrgUpdateStatus(value, allowed, fallback) {
+  const text = String(value || fallback).trim();
+  return allowed.includes(text) ? text : fallback;
+}
+
+function updateCompany(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+  const name = requiredText(body.company_name || body.companyName, "company_name");
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_user_company",
+    "  SET company_name = " + sqlLiteral(name) + ",",
+    "      business_domain = " + aicmOrgUpdateTextSql(body.business_domain || body.businessDomain) + ",",
+    "      company_common_rules_text = " + aicmOrgUpdateTextSql(body.company_common_rules_text || body.companyCommonRulesText) + ",",
+    "      president_policy_instruction_text = " + aicmOrgUpdateTextSql(body.president_policy_instruction_text || body.presidentPolicyInstructionText) + ",",
+    "      updated_at = now()",
+    "  WHERE aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'company', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+function updateDepartment(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const departmentId = requiredUuid(body.aicm_user_company_department_id, "aicm_user_company_department_id");
+  const name = requiredText(body.department_name || body.departmentName, "department_name");
+  const status = aicmOrgUpdateStatus(body.department_status || body.department_status_code, ["active", "inactive", "archived"], "active");
+
+  const sql = [
+
+============================================================
+routes around
+============================================================
+---- hit line 2125 pattern=/api/aicm/v2/human-review/approve ----
+if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, archiveManagerMajorItem(body));
+      return true;
+    }
+
+// AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+    if (route === "/api/aicm/v2/manager-major/import-csv" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, importManagerMajorItemsCsv(body));
+      return true;
+    }
+
+
+    if (route === "/api/aicm/v2/human-review/create" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, createHumanReviewItem(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/human-review/approve" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, approveHumanReviewItem(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/human-review/return" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, returnHumanReviewItem(body));
+      return true;
+    }
+
+
+    if (route === "/api/aicm/v2/company/update" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, updateCompany(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/department/update" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, updateDepartment(body));
+      return true;
+    }
+
+    // AICM_ORGANIZATION_UPDATE_DELEGATES_TO_SECTION_UPDATE
+    // UI label "組織変更" is connected to the current section/k課 update responsibility.
+    // Keep this as an explicit compatibility route so future split can be handled here.
+    if (route === "/api/aicm/v2/organization/update" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, updateSection(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/section/update" && req.method === "POST") {

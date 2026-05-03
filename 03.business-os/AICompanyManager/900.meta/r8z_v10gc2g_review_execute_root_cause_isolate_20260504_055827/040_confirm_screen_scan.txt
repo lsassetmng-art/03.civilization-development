@@ -1,0 +1,2629 @@
+---- 承認前の最終確認 around ----
+---- hit line 12683 pattern=承認前の最終確認 ----
+      return text(row && (
+        row.aicm_human_review_item_id ||
+        row.human_review_item_id ||
+        row.review_id ||
+        row.id ||
+        ""
+      ));
+    }
+
+    function findRowById(id) {
+      id = text(id);
+      var rows = fetchRows();
+
+      for (var i = 0; i < rows.length; i += 1) {
+        if (reviewId(rows[i]) === id) return rows[i];
+      }
+
+      return null;
+    }
+
+    function field(label, value) {
+      return '<dt>' + esc(label) + '</dt><dd>' + esc(text(value) || "-") + '</dd>';
+    }
+
+    function removeExistingConfirm() {
+      if (typeof document === "undefined") return;
+
+      var nodes = document.querySelectorAll('[data-aicm-v10f-confirm="true"]');
+      for (var i = 0; i < nodes.length; i += 1) {
+        if (nodes[i] && nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
+      }
+    }
+
+    function renderConfirm(row, mode, id) {
+      var isApprove = mode === "approve";
+      var title = isApprove ? "承認前の最終確認" : "差し戻し前の最終確認";
+      var nextStatus = isApprove ? "approved" : "returned";
+      var operation = isApprove ? "承認" : "差し戻し";
+      var border = isApprove ? "#22c55e" : "#f97316";
+      var bg = isApprove ? "#f0fdf4" : "#fff7ed";
+
+      return [
+        '<section class="aicm-core-card" style="border:3px solid ' + border + ';background:' + bg + ';">',
+        '  <p class="aicm-eyebrow">V10F / DB更新前確認</p>',
+        '  <h2>' + esc(title) + '</h2>',
+        '  <p class="aicm-selected-note">まだDB更新は実行しません。次工程V10GでAPI rollback smokeを行ってから本実行します。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        field("操作予定", operation),
+        field("status遷移予定", "pending → " + nextStatus),
+        field("review_id", id),
+        field("レビュー", row.review_title || row.title || "レビュー項目"),
+        field("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+        field("優先度", row.priority_code),
+        field("依頼日時", row.requested_at || row.created_at),
+        field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        field("会社", row.company_name),
+        '  </dl>',
+        '  <div class="aicm-core-card" style="background:#ffffff;">',
+        '    <p class="aicm-eyebrow">確認事項</p>',
+        '    <p class="aicm-selected-note">成果物内容・AIレビュー・未解決事項を確認したうえで、次工程でDB更新を実行します。</p>',
+        '  </div>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10f-cancel-confirm" data-review-id="' + esc(id) + '">確認を閉じる</button>',
+        '    <button type="button" disabled title="V10Gで有効化予定">' + esc(operation) + 'を実行する（次工程）</button>',
+        '  </div>',
+        '</section>'
+      ].join("");
+    }
+
+    function findActionElement(target) {
+      while (target && target !== document) {
+        if (target.getAttribute && target.getAttribute("data-core-action")) return target;
+        target = target.parentNode;
+      }
+      return null;
+    }
+
+    function findInsertHost(actionEl) {
+      var host = actionEl;
+
+
+---- hit line 13478 pattern=承認前の最終確認 ----
+        if (typeof render === "function") render();
+        return true;
+      }
+
+      try {
+        if (button) button.disabled = true;
+        message("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+
+        await postDecision(reviewItemId, decision, noteValue());
+
+        try {
+          var s = app();
+          s.aicmR8zV10fReviewConfirm = null;
+          s.reviewDecisionConfirm = null;
+          s.reviewConfirm = null;
+        } catch (_) {}
+
+        message("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+
+        await reloadReviewList(reviewItemId);
+      } catch (error) {
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "承認を実行する";
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "差し戻しを実行する";
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("[data-core-action]") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        if (action !== "review-v10gc2b-execute-approved" && action !== "review-v10gc2b-execute-returned") return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+
+---- hit line 13577 pattern=承認前の最終確認 ----
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bOriginal = originalRenderV10GC2B;
+      render = wrappedRenderV10GC2B;
+    }
+
+    setTimeout(upgradeButtons, 500);
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10gc2bExecuteReviewDecision = execute;
+      window.aicmR8zV10gc2bUpgradeButtons = upgradeButtons;
+    }
+  })();
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_END
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+
+---- hit line 13585 pattern=承認前の最終確認 ----
+      window.aicmR8zV10gc2bUpgradeButtons = upgradeButtons;
+    }
+  })();
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_END
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+
+---- 差し戻し前の最終確認 around ----
+---- hit line 12683 pattern=差し戻し前の最終確認 ----
+      return text(row && (
+        row.aicm_human_review_item_id ||
+        row.human_review_item_id ||
+        row.review_id ||
+        row.id ||
+        ""
+      ));
+    }
+
+    function findRowById(id) {
+      id = text(id);
+      var rows = fetchRows();
+
+      for (var i = 0; i < rows.length; i += 1) {
+        if (reviewId(rows[i]) === id) return rows[i];
+      }
+
+      return null;
+    }
+
+    function field(label, value) {
+      return '<dt>' + esc(label) + '</dt><dd>' + esc(text(value) || "-") + '</dd>';
+    }
+
+    function removeExistingConfirm() {
+      if (typeof document === "undefined") return;
+
+      var nodes = document.querySelectorAll('[data-aicm-v10f-confirm="true"]');
+      for (var i = 0; i < nodes.length; i += 1) {
+        if (nodes[i] && nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
+      }
+    }
+
+    function renderConfirm(row, mode, id) {
+      var isApprove = mode === "approve";
+      var title = isApprove ? "承認前の最終確認" : "差し戻し前の最終確認";
+      var nextStatus = isApprove ? "approved" : "returned";
+      var operation = isApprove ? "承認" : "差し戻し";
+      var border = isApprove ? "#22c55e" : "#f97316";
+      var bg = isApprove ? "#f0fdf4" : "#fff7ed";
+
+      return [
+        '<section class="aicm-core-card" style="border:3px solid ' + border + ';background:' + bg + ';">',
+        '  <p class="aicm-eyebrow">V10F / DB更新前確認</p>',
+        '  <h2>' + esc(title) + '</h2>',
+        '  <p class="aicm-selected-note">まだDB更新は実行しません。次工程V10GでAPI rollback smokeを行ってから本実行します。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        field("操作予定", operation),
+        field("status遷移予定", "pending → " + nextStatus),
+        field("review_id", id),
+        field("レビュー", row.review_title || row.title || "レビュー項目"),
+        field("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+        field("優先度", row.priority_code),
+        field("依頼日時", row.requested_at || row.created_at),
+        field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        field("会社", row.company_name),
+        '  </dl>',
+        '  <div class="aicm-core-card" style="background:#ffffff;">',
+        '    <p class="aicm-eyebrow">確認事項</p>',
+        '    <p class="aicm-selected-note">成果物内容・AIレビュー・未解決事項を確認したうえで、次工程でDB更新を実行します。</p>',
+        '  </div>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10f-cancel-confirm" data-review-id="' + esc(id) + '">確認を閉じる</button>',
+        '    <button type="button" disabled title="V10Gで有効化予定">' + esc(operation) + 'を実行する（次工程）</button>',
+        '  </div>',
+        '</section>'
+      ].join("");
+    }
+
+    function findActionElement(target) {
+      while (target && target !== document) {
+        if (target.getAttribute && target.getAttribute("data-core-action")) return target;
+        target = target.parentNode;
+      }
+      return null;
+    }
+
+    function findInsertHost(actionEl) {
+      var host = actionEl;
+
+
+---- hit line 13479 pattern=差し戻し前の最終確認 ----
+        return true;
+      }
+
+      try {
+        if (button) button.disabled = true;
+        message("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+
+        await postDecision(reviewItemId, decision, noteValue());
+
+        try {
+          var s = app();
+          s.aicmR8zV10fReviewConfirm = null;
+          s.reviewDecisionConfirm = null;
+          s.reviewConfirm = null;
+        } catch (_) {}
+
+        message("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+
+        await reloadReviewList(reviewItemId);
+      } catch (error) {
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "承認を実行する";
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "差し戻しを実行する";
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("[data-core-action]") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        if (action !== "review-v10gc2b-execute-approved" && action !== "review-v10gc2b-execute-returned") return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+        execute(button, action);
+
+---- hit line 13578 pattern=差し戻し前の最終確認 ----
+      render = wrappedRenderV10GC2B;
+    }
+
+    setTimeout(upgradeButtons, 500);
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10gc2bExecuteReviewDecision = execute;
+      window.aicmR8zV10gc2bUpgradeButtons = upgradeButtons;
+    }
+  })();
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_END
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+
+---- hit line 13586 pattern=差し戻し前の最終確認 ----
+    }
+  })();
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_END
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+
+---- 承認確認へ進む around ----
+---- hit line 11695 pattern=承認確認へ進む ----
+      var row = findSelectedRow(appState);
+      if (!row) return "";
+
+      var id = reviewId(row);
+      var m = meta(row);
+      var title = t(row.review_title || row.title || "レビュー項目");
+
+      return [
+        '<section class="aicm-core-card" style="border:2px solid #f59e0b;">',
+        '  <p class="aicm-eyebrow">成果物確認</p>',
+        '  <h2>' + esc(title) + '</h2>',
+        '  <p class="aicm-selected-note">承認/差し戻しの前に、成果物内容を確認してください。ここではDB更新しません。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        renderField("review_id", id),
+        renderField("レビュー種別", row.review_kind_label || row.review_kind_code),
+        renderField("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+        renderField("優先度", row.priority_code),
+        renderField("依頼日時", row.requested_at || row.created_at),
+        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        renderField("会社", row.company_name),
+        renderField("部門", row.department_name),
+        renderField("課", row.section_name),
+        '  </dl>',
+        renderArtifactLink(row),
+        '</section>',
+        renderTextSection("納品サマリー", row.delivery_summary_text),
+        renderTextSection("主な変更点", row.main_changes_text),
+        renderTextSection("AIレビュー結果", row.ai_review_result_text),
+        renderTextSection("未解決事項", row.unresolved_issues_text),
+        nestedOutputs(row),
+        '<section class="aicm-core-card" style="background:#fff7ed;border:1px solid #fdba74;">',
+        '  <p class="aicm-eyebrow">次工程</p>',
+        '  <h3>承認/差し戻しへ進む前の確認</h3>',
+        '  <p class="aicm-selected-note">V10DではまだDB更新しません。次のV10Eでrollback smokeを行います。</p>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d-preview-approve" data-review-id="' + esc(id) + '">承認確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d-preview-return" data-review-id="' + esc(id) + '">差し戻し確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d-close-detail">一覧へ戻る</button>',
+        '  </div>',
+        '</section>',
+        '<section class="aicm-core-card" style="background:#f8fafc;">',
+        '  <p class="aicm-eyebrow">metadata_jsonb</p>',
+        '  <pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + esc(jsonPreview(m, 3200)) + '</pre>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderPreviewDecisionCard(appState) {
+      appState = app(appState);
+      var mode = t(appState.aicmR8zV10dDecisionPreviewMode || "");
+      var row = findSelectedRow(appState);
+
+      if (!mode || !row) return "";
+
+      var title = mode === "approve" ? "承認確認プレビュー" : "差し戻し確認プレビュー";
+      var note = mode === "approve"
+        ? "次工程V10Eでrollback smoke後に承認DB更新を確認します。"
+        : "次工程V10Eでrollback smoke後に差し戻しDB更新を確認します。";
+
+      return [
+        '<section class="aicm-core-card" style="border:2px solid #38bdf8;">',
+        '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+        '  <h2>' + esc(row.review_title || "レビュー項目") + '</h2>',
+        '  <p class="aicm-selected-note">' + esc(note) + '</p>',
+        '  <dl class="aicm-core-detail-list">',
+        renderField("review_id", reviewId(row)),
+        renderField("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        '  </dl>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d-clear-preview">プレビューを閉じる</button>',
+        '  </div>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderListRow(row, index, currentId) {
+      var id = reviewId(row);
+      var title = t(row.review_title || row.title || "レビュー項目");
+      var summary = t(row.delivery_summary_text || row.summary || row.description || "");
+
+---- hit line 12164 pattern=承認確認へ進む ----
+    function renderInlineDetail(row) {
+      if (!row) return "";
+
+      var id = reviewId(row);
+      var m = meta(row);
+      var title = t(row.review_title || row.title || "レビュー項目");
+
+      return [
+        '<section id="aicm-v10d2-detail-' + esc(id) + '" class="aicm-core-card" style="border:3px solid #f59e0b;background:#fffbeb;">',
+        '  <p class="aicm-eyebrow">成果物確認 / 選択中</p>',
+        '  <h2>' + esc(title) + '</h2>',
+        '  <p class="aicm-selected-note">このカードは押したレビュー項目の直下に表示しています。承認/差し戻しの前に内容を確認してください。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        renderField("review_id", id),
+        renderField("レビュー種別", row.review_kind_label || row.review_kind_code),
+        renderField("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+        renderField("優先度", row.priority_code),
+        renderField("依頼日時", row.requested_at || row.created_at),
+        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        renderField("会社", row.company_name),
+        renderField("部門", row.department_name),
+        renderField("課", row.section_name),
+        '  </dl>',
+        renderArtifactLink(row),
+        '</section>',
+        renderTextSection("納品サマリー", row.delivery_summary_text),
+        renderTextSection("主な変更点", row.main_changes_text),
+        renderTextSection("AIレビュー結果", row.ai_review_result_text),
+        renderTextSection("未解決事項", row.unresolved_issues_text),
+        nestedOutputs(row),
+        '<section class="aicm-core-card" style="background:#fff7ed;border:1px solid #fdba74;">',
+        '  <p class="aicm-eyebrow">次工程</p>',
+        '  <h3>承認/差し戻しへ進む前の確認</h3>',
+        '  <p class="aicm-selected-note">ここではDB更新しません。次のV10Eでrollback smokeを行います。</p>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d2-preview-approve" data-review-id="' + esc(id) + '">承認確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d2-preview-return" data-review-id="' + esc(id) + '">差し戻し確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d2-close-detail">詳細を閉じる</button>',
+        '  </div>',
+        '</section>',
+        '<section class="aicm-core-card" style="background:#f8fafc;">',
+        '  <p class="aicm-eyebrow">metadata_jsonb</p>',
+        '  <pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + esc(jsonPreview(m, 3200)) + '</pre>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderPreview(appState, row) {
+      appState = app(appState);
+      var mode = t(appState.aicmR8zV10d2DecisionPreviewMode || "");
+      if (!mode || !row) return "";
+
+      var title = mode === "approve" ? "承認確認プレビュー" : "差し戻し確認プレビュー";
+
+      return [
+        '<section class="aicm-core-card" style="border:2px solid #38bdf8;">',
+        '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+        '  <h2>' + esc(row.review_title || "レビュー項目") + '</h2>',
+        '  <p class="aicm-selected-note">これはプレビューです。DB更新はまだ実行しません。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        renderField("review_id", reviewId(row)),
+        renderField("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        '  </dl>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d2-clear-preview">プレビューを閉じる</button>',
+        '  </div>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderListRow(appState, row, index, currentId) {
+      var id = reviewId(row);
+      var title = t(row.review_title || row.title || "レビュー項目");
+      var summary = t(row.delivery_summary_text || row.summary || row.description || "");
+      var selected = id && id === currentId;
+
+      return [
+        '<article class="aicm-core-card" style="' + (selected ? 'border:2px solid #f59e0b;' : 'border:1px solid #dbeafe;') + '">',
+        '  <p class="aicm-eyebrow">レビュー待ち #' + esc(String(index + 1)) + '</p>',
+
+---- hit line 13031 pattern=承認確認へ進む ----
+      return blocks.join("");
+    }
+
+    function renderDetail(row, id) {
+      var m = meta(row);
+      var title = text(row.review_title || row.title || "レビュー項目");
+
+      return [
+        '<section id="' + esc(detailId(id)) + '" class="aicm-core-card" style="border:3px solid #f59e0b;background:#fffbeb;">',
+        '  <p class="aicm-eyebrow">成果物確認 / V10D4</p>',
+        '  <h2>' + esc(title) + '</h2>',
+        '  <p class="aicm-selected-note">この詳細カードはクリック互換bridgeで押した行の直下に挿入しています。承認/差し戻しの前に確認してください。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        field("review_id", id),
+        field("レビュー種別", row.review_kind_label || row.review_kind_code),
+        field("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+        field("優先度", row.priority_code),
+        field("依頼日時", row.requested_at || row.created_at),
+        field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        field("会社", row.company_name),
+        field("部門", row.department_name),
+        field("課", row.section_name),
+        '  </dl>',
+        artifactLink(row),
+        '</section>',
+        section("納品サマリー", row.delivery_summary_text),
+        section("主な変更点", row.main_changes_text),
+        section("AIレビュー結果", row.ai_review_result_text),
+        section("未解決事項", row.unresolved_issues_text),
+        nestedOutputs(row),
+        '<section class="aicm-core-card" style="background:#fff7ed;border:1px solid #fdba74;">',
+        '  <p class="aicm-eyebrow">次工程</p>',
+        '  <h3>承認/差し戻しへ進む前の確認</h3>',
+        '  <p class="aicm-selected-note">ここではDB更新しません。次のV10Eでrollback smokeを行います。</p>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d4-preview-approve" data-review-id="' + esc(id) + '">承認確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d4-preview-return" data-review-id="' + esc(id) + '">差し戻し確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d4-close-detail" data-review-id="' + esc(id) + '">詳細を閉じる</button>',
+        '  </div>',
+        '</section>',
+        '<section class="aicm-core-card" style="background:#f8fafc;">',
+        '  <p class="aicm-eyebrow">metadata_jsonb</p>',
+        '  <pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + esc(jsonPreview(m, 3400)) + '</pre>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderPreview(row, mode, id) {
+      var title = mode === "approve" ? "承認確認プレビュー / V10D4" : "差し戻し確認プレビュー / V10D4";
+      return [
+        '<section class="aicm-core-card" style="border:2px solid #38bdf8;">',
+        '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+        '  <h2>' + esc(row.review_title || "レビュー項目") + '</h2>',
+        '  <p class="aicm-selected-note">これはプレビューです。DB更新はまだ実行しません。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        field("review_id", id),
+        field("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+        field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        '  </dl>',
+        '</section>'
+      ].join("");
+    }
+
+    function removeExistingDetails() {
+      if (typeof document === "undefined") return;
+      var existing = document.querySelectorAll('[data-aicm-v10d4-detail="true"]');
+      for (var i = 0; i < existing.length; i += 1) {
+        if (existing[i] && existing[i].parentNode) existing[i].parentNode.removeChild(existing[i]);
+      }
+    }
+
+    function findActionElement(target) {
+      while (target && target !== document) {
+        if (target.getAttribute && target.getAttribute("data-core-action")) return target;
+        target = target.parentNode;
+      }
+      return null;
+    }
+
+    function setVisibleDebug(message) {
+
+---- hit line 13575 pattern=承認確認へ進む ----
+      };
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bWrapped = true;
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bOriginal = originalRenderV10GC2B;
+      render = wrappedRenderV10GC2B;
+    }
+
+    setTimeout(upgradeButtons, 500);
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10gc2bExecuteReviewDecision = execute;
+      window.aicmR8zV10gc2bUpgradeButtons = upgradeButtons;
+    }
+  })();
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_END
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+
+---- 差し戻し確認へ進む around ----
+---- hit line 11696 pattern=差し戻し確認へ進む ----
+      if (!row) return "";
+
+      var id = reviewId(row);
+      var m = meta(row);
+      var title = t(row.review_title || row.title || "レビュー項目");
+
+      return [
+        '<section class="aicm-core-card" style="border:2px solid #f59e0b;">',
+        '  <p class="aicm-eyebrow">成果物確認</p>',
+        '  <h2>' + esc(title) + '</h2>',
+        '  <p class="aicm-selected-note">承認/差し戻しの前に、成果物内容を確認してください。ここではDB更新しません。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        renderField("review_id", id),
+        renderField("レビュー種別", row.review_kind_label || row.review_kind_code),
+        renderField("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+        renderField("優先度", row.priority_code),
+        renderField("依頼日時", row.requested_at || row.created_at),
+        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        renderField("会社", row.company_name),
+        renderField("部門", row.department_name),
+        renderField("課", row.section_name),
+        '  </dl>',
+        renderArtifactLink(row),
+        '</section>',
+        renderTextSection("納品サマリー", row.delivery_summary_text),
+        renderTextSection("主な変更点", row.main_changes_text),
+        renderTextSection("AIレビュー結果", row.ai_review_result_text),
+        renderTextSection("未解決事項", row.unresolved_issues_text),
+        nestedOutputs(row),
+        '<section class="aicm-core-card" style="background:#fff7ed;border:1px solid #fdba74;">',
+        '  <p class="aicm-eyebrow">次工程</p>',
+        '  <h3>承認/差し戻しへ進む前の確認</h3>',
+        '  <p class="aicm-selected-note">V10DではまだDB更新しません。次のV10Eでrollback smokeを行います。</p>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d-preview-approve" data-review-id="' + esc(id) + '">承認確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d-preview-return" data-review-id="' + esc(id) + '">差し戻し確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d-close-detail">一覧へ戻る</button>',
+        '  </div>',
+        '</section>',
+        '<section class="aicm-core-card" style="background:#f8fafc;">',
+        '  <p class="aicm-eyebrow">metadata_jsonb</p>',
+        '  <pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + esc(jsonPreview(m, 3200)) + '</pre>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderPreviewDecisionCard(appState) {
+      appState = app(appState);
+      var mode = t(appState.aicmR8zV10dDecisionPreviewMode || "");
+      var row = findSelectedRow(appState);
+
+      if (!mode || !row) return "";
+
+      var title = mode === "approve" ? "承認確認プレビュー" : "差し戻し確認プレビュー";
+      var note = mode === "approve"
+        ? "次工程V10Eでrollback smoke後に承認DB更新を確認します。"
+        : "次工程V10Eでrollback smoke後に差し戻しDB更新を確認します。";
+
+      return [
+        '<section class="aicm-core-card" style="border:2px solid #38bdf8;">',
+        '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+        '  <h2>' + esc(row.review_title || "レビュー項目") + '</h2>',
+        '  <p class="aicm-selected-note">' + esc(note) + '</p>',
+        '  <dl class="aicm-core-detail-list">',
+        renderField("review_id", reviewId(row)),
+        renderField("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        '  </dl>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d-clear-preview">プレビューを閉じる</button>',
+        '  </div>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderListRow(row, index, currentId) {
+      var id = reviewId(row);
+      var title = t(row.review_title || row.title || "レビュー項目");
+      var summary = t(row.delivery_summary_text || row.summary || row.description || "");
+      var selected = id && id === currentId;
+
+---- hit line 12165 pattern=差し戻し確認へ進む ----
+      if (!row) return "";
+
+      var id = reviewId(row);
+      var m = meta(row);
+      var title = t(row.review_title || row.title || "レビュー項目");
+
+      return [
+        '<section id="aicm-v10d2-detail-' + esc(id) + '" class="aicm-core-card" style="border:3px solid #f59e0b;background:#fffbeb;">',
+        '  <p class="aicm-eyebrow">成果物確認 / 選択中</p>',
+        '  <h2>' + esc(title) + '</h2>',
+        '  <p class="aicm-selected-note">このカードは押したレビュー項目の直下に表示しています。承認/差し戻しの前に内容を確認してください。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        renderField("review_id", id),
+        renderField("レビュー種別", row.review_kind_label || row.review_kind_code),
+        renderField("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+        renderField("優先度", row.priority_code),
+        renderField("依頼日時", row.requested_at || row.created_at),
+        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        renderField("会社", row.company_name),
+        renderField("部門", row.department_name),
+        renderField("課", row.section_name),
+        '  </dl>',
+        renderArtifactLink(row),
+        '</section>',
+        renderTextSection("納品サマリー", row.delivery_summary_text),
+        renderTextSection("主な変更点", row.main_changes_text),
+        renderTextSection("AIレビュー結果", row.ai_review_result_text),
+        renderTextSection("未解決事項", row.unresolved_issues_text),
+        nestedOutputs(row),
+        '<section class="aicm-core-card" style="background:#fff7ed;border:1px solid #fdba74;">',
+        '  <p class="aicm-eyebrow">次工程</p>',
+        '  <h3>承認/差し戻しへ進む前の確認</h3>',
+        '  <p class="aicm-selected-note">ここではDB更新しません。次のV10Eでrollback smokeを行います。</p>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d2-preview-approve" data-review-id="' + esc(id) + '">承認確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d2-preview-return" data-review-id="' + esc(id) + '">差し戻し確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d2-close-detail">詳細を閉じる</button>',
+        '  </div>',
+        '</section>',
+        '<section class="aicm-core-card" style="background:#f8fafc;">',
+        '  <p class="aicm-eyebrow">metadata_jsonb</p>',
+        '  <pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + esc(jsonPreview(m, 3200)) + '</pre>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderPreview(appState, row) {
+      appState = app(appState);
+      var mode = t(appState.aicmR8zV10d2DecisionPreviewMode || "");
+      if (!mode || !row) return "";
+
+      var title = mode === "approve" ? "承認確認プレビュー" : "差し戻し確認プレビュー";
+
+      return [
+        '<section class="aicm-core-card" style="border:2px solid #38bdf8;">',
+        '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+        '  <h2>' + esc(row.review_title || "レビュー項目") + '</h2>',
+        '  <p class="aicm-selected-note">これはプレビューです。DB更新はまだ実行しません。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        renderField("review_id", reviewId(row)),
+        renderField("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        '  </dl>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d2-clear-preview">プレビューを閉じる</button>',
+        '  </div>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderListRow(appState, row, index, currentId) {
+      var id = reviewId(row);
+      var title = t(row.review_title || row.title || "レビュー項目");
+      var summary = t(row.delivery_summary_text || row.summary || row.description || "");
+      var selected = id && id === currentId;
+
+      return [
+        '<article class="aicm-core-card" style="' + (selected ? 'border:2px solid #f59e0b;' : 'border:1px solid #dbeafe;') + '">',
+        '  <p class="aicm-eyebrow">レビュー待ち #' + esc(String(index + 1)) + '</p>',
+        '  <h3>' + esc(title) + '</h3>',
+
+---- hit line 13032 pattern=差し戻し確認へ進む ----
+    }
+
+    function renderDetail(row, id) {
+      var m = meta(row);
+      var title = text(row.review_title || row.title || "レビュー項目");
+
+      return [
+        '<section id="' + esc(detailId(id)) + '" class="aicm-core-card" style="border:3px solid #f59e0b;background:#fffbeb;">',
+        '  <p class="aicm-eyebrow">成果物確認 / V10D4</p>',
+        '  <h2>' + esc(title) + '</h2>',
+        '  <p class="aicm-selected-note">この詳細カードはクリック互換bridgeで押した行の直下に挿入しています。承認/差し戻しの前に確認してください。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        field("review_id", id),
+        field("レビュー種別", row.review_kind_label || row.review_kind_code),
+        field("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+        field("優先度", row.priority_code),
+        field("依頼日時", row.requested_at || row.created_at),
+        field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        field("会社", row.company_name),
+        field("部門", row.department_name),
+        field("課", row.section_name),
+        '  </dl>',
+        artifactLink(row),
+        '</section>',
+        section("納品サマリー", row.delivery_summary_text),
+        section("主な変更点", row.main_changes_text),
+        section("AIレビュー結果", row.ai_review_result_text),
+        section("未解決事項", row.unresolved_issues_text),
+        nestedOutputs(row),
+        '<section class="aicm-core-card" style="background:#fff7ed;border:1px solid #fdba74;">',
+        '  <p class="aicm-eyebrow">次工程</p>',
+        '  <h3>承認/差し戻しへ進む前の確認</h3>',
+        '  <p class="aicm-selected-note">ここではDB更新しません。次のV10Eでrollback smokeを行います。</p>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-v10d4-preview-approve" data-review-id="' + esc(id) + '">承認確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d4-preview-return" data-review-id="' + esc(id) + '">差し戻し確認へ進む</button>',
+        '    <button type="button" data-core-action="review-v10d4-close-detail" data-review-id="' + esc(id) + '">詳細を閉じる</button>',
+        '  </div>',
+        '</section>',
+        '<section class="aicm-core-card" style="background:#f8fafc;">',
+        '  <p class="aicm-eyebrow">metadata_jsonb</p>',
+        '  <pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + esc(jsonPreview(m, 3400)) + '</pre>',
+        '</section>'
+      ].join("");
+    }
+
+    function renderPreview(row, mode, id) {
+      var title = mode === "approve" ? "承認確認プレビュー / V10D4" : "差し戻し確認プレビュー / V10D4";
+      return [
+        '<section class="aicm-core-card" style="border:2px solid #38bdf8;">',
+        '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+        '  <h2>' + esc(row.review_title || "レビュー項目") + '</h2>',
+        '  <p class="aicm-selected-note">これはプレビューです。DB更新はまだ実行しません。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        field("review_id", id),
+        field("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+        field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+        '  </dl>',
+        '</section>'
+      ].join("");
+    }
+
+    function removeExistingDetails() {
+      if (typeof document === "undefined") return;
+      var existing = document.querySelectorAll('[data-aicm-v10d4-detail="true"]');
+      for (var i = 0; i < existing.length; i += 1) {
+        if (existing[i] && existing[i].parentNode) existing[i].parentNode.removeChild(existing[i]);
+      }
+    }
+
+    function findActionElement(target) {
+      while (target && target !== document) {
+        if (target.getAttribute && target.getAttribute("data-core-action")) return target;
+        target = target.parentNode;
+      }
+      return null;
+    }
+
+    function setVisibleDebug(message) {
+      var s = app();
+
+---- hit line 13576 pattern=差し戻し確認へ進む ----
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bWrapped = true;
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bOriginal = originalRenderV10GC2B;
+      render = wrappedRenderV10GC2B;
+    }
+
+    setTimeout(upgradeButtons, 500);
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10gc2bExecuteReviewDecision = execute;
+      window.aicmR8zV10gc2bUpgradeButtons = upgradeButtons;
+    }
+  })();
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_END
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+
+---- 承認を実行 around ----
+---- hit line 13449 pattern=承認を実行 ----
+
+      try {
+        if (typeof aicmR8zV9ReviewListScriptHydrate === "function") {
+          aicmR8zV9ReviewListScriptHydrate(app());
+        }
+      } catch (_) {}
+
+      try {
+        if (typeof render === "function") render();
+      } catch (_) {}
+    }
+
+    function noteValue() {
+      try {
+        var node = document.querySelector('[data-aicm-review-decision-note], textarea[name="human_review_note"], textarea[name="review_decision_note"], textarea[name="return_reason"]');
+        return node ? text(node.value) : "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    async function execute(button, action) {
+      var decision = decisionFromAction(action);
+      if (!decision) return false;
+
+      var reviewItemId = currentReviewId(button);
+
+      if (!reviewItemId) {
+        message("error", "review item id が見つかりません。成果物詳細からやり直してください。");
+        if (typeof render === "function") render();
+        return true;
+      }
+
+      try {
+        if (button) button.disabled = true;
+        message("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+
+        await postDecision(reviewItemId, decision, noteValue());
+
+        try {
+          var s = app();
+          s.aicmR8zV10fReviewConfirm = null;
+          s.reviewDecisionConfirm = null;
+          s.reviewConfirm = null;
+        } catch (_) {}
+
+        message("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+
+        await reloadReviewList(reviewItemId);
+      } catch (error) {
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+
+---- hit line 13480 pattern=承認を実行 ----
+      }
+
+      try {
+        if (button) button.disabled = true;
+        message("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+
+        await postDecision(reviewItemId, decision, noteValue());
+
+        try {
+          var s = app();
+          s.aicmR8zV10fReviewConfirm = null;
+          s.reviewDecisionConfirm = null;
+          s.reviewConfirm = null;
+        } catch (_) {}
+
+        message("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+
+        await reloadReviewList(reviewItemId);
+      } catch (error) {
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "承認を実行する";
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "差し戻しを実行する";
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("[data-core-action]") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        if (action !== "review-v10gc2b-execute-approved" && action !== "review-v10gc2b-execute-returned") return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+        execute(button, action);
+      }, true);
+
+---- hit line 13491 pattern=承認を実行 ----
+          s.reviewDecisionConfirm = null;
+          s.reviewConfirm = null;
+        } catch (_) {}
+
+        message("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+
+        await reloadReviewList(reviewItemId);
+      } catch (error) {
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "承認を実行する";
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "差し戻しを実行する";
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("[data-core-action]") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        if (action !== "review-v10gc2b-execute-approved" && action !== "review-v10gc2b-execute-returned") return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+        execute(button, action);
+      }, true);
+
+      document.addEventListener("click", function() {
+        setTimeout(upgradeButtons, 0);
+        setTimeout(upgradeButtons, 250);
+        setTimeout(upgradeButtons, 700);
+      }, true);
+    }
+
+    var originalRenderV10GC2B = typeof render === "function" ? render : null;
+    if (originalRenderV10GC2B && !originalRenderV10GC2B.__aicmR8zV10gc2bWrapped) {
+      var wrappedRenderV10GC2B = function() {
+
+---- hit line 13496 pattern=承認を実行 ----
+
+        await reloadReviewList(reviewItemId);
+      } catch (error) {
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "承認を実行する";
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "差し戻しを実行する";
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("[data-core-action]") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        if (action !== "review-v10gc2b-execute-approved" && action !== "review-v10gc2b-execute-returned") return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+        execute(button, action);
+      }, true);
+
+      document.addEventListener("click", function() {
+        setTimeout(upgradeButtons, 0);
+        setTimeout(upgradeButtons, 250);
+        setTimeout(upgradeButtons, 700);
+      }, true);
+    }
+
+    var originalRenderV10GC2B = typeof render === "function" ? render : null;
+    if (originalRenderV10GC2B && !originalRenderV10GC2B.__aicmR8zV10gc2bWrapped) {
+      var wrappedRenderV10GC2B = function() {
+        var result = originalRenderV10GC2B.apply(this, arguments);
+        setTimeout(upgradeButtons, 0);
+        setTimeout(upgradeButtons, 250);
+        return result;
+      };
+
+---- hit line 13587 pattern=承認を実行 ----
+  })();
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_END
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+
+---- hit line 13589 pattern=承認を実行 ----
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+
+---- hit line 13615 pattern=承認を実行 ----
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "差し戻しを実行する";
+            changed += 1;
+          }
+        });
+
+        if (typeof window !== "undefined") {
+          window.aicmR8zV10gc2fLastPrime = {
+            changed: changed,
+            at: new Date().toISOString()
+          };
+        }
+
+        return changed > 0;
+      } catch (error) {
+        try { console.warn("AICM V10GC2F one-shot prime failed", error); } catch (_) {}
+        return false;
+      }
+    }
+
+    function oneShotPrime() {
+      setTimeout(enableFinalButtonsNow, 0);
+      setTimeout(enableFinalButtonsNow, 80);
+      setTimeout(enableFinalButtonsNow, 180);
+
+---- hit line 13624 pattern=承認を実行 ----
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "差し戻しを実行する";
+            changed += 1;
+          }
+        });
+
+        if (typeof window !== "undefined") {
+          window.aicmR8zV10gc2fLastPrime = {
+            changed: changed,
+            at: new Date().toISOString()
+          };
+        }
+
+        return changed > 0;
+      } catch (error) {
+        try { console.warn("AICM V10GC2F one-shot prime failed", error); } catch (_) {}
+        return false;
+      }
+    }
+
+    function oneShotPrime() {
+      setTimeout(enableFinalButtonsNow, 0);
+      setTimeout(enableFinalButtonsNow, 80);
+      setTimeout(enableFinalButtonsNow, 180);
+      setTimeout(enableFinalButtonsNow, 350);
+      setTimeout(enableFinalButtonsNow, 700);
+      setTimeout(enableFinalButtonsNow, 1200);
+      setTimeout(enableFinalButtonsNow, 2000);
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+
+---- 差し戻しを実行 around ----
+---- hit line 13449 pattern=差し戻しを実行 ----
+
+      try {
+        if (typeof aicmR8zV9ReviewListScriptHydrate === "function") {
+          aicmR8zV9ReviewListScriptHydrate(app());
+        }
+      } catch (_) {}
+
+      try {
+        if (typeof render === "function") render();
+      } catch (_) {}
+    }
+
+    function noteValue() {
+      try {
+        var node = document.querySelector('[data-aicm-review-decision-note], textarea[name="human_review_note"], textarea[name="review_decision_note"], textarea[name="return_reason"]');
+        return node ? text(node.value) : "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    async function execute(button, action) {
+      var decision = decisionFromAction(action);
+      if (!decision) return false;
+
+      var reviewItemId = currentReviewId(button);
+
+      if (!reviewItemId) {
+        message("error", "review item id が見つかりません。成果物詳細からやり直してください。");
+        if (typeof render === "function") render();
+        return true;
+      }
+
+      try {
+        if (button) button.disabled = true;
+        message("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+
+        await postDecision(reviewItemId, decision, noteValue());
+
+        try {
+          var s = app();
+          s.aicmR8zV10fReviewConfirm = null;
+          s.reviewDecisionConfirm = null;
+          s.reviewConfirm = null;
+        } catch (_) {}
+
+        message("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+
+        await reloadReviewList(reviewItemId);
+      } catch (error) {
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+
+---- hit line 13481 pattern=差し戻しを実行 ----
+
+      try {
+        if (button) button.disabled = true;
+        message("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+
+        await postDecision(reviewItemId, decision, noteValue());
+
+        try {
+          var s = app();
+          s.aicmR8zV10fReviewConfirm = null;
+          s.reviewDecisionConfirm = null;
+          s.reviewConfirm = null;
+        } catch (_) {}
+
+        message("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+
+        await reloadReviewList(reviewItemId);
+      } catch (error) {
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "承認を実行する";
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "差し戻しを実行する";
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("[data-core-action]") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        if (action !== "review-v10gc2b-execute-approved" && action !== "review-v10gc2b-execute-returned") return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+        execute(button, action);
+      }, true);
+
+
+---- hit line 13499 pattern=差し戻しを実行 ----
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "承認を実行する";
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "差し戻しを実行する";
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("[data-core-action]") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        if (action !== "review-v10gc2b-execute-approved" && action !== "review-v10gc2b-execute-returned") return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+        execute(button, action);
+      }, true);
+
+      document.addEventListener("click", function() {
+        setTimeout(upgradeButtons, 0);
+        setTimeout(upgradeButtons, 250);
+        setTimeout(upgradeButtons, 700);
+      }, true);
+    }
+
+    var originalRenderV10GC2B = typeof render === "function" ? render : null;
+    if (originalRenderV10GC2B && !originalRenderV10GC2B.__aicmR8zV10gc2bWrapped) {
+      var wrappedRenderV10GC2B = function() {
+        var result = originalRenderV10GC2B.apply(this, arguments);
+        setTimeout(upgradeButtons, 0);
+        setTimeout(upgradeButtons, 250);
+        return result;
+      };
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bWrapped = true;
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bOriginal = originalRenderV10GC2B;
+      render = wrappedRenderV10GC2B;
+
+---- hit line 13504 pattern=差し戻しを実行 ----
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "承認を実行する";
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "差し戻しを実行する";
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("[data-core-action]") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        if (action !== "review-v10gc2b-execute-approved" && action !== "review-v10gc2b-execute-returned") return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+        execute(button, action);
+      }, true);
+
+      document.addEventListener("click", function() {
+        setTimeout(upgradeButtons, 0);
+        setTimeout(upgradeButtons, 250);
+        setTimeout(upgradeButtons, 700);
+      }, true);
+    }
+
+    var originalRenderV10GC2B = typeof render === "function" ? render : null;
+    if (originalRenderV10GC2B && !originalRenderV10GC2B.__aicmR8zV10gc2bWrapped) {
+      var wrappedRenderV10GC2B = function() {
+        var result = originalRenderV10GC2B.apply(this, arguments);
+        setTimeout(upgradeButtons, 0);
+        setTimeout(upgradeButtons, 250);
+        return result;
+      };
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bWrapped = true;
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bOriginal = originalRenderV10GC2B;
+      render = wrappedRenderV10GC2B;
+    }
+
+    setTimeout(upgradeButtons, 500);
+
+    if (typeof window !== "undefined") {
+
+---- hit line 13588 pattern=差し戻しを実行 ----
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_END
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+
+---- hit line 13590 pattern=差し戻しを実行 ----
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+
+---- hit line 13628 pattern=差し戻しを実行 ----
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "差し戻しを実行する";
+            changed += 1;
+          }
+        });
+
+        if (typeof window !== "undefined") {
+          window.aicmR8zV10gc2fLastPrime = {
+            changed: changed,
+            at: new Date().toISOString()
+          };
+        }
+
+        return changed > 0;
+      } catch (error) {
+        try { console.warn("AICM V10GC2F one-shot prime failed", error); } catch (_) {}
+        return false;
+      }
+    }
+
+    function oneShotPrime() {
+      setTimeout(enableFinalButtonsNow, 0);
+      setTimeout(enableFinalButtonsNow, 80);
+      setTimeout(enableFinalButtonsNow, 180);
+      setTimeout(enableFinalButtonsNow, 350);
+      setTimeout(enableFinalButtonsNow, 700);
+      setTimeout(enableFinalButtonsNow, 1200);
+      setTimeout(enableFinalButtonsNow, 2000);
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("button") : null;
+        if (!button) return;
+
+        if (looksLikeConfirmOpenButton(button)) {
+
+---- hit line 13637 pattern=差し戻しを実行 ----
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "差し戻しを実行する";
+            changed += 1;
+          }
+        });
+
+        if (typeof window !== "undefined") {
+          window.aicmR8zV10gc2fLastPrime = {
+            changed: changed,
+            at: new Date().toISOString()
+          };
+        }
+
+        return changed > 0;
+      } catch (error) {
+        try { console.warn("AICM V10GC2F one-shot prime failed", error); } catch (_) {}
+        return false;
+      }
+    }
+
+    function oneShotPrime() {
+      setTimeout(enableFinalButtonsNow, 0);
+      setTimeout(enableFinalButtonsNow, 80);
+      setTimeout(enableFinalButtonsNow, 180);
+      setTimeout(enableFinalButtonsNow, 350);
+      setTimeout(enableFinalButtonsNow, 700);
+      setTimeout(enableFinalButtonsNow, 1200);
+      setTimeout(enableFinalButtonsNow, 2000);
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("button") : null;
+        if (!button) return;
+
+        if (looksLikeConfirmOpenButton(button)) {
+          // Do not stop propagation. Let existing app route open the confirm card.
+          oneShotPrime();
+        }
+      }, true);
+    }
+
+    var originalRenderV10GC2F = typeof render === "function" ? render : null;
+    if (originalRenderV10GC2F && !originalRenderV10GC2F.__aicmR8zV10gc2fWrapped) {
+      var wrappedRenderV10GC2F = function() {

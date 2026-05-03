@@ -12690,7 +12690,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         '<section class="aicm-core-card" style="border:3px solid ' + border + ';background:' + bg + ';">',
         '  <p class="aicm-eyebrow">V10F / DB更新前確認</p>',
         '  <h2>' + esc(title) + '</h2>',
-        '  <p class="aicm-selected-note">この確認画面で内容を確認し、問題なければDB更新を実行します。</p>',
+        '  <p class="aicm-selected-note">まだDB更新は実行しません。次工程V10GでAPI rollback smokeを行ってから本実行します。</p>',
         '  <dl class="aicm-core-detail-list">',
         field("操作予定", operation),
         field("status遷移予定", "pending → " + nextStatus),
@@ -12704,11 +12704,11 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         '  </dl>',
         '  <div class="aicm-core-card" style="background:#ffffff;">',
         '    <p class="aicm-eyebrow">確認事項</p>',
-        '    <p class="aicm-selected-note">成果物内容・AIレビュー・未解決事項を確認したうえで、下のボタンからDB更新を実行します。</p>',
+        '    <p class="aicm-selected-note">成果物内容・AIレビュー・未解決事項を確認したうえで、次工程でDB更新を実行します。</p>',
         '  </div>',
         '  <div class="aicm-dashboard-action-row">',
         '    <button type="button" data-core-action="review-v10f-cancel-confirm" data-review-id="' + esc(id) + '">確認を閉じる</button>',
-        '    <button type="button" class="aicm-primary-button" data-core-action="review-decision-execute" data-review-decision="' + esc(nextStatus) + '" data-review-item-id="' + esc(id) + '" data-owner-civilization-id="' + esc(row.owner_civilization_id || row.ownerCivilizationId || row.owner_id || row.ownerId || "") + '" data-human-reviewer-label="' + esc(row.human_reviewer_label || row.humanReviewerLabel || row.reviewer_label || row.reviewerLabel || "user") + '">' + esc(operation) + 'を実行する</button>',
+        '    <button type="button" disabled title="V10Gで有効化予定">' + esc(operation) + 'を実行する（次工程）</button>',
         '  </div>',
         '</section>'
       ].join("");
@@ -13229,187 +13229,1057 @@ if (action === "review-v10f-cancel-confirm") {
 // AICM_R8Z_V10F3_REVIEW_CONFIRM_BACK_BUTTON_APPLIED
 
 
-// AICM_R8Z_V10GC3I_RENDERCONFIRM_DIRECT_BUTTON_CANON_START
-// Canonical review decision handler for renderConfirm(row, mode, id).
-// No DOM post-render normalization, no observer, no hardcoded owner fallback.
-function aicmR8zV10gc3iText(value) {
-  return String(value === undefined || value === null ? "" : value).trim();
-}
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_START
+  // Final-confirm-only review decision executor using existing server routes.
+  (function installAicmR8zV10gc2bReviewExistingRouteDecisionCore() {
+    var APPROVE_ROUTE = "/api/aicm/v2/human-review/approve";
+    var RETURN_ROUTE = "/api/aicm/v2/human-review/return";
 
-function aicmR8zV10gc3iApp() {
-  if (typeof state !== "undefined" && state && typeof state === "object") return state;
-  if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
-  return {};
-}
-
-function aicmR8zV10gc3iNoteValue() {
-  try {
-    var node = document.querySelector('[data-aicm-review-decision-note], textarea[name="human_review_note"], textarea[name="review_decision_note"], textarea[name="return_reason"]');
-    return node ? aicmR8zV10gc3iText(node.value) : "";
-  } catch (_) {
-    return "";
-  }
-}
-
-function aicmR8zV10gc3iSetMessage(kind, value) {
-  try {
-    if (typeof setMessage === "function") {
-      setMessage(kind, value);
-      return;
+    function app() {
+      if (typeof state !== "undefined" && state && typeof state === "object") return state;
+      if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
+      return {};
     }
-  } catch (_) {}
 
-  try {
-    var s = aicmR8zV10gc3iApp();
-    s.messageKind = kind;
-    s.messageText = value;
-  } catch (_) {}
-}
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
 
-function aicmR8zV10gc3iBuildPayload(button) {
-  return {
-    aicm_human_review_item_id: aicmR8zV10gc3iText(button.getAttribute("data-review-item-id") || ""),
-    owner_civilization_id: aicmR8zV10gc3iText(button.getAttribute("data-owner-civilization-id") || ""),
-    human_reviewer_label: aicmR8zV10gc3iText(button.getAttribute("data-human-reviewer-label") || "user") || "user",
-    human_review_note: aicmR8zV10gc3iNoteValue()
-  };
-}
+    function isUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text(value));
+    }
 
-function aicmR8zV10gc3iMissingPayloadKeys(payload) {
-  return ["aicm_human_review_item_id", "owner_civilization_id", "human_reviewer_label"].filter(function(key) {
-    return !aicmR8zV10gc3iText(payload[key]);
-  });
-}
-
-function aicmR8zV10gc3iRoute(decision) {
-  return decision === "returned" ? "/api/aicm/v2/human-review/return" : "/api/aicm/v2/human-review/approve";
-}
-
-async function aicmR8zV10gc3iPostDecision(decision, payload) {
-  var response = await fetch(aicmR8zV10gc3iRoute(decision), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  var json = null;
-  try { json = await response.json(); } catch (_) { json = null; }
-
-  if (!response.ok || (json && json.result === "error")) {
-    throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "レビュー更新に失敗しました。");
-  }
-
-  return json || { result: "ok" };
-}
-
-function aicmR8zV10gc3iRemoveReviewFromState(reviewId) {
-  var s = aicmR8zV10gc3iApp();
-  var id = aicmR8zV10gc3iText(reviewId);
-
-  function same(row) {
-    return aicmR8zV10gc3iText(row && (
-      row.aicm_human_review_item_id ||
-      row.human_review_item_id ||
-      row.review_item_id ||
-      row.review_id ||
-      row.id ||
-      ""
-    )) === id;
-  }
-
-  function filterRows(rows) {
-    return Array.isArray(rows) ? rows.filter(function(row) { return !same(row); }) : rows;
-  }
-
-  try {
-    s.review_wait_items = filterRows(s.review_wait_items);
-    s.reviewWaitItems = filterRows(s.reviewWaitItems);
-    s.reviewRows = filterRows(s.reviewRows);
-
-    if (s.context && typeof s.context === "object") {
-      Object.keys(s.context).forEach(function(key) {
-        if (Array.isArray(s.context[key])) {
-          s.context[key] = filterRows(s.context[key]);
+    function message(kind, value) {
+      try {
+        if (typeof setMessage === "function") {
+          setMessage(kind, value);
+          return;
         }
+      } catch (_) {}
+      try {
+        var s = app();
+        s.messageKind = kind;
+        s.messageText = value;
+      } catch (_) {}
+    }
+
+    function deepFindReviewId(obj, depth) {
+      if (!obj || depth > 5 || typeof obj !== "object") return "";
+
+      var keys = [
+        "aicm_human_review_item_id",
+        "review_item_id",
+        "review_id",
+        "reviewId",
+        "id"
+      ];
+
+      for (var i = 0; i < keys.length; i += 1) {
+        var key = keys[i];
+        if (isUuid(obj[key])) return text(obj[key]);
+      }
+
+      for (var k in obj) {
+        if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+        if (!/review|item|confirm|selected|detail|id/i.test(k)) continue;
+
+        var v = obj[k];
+        if (isUuid(v)) return text(v);
+
+        var nested = deepFindReviewId(v, depth + 1);
+        if (nested) return nested;
+      }
+
+      return "";
+    }
+
+    function currentConfirmObject() {
+      var s = app();
+      return (
+        s.aicmR8zV10fReviewConfirm ||
+        s.reviewDecisionConfirm ||
+        s.reviewConfirm ||
+        s.aicmReviewConfirm ||
+        s.selectedReview ||
+        s.reviewDetail ||
+        null
+      );
+    }
+
+    function currentReviewId(button) {
+      var fromButton = button ? text(
+        button.getAttribute("data-review-item-id") ||
+        button.getAttribute("data-review-id") ||
+        button.getAttribute("data-aicm-human-review-item-id") ||
+        ""
+      ) : "";
+
+      if (isUuid(fromButton)) return fromButton;
+
+      var confirm = currentConfirmObject();
+      var fromConfirm = deepFindReviewId(confirm, 0);
+      if (fromConfirm) return fromConfirm;
+
+      try {
+        var node = document.querySelector("[data-review-item-id],[data-review-id],[data-aicm-human-review-item-id]");
+        if (node) {
+          var domId = text(
+            node.getAttribute("data-review-item-id") ||
+            node.getAttribute("data-review-id") ||
+            node.getAttribute("data-aicm-human-review-item-id") ||
+            ""
+          );
+          if (isUuid(domId)) return domId;
+        }
+      } catch (_) {}
+
+      return deepFindReviewId(app(), 0);
+    }
+
+    function decisionFromAction(action) {
+      if (action === "review-v10gc2b-execute-approved") return "approved";
+      if (action === "review-v10gc2b-execute-returned") return "returned";
+      return "";
+    }
+
+    function routeForDecision(decision) {
+      return decision === "approved" ? APPROVE_ROUTE : RETURN_ROUTE;
+    }
+
+    function buildPayload(reviewItemId, decision, note) {
+      return {
+        aicm_human_review_item_id: reviewItemId,
+        review_item_id: reviewItemId,
+        review_id: reviewItemId,
+        human_review_status_code: decision,
+        decision: decision,
+        note: note || "",
+        human_review_note: note || ""
+      };
+    }
+
+    async function postDecision(reviewItemId, decision, note) {
+      var route = routeForDecision(decision);
+      var response = await fetch(route, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildPayload(reviewItemId, decision, note))
+      });
+
+      var json = null;
+      try { json = await response.json(); } catch (_) { json = null; }
+
+      if (!response.ok || !json || (json.result && json.result !== "ok")) {
+        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "レビュー更新に失敗しました。");
+      }
+
+      return json;
+    }
+
+    function removeReviewFromState(reviewItemId) {
+      var s = app();
+      var id = text(reviewItemId);
+
+      function same(row) {
+        return text(row && (
+          row.aicm_human_review_item_id ||
+          row.review_item_id ||
+          row.review_id ||
+          row.id ||
+          ""
+        )) === id;
+      }
+
+      function filterRows(rows) {
+        return Array.isArray(rows) ? rows.filter(function(row) { return !same(row); }) : rows;
+      }
+
+      try {
+        s.review_wait_items = filterRows(s.review_wait_items);
+        if (s.context && typeof s.context === "object") {
+          s.context.review_wait_items = filterRows(s.context.review_wait_items);
+        }
+      } catch (_) {}
+    }
+
+    async function reloadReviewList(reviewItemId) {
+      removeReviewFromState(reviewItemId);
+
+      try {
+        var s = app();
+        s.screen = "review-list";
+        s.aicmR8zV9Hydrated = false;
+        s.aicmR8zV9Hydrating = false;
+      } catch (_) {}
+
+      try {
+        if (typeof aicmR8zV9ReviewListScriptHydrate === "function") {
+          aicmR8zV9ReviewListScriptHydrate(app());
+        }
+      } catch (_) {}
+
+      try {
+        if (typeof render === "function") render();
+      } catch (_) {}
+    }
+
+    function noteValue() {
+      try {
+        var node = document.querySelector('[data-aicm-review-decision-note], textarea[name="human_review_note"], textarea[name="review_decision_note"], textarea[name="return_reason"]');
+        return node ? text(node.value) : "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    async function execute(button, action) {
+      var decision = decisionFromAction(action);
+      if (!decision) return false;
+
+      var reviewItemId = currentReviewId(button);
+
+      if (!reviewItemId) {
+        message("error", "review item id が見つかりません。成果物詳細からやり直してください。");
+        if (typeof render === "function") render();
+        return true;
+      }
+
+      try {
+        if (button) button.disabled = true;
+        message("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+
+        await postDecision(reviewItemId, decision, noteValue());
+
+        try {
+          var s = app();
+          s.aicmR8zV10fReviewConfirm = null;
+          s.reviewDecisionConfirm = null;
+          s.reviewConfirm = null;
+        } catch (_) {}
+
+        message("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+
+        await reloadReviewList(reviewItemId);
+      } catch (error) {
+        if (button) button.disabled = false;
+        message("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+        if (typeof render === "function") render();
+      }
+
+      return true;
+    }
+
+    function upgradeButtons() {
+      try {
+        if (typeof document === "undefined" || !document.body) return;
+
+        var body = String(document.body.innerText || "");
+        var onConfirm =
+          body.indexOf("承認前の最終確認") >= 0 ||
+          body.indexOf("差し戻し前の最終確認") >= 0 ||
+          body.indexOf("承認を実行する") >= 0 ||
+          body.indexOf("差し戻しを実行する") >= 0;
+
+        if (!onConfirm) return;
+
+        var reviewId = currentReviewId(null);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "承認を実行する";
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            if (reviewId) button.setAttribute("data-review-item-id", reviewId);
+            button.textContent = "差し戻しを実行する";
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("[data-core-action]") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        if (action !== "review-v10gc2b-execute-approved" && action !== "review-v10gc2b-execute-returned") return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+        execute(button, action);
+      }, true);
+
+      document.addEventListener("click", function() {
+        setTimeout(upgradeButtons, 0);
+        setTimeout(upgradeButtons, 250);
+        setTimeout(upgradeButtons, 700);
+      }, true);
+    }
+
+    var originalRenderV10GC2B = typeof render === "function" ? render : null;
+    if (originalRenderV10GC2B && !originalRenderV10GC2B.__aicmR8zV10gc2bWrapped) {
+      var wrappedRenderV10GC2B = function() {
+        var result = originalRenderV10GC2B.apply(this, arguments);
+        setTimeout(upgradeButtons, 0);
+        setTimeout(upgradeButtons, 250);
+        return result;
+      };
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bWrapped = true;
+      wrappedRenderV10GC2B.__aicmR8zV10gc2bOriginal = originalRenderV10GC2B;
+      render = wrappedRenderV10GC2B;
+    }
+
+    setTimeout(upgradeButtons, 500);
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10gc2bExecuteReviewDecision = execute;
+      window.aicmR8zV10gc2bUpgradeButtons = upgradeButtons;
+    }
+  })();
+  // AICM_R8Z_V10GC2B_REVIEW_EXISTING_ROUTE_DECISION_CORE_END
+
+
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_START
+  // One-shot prime after opening approve/return confirm screen.
+  // No MutationObserver / no interval / no auto execution.
+  (function installAicmR8zV10gc2fConfirmOpenOneShotPrime() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function looksLikeConfirmOpenButton(button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      return (
+        label.indexOf("承認確認へ進む") >= 0 ||
+        label.indexOf("差し戻し確認へ進む") >= 0 ||
+        label.indexOf("承認前の最終確認へ進む") >= 0 ||
+        label.indexOf("差し戻し前の最終確認へ進む") >= 0
+      );
+    }
+
+    function onFinalConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function callV10gc2bUpgrader() {
+      try {
+        if (typeof window !== "undefined" && typeof window.aicmR8zV10gc2bUpgradeButtons === "function") {
+          window.aicmR8zV10gc2bUpgradeButtons();
+        }
+      } catch (_) {}
+    }
+
+    function enableFinalButtonsNow() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onFinalConfirmScreen()) return false;
+
+        callV10gc2bUpgrader();
+
+        var changed = 0;
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+
+        buttons.forEach(function(button) {
+          var label = text(button.innerText || button.textContent || "");
+
+          if (label.indexOf("承認を実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-approved");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "承認を実行する";
+            changed += 1;
+          }
+
+          if (label.indexOf("差し戻しを実行") >= 0) {
+            button.disabled = false;
+            button.removeAttribute("disabled");
+            button.removeAttribute("aria-disabled");
+            button.classList.remove("disabled");
+            button.style.pointerEvents = "auto";
+            button.style.opacity = "1";
+            button.setAttribute("data-core-action", "review-v10gc2b-execute-returned");
+            button.setAttribute("data-aicm-v10gc2f-one-shot-primed", "true");
+            button.textContent = "差し戻しを実行する";
+            changed += 1;
+          }
+        });
+
+        if (typeof window !== "undefined") {
+          window.aicmR8zV10gc2fLastPrime = {
+            changed: changed,
+            at: new Date().toISOString()
+          };
+        }
+
+        return changed > 0;
+      } catch (error) {
+        try { console.warn("AICM V10GC2F one-shot prime failed", error); } catch (_) {}
+        return false;
+      }
+    }
+
+    function oneShotPrime() {
+      setTimeout(enableFinalButtonsNow, 0);
+      setTimeout(enableFinalButtonsNow, 80);
+      setTimeout(enableFinalButtonsNow, 180);
+      setTimeout(enableFinalButtonsNow, 350);
+      setTimeout(enableFinalButtonsNow, 700);
+      setTimeout(enableFinalButtonsNow, 1200);
+      setTimeout(enableFinalButtonsNow, 2000);
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("button") : null;
+        if (!button) return;
+
+        if (looksLikeConfirmOpenButton(button)) {
+          // Do not stop propagation. Let existing app route open the confirm card.
+          oneShotPrime();
+        }
+      }, true);
+    }
+
+    var originalRenderV10GC2F = typeof render === "function" ? render : null;
+    if (originalRenderV10GC2F && !originalRenderV10GC2F.__aicmR8zV10gc2fWrapped) {
+      var wrappedRenderV10GC2F = function() {
+        var result = originalRenderV10GC2F.apply(this, arguments);
+        oneShotPrime();
+        return result;
+      };
+      wrappedRenderV10GC2F.__aicmR8zV10gc2fWrapped = true;
+      wrappedRenderV10GC2F.__aicmR8zV10gc2fOriginal = originalRenderV10GC2F;
+      render = wrappedRenderV10GC2F;
+    }
+
+    setTimeout(enableFinalButtonsNow, 300);
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10gc2fPrimeReviewConfirmButtons = oneShotPrime;
+      window.aicmR8zV10gc2fEnableFinalButtonsNow = enableFinalButtonsNow;
+    }
+  })();
+  // AICM_R8Z_V10GC2F_CONFIRM_OPEN_ONE_SHOT_PRIME_END
+
+
+  // AICM_R8Z_V10GC2H_REVIEW_EXECUTE_RUNTIME_DEBUG_NO_POST_START
+  // Runtime debug only. Captures approve/return execution click and prevents POST.
+  (function installAicmR8zV10gc2hRuntimeDebugNoPost() {
+    var APPROVE_ROUTE = "/api/aicm/v2/human-review/approve";
+    var RETURN_ROUTE = "/api/aicm/v2/human-review/return";
+
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function esc(value) {
+      var s = text(value);
+      if (typeof escapeHtml === "function") return escapeHtml(s);
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function app() {
+      if (typeof state !== "undefined" && state && typeof state === "object") return state;
+      if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
+      return {};
+    }
+
+    function isUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text(value));
+    }
+
+    function deepFind(obj, keyCandidates, depth) {
+      if (!obj || typeof obj !== "object" || depth > 6) return "";
+
+      for (var i = 0; i < keyCandidates.length; i += 1) {
+        var key = keyCandidates[i];
+        if (obj[key] !== undefined && obj[key] !== null && text(obj[key]) !== "") {
+          return text(obj[key]);
+        }
+      }
+
+      for (var k in obj) {
+        if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+        if (!/review|item|confirm|selected|detail|owner|civilization|human|reviewer|label|context|state|id/i.test(k)) continue;
+        var nested = deepFind(obj[k], keyCandidates, depth + 1);
+        if (nested) return nested;
+      }
+
+      return "";
+    }
+
+    function findReviewId(button) {
+      var fromButton = button ? text(
+        button.getAttribute("data-review-item-id") ||
+        button.getAttribute("data-review-id") ||
+        button.getAttribute("data-aicm-human-review-item-id") ||
+        ""
+      ) : "";
+
+      if (isUuid(fromButton)) return fromButton;
+
+      try {
+        var node = document.querySelector("[data-review-item-id],[data-review-id],[data-aicm-human-review-item-id]");
+        if (node) {
+          var fromDom = text(
+            node.getAttribute("data-review-item-id") ||
+            node.getAttribute("data-review-id") ||
+            node.getAttribute("data-aicm-human-review-item-id") ||
+            ""
+          );
+          if (isUuid(fromDom)) return fromDom;
+        }
+      } catch (_) {}
+
+      return deepFind(app(), [
+        "aicm_human_review_item_id",
+        "review_item_id",
+        "review_id",
+        "reviewId",
+        "id"
+      ], 0);
+    }
+
+    function findOwnerCivilizationId() {
+      var s = app();
+
+      try {
+        var dom = document.querySelector("[data-owner-civilization-id],[data-owner-id]");
+        if (dom) {
+          var v = text(dom.getAttribute("data-owner-civilization-id") || dom.getAttribute("data-owner-id") || "");
+          if (isUuid(v)) return v;
+        }
+      } catch (_) {}
+
+      return deepFind(s, [
+        "owner_civilization_id",
+        "ownerCivilizationId",
+        "owner_id",
+        "ownerId"
+      ], 0);
+    }
+
+    function findReviewerLabel() {
+      var s = app();
+
+      try {
+        var dom = document.querySelector("[data-human-reviewer-label],[data-reviewer-label]");
+        if (dom) {
+          var v = text(dom.getAttribute("data-human-reviewer-label") || dom.getAttribute("data-reviewer-label") || "");
+          if (v) return v;
+        }
+      } catch (_) {}
+
+      var fromState = deepFind(s, [
+        "human_reviewer_label",
+        "humanReviewerLabel",
+        "reviewer_label",
+        "reviewerLabel"
+      ], 0);
+
+      return fromState || "user";
+    }
+
+    function noteValue() {
+      try {
+        var node = document.querySelector('[data-aicm-review-decision-note], textarea[name="human_review_note"], textarea[name="review_decision_note"], textarea[name="return_reason"]');
+        return node ? text(node.value) : "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function actionKind(action, button) {
+      var label = text(button && (button.innerText || button.textContent) || "");
+      if (action.indexOf("approved") >= 0 || label.indexOf("承認") >= 0) return "approved";
+      if (action.indexOf("returned") >= 0 || label.indexOf("差し戻し") >= 0) return "returned";
+      return "";
+    }
+
+    function buildPayload(kind, reviewId, ownerId, reviewerLabel, note) {
+      return {
+        aicm_human_review_item_id: reviewId,
+        human_review_note: note || "",
+        human_reviewer_label: reviewerLabel || "",
+        owner_civilization_id: ownerId || ""
+      };
+    }
+
+    function missingKeys(payload) {
+      var required = [
+        "aicm_human_review_item_id",
+        "human_review_note",
+        "human_reviewer_label",
+        "owner_civilization_id"
+      ];
+
+      return required.filter(function(key) {
+        return payload[key] === undefined || payload[key] === null || text(payload[key]) === "";
       });
     }
 
-    s.aicmR8zV10fReviewConfirm = null;
-    s.reviewDecisionConfirm = null;
-    s.reviewConfirm = null;
-    s.aicmReviewConfirm = null;
-    s.selectedReview = null;
-    s.reviewDetail = null;
-    s.screen = "review-list";
-  } catch (_) {}
-}
-
-async function aicmR8zV10gc3iRefreshReviewList(reviewId) {
-  aicmR8zV10gc3iRemoveReviewFromState(reviewId);
-
-  try {
-    if (typeof aicmR8zV9ReviewListScriptHydrate === "function") {
-      aicmR8zV9ReviewListScriptHydrate(aicmR8zV10gc3iApp());
+    function debugHtml(info) {
+      return [
+        '<section id="aicm-v10gc2h-runtime-debug-card" class="aicm-core-card" style="border:3px solid #ef4444;background:#fef2f2;">',
+        '  <p class="aicm-eyebrow">V10GC2H / 実行クリックDEBUG / NO POST</p>',
+        '  <h2>承認・差し戻し実行の原因追及</h2>',
+        '  <p class="aicm-selected-note">このdebug中はPOSTを止めています。DB更新は起きません。</p>',
+        '  <dl class="aicm-core-detail-list">',
+        '    <dt>clicked_action</dt><dd>' + esc(info.action) + '</dd>',
+        '    <dt>kind</dt><dd>' + esc(info.kind) + '</dd>',
+        '    <dt>route</dt><dd>' + esc(info.route) + '</dd>',
+        '    <dt>button_label</dt><dd>' + esc(info.buttonLabel) + '</dd>',
+        '    <dt>button_disabled</dt><dd>' + esc(info.buttonDisabled) + '</dd>',
+        '    <dt>button_data_core_action</dt><dd>' + esc(info.buttonDataCoreAction) + '</dd>',
+        '    <dt>aicm_human_review_item_id</dt><dd>' + esc(info.reviewId) + '</dd>',
+        '    <dt>owner_civilization_id</dt><dd>' + esc(info.ownerId) + '</dd>',
+        '    <dt>human_reviewer_label</dt><dd>' + esc(info.reviewerLabel) + '</dd>',
+        '    <dt>human_review_note</dt><dd>' + esc(info.note) + '</dd>',
+        '    <dt>payload_keys</dt><dd>' + esc(Object.keys(info.payload || {}).join(",")) + '</dd>',
+        '    <dt>missing_required_keys</dt><dd>' + esc(info.missing.join(",")) + '</dd>',
+        '    <dt>state_screen</dt><dd>' + esc(info.stateScreen) + '</dd>',
+        '    <dt>timestamp</dt><dd>' + esc(info.at) + '</dd>',
+        '  </dl>',
+        '</section>'
+      ].join("");
     }
-  } catch (_) {}
 
-  try {
-    if (typeof render === "function") render();
-  } catch (_) {}
-}
+    function showDebug(info) {
+      try {
+        var existing = document.getElementById("aicm-v10gc2h-runtime-debug-card");
+        if (existing) existing.remove();
 
-async function aicmR8zV10gc3iExecuteReviewDecision(button) {
-  var decision = aicmR8zV10gc3iText(button.getAttribute("data-review-decision") || "");
-  var payload = aicmR8zV10gc3iBuildPayload(button);
-  var missing = aicmR8zV10gc3iMissingPayloadKeys(payload);
+        var wrap = document.createElement("div");
+        wrap.innerHTML = debugHtml(info);
 
-  if (decision !== "approved" && decision !== "returned") {
-    aicmR8zV10gc3iSetMessage("error", "レビュー操作種別が不明です。");
-    return;
-  }
+        var main = document.querySelector("main") || document.body;
+        var first = main.querySelector(".aicm-core-card") || main.firstChild;
 
-  if (missing.length > 0) {
-    aicmR8zV10gc3iSetMessage("error", "レビュー更新に必要な値が不足しています: " + missing.join(", "));
-    try {
-      if (typeof window !== "undefined") {
-        window.aicmR8zV10gc3iLastMissingPayload = payload;
+        if (first && first.parentNode) {
+          first.parentNode.insertBefore(wrap.firstChild, first);
+        } else {
+          main.insertBefore(wrap.firstChild, main.firstChild);
+        }
+      } catch (error) {
+        try { console.warn("V10GC2H debug card failed", error); } catch (_) {}
       }
-    } catch (_) {}
-    if (typeof render === "function") render();
-    return;
-  }
+    }
 
-  try {
-    button.disabled = true;
-    aicmR8zV10gc3iSetMessage("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+    function captureClick(event, button) {
+      var action = button.getAttribute("data-core-action") || "";
+      var kind = actionKind(action, button);
+      var route = kind === "approved" ? APPROVE_ROUTE : kind === "returned" ? RETURN_ROUTE : "";
+      var reviewId = findReviewId(button);
+      var ownerId = findOwnerCivilizationId();
+      var reviewerLabel = findReviewerLabel();
+      var note = noteValue();
+      var payload = buildPayload(kind, reviewId, ownerId, reviewerLabel, note);
+      var missing = missingKeys(payload);
 
-    await aicmR8zV10gc3iPostDecision(decision, payload);
+      var s = app();
 
-    aicmR8zV10gc3iSetMessage("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+      var info = {
+        action: action,
+        kind: kind,
+        route: route,
+        buttonLabel: text(button.innerText || button.textContent || ""),
+        buttonDisabled: String(!!button.disabled),
+        buttonDataCoreAction: action,
+        reviewId: reviewId,
+        ownerId: ownerId,
+        reviewerLabel: reviewerLabel,
+        note: note,
+        payload: payload,
+        missing: missing,
+        stateScreen: text(s.screen || ""),
+        at: new Date().toISOString()
+      };
 
-    await aicmR8zV10gc3iRefreshReviewList(payload.aicm_human_review_item_id);
-  } catch (error) {
-    button.disabled = false;
-    aicmR8zV10gc3iSetMessage("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
-    if (typeof render === "function") render();
-  }
-}
+      if (typeof window !== "undefined") {
+        window.aicmR8zV10gc2hLastDebugInfo = info;
+      }
 
-if (typeof document !== "undefined") {
-  document.addEventListener("click", function(event) {
-    var target = event && event.target;
-    var button = target && target.closest ? target.closest('button[data-core-action="review-decision-execute"]') : null;
-    if (!button) return;
+      showDebug(info);
 
-    try { event.preventDefault(); } catch (_) {}
-    try { event.stopPropagation(); } catch (_) {}
-    try { event.stopImmediatePropagation(); } catch (_) {}
+      // Debug only: block real POST.
+      try { event.preventDefault(); } catch (_) {}
+      try { event.stopPropagation(); } catch (_) {}
+      try { event.stopImmediatePropagation(); } catch (_) {}
 
-    aicmR8zV10gc3iExecuteReviewDecision(button);
-  }, true);
-}
+      return false;
+    }
 
-if (typeof window !== "undefined") {
-  window.aicmR8zV10gc3iExecuteReviewDecision = aicmR8zV10gc3iExecuteReviewDecision;
-}
-// AICM_R8Z_V10GC3I_RENDERCONFIRM_DIRECT_BUTTON_CANON_END
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest("button") : null;
+        if (!button) return;
+
+        var action = button.getAttribute("data-core-action") || "";
+        var label = text(button.innerText || button.textContent || "");
+
+        var isExecute =
+          action === "review-v10gc2b-execute-approved" ||
+          action === "review-v10gc2b-execute-returned" ||
+          label.indexOf("承認を実行") >= 0 ||
+          label.indexOf("差し戻しを実行") >= 0;
+
+        if (!isExecute) return;
+
+        captureClick(event, button);
+      }, true);
+    }
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10gc2hShowRuntimeDebug = function() {
+        var button = document.querySelector('[data-core-action="review-v10gc2b-execute-approved"],[data-core-action="review-v10gc2b-execute-returned"]');
+        if (!button) return null;
+        var fakeEvent = {
+          preventDefault: function(){},
+          stopPropagation: function(){},
+          stopImmediatePropagation: function(){}
+        };
+        captureClick(fakeEvent, button);
+        return window.aicmR8zV10gc2hLastDebugInfo || null;
+      };
+    }
+  })();
+  // AICM_R8Z_V10GC2H_REVIEW_EXECUTE_RUNTIME_DEBUG_NO_POST_END
+
+
+  // AICM_R8Z_V10GC2I_CONFIRM_SCREEN_AUTO_DEBUG_NO_CLICK_START
+  // Confirm-screen auto debug. Does not require clicking disabled button. No POST.
+  (function installAicmR8zV10gc2iConfirmScreenAutoDebug() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function esc(value) {
+      var s = text(value);
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function app() {
+      if (typeof state !== "undefined" && state && typeof state === "object") return state;
+      if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
+      return {};
+    }
+
+    function isUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text(value));
+    }
+
+    function bodyText() {
+      try {
+        return String(document && document.body ? document.body.innerText || "" : "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function onConfirmScreen() {
+      var b = bodyText();
+      return (
+        b.indexOf("承認前の最終確認") >= 0 ||
+        b.indexOf("差し戻し前の最終確認") >= 0 ||
+        b.indexOf("承認を実行する") >= 0 ||
+        b.indexOf("承認を実行する（次工程）") >= 0 ||
+        b.indexOf("差し戻しを実行する") >= 0 ||
+        b.indexOf("差し戻しを実行する（次工程）") >= 0
+      );
+    }
+
+    function deepFind(obj, keyCandidates, depth) {
+      if (!obj || typeof obj !== "object" || depth > 6) return "";
+
+      for (var i = 0; i < keyCandidates.length; i += 1) {
+        var key = keyCandidates[i];
+        if (obj[key] !== undefined && obj[key] !== null && text(obj[key]) !== "") {
+          return text(obj[key]);
+        }
+      }
+
+      for (var k in obj) {
+        if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+        if (!/review|item|confirm|selected|detail|owner|civilization|human|reviewer|label|context|state|id/i.test(k)) continue;
+
+        var nested = deepFind(obj[k], keyCandidates, depth + 1);
+        if (nested) return nested;
+      }
+
+      return "";
+    }
+
+    function findReviewId() {
+      try {
+        var node = document.querySelector("[data-review-item-id],[data-review-id],[data-aicm-human-review-item-id]");
+        if (node) {
+          var v = text(
+            node.getAttribute("data-review-item-id") ||
+            node.getAttribute("data-review-id") ||
+            node.getAttribute("data-aicm-human-review-item-id") ||
+            ""
+          );
+          if (isUuid(v)) return v;
+        }
+      } catch (_) {}
+
+      return deepFind(app(), [
+        "aicm_human_review_item_id",
+        "review_item_id",
+        "review_id",
+        "reviewId",
+        "id"
+      ], 0);
+    }
+
+    function findOwnerCivilizationId() {
+      try {
+        var node = document.querySelector("[data-owner-civilization-id],[data-owner-id]");
+        if (node) {
+          var v = text(node.getAttribute("data-owner-civilization-id") || node.getAttribute("data-owner-id") || "");
+          if (isUuid(v)) return v;
+        }
+      } catch (_) {}
+
+      return deepFind(app(), [
+        "owner_civilization_id",
+        "ownerCivilizationId",
+        "owner_id",
+        "ownerId"
+      ], 0);
+    }
+
+    function findReviewerLabel() {
+      try {
+        var node = document.querySelector("[data-human-reviewer-label],[data-reviewer-label]");
+        if (node) {
+          var v = text(node.getAttribute("data-human-reviewer-label") || node.getAttribute("data-reviewer-label") || "");
+          if (v) return v;
+        }
+      } catch (_) {}
+
+      return deepFind(app(), [
+        "human_reviewer_label",
+        "humanReviewerLabel",
+        "reviewer_label",
+        "reviewerLabel"
+      ], 0) || "user";
+    }
+
+    function collectDecisionButtons() {
+      try {
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("button"));
+        return buttons
+          .map(function(button, index) {
+            var label = text(button.innerText || button.textContent || "");
+            var isTarget =
+              label.indexOf("承認を実行") >= 0 ||
+              label.indexOf("差し戻しを実行") >= 0 ||
+              (button.getAttribute("data-core-action") || "").indexOf("review-v10gc2b-execute") >= 0;
+
+            if (!isTarget) return null;
+
+            return {
+              index: index,
+              label: label,
+              disabled: String(!!button.disabled),
+              hasDisabledAttr: String(button.hasAttribute("disabled")),
+              ariaDisabled: text(button.getAttribute("aria-disabled") || ""),
+              dataCoreAction: text(button.getAttribute("data-core-action") || ""),
+              dataReviewItemId: text(button.getAttribute("data-review-item-id") || ""),
+              className: text(button.className || ""),
+              style: text(button.getAttribute("style") || "")
+            };
+          })
+          .filter(Boolean);
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function missingKeys(payload) {
+      return ["aicm_human_review_item_id", "owner_civilization_id", "human_reviewer_label"].filter(function(key) {
+        return !text(payload[key]);
+      });
+    }
+
+    function renderDebugCard() {
+      try {
+        if (typeof document === "undefined" || !document.body) return false;
+        if (!onConfirmScreen()) return false;
+
+        var s = app();
+        var reviewId = findReviewId();
+        var ownerId = findOwnerCivilizationId();
+        var reviewerLabel = findReviewerLabel();
+        var buttons = collectDecisionButtons();
+
+        var payload = {
+          aicm_human_review_item_id: reviewId,
+          owner_civilization_id: ownerId,
+          human_reviewer_label: reviewerLabel,
+          human_review_note: ""
+        };
+
+        var missing = missingKeys(payload);
+
+        var buttonHtml = buttons.length
+          ? buttons.map(function(b) {
+              return [
+                "<div style='border:1px solid #ef4444;border-radius:12px;padding:10px;margin:10px 0;background:#fff;'>",
+                "<b>button #" + esc(b.index) + "</b>",
+                "<dl class='aicm-core-detail-list'>",
+                "<dt>label</dt><dd>" + esc(b.label) + "</dd>",
+                "<dt>disabled</dt><dd>" + esc(b.disabled) + "</dd>",
+                "<dt>has disabled attr</dt><dd>" + esc(b.hasDisabledAttr) + "</dd>",
+                "<dt>aria-disabled</dt><dd>" + esc(b.ariaDisabled) + "</dd>",
+                "<dt>data-core-action</dt><dd>" + esc(b.dataCoreAction) + "</dd>",
+                "<dt>data-review-item-id</dt><dd>" + esc(b.dataReviewItemId) + "</dd>",
+                "<dt>class</dt><dd>" + esc(b.className) + "</dd>",
+                "<dt>style</dt><dd>" + esc(b.style) + "</dd>",
+                "</dl>",
+                "</div>"
+              ].join("");
+            }).join("")
+          : "<p class='aicm-selected-note'>実行ボタンがDOMから見つかりません。</p>";
+
+        var html = [
+          "<section id='aicm-v10gc2i-confirm-auto-debug-card' class='aicm-core-card' style='border:3px solid #ef4444;background:#fef2f2;'>",
+          "<p class='aicm-eyebrow'>V10GC2I / 確認画面AUTO DEBUG / NO POST</p>",
+          "<h2>承認・差し戻し確認画面の状態</h2>",
+          "<p class='aicm-selected-note'>クリック不要のdebugです。DB更新・POSTは実行しません。</p>",
+          "<dl class='aicm-core-detail-list'>",
+          "<dt>on_confirm_screen</dt><dd>true</dd>",
+          "<dt>decision_button_count</dt><dd>" + esc(String(buttons.length)) + "</dd>",
+          "<dt>aicm_human_review_item_id</dt><dd>" + esc(reviewId) + "</dd>",
+          "<dt>owner_civilization_id</dt><dd>" + esc(ownerId) + "</dd>",
+          "<dt>human_reviewer_label</dt><dd>" + esc(reviewerLabel) + "</dd>",
+          "<dt>missing_required_keys</dt><dd>" + esc(missing.join(",")) + "</dd>",
+          "<dt>state_screen</dt><dd>" + esc(s.screen || "") + "</dd>",
+          "<dt>timestamp</dt><dd>" + esc(new Date().toISOString()) + "</dd>",
+          "</dl>",
+          "<h3>実行ボタンDOM</h3>",
+          buttonHtml,
+          "</section>"
+        ].join("");
+
+        var existing = document.getElementById("aicm-v10gc2i-confirm-auto-debug-card");
+        if (existing) existing.remove();
+
+        var wrap = document.createElement("div");
+        wrap.innerHTML = html;
+
+        var main = document.querySelector("main") || document.body;
+        var firstCard = main.querySelector(".aicm-core-card") || main.firstChild;
+
+        if (firstCard && firstCard.parentNode) {
+          firstCard.parentNode.insertBefore(wrap.firstChild, firstCard);
+        } else {
+          main.insertBefore(wrap.firstChild, main.firstChild);
+        }
+
+        if (typeof window !== "undefined") {
+          window.aicmR8zV10gc2iLastDebug = {
+            reviewId: reviewId,
+            ownerId: ownerId,
+            reviewerLabel: reviewerLabel,
+            missing: missing,
+            buttons: buttons,
+            at: new Date().toISOString()
+          };
+        }
+
+        return true;
+      } catch (error) {
+        try { console.warn("V10GC2I confirm auto debug failed", error); } catch (_) {}
+        return false;
+      }
+    }
+
+    function burst() {
+      setTimeout(renderDebugCard, 0);
+      setTimeout(renderDebugCard, 100);
+      setTimeout(renderDebugCard, 300);
+      setTimeout(renderDebugCard, 700);
+      setTimeout(renderDebugCard, 1200);
+      setTimeout(renderDebugCard, 2000);
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function() {
+        burst();
+      }, true);
+      document.addEventListener("scroll", function() {
+        burst();
+      }, true);
+      document.addEventListener("touchstart", function() {
+        burst();
+      }, true);
+    }
+
+    var originalRenderV10GC2I = typeof render === "function" ? render : null;
+    if (originalRenderV10GC2I && !originalRenderV10GC2I.__aicmR8zV10gc2iWrapped) {
+      var wrappedRenderV10GC2I = function() {
+        var result = originalRenderV10GC2I.apply(this, arguments);
+        burst();
+        return result;
+      };
+      wrappedRenderV10GC2I.__aicmR8zV10gc2iWrapped = true;
+      wrappedRenderV10GC2I.__aicmR8zV10gc2iOriginal = originalRenderV10GC2I;
+      render = wrappedRenderV10GC2I;
+    }
+
+    setTimeout(burst, 300);
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10gc2iRenderConfirmDebug = renderDebugCard;
+    }
+  })();
+  // AICM_R8Z_V10GC2I_CONFIRM_SCREEN_AUTO_DEBUG_NO_CLICK_END
