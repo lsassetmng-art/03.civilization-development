@@ -1,0 +1,152 @@
+---- server review route candidates ----
+513-function aicmHumanReviewPriority(value) {
+514-  const text = String(value || "normal").trim();
+515-  return ["low", "normal", "high", "urgent"].includes(text) ? text : "normal";
+516-}
+517-
+518-function createHumanReviewItem(body) {
+519-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+520-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+521-  const title = requiredText(body.review_title || body.title, "review_title");
+522-
+523-  const sql = [
+524-    "WITH inserted AS (",
+525:    "  INSERT INTO business.aicm_human_review_item (",
+526-    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+527-    "    related_president_policy_id, related_manager_major_work_item_id, related_leader_middle_work_item_id,",
+528-    "    related_deliverable_requirement_id, related_worker_work_unit_id,",
+529-    "    review_kind_code, artifact_kind_code, review_title,",
+530-    "    delivery_summary_text, main_changes_text, ai_review_result_text, unresolved_issues_text, artifact_link,",
+531-    "    responsible_ai_label, requested_by_ai_label, human_review_status_code, priority_code, due_date,",
+532-    "    display_order, metadata_jsonb",
+533-    "  ) VALUES (",
+534-    "    " + sqlLiteral(owner) + "::uuid,",
+535-    "    " + sqlLiteral(companyId) + "::uuid,",
+536-    "    " + aicmHumanReviewOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+537-    "    " + aicmHumanReviewOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+--
+562-    "  'result', 'ok',",
+563-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+564-    "  'human_review_item', to_jsonb(inserted)",
+565-    ")::text",
+566-    "FROM inserted;"
+567-  ].join("\n");
+568-
+569-  return runPsqlJson(sql);
+570-}
+571-
+572-function approveHumanReviewItem(body) {
+573-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+574:  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+575-
+576-  const sql = [
+577-    "WITH updated AS (",
+578:    "  UPDATE business.aicm_human_review_item",
+579:    "  SET human_review_status_code = 'approved',",
+580-    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+581-    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+582-    "      reviewed_at = now(),",
+583-    "      updated_at = now()",
+584:    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+585-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+586-    "  RETURNING *",
+587-    ")",
+588-    "SELECT jsonb_build_object(",
+589-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+590-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+591-    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+592-    ")::text;"
+593-  ].join("\n");
+594-
+595-  return runPsqlJson(sql);
+596-}
+597-
+598-function returnHumanReviewItem(body) {
+599-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+600:  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+601-
+602-  const sql = [
+603-    "WITH updated AS (",
+604:    "  UPDATE business.aicm_human_review_item",
+605:    "  SET human_review_status_code = 'returned',",
+606-    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+607-    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+608-    "      reviewed_at = now(),",
+609-    "      updated_at = now()",
+610:    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+611-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+612-    "  RETURNING *",
+613-    ")",
+614-    "SELECT jsonb_build_object(",
+615-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+616-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+617-    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+618-    ")::text;"
+619-  ].join("\n");
+620-
+621-  return runPsqlJson(sql);
+622-}
+--
+786-    "    SELECT COALESCE(jsonb_agg(to_jsonb(w) ORDER BY w.display_order ASC, w.updated_at DESC, w.created_at DESC), '[]'::jsonb)",
+787-    "    FROM business.vw_aicm_pmlw_worker_work_unit_display w",
+788-    "    WHERE w.owner_civilization_id::text = " + sqlLiteral(owner),
+789-    "  ),",
+790-    "  'pmlw_workflow_tree', (",
+791-    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.last_updated_at DESC NULLS LAST), '[]'::jsonb)",
+792-    "    FROM business.vw_aicm_pmlw_workflow_tree t",
+793-    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+794-    "  ),",
+795-    // AICM_HUMAN_REVIEW_QUEUE_ARN_ARQ_V1_CONTEXT
+796-    "  'review_wait_items', (",
+797-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.priority_code DESC, r.requested_at DESC, r.created_at DESC), '[]'::jsonb)",
+798:    "    FROM business.vw_aicm_human_review_wait_display r",
+799-    "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+800-    "  ),",
+801-    "  'robot_catalog', (",
+802-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.aiworker_model_code), '[]'::jsonb)",
+803-    "    FROM business.vw_ai_company_manager_system_robot_selector_options r",
+804-    "  )",
+805-    ")::text;"
+806-  ].join("\n");
+807-
+808-  return runPsqlJson(sql);
+809-}
+810-
+--
+2107-      sendJson(res, 200, archiveManagerMajorItem(body));
+2108-      return true;
+2109-    }
+2110-
+2111-// AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+2112-    if (route === "/api/aicm/v2/manager-major/import-csv" && req.method === "POST") {
+2113-      const body = await readBody(req);
+2114-      sendJson(res, 200, importManagerMajorItemsCsv(body));
+2115-      return true;
+2116-    }
+2117-
+2118-
+2119:    if (route === "/api/aicm/v2/human-review/create" && req.method === "POST") {
+2120-      const body = await readBody(req);
+2121-      sendJson(res, 200, createHumanReviewItem(body));
+2122-      return true;
+2123-    }
+2124-
+2125:    if (route === "/api/aicm/v2/human-review/approve" && req.method === "POST") {
+2126-      const body = await readBody(req);
+2127-      sendJson(res, 200, approveHumanReviewItem(body));
+2128-      return true;
+2129-    }
+2130-
+2131:    if (route === "/api/aicm/v2/human-review/return" && req.method === "POST") {
+2132-      const body = await readBody(req);
+2133-      sendJson(res, 200, returnHumanReviewItem(body));
+2134-      return true;
+2135-    }
+2136-
+2137-
+2138-    if (route === "/api/aicm/v2/company/update" && req.method === "POST") {
+2139-      const body = await readBody(req);
+2140-      sendJson(res, 200, updateCompany(body));
+2141-      return true;
+2142-    }
+2143-

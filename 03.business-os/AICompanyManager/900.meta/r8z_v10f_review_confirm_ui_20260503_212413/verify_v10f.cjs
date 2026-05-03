@@ -1,0 +1,21 @@
+const fs = require("fs");
+const corePath = process.argv[2];
+const outPath = process.argv[3];
+const src = fs.readFileSync(corePath, "utf8");
+
+const out = [];
+out.push("V10F_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10F_REVIEW_APPROVE_RETURN_CONFIRM_UI/g) || []).length));
+out.push("V10F_HAS_BRIDGE=" + String(src.includes("__aicmR8zV10fReviewConfirmUiBridge")));
+out.push("V10F_HANDLES_APPROVE=" + String(src.includes('"review-v10d4-preview-approve"') && src.includes('mode = "approve"')));
+out.push("V10F_HANDLES_RETURN=" + String(src.includes('"review-v10d4-preview-return"') && src.includes('mode = "return"')));
+out.push("V10F_HAS_CONFIRM_CARD=" + String(src.includes("承認前の最終確認") && src.includes("差し戻し前の最終確認")));
+out.push("V10F_HAS_STATUS_APPROVED=" + String(src.includes("approved")));
+out.push("V10F_HAS_STATUS_RETURNED=" + String(src.includes("returned")));
+out.push("V10F_EXECUTE_DISABLED=" + String(src.includes("disabled title=") && src.includes("V10Gで有効化予定")));
+out.push("V10F_HAS_NO_API_POST=" + String(!src.includes("review-v10f-post") && !src.includes("fetch(" + "'/api")));
+out.push("V10D5_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10D5_REVIEW_DETAIL_BRIDGE_CONTEXT_FALLBACK/g) || []).length));
+out.push("V10D4_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10D4_REVIEW_DETAIL_COMPAT_CLICK_BRIDGE/g) || []).length));
+out.push("V10D2_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10D2_INLINE_ARTIFACT_DETAIL_UNDER_ROW/g) || []).length));
+out.push("V10C_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10C_REVIEW_LIST_DIRECT_CONTEXT_RENDERER/g) || []).length));
+out.push("V9G8B_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE/g) || []).length));
+fs.writeFileSync(outPath, out.join("\n") + "\n");
