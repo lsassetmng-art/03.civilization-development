@@ -1,0 +1,21 @@
+const fs = require("fs");
+const corePath = process.argv[2];
+const outPath = process.argv[3];
+const src = fs.readFileSync(corePath, "utf8");
+
+const out = [];
+out.push("V10D4_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10D4_REVIEW_DETAIL_COMPAT_CLICK_BRIDGE/g) || []).length));
+out.push("V10D4_HAS_COMPAT_BRIDGE=" + String(src.includes("__aicmR8zV10d4CompatClickBridge")));
+out.push("V10D4_HANDLES_V10D_ACTION=" + String(src.includes('"review-v10d-open-detail"')));
+out.push("V10D4_HANDLES_V10D2_ACTION=" + String(src.includes('"review-v10d2-open-detail"')));
+out.push("V10D4_HAS_POINTERUP=" + String(src.includes('addEventListener("pointerup"')));
+out.push("V10D4_HAS_TOUCHEND=" + String(src.includes('addEventListener("touchend"')));
+out.push("V10D4_HAS_VISIBLE_DEBUG=" + String(src.includes("aicm-v10d4-visible-debug")));
+out.push("V10D4_HAS_INSERT_DETAIL_AFTER_BUTTON=" + String(src.includes("insertDetailAfterButton")));
+out.push("V10D4_HAS_STOP_IMMEDIATE=" + String(src.includes("stopImmediatePropagation")));
+out.push("V10D4_HAS_NO_API_POST=" + String(!src.includes("review-v10d4-post")));
+out.push("V10D2_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10D2_INLINE_ARTIFACT_DETAIL_UNDER_ROW/g) || []).length));
+out.push("V10D_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10D_REVIEW_ARTIFACT_DETAIL_CARD/g) || []).length));
+out.push("V10C_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10C_REVIEW_LIST_DIRECT_CONTEXT_RENDERER/g) || []).length));
+out.push("V9G8B_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE/g) || []).length));
+fs.writeFileSync(outPath, out.join("\n") + "\n");

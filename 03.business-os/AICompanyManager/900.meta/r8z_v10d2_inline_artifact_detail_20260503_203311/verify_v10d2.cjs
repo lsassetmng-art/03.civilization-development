@@ -1,0 +1,20 @@
+const fs = require("fs");
+const corePath = process.argv[2];
+const outPath = process.argv[3];
+const src = fs.readFileSync(corePath, "utf8");
+
+const out = [];
+out.push("V10D2_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10D2_INLINE_ARTIFACT_DETAIL_UNDER_ROW/g) || []).length));
+out.push("HAS_V10D2_RENDER_FUNCTION=" + String(src.includes("function renderReviewList(appState)")));
+out.push("V10D2_OVERRIDES_V7_WINDOW_RENDERER=" + String(src.includes("window.aicmR8zV7RenderReviewList = renderReviewList")));
+out.push("V10D2_HAS_OPEN_BUTTON=" + String(src.includes('data-core-action="review-v10d2-open-detail"')));
+out.push("V10D2_HAS_INLINE_DETAIL_ID=" + String(src.includes('id="aicm-v10d2-detail-')));
+out.push("V10D2_HAS_SCROLL_INTO_VIEW=" + String(src.includes("scrollIntoView")));
+out.push("V10D2_HAS_PREVIEW_APPROVE=" + String(src.includes('data-core-action="review-v10d2-preview-approve"')));
+out.push("V10D2_HAS_PREVIEW_RETURN=" + String(src.includes('data-core-action="review-v10d2-preview-return"')));
+out.push("V10D2_HAS_CLICK_BRIDGE=" + String(src.includes("__aicmR8zV10d2InlineDetailClickBridge")));
+out.push("V10D2_HAS_NO_API_POST=" + String(!src.includes("review-v10d2-approve-post")));
+out.push("V10D_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10D_REVIEW_ARTIFACT_DETAIL_CARD/g) || []).length));
+out.push("V10C_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V10C_REVIEW_LIST_DIRECT_CONTEXT_RENDERER/g) || []).length));
+out.push("V9G8B_MARKER_COUNT=" + ((src.match(/AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE/g) || []).length));
+fs.writeFileSync(outPath, out.join("\n") + "\n");

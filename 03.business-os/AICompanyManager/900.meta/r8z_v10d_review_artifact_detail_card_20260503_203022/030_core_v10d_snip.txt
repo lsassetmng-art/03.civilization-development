@@ -1,0 +1,426 @@
+6317-  var aicmRenderTaskLedgerPlaceholderBeforeR8ZC = renderTaskLedgerPlaceholder;
+6318-
+6319-  renderTaskLedgerPlaceholder = function renderTaskLedgerPlaceholder() {
+6320-    return aicmInjectPmlwAutoOutputsPanelR8ZC(
+6321-      aicmRenderTaskLedgerPlaceholderBeforeR8ZC()
+6322-    );
+6323-  };
+6324-// AICM_R8Z_C_OUTPUT_VISIBILITY_PANEL_END
+6325-
+6326-
+6327-// AICM_R8Z_N_WORKER_RUNTIME_STATUS_PANEL_START
+6328-  function aicmR8ZNText(value) {
+6329-    if (value === null || typeof value === "undefined") return "";
+6330-    return String(value).trim();
+6331-  }
+6332-
+6333-  function aicmR8ZNHtml(value) {
+6334-    var text = aicmR8ZNText(value);
+6335-    if (typeof escapeHtml === "function") return escapeHtml(text);
+6336-    return text
+6337-      .replace(/&/g, "&amp;")
+6338-      .replace(/</g, "&lt;")
+6339-      .replace(/>/g, "&gt;")
+6340-      .replace(/"/g, "&quot;")
+6341-      .replace(/'/g, "&#039;");
+6342-  }
+6343-
+6344-  function aicmR8ZNMetadata(row) {
+6345:    var meta = row && (row.metadata_jsonb || row.metadata || row.meta) || {};
+6346-    if (typeof meta === "string") {
+6347-      try {
+6348-        meta = JSON.parse(meta);
+6349-      } catch (_) {
+6350-        meta = {};
+6351-      }
+6352-    }
+6353-    if (!meta || typeof meta !== "object") meta = {};
+6354-    return meta;
+6355-  }
+6356-
+6357-  function aicmR8ZNDeepGet(source, path) {
+6358-    var cur = source;
+6359-    for (var i = 0; i < path.length; i += 1) {
+6360-      if (!cur || typeof cur !== "object") return "";
+6361-      cur = cur[path[i]];
+6362-    }
+6363-    return cur;
+6364-  }
+6365-
+6366-  function aicmR8ZNRowsFromContext() {
+6367-    var ctx = state && state.context ? state.context : {};
+6368-    var keys = [
+6369-      "pmlw_worker_work_units",
+6370-      "pmlwWorkerWorkUnits",
+6371-      "worker_work_units",
+6372-      "workerWorkUnits"
+6373-    ];
+--
+9384-      return "auto_processing";
+9385-    }
+9386-
+9387-    if (
+9388-      handoff === "handed_off" ||
+9389-      handoff === "sent" ||
+9390-      decomposition === "assigned_to_leader"
+9391-    ) {
+9392-      return "auto_waiting";
+9393-    }
+9394-
+9395-    if (
+9396-      !handoff ||
+9397-      !decomposition ||
+9398-      handoff === "draft" ||
+9399-      handoff === "ready_handoff" ||
+9400-      decomposition === "not_started" ||
+9401-      decomposition === "draft"
+9402-    ) {
+9403-      return "unhandoff";
+9404-    }
+9405-
+9406-    return "needs_check";
+9407-  }
+9408-
+9409-  function aicmR8ZOWorkerStatus(row) {
+9410-    var work = aicmR8ZOLower(row && row.work_status_code);
+9411-    var review = aicmR8ZOLower(row && row.review_status_code);
+9412:    var meta = row && row.metadata_jsonb && typeof row.metadata_jsonb === "object" ? row.metadata_jsonb : {};
+9413-    var runtime = meta.runtime_result && typeof meta.runtime_result === "object" ? meta.runtime_result : {};
+9414-
+9415-    if (
+9416-      work === "blocked" ||
+9417-      work === "returned" ||
+9418-      work === "error" ||
+9419-      work === "failed" ||
+9420-      runtime.result === "error"
+9421-    ) {
+9422-      return "worker_needs_check";
+9423-    }
+9424-
+9425-    if (
+9426-      work === "review_waiting" ||
+9427-      review === "waiting" ||
+9428-      review === "pending"
+9429-    ) {
+9430-      return "review_waiting";
+9431-    }
+9432-
+9433-    if (
+9434-      work === "done" ||
+9435-      work === "completed" ||
+9436-      review === "approved"
+9437-    ) {
+9438-      return "worker_completed";
+9439-    }
+9440-
+--
+11254-          ].join("")
+11255-        : [
+11256-            '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
+11257-            '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+11258-            '  <h2>レビュー・承認待ち: 0件</h2>',
+11259-            '  <p class="aicm-selected-note">' + v10cEsc(debug) + '</p>',
+11260-            '  <p class="aicm-core-message aicm-core-message-error">context APIからレビュー待ちを取得できませんでした。</p>',
+11261-            '  <div class="aicm-dashboard-action-row">',
+11262-            '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
+11263-            '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳へ</button>',
+11264-            '  </div>',
+11265-            '</section>'
+11266-          ].join("");
+11267-
+11268-      if (typeof renderShell === "function") {
+11269-        return renderShell(body);
+11270-      }
+11271-
+11272-      return body;
+11273-    }
+11274-
+11275-    if (typeof window !== "undefined") {
+11276-      window.aicmR8zV10cRenderReviewList = v10cRenderReviewList;
+11277-      window.aicmR8zV7RenderReviewList = v10cRenderReviewList;
+11278-    }
+11279-  })();
+11280-  // AICM_R8Z_V10C_REVIEW_LIST_DIRECT_CONTEXT_RENDERER_END
+11281-
+11282:  // AICM_R8Z_V10D_REVIEW_ARTIFACT_DETAIL_CARD_START
+11283-  // Review artifact detail card. Scope: review-list only. No DB write / no API POST.
+11284-  (function installAicmR8zV10dReviewArtifactDetailCard() {
+11285-    function t(value) {
+11286-      return String(value === undefined || value === null ? "" : value).trim();
+11287-    }
+11288-
+11289-    function esc(value) {
+11290-      var text = t(value);
+11291-      if (typeof escapeHtml === "function") return escapeHtml(text);
+11292-      return text
+11293-        .replace(/&/g, "&amp;")
+11294-        .replace(/</g, "&lt;")
+11295-        .replace(/>/g, "&gt;")
+11296-        .replace(/"/g, "&quot;")
+11297-        .replace(/'/g, "&#039;");
+11298-    }
+11299-
+11300-    function app(appState) {
+11301-      if (appState && typeof appState === "object") return appState;
+11302-      if (typeof state !== "undefined" && state && typeof state === "object") return state;
+11303-      return {};
+11304-    }
+11305-
+11306-    function ctx(appState) {
+11307-      appState = app(appState);
+11308-      if (!appState.context || typeof appState.context !== "object") appState.context = {};
+11309-      return appState.context;
+11310-    }
+--
+11435-    function reviewId(row) {
+11436-      return t(row && (
+11437-        row.aicm_human_review_item_id ||
+11438-        row.human_review_item_id ||
+11439-        row.review_id ||
+11440-        row.id ||
+11441-        ""
+11442-      ));
+11443-    }
+11444-
+11445-    function selectedReviewId(appState) {
+11446-      appState = app(appState);
+11447-      return t(appState.aicmR8zV10dSelectedReviewId || "");
+11448-    }
+11449-
+11450-    function findSelectedRow(appState) {
+11451-      var id = selectedReviewId(appState);
+11452-      if (!id) return null;
+11453-
+11454-      var r = rows(appState);
+11455-      for (var i = 0; i < r.length; i += 1) {
+11456-        if (reviewId(r[i]) === id) return r[i];
+11457-      }
+11458-
+11459-      return null;
+11460-    }
+11461-
+11462-    function meta(row) {
+11463:      var m = row && (row.metadata_jsonb || row.metadata || row.meta) || {};
+11464-      if (typeof m === "string") {
+11465-        try {
+11466-          m = JSON.parse(m);
+11467-        } catch (_) {
+11468-          m = { raw_metadata_text: m };
+11469-        }
+11470-      }
+11471-      if (!m || typeof m !== "object") m = {};
+11472-      return m;
+11473-    }
+11474-
+11475-    function jsonPreview(value, maxLen) {
+11476-      var text = "";
+11477-      try {
+11478-        text = JSON.stringify(value || {}, null, 2);
+11479-      } catch (_) {
+11480-        text = t(value);
+11481-      }
+11482-      maxLen = maxLen || 2400;
+11483-      if (text.length > maxLen) text = text.slice(0, maxLen) + "\n...省略";
+11484-      return text;
+11485-    }
+11486-
+11487-    function nestedOutputs(row) {
+11488-      var m = meta(row);
+11489-      var ocp = m.output_collection_payload || m.aiworker_output_collection_payload || {};
+11490-      var blocks = [];
+11491-
+--
+11523-        '</section>'
+11524-      ].join("");
+11525-    }
+11526-
+11527-    function renderArtifactLink(row) {
+11528-      var link = t(row && row.artifact_link);
+11529-      if (!link) {
+11530-        return '<p class="aicm-selected-note">成果物リンク: 未登録</p>';
+11531-      }
+11532-
+11533-      return [
+11534-        '<p class="aicm-selected-note">',
+11535-        '成果物リンク: <a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">' + esc(link) + '</a>',
+11536-        '</p>'
+11537-      ].join("");
+11538-    }
+11539-
+11540-    function renderDetailCard(appState) {
+11541-      appState = app(appState);
+11542-      var row = findSelectedRow(appState);
+11543-      if (!row) return "";
+11544-
+11545-      var id = reviewId(row);
+11546-      var m = meta(row);
+11547-      var title = t(row.review_title || row.title || "レビュー項目");
+11548-
+11549-      return [
+11550-        '<section class="aicm-core-card" style="border:2px solid #f59e0b;">',
+11551:        '  <p class="aicm-eyebrow">成果物確認</p>',
+11552-        '  <h2>' + esc(title) + '</h2>',
+11553-        '  <p class="aicm-selected-note">承認/差し戻しの前に、成果物内容を確認してください。ここではDB更新しません。</p>',
+11554-        '  <dl class="aicm-core-detail-list">',
+11555-        renderField("review_id", id),
+11556-        renderField("レビュー種別", row.review_kind_label || row.review_kind_code),
+11557-        renderField("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+11558-        renderField("優先度", row.priority_code),
+11559-        renderField("依頼日時", row.requested_at || row.created_at),
+11560-        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+11561-        renderField("会社", row.company_name),
+11562-        renderField("部門", row.department_name),
+11563-        renderField("課", row.section_name),
+11564-        '  </dl>',
+11565-        renderArtifactLink(row),
+11566-        '</section>',
+11567-        renderTextSection("納品サマリー", row.delivery_summary_text),
+11568-        renderTextSection("主な変更点", row.main_changes_text),
+11569-        renderTextSection("AIレビュー結果", row.ai_review_result_text),
+11570-        renderTextSection("未解決事項", row.unresolved_issues_text),
+11571-        nestedOutputs(row),
+11572-        '<section class="aicm-core-card" style="background:#fff7ed;border:1px solid #fdba74;">',
+11573-        '  <p class="aicm-eyebrow">次工程</p>',
+11574-        '  <h3>承認/差し戻しへ進む前の確認</h3>',
+11575-        '  <p class="aicm-selected-note">V10DではまだDB更新しません。次のV10Eでrollback smokeを行います。</p>',
+11576-        '  <div class="aicm-dashboard-action-row">',
+11577:        '    <button type="button" data-core-action="review-v10d-preview-approve" data-review-id="' + esc(id) + '">承認確認へ進む</button>',
+11578:        '    <button type="button" data-core-action="review-v10d-preview-return" data-review-id="' + esc(id) + '">差し戻し確認へ進む</button>',
+11579-        '    <button type="button" data-core-action="review-v10d-close-detail">一覧へ戻る</button>',
+11580-        '  </div>',
+11581-        '</section>',
+11582-        '<section class="aicm-core-card" style="background:#f8fafc;">',
+11583:        '  <p class="aicm-eyebrow">metadata_jsonb</p>',
+11584-        '  <pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + esc(jsonPreview(m, 3200)) + '</pre>',
+11585-        '</section>'
+11586-      ].join("");
+11587-    }
+11588-
+11589-    function renderPreviewDecisionCard(appState) {
+11590-      appState = app(appState);
+11591-      var mode = t(appState.aicmR8zV10dDecisionPreviewMode || "");
+11592-      var row = findSelectedRow(appState);
+11593-
+11594-      if (!mode || !row) return "";
+11595-
+11596-      var title = mode === "approve" ? "承認確認プレビュー" : "差し戻し確認プレビュー";
+11597-      var note = mode === "approve"
+11598-        ? "次工程V10Eでrollback smoke後に承認DB更新を確認します。"
+11599-        : "次工程V10Eでrollback smoke後に差し戻しDB更新を確認します。";
+11600-
+11601-      return [
+11602-        '<section class="aicm-core-card" style="border:2px solid #38bdf8;">',
+11603-        '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+11604-        '  <h2>' + esc(row.review_title || "レビュー項目") + '</h2>',
+11605-        '  <p class="aicm-selected-note">' + esc(note) + '</p>',
+11606-        '  <dl class="aicm-core-detail-list">',
+11607-        renderField("review_id", reviewId(row)),
+11608-        renderField("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+11609-        renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+11610-        '  </dl>',
+11611-        '  <div class="aicm-dashboard-action-row">',
+11612-        '    <button type="button" data-core-action="review-v10d-clear-preview">プレビューを閉じる</button>',
+11613-        '  </div>',
+11614-        '</section>'
+11615-      ].join("");
+11616-    }
+11617-
+11618-    function renderListRow(row, index, currentId) {
+11619-      var id = reviewId(row);
+11620-      var title = t(row.review_title || row.title || "レビュー項目");
+11621-      var summary = t(row.delivery_summary_text || row.summary || row.description || "");
+11622-      var selected = id && id === currentId;
+11623-
+11624-      return [
+11625-        '<article class="aicm-core-card" style="' + (selected ? 'border:2px solid #f59e0b;' : 'border:1px solid #dbeafe;') + '">',
+11626-        '  <p class="aicm-eyebrow">レビュー待ち #' + esc(String(index + 1)) + '</p>',
+11627-        '  <h3>' + esc(title) + '</h3>',
+11628-        summary ? '  <p class="aicm-selected-note">' + esc(summary) + '</p>' : '',
+11629-        '  <dl class="aicm-core-detail-list">',
+11630-        renderField("種別", row.review_kind_label || row.review_kind_code),
+11631-        renderField("成果物", row.artifact_kind_label || row.artifact_kind_code),
+11632-        renderField("優先度", row.priority_code),
+11633-        renderField("依頼日時", row.requested_at || row.created_at),
+11634-        renderField("review_id", id),
+11635-        '  </dl>',
+11636-        '  <div class="aicm-dashboard-action-row">',
+11637:        '    <button type="button" data-core-action="review-v10d-open-detail" data-review-id="' + esc(id) + '">成果物を確認</button>',
+11638-        '  </div>',
+11639-        '</article>'
+11640-      ].join("");
+11641-    }
+11642-
+11643-    function renderReviewList(appState) {
+11644-      appState = app(appState);
+11645-
+11646-      if (!rows(appState).length) {
+11647-        syncFetch(appState);
+11648-      }
+11649-
+11650-      var r = rows(appState);
+11651-      var currentId = selectedReviewId(appState);
+11652-
+11653-      var debug = [
+11654-        "V10D",
+11655-        "selectedCompanyId=" + companyId(appState),
+11656-        "owner=" + ownerId(appState),
+11657-        "rows=" + String(r.length),
+11658-        "payloadRows=" + String(appState.aicmR8zV10dPayloadRows !== undefined ? appState.aicmR8zV10dPayloadRows : "na"),
+11659-        "http=" + String(appState.aicmR8zV10dHttpStatus !== undefined ? appState.aicmR8zV10dHttpStatus : "na"),
+11660-        "status=" + t(appState.aicmR8zV10dFetchStatus || "context"),
+11661-        currentId ? "selectedReviewId=" + currentId : "",
+11662-        appState.aicmR8zV10dError ? "error=" + t(appState.aicmR8zV10dError) : ""
+11663-      ].filter(Boolean).join(" / ");
+11664-
+11665-      var body = [
+--
+11722-    }
+11723-
+11724-    function clearPreview() {
+11725-      var s = app();
+11726-      s.aicmR8zV10dDecisionPreviewMode = "";
+11727-      rerender();
+11728-    }
+11729-
+11730-    function installClickBridge() {
+11731-      if (typeof document === "undefined" || document.__aicmR8zV10dReviewDetailClickBridge) return;
+11732-      document.__aicmR8zV10dReviewDetailClickBridge = true;
+11733-
+11734-      document.addEventListener("click", function(event) {
+11735-        var target = event.target;
+11736-        while (target && target !== document && !target.getAttribute("data-core-action")) {
+11737-          target = target.parentNode;
+11738-        }
+11739-
+11740-        if (!target || target === document) return;
+11741-
+11742-        var action = target.getAttribute("data-core-action");
+11743-        if (!action || action.indexOf("review-v10d-") !== 0) return;
+11744-
+11745-        event.preventDefault();
+11746-        event.stopPropagation();
+11747-
+11748-        var id = target.getAttribute("data-review-id") || target.getAttribute("data-human-review-id") || "";
+11749-
+11750:        if (action === "review-v10d-open-detail") return setDetail(id);
+11751-        if (action === "review-v10d-close-detail") return closeDetail();
+11752:        if (action === "review-v10d-preview-approve") return previewDecision("approve", id);
+11753:        if (action === "review-v10d-preview-return") return previewDecision("return", id);
+11754-        if (action === "review-v10d-clear-preview") return clearPreview();
+11755-      }, true);
+11756-    }
+11757-
+11758-    installClickBridge();
+11759-
+11760-    if (typeof window !== "undefined") {
+11761-      window.aicmR8zV10dRenderReviewList = renderReviewList;
+11762-      window.aicmR8zV7RenderReviewList = renderReviewList;
+11763-    }
+11764-  })();
+11765:  // AICM_R8Z_V10D_REVIEW_ARTIFACT_DETAIL_CARD_END
+11766-
+11767-
+11768-
+11769-
+11770-// AICM_R8Z_V7_REVIEW_LIST_ROUTE_BRIDGE_END
+11771-
