@@ -1,0 +1,801 @@
+3961-      not_started: "未着手",
+3962-      assigned_to_leader: "Leader割当済",
+3963-      leader_decomposing: "Leader分解中",
+3964-      decomposed: "分解済",
+3965-      returned: "差戻し",
+3966-      archived: "削除済",
+3967-      draft: "下書き",
+3968-      ready_handoff: "引渡し準備",
+3969-      handed_off: "引渡し済",
+3970-      accepted: "受領済",
+3971-      completed: "完了",
+3972-      low: "低",
+3973-      normal: "通常",
+3974-      high: "高",
+3975-      urgent: "緊急"
+3976-    };
+3977-
+3978-    return map[value] || pmlwValue(value, "-");
+3979-  }
+3980-
+3981-  
+3982-// AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+3983-// Manager大項目 -> 課長/Leader引渡し。
+3984-// Worker Runtime requestはここでは作らない。
+3985:// DB書込は既存確認画面を通して /api/aicm/v2/manager-major/update で実行する。
+3986-function aicmAxuR1Text(value) {
+3987-    return String(value === undefined || value === null ? "" : value).trim();
+3988-  }
+3989-
+3990-function aicmAxuR1OwnerId() {
+3991-    if (state && state.ownerCivilizationId) return aicmAxuR1Text(state.ownerCivilizationId);
+3992-    if (state && state.context && state.context.owner_civilization_id) return aicmAxuR1Text(state.context.owner_civilization_id);
+3993-    return "00000000-0000-4000-8000-000000000001";
+3994-  }
+3995-
+3996-function aicmAxuR1MajorId(row) {
+3997-    row = row || {};
+3998-    return aicmAxuR1Text(
+3999-      row.aicm_manager_major_work_item_id ||
+4000-      row.manager_major_work_item_id ||
+4001-      row.major_work_item_id ||
+4002-      row.id
+4003-    );
+4004-  }
+4005-
+4006-function aicmAxuR1FindMajorById(majorId) {
+4007-    var rows = state && state.context && Array.isArray(state.context.pmlw_major_items)
+4008-      ? state.context.pmlw_major_items
+4009-      : [];
+--
+4100-    if (nickname) return nickname + "@" + role;
+4101-    if (display) return display;
+4102-    if (model) return model + "@" + role;
+4103-
+4104-    return role;
+4105-  }
+4106-
+4107-function aicmAxuR1BuildLeaderHandoffPayload(row) {
+4108-    row = row || {};
+4109-
+4110-    var majorId = aicmAxuR1MajorId(row);
+4111-    var leaderLabel = aicmAxuR1LeaderLabel(row);
+4112-
+4113-    if (!majorId) {
+4114-      throw new Error("Manager大項目IDを特定できません。");
+4115-    }
+4116-
+4117-    if (!leaderLabel) {
+4118-      throw new Error("課長/Leaderが未設定です。課変更でLeaderを設定するか、Manager大項目のLeader欄を設定してください。");
+4119-    }
+4120-
+4121-    return {
+4122-      kind: "manager-major-leader-handoff",
+4123-      title: "課長へ送る確認",
+4124:      endpoint: "/api/aicm/v2/manager-major/update",
+4125-      backScreen: "task-ledger",
+4126-      body: {
+4127-        owner_civilization_id: aicmAxuR1OwnerId(),
+4128-        aicm_manager_major_work_item_id: majorId,
+4129-        assigned_leader_label: leaderLabel,
+4130-        decomposition_status_code: "assigned_to_leader",
+4131-        handoff_status_code: "handed_off",
+4132-        note: aicmAxuR1Text(row.note)
+4133-      }
+4134-    };
+4135-  }
+4136-
+4137-function aicmAxuR1ShowLeaderHandoffConfirm(payload) {
+4138-    if (typeof aicmAvdShowDbConfirm === "function") {
+4139-      aicmAvdShowDbConfirm(payload);
+4140-      return;
+4141-    }
+4142-
+4143-    if (typeof aicmOrgShowUpdateConfirm === "function") {
+4144-      aicmOrgShowUpdateConfirm(payload);
+4145-      return;
+4146-    }
+4147-
+4148-    state.pendingOrgUpdate = payload;
+--
+4571-        row.task_name ||
+4572-        row.deliverable_name ||
+4573-        row.title ||
+4574-        "Manager大項目"
+4575-      ).trim();
+4576-
+4577-      var leader = String(
+4578-        row.assigned_leader_label ||
+4579-        row.leader_robot_label ||
+4580-        row.responsible_robot_label ||
+4581-        row.responsible_role_code ||
+4582-        "課長/Leader"
+4583-      ).trim();
+4584-
+4585-      state.managerMajorLeaderHandoffConfirm = {
+4586-        kind: "manager-major-leader-handoff",
+4587-        title: "課長へ送る確認",
+4588-        majorId: majorId,
+4589-        aicm_manager_major_work_item_id: majorId,
+4590-        major_item_name: title,
+4591-        targetTitle: title,
+4592-        leaderLabel: leader,
+4593-        leaderRaw: leader,
+4594-        row: row,
+4595:        endpoint: "/api/aicm/v2/manager-major/update",
+4596-        backScreen: "task-ledger",
+4597-        body: {
+4598-          owner_civilization_id: typeof aicmLeaderHandoffOwnerIdR8S === "function"
+4599-            ? aicmLeaderHandoffOwnerIdR8S(row)
+4600-            : ((state && state.ownerCivilizationId) || (state && state.owner_civilization_id) || (ctx && ctx.owner_civilization_id) || "00000000-0000-4000-8000-000000000001"),
+4601-          aicm_manager_major_work_item_id: majorId,
+4602-          assigned_leader_label: leader,
+4603-          decomposition_status_code: "assigned_to_leader",
+4604-          handoff_status_code: "handed_off",
+4605-          note: String(row.note || "").trim()
+4606-        }
+4607-      };
+4608-
+4609-      state.screen = "task-ledger";
+4610-
+4611-      if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+4612-        aicmRenderTaskLedgerSafeR8V4("r8z_v9f3_open_confirm");
+4613-        return;
+4614-      }
+4615-
+4616-      if (typeof render === "function") {
+4617-        render();
+4618-      }
+4619-    } catch (error) {
+--
+4820-      setMessage("error", "課長へ送る対象がありません。");
+4821-      render();
+4822-      return;
+4823-    }
+4824-
+4825-    var ownerCivilizationId = aicmLeaderHandoffOwnerIdR8S(payload);
+4826-    if (!ownerCivilizationId) {
+4827-      setMessage("error", "owner_civilization_idを特定できません。");
+4828-      render();
+4829-      return;
+4830-    }
+4831-
+4832-    try {
+4833-      var body = {
+4834-        owner_civilization_id: ownerCivilizationId,
+4835-        aicm_manager_major_work_item_id: payload.majorId,
+4836-        decomposition_status_code: "assigned_to_leader",
+4837-        handoff_status_code: "handed_off"
+4838-      };
+4839-
+4840-      if (payload.leaderRaw) {
+4841-        body.assigned_leader_label = payload.leaderRaw;
+4842-      }
+4843-
+4844:      var response = await fetch("/api/aicm/v2/manager-major/update", {
+4845-        method: "POST",
+4846-        headers: {
+4847-          "content-type": "application/json"
+4848-        },
+4849-        body: JSON.stringify(body)
+4850-      });
+4851-
+4852-      var rawText = await response.text();
+4853-      var json = null;
+4854-      try {
+4855-        json = rawText ? JSON.parse(rawText) : null;
+4856-      } catch (_) {
+4857-        json = null;
+4858-      }
+4859-
+4860-      if (!response.ok || (json && json.result && json.result !== "ok")) {
+4861-        throw new Error(aicmLeaderHandoffApiErrorTextR8S(response, json, rawText));
+4862-      }
+4863-
+4864-      state.managerMajorLeaderHandoffConfirm = null;
+4865-      state.screen = "task-ledger";
+4866-      setMessage("ok", "課長へ送信しました。");
+4867-
+4868-      if (typeof aicmReloadTaskLedgerContext === "function") {
+--
+4949-    if (decomposition === "in_progress") return "分解中";
+4950-    if (decomposition === "done" || decomposition === "completed") return "分解済";
+4951-    return "未実行";
+4952-  }
+4953-
+4954-  function aicmMajorItemSummaryR8O(row) {
+4955-    var title = row && (row.major_item_name || row.deliverable_name || row.task_name) || "Manager大項目";
+4956-    var description = row && (row.major_item_description || row.task_description || row.note) || "";
+4957-    var leader = row && (row.assigned_leader_label || row.leader_label || row.responsible_robot_label) || "未設定";
+4958-    var due = row && row.due_date ? String(row.due_date) : "未設定";
+4959-    var priority = aicmMajorItemPriorityLabelR8O(row && row.priority_code);
+4960-    var status = aicmMajorItemStatusLabelR8O(row);
+4961-
+4962-    return {
+4963-      title: String(title),
+4964-      description: String(description),
+4965-      leader: String(leader),
+4966-      due: String(due),
+4967-      priority: String(priority),
+4968-      status: String(status)
+4969-    };
+4970-  }
+4971-
+4972-  function aicmRenderMajorItemDeleteConfirmCardR8P() {
+4973:    var payload = state.managerMajorDeleteConfirm || null;
+4974-    if (!payload) return "";
+4975-
+4976-    return [
+4977-      '<section class="aicm-core-card" style="border:2px solid #f97316;">',
+4978-      '  <p class="aicm-eyebrow">削除確認</p>',
+4979-      '  <h2>登録済み大項目を削除しますか？</h2>',
+4980-      '  <p class="aicm-selected-note">この操作は確認後にDBへ保存されます。物理DELETEではなく、既存APIで削除済み扱いにします。</p>',
+4981-      '  <dl class="aicm-core-detail-list">',
+4982-      '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
+4983-      '    <dt>課長/Leader</dt><dd>' + escapeHtml(payload.leader || "未設定") + '</dd>',
+4984-      '    <dt>状態</dt><dd>' + escapeHtml(payload.status || "") + '</dd>',
+4985-      '    <dt>期限</dt><dd>' + escapeHtml(payload.due || "未設定") + '</dd>',
+4986-      '  </dl>',
+4987-      payload.description ? '<p class="aicm-selected-note">' + escapeHtml(payload.description) + '</p>' : '',
+4988-      '  <div class="aicm-dashboard-action-row">',
+4989-      '    <button type="button" data-core-action="pmlw-major-delete-execute">削除を確定</button>',
+4990-      '    <button type="button" data-core-action="pmlw-major-delete-cancel">キャンセル</button>',
+4991-      '  </div>',
+4992-      '</section>'
+4993-    ].join("");
+4994-  }
+4995-
+4996-  function aicmOpenMajorItemDeleteConfirmR8P(button) {
+4997-    try {
+4998-      var majorId = button && button.getAttribute ? button.getAttribute("data-major-id") : "";
+4999-      if (!majorId) throw new Error("Manager大項目IDを特定できません。");
+5000-
+5001-      var row = aicmAxuR1FindMajorById(majorId);
+5002-      if (!row) throw new Error("Manager大項目を特定できません。");
+5003-
+5004-      var summary = aicmMajorItemSummaryR8O(row);
+5005-
+5006:      state.managerMajorDeleteConfirm = {
+5007-        majorId: majorId,
+5008-        title: summary.title,
+5009-        description: summary.description,
+5010-        leader: summary.leader,
+5011-        due: summary.due,
+5012-        priority: summary.priority,
+5013-        status: summary.status
+5014-      };
+5015-
+5016-      state.screen = "task-ledger";
+5017-      setMessage("ok", "削除確認を表示しました。内容を確認してから確定してください。");
+5018-      render();
+5019-    } catch (error) {
+5020-      setMessage("error", error && error.message ? error.message : "削除確認を表示できません。");
+5021-      render();
+5022-    }
+5023-  }
+5024-
+5025-  function aicmCancelMajorItemDeleteConfirmR8P() {
+5026:    state.managerMajorDeleteConfirm = null;
+5027-    setMessage("ok", "削除をキャンセルしました。");
+5028-    state.screen = "task-ledger";
+5029-    render();
+5030-  }
+5031-
+5032-  async function aicmExecuteMajorItemDeleteConfirmR8P() {
+5033:    var payload = state.managerMajorDeleteConfirm || null;
+5034-    if (!payload || !payload.majorId) {
+5035-      setMessage("error", "削除確認対象がありません。");
+5036-      render();
+5037-      return;
+5038-    }
+5039-
+5040-    try {
+5041-      var response = await fetch("/api/aicm/v2/manager-major/archive", {
+5042-        method: "POST",
+5043-        headers: {
+5044-          "content-type": "application/json"
+5045-        },
+5046-        body: JSON.stringify({
+5047-          aicm_manager_major_work_item_id: payload.majorId
+5048-        })
+5049-      });
+5050-
+5051-      var json = null;
+5052-      try {
+5053-        json = await response.json();
+5054-      } catch (_) {
+5055-        json = null;
+5056-      }
+5057-
+5058-      if (!response.ok || (json && json.result && json.result !== "ok")) {
+5059-        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+5060-      }
+5061-
+5062:      state.managerMajorDeleteConfirm = null;
+5063-      setMessage("ok", "大項目を削除済みにしました。");
+5064-      await aicmReloadTaskLedgerContext();
+5065-      state.screen = "task-ledger";
+5066-      render();
+5067-    } catch (error) {
+5068-      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+5069-      render();
+5070-    }
+5071-  }
+5072-// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+5073-
+5074-
+5075-  
+5076-function aicmRenderManagerMajorRows(rows) {
+5077-    var sourceRows = Array.isArray(rows) ? rows : [];
+5078-    var pendingRows = sourceRows.filter(function (row) {
+5079-      // AICM_R8Z_V9D1_IS_PENDING_MAJOR_SCOPE_CALLSITE_FIX: use existing visible canonical helper, not the scope-local isPendingMajor
+5080-      if (typeof aicmIsPendingManagerMajorRowR8V6 === "function") {
+5081-        return aicmIsPendingManagerMajorRowR8V6(row);
+5082-      }
+5083-      return !!row;
+5084-    });
+5085-
+5086-    var confirmCard = aicmRenderMajorItemDeleteConfirmCardR8P();
+--
+5171-          '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
+5172-          '  <p class="aicm-eyebrow">TASK LEDGER RENDER ERROR</p>',
+5173-          '  <h2>部門別タスク台帳の描画でエラーが発生しました</h2>',
+5174-          '  <p class="aicm-selected-note">クリック処理と画面遷移は動いています。以下はブラウザ側の描画エラーです。</p>',
+5175-          '  <dl class="aicm-core-detail-list">',
+5176-          '    <dt>source</dt><dd>' + escapeHtml(sourceLabel || "") + '</dd>',
+5177-          '    <dt>message</dt><dd>' + escapeHtml(message) + '</dd>',
+5178-          '  </dl>',
+5179-          stack ? '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(stack) + '</pre>' : '',
+5180-          '  <div class="aicm-dashboard-action-row">',
+5181-          '    <button type="button" data-core-action="task-ledger-refresh">再読み込み</button>',
+5182-          '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
+5183-          '  </div>',
+5184-          '</section>'
+5185-        ].join(""));
+5186-      }
+5187-
+5188-      return false;
+5189-    }
+5190-  }
+5191-// AICM_R8_NAV_TASK_LEDGER_SAFE_RENDER_V4_END
+5192-
+5193-  function aicmOpenTaskLedgerScreenR8V3Clean() {
+5194-    state.screen = "task-ledger";
+5195:    state.managerMajorDeleteConfirm = null;
+5196-
+5197-    if (typeof setMessage === "function") {
+5198-      setMessage("ok", "部門別タスク台帳を表示します。");
+5199-    }
+5200-
+5201-    aicmRenderTaskLedgerSafeR8V4("open:initial");
+5202-
+5203-    Promise.resolve()
+5204-      .then(function () {
+5205-        if (typeof aicmReloadTaskLedgerContext === "function") {
+5206-          return aicmReloadTaskLedgerContext();
+5207-        }
+5208-        return null;
+5209-      })
+5210-      .then(function () {
+5211-        state.screen = "task-ledger";
+5212-        render();
+5213-      })
+5214-      .catch(function (error) {
+5215-        state.screen = "task-ledger";
+5216-
+5217-        if (typeof setMessage === "function") {
+5218-          setMessage("error", error && error.message ? error.message : "部門別タスク台帳の読込に失敗しました。");
+5219-        }
+--
+6571-          return String(base || "") + aicmRenderR8ZNWorkerRuntimeStatusPanel();
+6572-        };
+6573-
+6574-        wrappedTaskLedgerPlaceholder.__r8znWrapped = true;
+6575-        wrappedTaskLedgerPlaceholder.__r8znOriginal = originalTaskLedgerPlaceholder;
+6576-        renderTaskLedgerPlaceholder = wrappedTaskLedgerPlaceholder;
+6577-      }
+6578-    } catch (error) {
+6579-      if (typeof console !== "undefined" && console.warn) {
+6580-        console.warn("AICM R8Z-N worker runtime status panel install skipped", error);
+6581-      }
+6582-    }
+6583-  })();
+6584-// AICM_R8Z_N_WORKER_RUNTIME_STATUS_PANEL_END
+6585-
+6586-
+6587-
+6588-  
+6589-
+6590-
+6591-
+6592-
+6593-
+6594-
+6595:/* AICM_R8Z_V9G5_RESTORE_DELETE_CONFIRM_EXECUTE_BRIDGE_ONLY
+6596- * Restore only delete-confirm execute/cancel click bridge.
+6597- * Patch itself does not call API.
+6598- * User click on delete-confirm execute will POST/archive the selected Manager大項目.
+6599- */
+6600-function aicmR8zV9g5Text(value) {
+6601-  return String(value === undefined || value === null ? "" : value).trim();
+6602-}
+6603-
+6604-function aicmR8zV9g5DeleteConfirmState() {
+6605:  return state && state.managerMajorDeleteConfirm && typeof state.managerMajorDeleteConfirm === "object"
+6606:    ? state.managerMajorDeleteConfirm
+6607-    : null;
+6608-}
+6609-
+6610-function aicmR8zV9g5OwnerId(payload) {
+6611-  payload = payload || {};
+6612-  var body = payload.body && typeof payload.body === "object" ? payload.body : {};
+6613-  return aicmR8zV9g5Text(
+6614-    body.owner_civilization_id ||
+6615-    payload.owner_civilization_id ||
+6616-    (payload.row && payload.row.owner_civilization_id) ||
+6617-    (state && state.ownerCivilizationId) ||
+6618-    (state && state.owner_civilization_id) ||
+6619-    (state && state.context && state.context.owner_civilization_id) ||
+6620-    "00000000-0000-4000-8000-000000000001"
+6621-  );
+6622-}
+6623-
+6624-function aicmR8zV9g5MajorId(payload, btn) {
+6625-  payload = payload || {};
+6626-  var body = payload.body && typeof payload.body === "object" ? payload.body : {};
+6627-
+6628-  var fromButton = "";
+6629-  try {
+6630-    if (btn && btn.getAttribute) {
+6631-      fromButton = btn.getAttribute("data-major-id") ||
+6632-        btn.getAttribute("data-manager-major-id") ||
+6633-        btn.getAttribute("data-id") ||
+6634-        "";
+6635-    }
+6636-  } catch (_) {}
+6637-
+6638-  return aicmR8zV9g5Text(
+6639-    body.aicm_manager_major_work_item_id ||
+6640-    payload.aicm_manager_major_work_item_id ||
+6641-    payload.majorId ||
+6642-    payload.managerMajorId ||
+6643-    (payload.row && (
+6644-      payload.row.aicm_manager_major_work_item_id ||
+6645-      payload.row.manager_major_work_item_id ||
+6646-      payload.row.major_work_item_id ||
+6647-      payload.row.id
+6648-    )) ||
+6649-    fromButton ||
+6650-    ""
+6651-  );
+6652-}
+6653-
+6654:async function aicmR8zV9g5ExecuteDeleteConfirm(btn) {
+6655-  var payload = aicmR8zV9g5DeleteConfirmState();
+6656-
+6657-  if (!payload) {
+6658-    if (typeof setMessage === "function") setMessage("error", "削除確認情報が見つかりません。もう一度削除を押してください。");
+6659-    if (typeof render === "function") render();
+6660-    return;
+6661-  }
+6662-
+6663-  var majorId = aicmR8zV9g5MajorId(payload, btn);
+6664-  var owner = aicmR8zV9g5OwnerId(payload);
+6665-
+6666-  if (!majorId) {
+6667-    if (typeof setMessage === "function") setMessage("error", "削除対象のManager大項目IDを特定できません。");
+6668-    if (typeof render === "function") render();
+6669-    return;
+6670-  }
+6671-
+6672-  try {
+6673-    if (typeof setMessage === "function") setMessage("info", "削除を実行しています。");
+6674-
+6675-    if (typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") {
+6676-      try {
+6677-        await aicmExecuteMajorItemDeleteConfirmR8P();
+6678-        return;
+--
+6684-    if (typeof aicmExecuteManagerMajorDeleteConfirmR8P === "function") {
+6685-      try {
+6686-        await aicmExecuteManagerMajorDeleteConfirmR8P();
+6687-        return;
+6688-      } catch (existingError2) {
+6689-        if (typeof console !== "undefined" && console.warn) console.warn("existing manager delete execute R8P failed; fallback follows", existingError2);
+6690-      }
+6691-    }
+6692-
+6693-    var postBody = {
+6694-      owner_civilization_id: owner,
+6695-      aicm_manager_major_work_item_id: majorId,
+6696-      decomposition_status_code: "archived",
+6697-      handoff_status_code: "archived",
+6698-      note: aicmR8zV9g5Text(
+6699-        (payload.body && payload.body.note) ||
+6700-        (payload.row && payload.row.note) ||
+6701-        ""
+6702-      )
+6703-    };
+6704-
+6705-    var result = null;
+6706-
+6707-    if (typeof requestJson === "function") {
+6708:      result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+6709-    } else {
+6710:      var response = await fetch("/api/aicm/v2/manager-major/update", {
+6711-        method: "POST",
+6712-        headers: { "content-type": "application/json" },
+6713-        body: JSON.stringify(postBody)
+6714-      });
+6715-
+6716-      var json = null;
+6717-      try { json = await response.json(); } catch (_) { json = null; }
+6718-
+6719-      if (!response.ok || (json && json.result && json.result !== "ok")) {
+6720-        throw new Error(
+6721-          json && (json.error_message || json.message || json.error)
+6722-            ? (json.error_message || json.message || json.error)
+6723-            : "削除更新に失敗しました。"
+6724-        );
+6725-      }
+6726-
+6727-      result = json || {};
+6728-    }
+6729-
+6730:    state.managerMajorDeleteConfirm = null;
+6731-    state.screen = "task-ledger";
+6732-
+6733-    try {
+6734-      if (typeof aicmReloadTaskLedgerContext === "function") {
+6735-        await aicmReloadTaskLedgerContext();
+6736-      } else if (typeof refreshContext === "function") {
+6737-        await refreshContext();
+6738-      } else if (typeof loadContext === "function") {
+6739-        await loadContext();
+6740-      } else {
+6741-        var responseReload = await fetch("/api/aicm/v2/context?owner_civilization_id=" + encodeURIComponent(owner) + "&v=r8z_v9g5_" + Date.now());
+6742-        var contextJson = await responseReload.json();
+6743-        if (contextJson && contextJson.result === "ok") state.context = contextJson;
+6744-      }
+6745-    } catch (reloadError) {
+6746-      if (typeof console !== "undefined" && console.warn) console.warn("delete context reload skipped", reloadError);
+6747-    }
+6748-
+6749-    if (typeof setMessage === "function") setMessage("ok", "Manager大項目を削除しました。");
+6750-
+6751-    if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+6752-      aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_done");
+6753-    } else if (typeof render === "function") {
+6754-      render();
+6755-    }
+6756-
+6757-    return result || {};
+6758-  } catch (error) {
+6759-    if (typeof setMessage === "function") {
+6760-      setMessage("error", error && error.message ? error.message : "削除に失敗しました。");
+6761-    }
+6762-    if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+6763-      aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_error");
+6764-    } else if (typeof render === "function") {
+6765-      render();
+6766-    }
+6767-    throw error;
+6768-  }
+6769-}
+6770-
+6771-function aicmR8zV9g5CancelDeleteConfirm() {
+6772:  if (state) state.managerMajorDeleteConfirm = null;
+6773-  if (typeof setMessage === "function") setMessage("info", "削除をキャンセルしました。");
+6774-
+6775-  if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+6776-    aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_cancel");
+6777-  } else if (typeof render === "function") {
+6778-    render();
+6779-  }
+6780-}
+6781-
+6782-(function aicmInstallR8zV9g5DeleteConfirmExecuteBridge() {
+6783-  try {
+6784-    if (typeof document !== "undefined" && document.addEventListener && typeof window !== "undefined") {
+6785:      if (!window.__aicmR8zV9g5DeleteConfirmExecuteBridgeInstalled) {
+6786:        window.__aicmR8zV9g5DeleteConfirmExecuteBridgeInstalled = true;
+6787-
+6788-        document.addEventListener("click", function aicmR8zV9g5DeleteConfirmClickBridge(ev) {
+6789-          try {
+6790-            var target = ev && ev.target;
+6791-            var btn = target && typeof target.closest === "function"
+6792-              ? target.closest("[data-core-action], button")
+6793-              : null;
+6794-
+6795-            if (!btn || !btn.getAttribute) return;
+6796-
+6797-            var action = aicmR8zV9g5Text(btn.getAttribute("data-core-action"));
+6798-            var label = aicmR8zV9g5Text(btn.textContent || btn.innerText || "");
+6799-
+6800-            var isDeleteExecuteAction =
+6801-              action === "pmlw-major-delete-execute" ||
+6802-              action === "manager-major-delete-execute" ||
+6803-              action === "major-delete-execute" ||
+6804-              action === "delete-major-confirm" ||
+6805-              action === "r8z-v9g-delete-execute" ||
+6806-              action === "r8z-v9g5-delete-execute";
+6807-
+6808-            var isDeleteCancelAction =
+6809-              action === "pmlw-major-delete-cancel" ||
+6810-              action === "manager-major-delete-cancel" ||
+6811-              action === "major-delete-cancel" ||
+6812-              action === "delete-major-cancel" ||
+6813-              action === "r8z-v9g-delete-cancel" ||
+6814-              action === "r8z-v9g5-delete-cancel";
+6815-
+6816-            var hasDeleteState = !!aicmR8zV9g5DeleteConfirmState();
+6817-
+6818-            if (!isDeleteExecuteAction && hasDeleteState && /削除/.test(label) && /確定|実行|削除する|はい/.test(label)) {
+6819-              isDeleteExecuteAction = true;
+6820-            }
+6821-
+6822-            if (!isDeleteCancelAction && hasDeleteState && /キャンセル|戻る|いいえ/.test(label)) {
+6823-              isDeleteCancelAction = true;
+6824-            }
+6825-
+6826-            if (isDeleteExecuteAction) {
+6827-              ev.preventDefault();
+6828-              ev.stopPropagation();
+6829:              aicmR8zV9g5ExecuteDeleteConfirm(btn);
+6830-              return;
+6831-            }
+6832-
+6833-            if (isDeleteCancelAction) {
+6834-              ev.preventDefault();
+6835-              ev.stopPropagation();
+6836-              aicmR8zV9g5CancelDeleteConfirm();
+6837-            }
+6838-          } catch (error) {
+6839-            try {
+6840-              if (typeof setMessage === "function") setMessage("error", error && error.message ? error.message : "削除操作でエラーが発生しました。");
+6841-              if (typeof render === "function") render();
+6842-            } catch (_) {}
+6843-          }
+6844-        }, true);
+6845-      }
+6846-    }
+6847-  } catch (error) {
+6848-    try {
+6849-      if (typeof console !== "undefined" && console.warn) {
+6850-        console.warn("AICM R8Z-V9G5 delete confirm execute bridge install skipped", error);
+6851-      }
+6852-    } catch (_) {}
+6853-  }
+6854-})();
+6855-
+6856-/* AICM_R8Z_V9F6_RESTORE_LEADER_HANDOFF_EXECUTE_ONLY
+6857- * Restore only the missing execute entrypoint for the already-visible
+6858- * Manager大項目 -> 課長へ送る confirmation card.
+6859- * Patch execution itself does not write DB or call API.
+6860: * User click on the confirm button will POST to /api/aicm/v2/manager-major/update.
+6861- */
+6862-async function aicmExecuteLeaderHandoffConfirmR8S() {
+6863-  var payload = state && state.managerMajorLeaderHandoffConfirm;
+6864-
+6865-  try {
+6866-    if (!payload || typeof payload !== "object") {
+6867-      throw new Error("課長へ送る確認情報が見つかりません。もう一度「課長へ送る」を押してください。");
+6868-    }
+6869-
+6870-    var body = payload.body && typeof payload.body === "object" ? payload.body : {};
+6871-
+6872-    var owner = String(
+6873-      body.owner_civilization_id ||
+6874-      (typeof aicmLeaderHandoffOwnerIdR8S === "function" ? aicmLeaderHandoffOwnerIdR8S(payload.row || payload) : "") ||
+6875-      (state && state.ownerCivilizationId) ||
+6876-      (state && state.owner_civilization_id) ||
+6877-      (state && state.context && state.context.owner_civilization_id) ||
+6878-      "00000000-0000-4000-8000-000000000001"
+6879-    ).trim();
+6880-
+6881-    var majorId = String(
+6882-      body.aicm_manager_major_work_item_id ||
+6883-      payload.majorId ||
+6884-      payload.aicm_manager_major_work_item_id ||
+--
+6891-    var leader = String(
+6892-      body.assigned_leader_label ||
+6893-      payload.leaderLabel ||
+6894-      payload.leaderRaw ||
+6895-      (payload.row && (payload.row.assigned_leader_label || payload.row.leader_robot_label)) ||
+6896-      "課長/Leader"
+6897-    ).trim();
+6898-
+6899-    var postBody = {
+6900-      owner_civilization_id: owner,
+6901-      aicm_manager_major_work_item_id: majorId,
+6902-      assigned_leader_label: leader,
+6903-      decomposition_status_code: "assigned_to_leader",
+6904-      handoff_status_code: "handed_off",
+6905-      note: String(body.note || (payload.row && payload.row.note) || "").trim()
+6906-    };
+6907-
+6908-    if (typeof setMessage === "function") {
+6909-      setMessage("info", "課長へ送る処理を実行しています。");
+6910-    }
+6911-
+6912-    var result = null;
+6913-
+6914-    if (typeof requestJson === "function") {
+6915:      result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+6916-    } else {
+6917:      var response = await fetch("/api/aicm/v2/manager-major/update", {
+6918-        method: "POST",
+6919-        headers: { "content-type": "application/json" },
+6920-        body: JSON.stringify(postBody)
+6921-      });
+6922-
+6923-      var json = null;
+6924-      try {
+6925-        json = await response.json();
+6926-      } catch (_) {
+6927-        json = null;
+6928-      }
+6929-
+6930-      if (!response.ok || (json && json.result && json.result !== "ok")) {
+6931-        throw new Error(
+6932-          json && (json.error_message || json.message || json.error)
+6933-            ? (json.error_message || json.message || json.error)
+6934-            : "課長へ送る更新に失敗しました。"
+6935-        );
+6936-      }
+6937-
+6938-      result = json || {};
+6939-    }
+6940-
+6941-    var autoMessages = [];
+--
+9264-      setMessage("error", "削除対象のボタンを特定できません。");
+9265-      render();
+9266-      return;
+9267-    }
+9268-
+9269-    if (typeof aicmOpenMajorItemDeleteConfirmR8P !== "function") {
+9270-      setMessage("error", "削除確認処理が見つかりません。");
+9271-      render();
+9272-      return;
+9273-    }
+9274-
+9275-    aicmOpenMajorItemDeleteConfirmR8P(deleteTarget);
+9276-
+9277-    if (typeof aicmScrollMajorDeleteConfirmIntoViewR8V7D2 === "function") {
+9278-      setTimeout(aicmScrollMajorDeleteConfirmIntoViewR8V7D2, 50);
+9279-    }
+9280-  }
+9281-  function aicmCancelMajorDeleteConfirmFromActionR8V7C2() {
+9282-    if (typeof aicmCancelMajorItemDeleteConfirmR8P === "function") {
+9283-      aicmCancelMajorItemDeleteConfirmR8P();
+9284-      return;
+9285-    }
+9286-
+9287-    if (state) {
+9288:      state.managerMajorDeleteConfirm = null;
+9289-      state.screen = "task-ledger";
+9290-    }
+9291-
+9292-    setMessage("ok", "削除をキャンセルしました。");
+9293-    render();
+9294-  }
+9295-
+9296-  function aicmExecuteMajorDeleteConfirmFromActionR8V7C2() {
+9297-    if (typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") {
+9298-      aicmExecuteMajorItemDeleteConfirmR8P();
+9299-      return;
+9300-    }
+9301-
+9302-    setMessage("error", "削除確定処理が見つかりません。");
+9303-    render();
+9304-  }
+9305-
+9306-  function aicmMoveMajorItemPageFromActionR8V7C2(delta) {
+9307-    if (typeof aicmMajorItemSetPageR8O === "function") {
+9308-      aicmMajorItemSetPageR8O(delta);
+9309-      return;
+9310-    }
+9311-
+9312-    var current = Number(state.managerMajorPage || 1);

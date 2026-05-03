@@ -1,0 +1,145 @@
+6567-      if (typeof renderTaskLedgerPlaceholder === "function" && !renderTaskLedgerPlaceholder.__r8znWrapped) {
+6568-        var originalTaskLedgerPlaceholder = renderTaskLedgerPlaceholder;
+6569-        var wrappedTaskLedgerPlaceholder = function () {
+6570-          var base = originalTaskLedgerPlaceholder.apply(this, arguments);
+6571-          return String(base || "") + aicmRenderR8ZNWorkerRuntimeStatusPanel();
+6572-        };
+6573-
+6574-        wrappedTaskLedgerPlaceholder.__r8znWrapped = true;
+6575-        wrappedTaskLedgerPlaceholder.__r8znOriginal = originalTaskLedgerPlaceholder;
+6576-        renderTaskLedgerPlaceholder = wrappedTaskLedgerPlaceholder;
+6577-      }
+6578-    } catch (error) {
+6579-      if (typeof console !== "undefined" && console.warn) {
+6580-        console.warn("AICM R8Z-N worker runtime status panel install skipped", error);
+6581-      }
+6582-    }
+6583-  })();
+6584-// AICM_R8Z_N_WORKER_RUNTIME_STATUS_PANEL_END
+6585-
+6586-
+6587-
+6588-  
+6589-
+6590-
+6591:/* AICM_R8Z_V9F4B_CONFIRM_CARD_POST_RENDER_WRAPPER
+6592- * Display-only repair for Manager大項目 -> 課長へ送る confirmation card.
+6593- * This block is intentionally installed AFTER renderTaskLedgerPlaceholder exists.
+6594- * It does not write DB and does not call API.
+6595- */
+6596:function aicmRenderLeaderHandoffConfirmCardR8SV9F4B() {
+6597-  var payload = state && state.managerMajorLeaderHandoffConfirm;
+6598-  if (!payload || typeof payload !== "object") return "";
+6599-
+6600-  var esc = typeof escapeHtml === "function" ? escapeHtml : function(value) {
+6601-    return String(value === undefined || value === null ? "" : value)
+6602-      .replace(/&/g, "&amp;")
+6603-      .replace(/</g, "&lt;")
+6604-      .replace(/>/g, "&gt;")
+6605-      .replace(/"/g, "&quot;")
+6606-      .replace(/'/g, "&#039;");
+6607-  };
+6608-
+6609-  var majorId = String(
+6610-    payload.majorId ||
+6611-    payload.aicm_manager_major_work_item_id ||
+6612-    (payload.body && payload.body.aicm_manager_major_work_item_id) ||
+6613-    ""
+6614-  ).trim();
+6615-
+6616-  var row = payload.row || {};
+6617-  var title = String(
+6618-    payload.major_item_name ||
+6619-    payload.targetTitle ||
+6620-    row.major_item_name ||
+--
+6630-    (payload.body && payload.body.assigned_leader_label) ||
+6631-    row.assigned_leader_label ||
+6632-    row.leader_robot_label ||
+6633-    "課長/Leader"
+6634-  ).trim();
+6635-
+6636-  return [
+6637-    '<section class="aicm-core-card aicm-leader-handoff-confirm-r8s" style="border:2px solid #f59e0b;">',
+6638-    '  <p class="aicm-eyebrow">課長へ送る確認</p>',
+6639-    '  <h2>このManager大項目を課長へ送りますか？</h2>',
+6640-    '  <p class="aicm-selected-note">DB更新前の確認カードです。内容を確認してから確定してください。</p>',
+6641-    '  <dl class="aicm-core-detail-list">',
+6642-    '    <dt>対象</dt><dd>' + esc(title) + '</dd>',
+6643-    '    <dt>課長/Leader</dt><dd>' + esc(leader) + '</dd>',
+6644-    '    <dt>Manager大項目ID</dt><dd>' + esc(majorId || '-') + '</dd>',
+6645-    '  </dl>',
+6646-    '  <div class="aicm-dashboard-action-row">',
+6647-    '    <button type="button" data-core-action="r8z-v9f4b-leader-handoff-confirm-cancel">キャンセル</button>',
+6648-    '    <button type="button" data-core-action="r8z-v9f4b-leader-handoff-confirm-execute" data-major-id="' + esc(majorId) + '">確認して課長へ送る</button>',
+6649-    '  </div>',
+6650-    '</section>'
+6651-  ].join("");
+6652-}
+6653-
+6654:function aicmInjectLeaderHandoffConfirmCardR8SV9F4B(html) {
+6655-  var source = String(html || "");
+6656:  var card = aicmRenderLeaderHandoffConfirmCardR8SV9F4B();
+6657-
+6658-  if (!card) return source;
+6659-  if (source.indexOf("aicm-leader-handoff-confirm-r8s") >= 0) return source;
+6660-
+6661-  var anchor = '<p class="aicm-eyebrow">Manager大項目</p>';
+6662-  var idx = source.indexOf(anchor);
+6663-
+6664-  if (idx >= 0) {
+6665-    var sectionIdx = source.lastIndexOf("<section", idx);
+6666-    if (sectionIdx >= 0) {
+6667-      return source.slice(0, sectionIdx) + card + source.slice(sectionIdx);
+6668-    }
+6669-    return source.slice(0, idx) + card + source.slice(idx);
+6670-  }
+6671-
+6672-  if (source.indexOf("</main>") >= 0) {
+6673-    return source.replace("</main>", card + "</main>");
+6674-  }
+6675-
+6676-  return card + source;
+6677-}
+6678-
+6679-(function aicmInstallLeaderHandoffConfirmCardBridgeR8SV9F4B() {
+6680-  try {
+6681-    if (typeof renderTaskLedgerPlaceholder === "function" && !renderTaskLedgerPlaceholder.__r8zV9f4bLeaderConfirmWrapped) {
+6682-      var originalTaskLedgerPlaceholderR8zV9f4b = renderTaskLedgerPlaceholder;
+6683-      var wrappedTaskLedgerPlaceholderR8zV9f4b = function renderTaskLedgerPlaceholder() {
+6684:        return aicmInjectLeaderHandoffConfirmCardR8SV9F4B(
+6685-          originalTaskLedgerPlaceholderR8zV9f4b.apply(this, arguments)
+6686-        );
+6687-      };
+6688-      wrappedTaskLedgerPlaceholderR8zV9f4b.__r8zV9f4bLeaderConfirmWrapped = true;
+6689-      wrappedTaskLedgerPlaceholderR8zV9f4b.__r8zV9f4bOriginal = originalTaskLedgerPlaceholderR8zV9f4b;
+6690-      renderTaskLedgerPlaceholder = wrappedTaskLedgerPlaceholderR8zV9f4b;
+6691-    }
+6692-
+6693-    if (typeof document !== "undefined" && document.addEventListener && typeof window !== "undefined") {
+6694:      if (!window.__aicmR8zV9f4bLeaderHandoffClickBridgeInstalled) {
+6695:        window.__aicmR8zV9f4bLeaderHandoffClickBridgeInstalled = true;
+6696-
+6697-        document.addEventListener("click", function aicmR8zV9f4bLeaderHandoffClickBridge(ev) {
+6698-          try {
+6699-            var target = ev && ev.target;
+6700-            var btn = target && typeof target.closest === "function"
+6701-              ? target.closest("[data-core-action]")
+6702-              : null;
+6703-
+6704-            if (!btn || !btn.getAttribute) return;
+6705-
+6706-            var action = String(btn.getAttribute("data-core-action") || "").trim();
+6707-
+6708-            if (action === "pmlw-major-leader-handoff") {
+6709-              if (typeof aicmOpenLeaderHandoffConfirmR8S === "function") {
+6710-                ev.preventDefault();
+6711-                ev.stopPropagation();
+6712-                aicmOpenLeaderHandoffConfirmR8S(ev, btn);
+6713-              }
+6714-              return;
+6715-            }
+6716-
+6717-            if (action === "r8z-v9f4b-leader-handoff-confirm-cancel") {
+6718-              ev.preventDefault();
+6719-              ev.stopPropagation();

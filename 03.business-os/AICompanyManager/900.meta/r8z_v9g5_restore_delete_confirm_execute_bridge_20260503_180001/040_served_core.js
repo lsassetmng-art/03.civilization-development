@@ -6652,7 +6652,6 @@ function aicmR8zV9g5MajorId(payload, btn) {
 }
 
 async function aicmR8zV9g5ExecuteDeleteConfirm(btn) {
-  // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: V9G5 owns confirmed delete via manager-major/update fallback.
   var payload = aicmR8zV9g5DeleteConfirmState();
 
   if (!payload) {
@@ -6673,7 +6672,7 @@ async function aicmR8zV9g5ExecuteDeleteConfirm(btn) {
   try {
     if (typeof setMessage === "function") setMessage("info", "削除を実行しています。");
 
-    if (false && typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") { // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: skip old1
+    if (typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") {
       try {
         await aicmExecuteMajorItemDeleteConfirmR8P();
         return;
@@ -6682,7 +6681,7 @@ async function aicmR8zV9g5ExecuteDeleteConfirm(btn) {
       }
     }
 
-    if (false && typeof aicmExecuteManagerMajorDeleteConfirmR8P === "function") { // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: skip old2
+    if (typeof aicmExecuteManagerMajorDeleteConfirmR8P === "function") {
       try {
         await aicmExecuteManagerMajorDeleteConfirmR8P();
         return;

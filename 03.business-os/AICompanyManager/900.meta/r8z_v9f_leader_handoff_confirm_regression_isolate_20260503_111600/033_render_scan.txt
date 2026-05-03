@@ -1,0 +1,804 @@
+---- renderTaskLedgerPlaceholder nearby ----
+4921-      var response = await fetch("/api/aicm/v2/manager-major/archive", {
+4922-        method: "POST",
+4923-        headers: {
+4924-          "content-type": "application/json"
+4925-        },
+4926-        body: JSON.stringify({
+4927-          aicm_manager_major_work_item_id: payload.majorId
+4928-        })
+4929-      });
+4930-
+4931-      var json = null;
+4932-      try {
+4933-        json = await response.json();
+4934-      } catch (_) {
+4935-        json = null;
+4936-      }
+4937-
+4938-      if (!response.ok || (json && json.result && json.result !== "ok")) {
+4939-        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+4940-      }
+4941-
+4942-      state.managerMajorDeleteConfirm = null;
+4943-      setMessage("ok", "大項目を削除済みにしました。");
+4944-      await aicmReloadTaskLedgerContext();
+4945-      state.screen = "task-ledger";
+4946-      render();
+4947-    } catch (error) {
+4948-      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+4949-      render();
+4950-    }
+4951-  }
+4952-// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+4953-
+4954-
+4955-  
+4956:function aicmRenderManagerMajorRows(rows) {
+4957-    var sourceRows = Array.isArray(rows) ? rows : [];
+4958-    var pendingRows = sourceRows.filter(function (row) {
+4959-      // AICM_R8Z_V9D1_IS_PENDING_MAJOR_SCOPE_CALLSITE_FIX: use existing visible canonical helper, not the scope-local isPendingMajor
+4960-      if (typeof aicmIsPendingManagerMajorRowR8V6 === "function") {
+4961-        return aicmIsPendingManagerMajorRowR8V6(row);
+4962-      }
+4963-      return !!row;
+4964-    });
+4965-
+4966-    var confirmCard = aicmRenderMajorItemDeleteConfirmCardR8P();
+4967-
+4968-    if (!pendingRows.length) {
+4969-      return [
+4970-        confirmCard,
+4971-        '<div class="aicm-core-empty">',
+4972-        '  <strong>登録済み大項目はまだありません</strong>',
+4973-        '  <p>CSV取り込み後、未実行/未引き継ぎのManager大項目だけが表示されます。</p>',
+4974-        '</div>'
+4975-      ].join("");
+4976-    }
+4977-
+4978-    var pageSize = aicmMajorItemPageSizeR8O();
+4979-    var totalRows = pendingRows.length;
+4980-    var totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+4981-    var page = aicmMajorItemCurrentPageR8O(totalRows);
+4982-    var start = (page - 1) * pageSize;
+4983-    var pageRows = pendingRows.slice(start, start + pageSize);
+4984-
+4985-    var pager = [
+4986-      '<div class="aicm-dashboard-action-row">',
+4987-      '  <button type="button" data-core-action="pmlw-major-page-prev"' + (page <= 1 ? ' disabled' : '') + '>前ページ</button>',
+4988-      '  <span class="aicm-selected-note">ページ ' + escapeHtml(String(page)) + ' / ' + escapeHtml(String(totalPages)) + '　表示 ' + escapeHtml(String(start + 1)) + '-' + escapeHtml(String(start + pageRows.length)) + ' / ' + escapeHtml(String(totalRows)) + '件</span>',
+4989-      '  <button type="button" data-core-action="pmlw-major-page-next"' + (page >= totalPages ? ' disabled' : '') + '>次ページ</button>',
+4990-      '</div>'
+4991-    ].join("");
+--
+5544-    }).join("");
+5545-
+5546-    var more = rows.length > limit ? '<p class="aicm-selected-note">表示は先頭' + escapeHtml(String(limit)) + '件です。全件確認は次工程で詳細画面化します。</p>' : '';
+5547-
+5548-    return [
+5549-      '<div class="aicm-ledger-list">',
+5550-      cards,
+5551-      '</div>',
+5552-      more
+5553-    ].join("");
+5554-  }
+5555-
+5556-  function aicmRenderManagerMajorSummaryDetailR8U(summary) {
+5557-    var filter = aicmSummaryTextR8U(state && state.managerMajorSummaryFilterR8U);
+5558-    if (!filter) {
+5559-      return '<p class="aicm-selected-note">件数カードを押すと、その分類の詳細をここで確認できます。</p>';
+5560-    }
+5561-
+5562-    var bucket = summary.map[filter] || summary.map.other;
+5563-    var label = bucket ? bucket.label : "詳細";
+5564-    var rows = bucket ? bucket.rows : [];
+5565-
+5566-    return [
+5567-      '<section class="aicm-core-card" style="border:1px solid #c7d2fe;">',
+5568-      '  <p class="aicm-eyebrow">サマリ詳細</p>',
+5569-      '  <h3>' + escapeHtml(label) + ' の詳細</h3>',
+5570-      '  <p class="aicm-selected-note">対象: <strong>' + escapeHtml(String(rows.length)) + '件</strong></p>',
+5571-      '  <div class="aicm-dashboard-action-row">',
+5572-      '    <button type="button" data-core-action="manager-major-summary-filter-clear">詳細表示を閉じる</button>',
+5573-      '  </div>',
+5574-      aicmRenderManagerMajorSummaryDetailRowsR8U(rows, label),
+5575-      '</section>'
+5576-    ].join("");
+5577-  }
+5578-
+5579:  function aicmRenderManagerMajorSummarySectionR8U() {
+5580-    var summary = aicmManagerMajorSummaryCountsR8U();
+5581-    var cards = summary.buckets.map(function (bucket) {
+5582-      var selected = aicmSummaryTextR8U(state && state.managerMajorSummaryFilterR8U) === bucket.code;
+5583-      return [
+5584-        '<button type="button" data-core-action="manager-major-summary-filter" data-summary-filter="' + escapeHtml(bucket.code) + '" style="text-align:left;display:block;">',
+5585-        '  <span style="display:block;font-size:12px;color:#64748b;font-weight:900;">' + escapeHtml(bucket.label) + '</span>',
+5586-        '  <strong style="display:block;font-size:24px;margin-top:4px;">' + escapeHtml(String(bucket.count)) + '件</strong>',
+5587-        '  <span style="display:block;font-size:12px;margin-top:4px;color:#64748b;">' + escapeHtml(selected ? "選択中" : bucket.note) + '</span>',
+5588-        '</button>'
+5589-      ].join("");
+5590-    }).join("");
+5591-
+5592-    return [
+5593-      '<section class="aicm-core-card">',
+5594-      '  <p class="aicm-eyebrow">Manager大項目サマリ</p>',
+5595-      '  <h2>大項目 件数サマリ</h2>',
+5596-      '  <p class="aicm-selected-note">Manager大項目から現在の状態別件数を表示します。件数カードを押すと詳細を確認できます。</p>',
+5597-      '  <p class="aicm-selected-note">合計: <strong>' + escapeHtml(String(summary.total)) + '件</strong></p>',
+5598-      '  <div class="aicm-dashboard-action-row">',
+5599-      cards,
+5600-      '  </div>',
+5601-      aicmRenderManagerMajorSummaryDetailR8U(summary),
+5602-      '</section>'
+5603-    ].join("");
+5604-  }
+5605-
+5606-  function aicmManagerMajorSummaryActionTargetR8U(ev, btn) {
+5607-    if (typeof aicmActionTargetSafe === "function") {
+5608-      var safeTarget = aicmActionTargetSafe(ev, btn);
+5609-      if (safeTarget && safeTarget.getAttribute) return safeTarget;
+5610-    }
+5611-
+5612-    if (btn && btn.getAttribute) return btn;
+5613-
+5614-    if (ev && ev.target && ev.target.closest) {
+--
+5732-
+5733-    var limit = 5;
+5734-    var visible = rows.slice(0, limit);
+5735-    var cards = visible.map(function (row, index) {
+5736-      var title = aicmLeaderAutoTextR8W(row && (row.major_item_name || row.deliverable_name || row.task_name)) || "Manager大項目";
+5737-      var description = aicmLeaderAutoTextR8W(row && (row.major_item_description || row.task_description || row.note));
+5738-      var leader = aicmLeaderAutoTextR8W(row && (row.assigned_leader_label || row.leader_label || row.responsible_robot_label)) || "自動割当";
+5739-      var due = aicmLeaderAutoTextR8W(row && row.due_date) || "未設定";
+5740-      var status = aicmLeaderAutoFlowStatusLabelR8W(row);
+5741-
+5742-      return [
+5743-        '<article class="aicm-ledger-row">',
+5744-        '  <p class="aicm-eyebrow">自動処理対象 #' + escapeHtml(String(index + 1)) + '</p>',
+5745-        '  <h3>' + escapeHtml(title) + '</h3>',
+5746-        description ? '  <p class="aicm-selected-note">' + escapeHtml(description) + '</p>' : '',
+5747-        '  <dl class="aicm-ledger-meta">',
+5748-        '    <div><dt>自動状態</dt><dd>' + escapeHtml(status) + '</dd></div>',
+5749-        '    <div><dt>課長/Leader</dt><dd>' + escapeHtml(leader) + '</dd></div>',
+5750-        '    <div><dt>優先度</dt><dd>' + escapeHtml(aicmLeaderAutoPriorityLabelR8W(row && row.priority_code)) + '</dd></div>',
+5751-        '    <div><dt>期限</dt><dd>' + escapeHtml(due) + '</dd></div>',
+5752-        '  </dl>',
+5753-        '</article>'
+5754-      ].join("");
+5755-    }).join("");
+5756-
+5757-    var more = rows.length > limit ? '<p class="aicm-selected-note">ほか ' + escapeHtml(String(rows.length - limit)) + '件はサマリ詳細で確認できます。</p>' : '';
+5758-
+5759-    return [
+5760-      '<div class="aicm-ledger-list">',
+5761-      cards,
+5762-      '</div>',
+5763-      more
+5764-    ].join("");
+5765-  }
+5766-
+5767:  function aicmRenderLeaderAutoFlowStatusR8W() {
+5768-    var rows = aicmLeaderAutoFlowRowsR8W();
+5769-
+5770-    return [
+5771-      '<section class="aicm-core-card">',
+5772-      '  <p class="aicm-eyebrow">Leader以降自動処理</p>',
+5773-      '  <h2>課長以降は自動処理</h2>',
+5774-      '  <p class="aicm-selected-note">課長へ送ったManager大項目は、ユーザー操作なしでLeader分解・Worker展開へ進む前提です。ここでは自動処理対象の状態だけを確認します。</p>',
+5775-      '  <p class="aicm-selected-note">自動分解対象: <strong>' + escapeHtml(String(rows.length)) + '件</strong></p>',
+5776-      aicmRenderLeaderAutoFlowRowsR8W(rows),
+5777-      '</section>'
+5778-    ].join("");
+5779-  }
+5780-// AICM_R8W_LEADER_AUTO_FLOW_DISPLAY_HELPER_END
+5781-
+5782-// AICM_R8Z_B_LEADER_AUTO_DECOMPOSITION_CORE_START
+5783-  function aicmR8ZBText(value) {
+5784-    if (value === null || typeof value === "undefined") return "";
+5785-    return String(value).trim();
+5786-  }
+5787-
+5788-  function aicmR8ZBOwnerId() {
+5789-    if (state && state.ownerCivilizationId) return aicmR8ZBText(state.ownerCivilizationId);
+5790-    if (state && state.owner_civilization_id) return aicmR8ZBText(state.owner_civilization_id);
+5791-    if (state && state.context && state.context.owner_civilization_id) return aicmR8ZBText(state.context.owner_civilization_id);
+5792-    if (typeof aicmHumanReviewOwnerId === "function") {
+5793-      try {
+5794-        var ownerFromReview = aicmHumanReviewOwnerId();
+5795-        if (ownerFromReview) return aicmR8ZBText(ownerFromReview);
+5796-      } catch (_) {}
+5797-    }
+5798-    return "00000000-0000-4000-8000-000000000001";
+5799-  }
+5800-
+5801-  function aicmR8ZBCompanyId() {
+5802-    if (state && state.selectedCompanyId) return aicmR8ZBText(state.selectedCompanyId);
+--
+5921-      headers: {
+5922-        "content-type": "application/json"
+5923-      },
+5924-      body: JSON.stringify(body)
+5925-    });
+5926-
+5927-    var json = null;
+5928-    try {
+5929-      json = await response.json();
+5930-    } catch (_) {
+5931-      json = null;
+5932-    }
+5933-
+5934-    if (!response.ok || (json && json.result && json.result !== "ok")) {
+5935-      throw new Error(json && (json.error_message || json.message || json.error) ? (json.error_message || json.message || json.error) : "Worker自動実行に失敗しました。");
+5936-    }
+5937-
+5938-    return json || {};
+5939-  }
+5940-
+5941-  function aicmWorkerAutoExecutionMessageR8ZI(result) {
+5942-    var executed = result && typeof result.executed_count !== "undefined" ? Number(result.executed_count || 0) : 0;
+5943-    var failed = result && typeof result.failed_count !== "undefined" ? Number(result.failed_count || 0) : 0;
+5944-
+5945-    if (failed > 0) {
+5946-      return "Leader自動分解後、Worker自動実行で一部エラーがありました。成功 " + String(executed) + "件 / 失敗 " + String(failed) + "件。";
+5947-    }
+5948-
+5949-    return "Leader自動分解後、Worker自動実行requestを " + String(executed) + "件作成しました。";
+5950-  }
+5951-// AICM_R8Z_I_WORKER_AUTO_EXECUTION_CORE_END
+5952-
+5953-// AICM_R8Z_B_LEADER_AUTO_DECOMPOSITION_CORE_END
+5954-
+5955-
+5956:function renderTaskLedgerPlaceholder() {
+5957-    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: screen
+5958-    var company = typeof selectedCompany === "function" ? selectedCompany() : null;
+5959-    var companyId = company && company.aicm_user_company_id ? company.aicm_user_company_id : "";
+5960-    var rows = aicmGetManagerMajorRowsForSelectedCompany(companyId);
+5961-    
+5962-
+5963-    // AICM_R8V_REMOVE_LEADER_INBOX_UI_START
+5964-  // Leader受信箱 routine section removed.
+5965-  // Manager大項目サマリの Leader受信済み 件数/詳細を正面表示として使う。
+5966-// AICM_R8V_REMOVE_LEADER_INBOX_UI_END
+5967-return renderShell([
+5968-      '<section class="aicm-core-card">',
+5969-      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+5970-      '  <h2>部門別タスク台帳</h2>',
+5971-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+5972-      '  <p class="aicm-selected-note">未実行のManager大項目だけをDB/contextから表示します。CSV取り込みは部長/Manager分解済み大項目の新規追加です。</p>',
+5973-'  <div class="aicm-dashboard-action-row">',
+5974-      '    <button type="button" data-core-action="task-ledger-refresh">登録済み大項目をリロード</button>',
+5975-      '  </div>',
+5976-      '</section>',
+5977:      aicmRenderManagerMajorSummarySectionR8U(),
+5978:      aicmRenderLeaderAutoFlowStatusR8W(),
+5979-      renderCsvImportCard(company),
+5980-      '<section class="aicm-core-card">',
+5981-      '  <p class="aicm-eyebrow">Manager大項目</p>',
+5982-      '  <h2>登録済み大項目</h2>',
+5983:      aicmRenderManagerMajorRows(rows),
+5984-      '</section>'
+5985-    ].join(""));
+5986-  }
+5987-// AICM_R8Z_C_OUTPUT_VISIBILITY_PANEL_START
+5988-  function aicmR8ZCText(value) {
+5989-    if (value === null || typeof value === "undefined") return "";
+5990-    return String(value).trim();
+5991-  }
+5992-
+5993-  function aicmR8ZCHtml(value) {
+5994-    if (typeof escapeHtml === "function") return escapeHtml(aicmR8ZCText(value));
+5995-    return aicmR8ZCText(value)
+5996-      .replace(/&/g, "&amp;")
+5997-      .replace(/</g, "&lt;")
+5998-      .replace(/>/g, "&gt;")
+5999-      .replace(/"/g, "&quot;")
+6000-      .replace(/'/g, "&#39;");
+6001-  }
+6002-
+6003-  function aicmR8ZCContextArray(names) {
+6004-    var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+6005-
+6006-    for (var i = 0; i < names.length; i += 1) {
+6007-      var key = names[i];
+6008-
+6009-      if (Array.isArray(ctx[key])) return ctx[key];
+6010-      if (Array.isArray(state && state[key])) return state[key];
+6011-    }
+6012-
+6013-    return [];
+6014-  }
+6015-
+6016-  function aicmR8ZCSelectedCompanyId() {
+6017-    if (state && state.selectedCompanyId) return aicmR8ZCText(state.selectedCompanyId);
+6018-
+--
+6164-      '</section>'
+6165-    ].join("");
+6166-  }
+6167-
+6168-  function aicmInjectPmlwAutoOutputsPanelR8ZC(html) {
+6169-    var panel = aicmRenderPmlwAutoOutputsPanelR8ZC();
+6170-    var source = String(html || "");
+6171-
+6172-    // AICM_R8Z_C2_OUTPUT_PANEL_POSITION_V1
+6173-    // Prefer showing this directly after Manager大項目サマリ and before CSV/import/list sections.
+6174-    var anchors = [
+6175-      '<section class="aicm-core-card aicm-csv-panel">',
+6176-      '<section class="aicm-core-card"><p class="aicm-eyebrow">Manager大項目</p>',
+6177-      '<section class="aicm-core-card">\n  <p class="aicm-eyebrow">Manager大項目</p>',
+6178-      '<p class="aicm-eyebrow">CSV取り込み</p>'
+6179-    ];
+6180-
+6181-    for (var i = 0; i < anchors.length; i += 1) {
+6182-      var anchor = anchors[i];
+6183-      var index = source.indexOf(anchor);
+6184-
+6185-      if (index >= 0) {
+6186-        return source.slice(0, index) + panel + source.slice(index);
+6187-      }
+6188-    }
+6189-
+6190-    if (source.indexOf('</main>') >= 0) {
+6191-      return source.replace('</main>', panel + '</main>');
+6192-    }
+6193-
+6194-    return source + panel;
+6195-  }
+6196-
+6197-  var aicmRenderTaskLedgerPlaceholderBeforeR8ZC = renderTaskLedgerPlaceholder;
+6198-
+6199:  renderTaskLedgerPlaceholder = function renderTaskLedgerPlaceholder() {
+6200-    return aicmInjectPmlwAutoOutputsPanelR8ZC(
+6201-      aicmRenderTaskLedgerPlaceholderBeforeR8ZC()
+6202-    );
+6203-  };
+6204-// AICM_R8Z_C_OUTPUT_VISIBILITY_PANEL_END
+6205-
+6206-
+6207-// AICM_R8Z_N_WORKER_RUNTIME_STATUS_PANEL_START
+6208-  function aicmR8ZNText(value) {
+6209-    if (value === null || typeof value === "undefined") return "";
+6210-    return String(value).trim();
+6211-  }
+6212-
+6213-  function aicmR8ZNHtml(value) {
+6214-    var text = aicmR8ZNText(value);
+6215-    if (typeof escapeHtml === "function") return escapeHtml(text);
+6216-    return text
+6217-      .replace(/&/g, "&amp;")
+6218-      .replace(/</g, "&lt;")
+6219-      .replace(/>/g, "&gt;")
+6220-      .replace(/"/g, "&quot;")
+6221-      .replace(/'/g, "&#039;");
+6222-  }
+6223-
+6224-  function aicmR8ZNMetadata(row) {
+6225-    var meta = row && (row.metadata_jsonb || row.metadata || row.meta) || {};
+6226-    if (typeof meta === "string") {
+6227-      try {
+6228-        meta = JSON.parse(meta);
+6229-      } catch (_) {
+6230-        meta = {};
+6231-      }
+6232-    }
+6233-    if (!meta || typeof meta !== "object") meta = {};
+6234-    return meta;
+--
+8854-      '  <p class="aicm-selected-note">対象: <strong>' + aicmR8ZOEscape(String(rows.length)) + '件</strong></p>',
+8855-      '  <div class="aicm-dashboard-action-row">',
+8856-      '    <button type="button" data-core-action="manager-major-summary-filter-clear">詳細表示を閉じる</button>',
+8857-      '  </div>',
+8858-      body,
+8859-      '</section>'
+8860-    ].join("");
+8861-  }
+8862-
+8863-  function aicmRenderManagerMajorSummaryPanelR8U() {
+8864-    var majorRows = aicmR8ZOArray("pmlw_major_items", "managerMajorItems", "manager_major_items");
+8865-    var workerRows = aicmR8ZOArray("pmlw_worker_work_units", "pmlwWorkerWorkUnits");
+8866-    var majorCounts = aicmR8ZOCountBy(majorRows, aicmR8ZOMajorStatus);
+8867-    var workerCounts = aicmR8ZOCountBy(workerRows, aicmR8ZOWorkerStatus);
+8868-    var filter = state && state.managerMajorSummaryFilter ? String(state.managerMajorSummaryFilter) : "";
+8869-
+8870-    return [
+8871-      '<section class="aicm-core-card aicm-manager-major-summary-card">',
+8872-      '  <p class="aicm-eyebrow">本番サマリ</p>',
+8873-      '  <h2>部門別タスク台帳サマリ</h2>',
+8874-      '  <p class="aicm-selected-note">合計: <strong>' + aicmR8ZOEscape(String(majorRows.length)) + '件</strong> / Worker作業単位: <strong>' + aicmR8ZOEscape(String(workerRows.length)) + '件</strong></p>',
+8875-      '  <div class="aicm-dashboard-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));">',
+8876-      aicmR8ZOSummaryButton("unhandoff", "未引き継ぎ", majorCounts.unhandoff || 0, "課長へ送る前"),
+8877-      aicmR8ZOSummaryButton("auto_waiting", "自動処理待ち", majorCounts.auto_waiting || 0, "Leader以降の開始待ち"),
+8878-      aicmR8ZOSummaryButton("manager_completed", "分解済み", majorCounts.manager_completed || 0, "Worker作業単位まで作成"),
+8879-      aicmR8ZOSummaryButton("worker_running", "Worker実行中", workerCounts.worker_running || 0, "AIWorkerOS受付済み"),
+8880-      aicmR8ZOSummaryButton("review_waiting", "レビュー待ち", workerCounts.review_waiting || 0, "承認待ちへ表示予定"),
+8881-      aicmR8ZOSummaryButton("archived", "削除済み", majorCounts.archived || 0, "非表示・保管扱い"),
+8882-      '  </div>',
+8883-      '  <p class="aicm-selected-note">件数カードを押すと、その分類の詳細だけ確認できます。request_id などの開発者情報は通常表示しません。</p>',
+8884-      aicmR8ZORenderDetail(filter),
+8885-      '</section>'
+8886-    ].join("");
+8887-  }
+8888-
+8889:  function aicmRenderLeaderAutoFlowStatusR8W() {
+8890-    return "";
+8891-  }
+8892-
+8893-  function aicmRenderPmlwAutoOutputsPanelR8ZC() {
+8894-    return "";
+8895-  }
+8896-
+8897-  function aicmRenderR8ZNWorkerRuntimeStatusPanel() {
+8898-    return "";
+8899-  }
+8900-// AICM_R8Z_O_PRODUCTION_SUMMARY_UI_END
+8901-
+8902-
+8903-function handleRootChange(event) {
+8904-    var field = event.target;
+8905-    var fileKind = field.getAttribute("data-core-file") || "";
+8906-    if (fileKind === "task-ledger-csv") {
+8907-      aicmCsvReadSelectedFile(field);
+8908-      return;
+8909-    }
+8910-
+8911-    var fieldName = field.getAttribute("data-core-field") || "";
+8912-
+8913-    if (fieldName === "selectedCompanyId") {
+8914-      setSelectedCompany(field.value);
+8915-      render();
+8916-      return;
+8917-    }
+8918-
+8919-    if (fieldName === "selectedDepartmentId") {
+8920-      setSelectedDepartment(field.value);
+8921-      render();
+8922-    }
+8923-  }
+8924-
+
+---- confirm card insertion candidates ----
+4105-  }
+4106-
+4107-function aicmAxuR1BuildLeaderHandoffPayload(row) {
+4108-    row = row || {};
+4109-
+4110-    var majorId = aicmAxuR1MajorId(row);
+4111-    var leaderLabel = aicmAxuR1LeaderLabel(row);
+4112-
+4113-    if (!majorId) {
+4114-      throw new Error("Manager大項目IDを特定できません。");
+4115-    }
+4116-
+4117-    if (!leaderLabel) {
+4118-      throw new Error("課長/Leaderが未設定です。課変更でLeaderを設定するか、Manager大項目のLeader欄を設定してください。");
+4119-    }
+4120-
+4121-    return {
+4122-      kind: "manager-major-leader-handoff",
+4123:      title: "課長へ送る確認",
+4124-      endpoint: "/api/aicm/v2/manager-major/update",
+4125-      backScreen: "task-ledger",
+4126-      body: {
+4127-        owner_civilization_id: aicmAxuR1OwnerId(),
+4128-        aicm_manager_major_work_item_id: majorId,
+4129-        assigned_leader_label: leaderLabel,
+4130-        decomposition_status_code: "assigned_to_leader",
+4131-        handoff_status_code: "handed_off",
+4132-        note: aicmAxuR1Text(row.note)
+4133-      }
+4134-    };
+4135-  }
+4136-
+4137-function aicmAxuR1ShowLeaderHandoffConfirm(payload) {
+4138-    if (typeof aicmAvdShowDbConfirm === "function") {
+4139-      aicmAvdShowDbConfirm(payload);
+4140-      return;
+4141-    }
+--
+4610-      due: String(due),
+4611-      status: String(status),
+4612-      leader: String(leader),
+4613-      leaderRaw: leaderRaw
+4614-    };
+4615-  }
+4616-
+4617-  function aicmOpenMajorLeaderHandoffConfirmR8S(ev, btn) {
+4618-    try {
+4619-      var target = aicmLeaderHandoffActionTargetR8S(ev, btn);
+4620-      var majorId = aicmLeaderHandoffMajorIdFromTargetR8S(target);
+4621-      if (!majorId) throw new Error("Manager大項目IDを特定できません。");
+4622-
+4623-      var row = aicmFindMajorForLeaderHandoffR8S(majorId);
+4624-      if (!row) throw new Error("Manager大項目を特定できません。");
+4625-
+4626-      var summary = aicmLeaderHandoffSummaryR8S(row);
+4627-
+4628:      state.managerMajorLeaderHandoffConfirm = {
+4629-        majorId: majorId,
+4630-        title: summary.title,
+4631-        description: summary.description,
+4632-        leader: summary.leader,
+4633-        leaderRaw: summary.leaderRaw,
+4634-        due: summary.due,
+4635-        status: summary.status
+4636-      };
+4637-
+4638-      state.screen = "task-ledger";
+4639:      setMessage("ok", "課長へ送る確認を表示しました。内容を確認してから確定してください。");
+4640-      render();
+4641-
+4642-      setTimeout(function () {
+4643-        try {
+4644-          var card = document.getElementById("aicm-manager-major-leader-handoff-confirm");
+4645-          if (card && card.scrollIntoView) card.scrollIntoView({ behavior: "smooth", block: "start" });
+4646-        } catch (_) {}
+4647-      }, 50);
+4648-    } catch (error) {
+4649:      setMessage("error", error && error.message ? error.message : "課長へ送る確認を表示できません。");
+4650-      render();
+4651-    }
+4652-  }
+4653-
+4654:  function aicmRenderMajorLeaderHandoffConfirmCardR8S() {
+4655:    var payload = state.managerMajorLeaderHandoffConfirm || null;
+4656-    if (!payload) return "";
+4657-
+4658-    return [
+4659-      '<section id="aicm-manager-major-leader-handoff-confirm" class="aicm-core-card" style="border:2px solid #2563eb;">',
+4660:      '  <p class="aicm-eyebrow">課長へ送る確認</p>',
+4661-      '  <h2>このManager大項目を課長/Leaderへ送りますか？</h2>',
+4662-      '  <p class="aicm-selected-note">確定するとDBへ保存されます。ステータスを assigned_to_leader / handed_off に更新し、その後Leader中項目/成果物要件/Worker作業単位を自動作成します。</p>',
+4663-      '  <dl class="aicm-core-detail-list">',
+4664-      '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
+4665-      '    <dt>課長/Leader</dt><dd>' + escapeHtml(payload.leader || "未設定") + '</dd>',
+4666-      '    <dt>状態</dt><dd>' + escapeHtml(payload.status || "") + '</dd>',
+4667-      '    <dt>期限</dt><dd>' + escapeHtml(payload.due || "未設定") + '</dd>',
+4668-      '  </dl>',
+4669-      payload.description ? '<p class="aicm-selected-note">' + escapeHtml(payload.description) + '</p>' : '',
+4670-      '  <div class="aicm-dashboard-action-row">',
+4671-      '    <button type="button" data-core-action="pmlw-major-leader-handoff-execute">課長へ送るを確定</button>',
+4672-      '    <button type="button" data-core-action="pmlw-major-leader-handoff-cancel">キャンセル</button>',
+4673-      '  </div>',
+4674-      '</section>'
+4675-    ].join("");
+4676-  }
+4677-
+4678-  function aicmCancelMajorLeaderHandoffConfirmR8S() {
+4679:    state.managerMajorLeaderHandoffConfirm = null;
+4680-    state.screen = "task-ledger";
+4681-    setMessage("ok", "課長へ送るをキャンセルしました。");
+4682-    render();
+4683-  }
+4684-
+4685-  function aicmLeaderHandoffApiErrorTextR8S(response, json, rawText) {
+4686-    var parts = [];
+4687-    if (response && response.status) parts.push("HTTP " + response.status);
+4688-    if (json && json.result && json.result !== "ok") parts.push("result=" + String(json.result));
+4689-    if (json && json.error_message) parts.push(String(json.error_message));
+4690-    if (json && json.error) parts.push(String(json.error));
+4691-    if (json && json.message) parts.push(String(json.message));
+4692-    if (!parts.length && rawText) parts.push(String(rawText).slice(0, 500));
+4693-    if (!parts.length) parts.push("課長へ送るAPIでエラーが発生しました。");
+4694-    return parts.join(" / ");
+4695-  }
+4696-
+4697-  async function aicmExecuteMajorLeaderHandoffConfirmR8S() {
+4698:    var payload = state.managerMajorLeaderHandoffConfirm || null;
+4699-    if (!payload || !payload.majorId) {
+4700-      setMessage("error", "課長へ送る対象がありません。");
+4701-      render();
+4702-      return;
+4703-    }
+4704-
+4705-    var ownerCivilizationId = aicmLeaderHandoffOwnerIdR8S(payload);
+4706-    if (!ownerCivilizationId) {
+4707-      setMessage("error", "owner_civilization_idを特定できません。");
+4708-      render();
+4709-      return;
+4710-    }
+4711-
+4712-    try {
+4713-      var body = {
+4714-        owner_civilization_id: ownerCivilizationId,
+4715-        aicm_manager_major_work_item_id: payload.majorId,
+4716-        decomposition_status_code: "assigned_to_leader",
+--
+4726-        headers: {
+4727-          "content-type": "application/json"
+4728-        },
+4729-        body: JSON.stringify(body)
+4730-      });
+4731-
+4732-      var rawText = await response.text();
+4733-      var json = null;
+4734-      try {
+4735-        json = rawText ? JSON.parse(rawText) : null;
+4736-      } catch (_) {
+4737-        json = null;
+4738-      }
+4739-
+4740-      if (!response.ok || (json && json.result && json.result !== "ok")) {
+4741-        throw new Error(aicmLeaderHandoffApiErrorTextR8S(response, json, rawText));
+4742-      }
+4743-
+4744:      state.managerMajorLeaderHandoffConfirm = null;
+4745-      state.screen = "task-ledger";
+4746-      setMessage("ok", "課長へ送信しました。");
+4747-
+4748-      if (typeof aicmReloadTaskLedgerContext === "function") {
+4749-        
+4750-      // AICM_R8Z_B_LEADER_AUTO_DECOMPOSITION_CORE_CALL_START
+4751-      var aicmR8zBMajorIdForAuto = "";
+4752-      try {
+4753-        aicmR8zBMajorIdForAuto = aicmR8ZBText(
+4754-          (payload && (payload.majorId || payload.aicm_manager_major_work_item_id || payload.manager_major_work_item_id)) || ""
+4755-        );
+4756-      } catch (_) {
+4757-        aicmR8zBMajorIdForAuto = "";
+4758-      }
+4759-
+4760-      var aicmR8zBAutoResult = await aicmRunLeaderAutoDecompositionAfterHandoffR8ZB(aicmR8zBMajorIdForAuto);
+4761-      var aicmR8zIWorkerAutoResult = await aicmRunWorkerAutoExecutionAfterDecompositionR8ZI(aicmR8zBMajorIdForAuto);
+4762-      if (typeof aicmWorkerAutoExecutionMessageR8ZI === "function") {
+--
+4834-  function aicmMajorItemSummaryR8O(row) {
+4835-    var title = row && (row.major_item_name || row.deliverable_name || row.task_name) || "Manager大項目";
+4836-    var description = row && (row.major_item_description || row.task_description || row.note) || "";
+4837-    var leader = row && (row.assigned_leader_label || row.leader_label || row.responsible_robot_label) || "未設定";
+4838-    var due = row && row.due_date ? String(row.due_date) : "未設定";
+4839-    var priority = aicmMajorItemPriorityLabelR8O(row && row.priority_code);
+4840-    var status = aicmMajorItemStatusLabelR8O(row);
+4841-
+4842-    return {
+4843-      title: String(title),
+4844-      description: String(description),
+4845-      leader: String(leader),
+4846-      due: String(due),
+4847-      priority: String(priority),
+4848-      status: String(status)
+4849-    };
+4850-  }
+4851-
+4852:  function aicmRenderMajorItemDeleteConfirmCardR8P() {
+4853-    var payload = state.managerMajorDeleteConfirm || null;
+4854-    if (!payload) return "";
+4855-
+4856-    return [
+4857-      '<section class="aicm-core-card" style="border:2px solid #f97316;">',
+4858-      '  <p class="aicm-eyebrow">削除確認</p>',
+4859-      '  <h2>登録済み大項目を削除しますか？</h2>',
+4860-      '  <p class="aicm-selected-note">この操作は確認後にDBへ保存されます。物理DELETEではなく、既存APIで削除済み扱いにします。</p>',
+4861-      '  <dl class="aicm-core-detail-list">',
+4862-      '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
+4863-      '    <dt>課長/Leader</dt><dd>' + escapeHtml(payload.leader || "未設定") + '</dd>',
+4864-      '    <dt>状態</dt><dd>' + escapeHtml(payload.status || "") + '</dd>',
+4865-      '    <dt>期限</dt><dd>' + escapeHtml(payload.due || "未設定") + '</dd>',
+4866-      '  </dl>',
+4867-      payload.description ? '<p class="aicm-selected-note">' + escapeHtml(payload.description) + '</p>' : '',
+4868-      '  <div class="aicm-dashboard-action-row">',
+4869-      '    <button type="button" data-core-action="pmlw-major-delete-execute">削除を確定</button>',
+4870-      '    <button type="button" data-core-action="pmlw-major-delete-cancel">キャンセル</button>',
+--
+4948-      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+4949-      render();
+4950-    }
+4951-  }
+4952-// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+4953-
+4954-
+4955-  
+4956-function aicmRenderManagerMajorRows(rows) {
+4957-    var sourceRows = Array.isArray(rows) ? rows : [];
+4958-    var pendingRows = sourceRows.filter(function (row) {
+4959-      // AICM_R8Z_V9D1_IS_PENDING_MAJOR_SCOPE_CALLSITE_FIX: use existing visible canonical helper, not the scope-local isPendingMajor
+4960-      if (typeof aicmIsPendingManagerMajorRowR8V6 === "function") {
+4961-        return aicmIsPendingManagerMajorRowR8V6(row);
+4962-      }
+4963-      return !!row;
+4964-    });
+4965-
+4966:    var confirmCard = aicmRenderMajorItemDeleteConfirmCardR8P();
+4967-
+4968-    if (!pendingRows.length) {
+4969-      return [
+4970:        confirmCard,
+4971-        '<div class="aicm-core-empty">',
+4972-        '  <strong>登録済み大項目はまだありません</strong>',
+4973-        '  <p>CSV取り込み後、未実行/未引き継ぎのManager大項目だけが表示されます。</p>',
+4974-        '</div>'
+4975-      ].join("");
+4976-    }
+4977-
+4978-    var pageSize = aicmMajorItemPageSizeR8O();
+4979-    var totalRows = pendingRows.length;
+4980-    var totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+4981-    var page = aicmMajorItemCurrentPageR8O(totalRows);
+4982-    var start = (page - 1) * pageSize;
+4983-    var pageRows = pendingRows.slice(start, start + pageSize);
+4984-
+4985-    var pager = [
+4986-      '<div class="aicm-dashboard-action-row">',
+4987-      '  <button type="button" data-core-action="pmlw-major-page-prev"' + (page <= 1 ? ' disabled' : '') + '>前ページ</button>',
+4988-      '  <span class="aicm-selected-note">ページ ' + escapeHtml(String(page)) + ' / ' + escapeHtml(String(totalPages)) + '　表示 ' + escapeHtml(String(start + 1)) + '-' + escapeHtml(String(start + pageRows.length)) + ' / ' + escapeHtml(String(totalRows)) + '件</span>',
+--
+5000-        '  <p class="aicm-eyebrow">Manager大項目 #' + escapeHtml(String(displayNo)) + '</p>',
+5001-        '  <h3>' + escapeHtml(summary.title) + '</h3>',
+5002-        summary.description ? '  <p class="aicm-selected-note">' + escapeHtml(summary.description) + '</p>' : '',
+5003-        '  <dl class="aicm-core-detail-list">',
+5004-        '    <dt>課長/Leader</dt><dd>' + escapeHtml(summary.leader) + '</dd>',
+5005-        '    <dt>優先度</dt><dd>' + escapeHtml(summary.priority) + '</dd>',
+5006-        '    <dt>期限</dt><dd>' + escapeHtml(summary.due) + '</dd>',
+5007-        '    <dt>状態</dt><dd>' + escapeHtml(summary.status) + '</dd>',
+5008-        '  </dl>',
+5009-        '  <div class="aicm-dashboard-action-row">',
+5010-        '    <button type="button" data-core-action="pmlw-major-leader-handoff" data-major-id="' + escapeHtml(majorId) + '">課長へ送る</button>',
+5011-        '    <button type="button" data-core-action="pmlw-major-delete-open" data-major-id="' + escapeHtml(majorId) + '">削除</button>',
+5012-        '  </div>',
+5013-        '</article>'
+5014-      ].join("");
+5015-    }).join("");
+5016-
+5017-    return [
+5018:      confirmCard,
+5019-      pager,
+5020-      '<div class="aicm-manager-major-list">',
+5021-      cards,
+5022-      '</div>',
+5023-      pager
+5024-    ].join("");
+5025-  }
+5026-
+5027-    function aicmRenderTaskLedgerSafeR8V4(sourceLabel) {
+5028-    state.screen = "task-ledger";
+5029-
+5030-    try {
+5031-      if (!root) return;
+5032-
+5033-      var html = renderTaskLedgerPlaceholder();
+5034-      root.innerHTML = html;
+5035-
+5036-      return true;
+--
+5820-    var createdRequirement = Number(json.created_deliverable_requirement_count || 0);
+5821-    var createdWorker = Number(json.created_worker_work_unit_count || 0);
+5822-    var skipped = Number(json.skipped_count || 0);
+5823-
+5824-    if (createdMiddle || createdRequirement || createdWorker) {
+5825-      return "課長へ送信し、Leader中項目/成果物要件/Worker作業単位を自動作成しました。";
+5826-    }
+5827-
+5828-    if (skipped) {
+5829-      return "課長へ送信しました。Leader自動分解は既存データがあるためスキップしました。";
+5830-    }
+5831-
+5832-    return "課長へ送信しました。Leader自動分解の対象はありませんでした。";
+5833-  }
+5834-
+5835-  async function aicmRunLeaderAutoDecompositionAfterHandoffR8ZB(majorId) {
+5836-    var safeMajorId = aicmR8ZBText(majorId);
+5837-
+5838:    if (!safeMajorId && state && state.managerMajorLeaderHandoffConfirm) {
+5839-      safeMajorId = aicmR8ZBText(
+5840:        state.managerMajorLeaderHandoffConfirm.majorId ||
+5841:        state.managerMajorLeaderHandoffConfirm.aicm_manager_major_work_item_id ||
+5842:        state.managerMajorLeaderHandoffConfirm.manager_major_work_item_id
+5843-      );
+5844-    }
+5845-
+5846-    var companyId = aicmR8ZBCompanyId();
+5847-    var ownerId = aicmR8ZBOwnerId();
+5848-
+5849-    if (!safeMajorId) {
+5850-      return {
+5851-        ok: false,
+5852-        message: "Leader自動分解対象のManager大項目IDを特定できません。"
+5853-      };
+5854-    }
+5855-
+5856-    if (!companyId) {
+5857-      return {
+5858-        ok: false,
+5859-        message: "Leader自動分解対象のAI企業IDを特定できません。"
+5860-      };

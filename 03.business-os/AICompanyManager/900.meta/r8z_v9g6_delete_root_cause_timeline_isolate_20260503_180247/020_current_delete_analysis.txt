@@ -1,0 +1,176 @@
+CURRENT_DELETE_ANALYSIS
+HAS_CONFIRM_STATE=true
+HAS_CONFIRM_CARD_FUNCTION=true
+HAS_OLD_EXECUTE_1_aicmExecuteMajorItemDeleteConfirmR8P=true
+HAS_OLD_EXECUTE_2_aicmExecuteManagerMajorDeleteConfirmR8P=false
+HAS_V9G5_EXECUTE=true
+HAS_V9G5_BRIDGE=true
+HAS_MANAGER_MAJOR_UPDATE_ENDPOINT=true
+HAS_MANAGER_MAJOR_ARCHIVE_ENDPOINT=true
+DELETE_FUNCTION_NAMES=aicmRenderMajorItemDeleteConfirmCardR8P,aicmOpenMajorItemDeleteConfirmR8P,aicmCancelMajorItemDeleteConfirmR8P,aicmExecuteMajorItemDeleteConfirmR8P,aicmR8zV9g5DeleteConfirmState,aicmR8zV9g5ExecuteDeleteConfirm,aicmR8zV9g5CancelDeleteConfirm,aicmInstallR8zV9g5DeleteConfirmExecuteBridge,aicmR8zV9g5DeleteConfirmClickBridge,aicmScrollMajorDeleteConfirmIntoViewR8V7D2,aicmResolveMajorDeleteActionTargetR8V7C2,aicmOpenMajorDeleteConfirmFromActionR8V7C2,aicmCancelMajorDeleteConfirmFromActionR8V7C2,aicmExecuteMajorDeleteConfirmFromActionR8V7C2
+
+DELETE_ACTION_TABLE
+action	buttonCount	handledCount
+pmlw-major-leader-handoff	5	2
+pmlw-major-leader-handoff-execute	1	1
+pmlw-major-leader-handoff-cancel	1	1
+pmlw-major-delete-execute	1	3
+pmlw-major-delete-cancel	1	3
+pmlw-major-page-prev	1	2
+pmlw-major-page-next	1	2
+pmlw-major-delete-open	1	2
+manager-major-summary-filter-clear	2	1
+manager-major-summary-filter	2	1
+
+UNHANDLED_DELETE_ACTIONS=
+STATIC_JUDGEMENT=STATIC_PATH_PRESENT_NEXT_COMPARE_WITH_WORKING_BACKUP_OR_RUNTIME_EVENT
+
+CARD_BLOCK_HEAD
+function aicmRenderMajorItemDeleteConfirmCardR8P() {
+    var payload = state.managerMajorDeleteConfirm || null;
+    if (!payload) return "";
+
+    return [
+      '<section class="aicm-core-card" style="border:2px solid #f97316;">',
+      '  <p class="aicm-eyebrow">削除確認</p>',
+      '  <h2>登録済み大項目を削除しますか？</h2>',
+      '  <p class="aicm-selected-note">この操作は確認後にDBへ保存されます。物理DELETEではなく、既存APIで削除済み扱いにします。</p>',
+      '  <dl class="aicm-core-detail-list">',
+      '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
+      '    <dt>課長/Leader</dt><dd>' + escapeHtml(payload.leader || "未設定") + '</dd>',
+      '    <dt>状態</dt><dd>' + escapeHtml(payload.status || "") + '</dd>',
+      '    <dt>期限</dt><dd>' + escapeHtml(payload.due || "未設定") + '</dd>',
+      '  </dl>',
+      payload.description ? '<p class="aicm-selected-note">' + escapeHtml(payload.description) + '</p>' : '',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="pmlw-major-delete-execute">削除を確定</button>',
+      '    <button type="button" data-core-action="pmlw-major-delete-cancel">キャンセル</button>',
+      '  </div>',
+      '</section>'
+    ].join("");
+  }
+
+OLD_EXECUTE_1_HEAD
+function aicmExecuteMajorItemDeleteConfirmR8P() {
+    var payload = state.managerMajorDeleteConfirm || null;
+    if (!payload || !payload.majorId) {
+      setMessage("error", "削除確認対象がありません。");
+      render();
+      return;
+    }
+
+    try {
+      var response = await fetch("/api/aicm/v2/manager-major/archive", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          aicm_manager_major_work_item_id: payload.majorId
+        })
+      });
+
+      var json = null;
+      try {
+        json = await response.json();
+      } catch (_) {
+        json = null;
+      }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+      }
+
+      state.managerMajorDeleteConfirm = null;
+      setMessage("ok", "大項目を削除済みにしました。");
+      await aicmReloadTaskLedgerContext();
+      state.screen = "task-ledger";
+      render();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+      render();
+    }
+  }
+
+OLD_EXECUTE_2_HEAD
+NOT_FOUND
+
+V9G5_EXECUTE_HEAD
+function aicmR8zV9g5ExecuteDeleteConfirm(btn) {
+  var payload = aicmR8zV9g5DeleteConfirmState();
+
+  if (!payload) {
+    if (typeof setMessage === "function") setMessage("error", "削除確認情報が見つかりません。もう一度削除を押してください。");
+    if (typeof render === "function") render();
+    return;
+  }
+
+  var majorId = aicmR8zV9g5MajorId(payload, btn);
+  var owner = aicmR8zV9g5OwnerId(payload);
+
+  if (!majorId) {
+    if (typeof setMessage === "function") setMessage("error", "削除対象のManager大項目IDを特定できません。");
+    if (typeof render === "function") render();
+    return;
+  }
+
+  try {
+    if (typeof setMessage === "function") setMessage("info", "削除を実行しています。");
+
+    if (typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") {
+      try {
+        await aicmExecuteMajorItemDeleteConfirmR8P();
+        return;
+      } catch (existingError1) {
+        if (typeof console !== "undefined" && console.warn) console.warn("existing delete execute R8P failed; fallback follows", existingError1);
+      }
+    }
+
+    if (typeof aicmExecuteManagerMajorDeleteConfirmR8P === "function") {
+      try {
+        await aicmExecuteManagerMajorDeleteConfirmR8P();
+        return;
+      } catch (existingError2) {
+        if (typeof console !== "undefined" && console.warn) console.warn("existing manager delete execute R8P failed; fallback follows", existingError2);
+      }
+    }
+
+    var postBody = {
+      owner_civilization_id: owner,
+      aicm_manager_major_work_item_id: majorId,
+      decomposition_status_code: "archived",
+      handoff_status_code: "archived",
+      note: aicmR8zV9g5Text(
+        (payload.body && payload.body.note) ||
+        (payload.row && payload.row.note) ||
+        ""
+      )
+    };
+
+    var result = null;
+
+    if (typeof requestJson === "function") {
+      result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+    } else {
+      var response = await fetch("/api/aicm/v2/manager-major/update", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(postBody)
+      });
+
+      var json = null;
+      try { json = await response.json(); } catch (_) { json = null; }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(
+          json && (json.error_message || json.message || json.error)
+            ? (json.error_message || json.message || json.error)
+            : "削除更新に失敗しました。"
+        );
+      }
+
+      result = json || {};
+    }
+
+    state.managerMajorDeleteConfirm = null;
+ 

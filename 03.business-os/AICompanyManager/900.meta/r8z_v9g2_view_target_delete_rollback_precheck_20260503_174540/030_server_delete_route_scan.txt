@@ -1,0 +1,140 @@
+---- server delete/archive/update snippets ----
+309-    "    " + aicmPmlwOptionalDateSql(body.due_date) + ",",
+310-    "    " + aicmPmlwTextSql(body.reference_files_text) + ",",
+311-    "    " + aicmPmlwTextSql(body.supplemental_materials_text) + ",",
+312-    "    " + aicmPmlwTextSql(body.applicable_rules_text) + ",",
+313-    "    " + aicmPmlwTextSql(body.note) + ",",
+314-    "    " + aicmPmlwTextSql(body.handoff_link),
+315-    "  )",
+316-    "  RETURNING *",
+317-    ")",
+318-    "SELECT jsonb_build_object(",
+319-    "  'result', 'ok',",
+320-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+321-    "  'manager_major_item', to_jsonb(inserted)",
+322-    ")::text",
+323-    "FROM inserted;"
+324-  ].join("\n");
+325-
+326-  return runPsqlJson(sql);
+327-}
+328-
+329:function updateManagerMajorItem(body) {
+330-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+331-  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+332-  const updates = [];
+333-
+334-  if (body.major_item_name !== undefined) updates.push("major_item_name = " + sqlLiteral(String(body.major_item_name || "").trim()));
+335-  if (body.major_item_description !== undefined) updates.push("major_item_description = " + aicmPmlwTextSql(body.major_item_description));
+336-  if (body.aicm_president_policy_id !== undefined) updates.push("aicm_president_policy_id = " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id));
+337-  if (body.aicm_user_company_department_id !== undefined) updates.push("aicm_user_company_department_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id));
+338-  if (body.aicm_user_company_section_id !== undefined) updates.push("aicm_user_company_section_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id));
+339-  if (body.manager_robot_label !== undefined) updates.push("manager_robot_label = " + aicmPmlwTextSql(body.manager_robot_label));
+340-  if (body.assigned_leader_label !== undefined) updates.push("assigned_leader_label = " + aicmPmlwTextSql(body.assigned_leader_label));
+341-  if (body.decomposition_status_code !== undefined) updates.push("decomposition_status_code = " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)));
+342-  if (body.handoff_status_code !== undefined) updates.push("handoff_status_code = " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)));
+343-  if (body.priority_code !== undefined) updates.push("priority_code = " + sqlLiteral(aicmPmlwPriority(body.priority_code)));
+344-  if (body.due_date !== undefined) updates.push("due_date = " + aicmPmlwOptionalDateSql(body.due_date));
+345-  if (body.reference_files_text !== undefined) updates.push("reference_files_text = " + aicmPmlwTextSql(body.reference_files_text));
+346-  if (body.supplemental_materials_text !== undefined) updates.push("supplemental_materials_text = " + aicmPmlwTextSql(body.supplemental_materials_text));
+347-  if (body.applicable_rules_text !== undefined) updates.push("applicable_rules_text = " + aicmPmlwTextSql(body.applicable_rules_text));
+348-  if (body.note !== undefined) updates.push("note = " + aicmPmlwTextSql(body.note));
+349-  if (body.handoff_link !== undefined) updates.push("handoff_link = " + aicmPmlwTextSql(body.handoff_link));
+--
+351-  updates.push("updated_at = now()");
+352-
+353-  const sql = [
+354-    "WITH updated AS (",
+355-    "  UPDATE business.aicm_manager_major_work_item",
+356-    "  SET " + updates.join(", "),
+357-    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+358-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+359-    "  RETURNING *",
+360-    ")",
+361-    "SELECT jsonb_build_object(",
+362-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+363-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+364-    "  'manager_major_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+365-    ")::text;"
+366-  ].join("\n");
+367-
+368-  return runPsqlJson(sql);
+369-}
+370-
+371:function archiveManagerMajorItem(body) {
+372-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+373-  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+374-
+375-  const sql = [
+376-    "WITH archived AS (",
+377-    "  UPDATE business.aicm_manager_major_work_item",
+378-    "  SET decomposition_status_code = 'archived',",
+379-    "      handoff_status_code = 'archived',",
+380-    "      updated_at = now()",
+381-    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+382-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+383-    "  RETURNING *",
+384-    ")",
+385-    "SELECT jsonb_build_object(",
+386-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM archived) THEN 'ok' ELSE 'not_found' END,",
+387-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+388-    "  'manager_major_item', COALESCE((SELECT to_jsonb(archived) FROM archived), '{}'::jsonb)",
+389-    ")::text;"
+390-  ].join("\n");
+391-
+--
+2073-
+2074-  try {
+2075-    if (req.method === "OPTIONS") {
+2076-      sendJson(res, 200, { result: "ok", api_identifier: SERVER_MARK });
+2077-      return true;
+2078-    }
+2079-
+2080-    
+2081-    if (route === "/api/aicm/v2/president-policy/create" && req.method === "POST") {
+2082-      const body = await readBody(req);
+2083-      sendJson(res, 200, createPresidentPolicy(body));
+2084-      return true;
+2085-    }
+2086-
+2087-    if (route === "/api/aicm/v2/manager-major/create" && req.method === "POST") {
+2088-      const body = await readBody(req);
+2089-      sendJson(res, 200, createManagerMajorItem(body));
+2090-      return true;
+2091-    }
+2092-
+2093:    if (route === "/api/aicm/v2/manager-major/update" && req.method === "POST") {
+2094-      const body = await readBody(req);
+2095:      sendJson(res, 200, updateManagerMajorItem(body));
+2096-      return true;
+2097-    }
+2098-
+2099-    
+2100-    if (route === "/api/aicm/v2/leader-auto-decomposition/run" && req.method === "POST") {
+2101-      const body = await readBody(req);
+2102-      sendJson(res, 200, runLeaderAutoDecomposition(body));
+2103-      return true;
+2104-    }
+2105:if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+2106-      const body = await readBody(req);
+2107:      sendJson(res, 200, archiveManagerMajorItem(body));
+2108-      return true;
+2109-    }
+2110-
+2111-// AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+2112-    if (route === "/api/aicm/v2/manager-major/import-csv" && req.method === "POST") {
+2113-      const body = await readBody(req);
+2114-      sendJson(res, 200, importManagerMajorItemsCsv(body));
+2115-      return true;
+2116-    }
+2117-
+2118-
+2119-    if (route === "/api/aicm/v2/human-review/create" && req.method === "POST") {
+2120-      const body = await readBody(req);
+2121-      sendJson(res, 200, createHumanReviewItem(body));
+2122-      return true;
+2123-    }
+2124-
+2125-    if (route === "/api/aicm/v2/human-review/approve" && req.method === "POST") {
+2126-      const body = await readBody(req);
+2127-      sendJson(res, 200, approveHumanReviewItem(body));

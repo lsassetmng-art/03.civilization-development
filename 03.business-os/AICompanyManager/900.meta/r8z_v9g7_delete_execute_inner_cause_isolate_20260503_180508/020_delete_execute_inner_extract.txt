@@ -1,0 +1,200 @@
+CURRENT_DELETE_EXECUTE_INNER_ANALYSIS
+
+FUNCTION=aicmExecuteMajorItemDeleteConfirmR8P
+EXISTS=true
+LENGTH=1160
+USES_API_CALL=true
+USES_AWAIT_OR_THEN=true
+USES_DELETE_STATE=true
+CLEARS_DELETE_STATE=true
+USES_MANAGER_UPDATE_ENDPOINT=false
+USES_MANAGER_ARCHIVE_ENDPOINT=true
+HAS_EARLY_RETURN=true
+HEAD=
+function aicmExecuteMajorItemDeleteConfirmR8P() {
+    var payload = state.managerMajorDeleteConfirm || null;
+    if (!payload || !payload.majorId) {
+      setMessage("error", "削除確認対象がありません。");
+      render();
+      return;
+    }
+
+    try {
+      var response = await fetch("/api/aicm/v2/manager-major/archive", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          aicm_manager_major_work_item_id: payload.majorId
+        })
+      });
+
+      var json = null;
+      try {
+        json = await response.json();
+      } catch (_) {
+        json = null;
+      }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+      }
+
+      state.managerMajorDeleteConfirm = null;
+      setMessage("ok", "大項目を削除済みにしました。");
+      await aicmReloadTaskLedgerContext();
+      state.screen = "task-ledger";
+      render();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+      render();
+    }
+  }
+
+FUNCTION=aicmExecuteManagerMajorDeleteConfirmR8P
+EXISTS=false
+LENGTH=0
+USES_API_CALL=false
+USES_AWAIT_OR_THEN=false
+USES_DELETE_STATE=false
+CLEARS_DELETE_STATE=false
+USES_MANAGER_UPDATE_ENDPOINT=false
+USES_MANAGER_ARCHIVE_ENDPOINT=false
+HAS_EARLY_RETURN=false
+HEAD=
+NOT_FOUND
+
+FUNCTION=aicmR8zV9g5ExecuteDeleteConfirm
+EXISTS=true
+LENGTH=3969
+USES_API_CALL=true
+USES_AWAIT_OR_THEN=true
+USES_DELETE_STATE=true
+CLEARS_DELETE_STATE=true
+USES_MANAGER_UPDATE_ENDPOINT=true
+USES_MANAGER_ARCHIVE_ENDPOINT=false
+HAS_EARLY_RETURN=true
+HEAD=
+function aicmR8zV9g5ExecuteDeleteConfirm(btn) {
+  var payload = aicmR8zV9g5DeleteConfirmState();
+
+  if (!payload) {
+    if (typeof setMessage === "function") setMessage("error", "削除確認情報が見つかりません。もう一度削除を押してください。");
+    if (typeof render === "function") render();
+    return;
+  }
+
+  var majorId = aicmR8zV9g5MajorId(payload, btn);
+  var owner = aicmR8zV9g5OwnerId(payload);
+
+  if (!majorId) {
+    if (typeof setMessage === "function") setMessage("error", "削除対象のManager大項目IDを特定できません。");
+    if (typeof render === "function") render();
+    return;
+  }
+
+  try {
+    if (typeof setMessage === "function") setMessage("info", "削除を実行しています。");
+
+    if (typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") {
+      try {
+        await aicmExecuteMajorItemDeleteConfirmR8P();
+        return;
+      } catch (existingError1) {
+        if (typeof console !== "undefined" && console.warn) console.warn("existing delete execute R8P failed; fallback follows", existingError1);
+      }
+    }
+
+    if (typeof aicmExecuteManagerMajorDeleteConfirmR8P === "function") {
+      try {
+        await aicmExecuteManagerMajorDeleteConfirmR8P();
+        return;
+      } catch (existingError2) {
+        if (typeof console !== "undefined" && console.warn) console.warn("existing manager delete execute R8P failed; fallback follows", existingError2);
+      }
+    }
+
+    var postBody = {
+      owner_civilization_id: owner,
+      aicm_manager_major_work_item_id: majorId,
+      decomposition_status_code: "archived",
+      handoff_status_code: "archived",
+      note: aicmR8zV9g5Text(
+        (payload.body && payload.body.note) ||
+        (payload.row && payload.row.note) ||
+        ""
+      )
+    };
+
+    var result = null;
+
+    if (typeof requestJson === "function") {
+      result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+    } else {
+      var response = await fetch("/api/aicm/v2/manager-major/update", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(postBody)
+      });
+
+      var json = null;
+      try { json = await response.json(); } catch (_) { json = null; }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(
+          json && (json.error_message || json.message || json.error)
+            ? (json.error_message || json.message || json.error)
+            : "削除更新に失敗しました。"
+        );
+      }
+
+      result = json || {};
+    }
+
+    state.managerMajorDeleteConfirm = null;
+    state.screen = "task-ledger";
+
+    try {
+      if (typeof aicmReloadTaskLedgerContext === "function") {
+        await aicmReloadTaskLedgerContext();
+      } else if (typeof refreshContext === "function") {
+        await refreshContext();
+      } else if (typeof loadContext === "function") {
+        await loadContext();
+      } else {
+        var responseReload = await fetch("/api/aicm/v2/context?owner_civilization_id=" + encodeURIComponent(owner) + "&v=r8z_v9g5_" + Date.now());
+        var contextJson = await responseReload.json();
+        if (contextJson && contextJson.result === "ok") state.context = contextJson;
+      }
+    } catch (reloadError) {
+      if (typeof console !== "undefined" && console.warn) console.warn("delete context reload skipped", reloadError);
+    }
+
+    if (typeof setMessage === "function") setMessage("ok", "Manager大項目を削除しました。");
+
+    if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+      aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_done");
+    } else if (typeof render === "function") {
+      render();
+    }
+
+    return result || {};
+  } catch (error) {
+    if (typeof setMessage === "function") {
+      setMessage("error", error && error.message ? error.message : "削除に失敗しました。");
+    }
+    if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+      aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_error");
+    } else if (typeof render === "function") {
+      render();
+    }
+    throw error;
+  }
+}
+
+V9G5_CALLS_OLD1=true
+V9G5_RETURNS_AFTER_OLD1=true
+V9G5_HAS_FALLBACK_UPDATE=true
+OLD1_API_EMPTY_BUT_EXISTS=false
+LIKELY_CAUSE=OLD_EXECUTE_HAS_API_CHECK_RUNTIME_ERROR_OR_PAYLOAD

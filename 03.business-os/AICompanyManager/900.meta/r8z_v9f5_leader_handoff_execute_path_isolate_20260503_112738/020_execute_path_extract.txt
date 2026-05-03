@@ -1,0 +1,668 @@
+COUNTS
+HAS_EXECUTE_FUNCTION=false
+EXECUTE_USES_MANAGER_CONFIRM_STATE=false
+EXECUTE_USES_PAYLOAD_MAJORID=false
+EXECUTE_USES_REQUEST_JSON=false
+EXECUTE_USES_FETCH=false
+EXECUTE_USES_ENDPOINT_UPDATE=false
+EXECUTE_CALLS_RELOAD=false
+EXECUTE_CALLS_RENDER=false
+HAS_V9F4B_EXECUTE_BUTTON=true
+BRIDGE_HANDLES_V9F4B_EXECUTE=true
+BRIDGE_CALLS_EXECUTE_FUNCTION=true
+HAS_OPEN_CONFIRM_FUNCTION=true
+OPEN_CONFIRM_ASSIGNS_STATE=true
+OPEN_CONFIRM_BODY_HAS_OWNER=true
+OPEN_CONFIRM_BODY_HAS_MAJOR_ID=true
+
+EXECUTE_FUNCTION_BLOCK
+NOT_FOUND
+
+OPEN_CONFIRM_FUNCTION_BLOCK
+function aicmOpenLeaderHandoffConfirmR8S(ev, btn) {
+    try {
+      btn = btn || (typeof aicmActionTargetSafe === "function" ? aicmActionTargetSafe(ev, null) : null);
+      if (!btn && ev && ev.target && typeof ev.target.closest === "function") {
+        btn = ev.target.closest("[data-core-action]");
+      }
+
+      var majorId = "";
+      if (btn && btn.getAttribute) {
+        majorId = String(btn.getAttribute("data-major-id") || btn.getAttribute("data-manager-major-id") || "").trim();
+      }
+
+      if (!majorId && btn && btn.dataset) {
+        majorId = String(btn.dataset.majorId || btn.dataset.managerMajorId || "").trim();
+      }
+
+      if (!majorId) {
+        if (typeof setMessage === "function") setMessage("error", "課長へ送る対象のManager大項目IDを特定できません。");
+        if (typeof render === "function") render();
+        return;
+      }
+
+      var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+      var rows = [];
+      function addRows(value) {
+        if (Array.isArray(value)) rows = rows.concat(value);
+      }
+
+      addRows(ctx.pmlw_major_items);
+      addRows(ctx.manager_major_items);
+      addRows(ctx.major_items);
+      addRows(state && state.pmlw_major_items);
+      addRows(state && state.manager_major_items);
+      addRows(state && state.major_items);
+
+      var row = null;
+      for (var i = 0; i < rows.length; i += 1) {
+        var candidate = rows[i] || {};
+        var candidateId = String(
+          candidate.aicm_manager_major_work_item_id ||
+          candidate.manager_major_work_item_id ||
+          candidate.major_work_item_id ||
+          candidate.major_id ||
+          candidate.id ||
+          ""
+        ).trim();
+
+        if (candidateId === majorId) {
+          row = candidate;
+          break;
+        }
+      }
+
+      row = row || {};
+
+      var title = String(
+        row.major_item_name ||
+        row.task_name ||
+        row.deliverable_name ||
+        row.title ||
+        "Manager大項目"
+      ).trim();
+
+      var leader = String(
+        row.assigned_leader_label ||
+        row.leader_robot_label ||
+        row.responsible_robot_label ||
+        row.responsible_role_code ||
+        "課長/Leader"
+      ).trim();
+
+      state.managerMajorLeaderHandoffConfirm = {
+        kind: "manager-major-leader-handoff",
+        title: "課長へ送る確認",
+        majorId: majorId,
+        aicm_manager_major_work_item_id: majorId,
+        major_item_name: title,
+        targetTitle: title,
+        leaderLabel: leader,
+        leaderRaw: leader,
+        row: row,
+        endpoint: "/api/aicm/v2/manager-major/update",
+        backScreen: "task-ledger",
+        body: {
+          owner_civilization_id: typeof aicmLeaderHandoffOwnerIdR8S === "function"
+            ? aicmLeaderHandoffOwnerIdR8S(row)
+            : ((state && state.ownerCivilizationId) || (state && state.owner_civilization_id) || (ctx && ctx.owner_civilization_id) || "00000000-0000-4000-8000-000000000001"),
+          aicm_manager_major_work_item_id: majorId,
+          assigned_leader_label: leader,
+          decomposition_status_code: "assigned_to_leader",
+          handoff_status_code: "handed_off",
+          note: String(row.note || "").trim()
+        }
+      };
+
+      state.screen = "task-ledger";
+
+      if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+        aicmRenderTaskLedgerSafeR8V4("r8z_v9f3_open_confirm");
+        return;
+      }
+
+      if (typeof render === "function") {
+        render();
+      }
+    } catch (error) {
+      try {
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "課長へ送る確認の表示に失敗しました。");
+        }
+        if (typeof render === "function") render();
+      } catch (_) {}
+    }
+  }
+
+V9F4B_ACTION_SNIPS
+---- line 4200 ----
+  4184:       '  <p class="aicm-eyebrow">Manager大項目</p>',
+  4185:       '  <h2>課長への引渡し</h2>',
+  4186:       '  <p class="aicm-selected-note">Manager大項目を課長/Leaderへ送ります。Worker Runtime request はまだ作成しません。</p>',
+  4187:       rows.map(function (row) {
+  4188:         var majorId = typeof aicmAxuR1MajorId === "function" ? aicmAxuR1MajorId(row) : "";
+  4189:         var title = row.major_item_name || row.deliverable_name || row.task_name || "Manager大項目";
+  4190:         var leader = row.assigned_leader_label || row.leader_label || "Leader未設定";
+  4191:         var status = row.decomposition_status_code || "-";
+  4192:         var handoff = row.handoff_status_code || "-";
+  4193: 
+  4194:         return [
+  4195:           '<article class="aicm-org-update-row">',
+  4196:           '  <div>',
+  4197:           '    <strong>' + escapeHtml(title) + '</strong>',
+  4198:           '    <p>Leader: ' + escapeHtml(leader) + ' / 状態: ' + escapeHtml(status) + ' / 引渡し: ' + escapeHtml(handoff) + '</p>',
+  4199:           '  </div>',
+  4200:           '  <button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + escapeHtml(majorId) + '">課長へ送る</button>',
+  4201:           '</article>'
+  4202:         ].join("");
+  4203:       }).join(""),
+  4204:       '</section>'
+  4205:     ].join("");
+  4206:   }
+  4207: 
+  4208: 
+  4209: function renderPmlwMajorRowsBaseAxuR1B(rows) {
+  4210:     if (!rows.length) {
+  4211:       return [
+  4212:         '<div class="aicm-empty-state">',
+  4213:         '  <strong>登録済み大項目はまだありません</strong>',
+  4214:         '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+  4215:         '</div>'
+  4216:       ].join("");
+---- line 4249 ----
+  4233:       '        <th>操作</th>',
+  4234:       '      </tr>',
+  4235:       '    </thead>',
+  4236:       '    <tbody>',
+  4237:       rows.map(function (row) {
+  4238:         return [
+  4239:           '      <tr>',
+  4240:           '        <td>' + escapeHtml(pmlwValue(row.policy_title, row.source_route_code || "-")) + '</td>',
+  4241:           '        <td><strong>' + escapeHtml(pmlwValue(row.major_item_name, "-")) + '</strong><small>' + escapeHtml(pmlwValue(row.major_item_description, "")) + '</small></td>',
+  4242:           '        <td>' + escapeHtml(pmlwValue(row.department_name, "未割当")) + '</td>',
+  4243:           '        <td>' + escapeHtml(pmlwValue(row.section_name, "未割当")) + '</td>',
+  4244:           '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+  4245:           '        <td>' + escapeHtml(pmlwStatusLabel(row.decomposition_status_code)) + '</td>',
+  4246:           '        <td>' + escapeHtml(pmlwStatusLabel(row.handoff_status_code)) + '</td>',
+  4247:           '        <td>' + escapeHtml(pmlwStatusLabel(row.priority_code)) + '</td>',
+  4248:           '        <td>' + escapeHtml(pmlwValue(row.due_date, "-")) + '</td>',
+  4249:           '        <td><button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + escapeHtml(aicmAxuR1MajorId(row)) + '">課長へ送る</button></td>',
+  4250:           '      </tr>'
+  4251:         ].join("");
+  4252:       }).join(""),
+  4253:       '    </tbody>',
+  4254:       '  </table>',
+  4255:       '</div>'
+  4256:     ].join("");
+  4257:   }
+  4258: 
+  4259: function renderPmlwMajorRows(rows) {
+  4260:     // AICM_AXU_CSV_R8_RENDER_PMLW_MAJOR_ROWS_REPAIR_V1
+  4261:     function h(value) {
+  4262:       if (typeof escapeHtml === "function") return escapeHtml(value);
+  4263:       return String(value == null ? "" : value)
+  4264:         .replace(/&/g, "&amp;")
+  4265:         .replace(/</g, "&lt;")
+---- line 4345 ----
+  4329:         var title = value(row, ["major_item_name", "title", "task_name", "deliverable_name"], "-");
+  4330:         var description = value(row, ["major_item_description", "description", "note"], "");
+  4331:         var department = value(row, ["department_name", "department_label"], "-");
+  4332:         var section = value(row, ["section_name", "section_label"], "-");
+  4333:         var priority = value(row, ["priority_code"], "normal");
+  4334:         var dueDate = value(row, ["due_date"], "-");
+  4335:         var status = value(row, ["handoff_status_code", "decomposition_status_code", "status_code"], "-");
+  4336: 
+  4337:         return [
+  4338:           '      <tr>',
+  4339:           '        <td><strong>' + h(title) + '</strong>' + (description ? '<p class="aicm-selected-note">' + h(description) + '</p>' : '') + '</td>',
+  4340:           '        <td>' + h(department) + '</td>',
+  4341:           '        <td>' + h(section) + '</td>',
+  4342:           '        <td>' + h(priority) + '</td>',
+  4343:           '        <td>' + h(dueDate || "-") + '</td>',
+  4344:           '        <td>' + h(status || "-") + '</td>',
+  4345:           '        <td><button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + h(id) + '">課長へ送る</button></td>',
+  4346:           '      </tr>'
+  4347:         ].join("");
+  4348:       }).join(""),
+  4349:       '    </tbody>',
+  4350:       '  </table>',
+  4351:       '</div>'
+  4352:     ].join("");
+  4353:   }
+  4354: 
+  4355: 
+  4356:   
+  4357: 
+  4358: 
+  4359: 
+  4360: 
+  4361: 
+---- line 4512 ----
+  4496:     if (
+  4497:       decomposition === "completed" ||
+  4498:       decomposition === "complete" ||
+  4499:       decomposition === "done"
+  4500:     ) {
+  4501:       return false;
+  4502:     }
+  4503: 
+  4504:     return true;
+  4505:   }
+  4506: // AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_END
+  4507: 
+  4508: 
+  4509:   
+  4510: 
+  4511:   // AICM_R8Z_V9F3_RESTORE_LEADER_HANDOFF_OPEN_CONFIRM_ONLY
+  4512:   // Restore only the missing open-confirm entrypoint for data-core-action="pmlw-major-leader-handoff".
+  4513:   // This function does not write DB and does not call any API.
+  4514:   function aicmOpenLeaderHandoffConfirmR8S(ev, btn) {
+  4515:     try {
+  4516:       btn = btn || (typeof aicmActionTargetSafe === "function" ? aicmActionTargetSafe(ev, null) : null);
+  4517:       if (!btn && ev && ev.target && typeof ev.target.closest === "function") {
+  4518:         btn = ev.target.closest("[data-core-action]");
+  4519:       }
+  4520: 
+  4521:       var majorId = "";
+  4522:       if (btn && btn.getAttribute) {
+  4523:         majorId = String(btn.getAttribute("data-major-id") || btn.getAttribute("data-manager-major-id") || "").trim();
+  4524:       }
+  4525: 
+  4526:       if (!majorId && btn && btn.dataset) {
+  4527:         majorId = String(btn.dataset.majorId || btn.dataset.managerMajorId || "").trim();
+  4528:       }
+---- line 4791 ----
+  4775:     var payload = state.managerMajorLeaderHandoffConfirm || null;
+  4776:     if (!payload) return "";
+  4777: 
+  4778:     return [
+  4779:       '<section id="aicm-manager-major-leader-handoff-confirm" class="aicm-core-card" style="border:2px solid #2563eb;">',
+  4780:       '  <p class="aicm-eyebrow">課長へ送る確認</p>',
+  4781:       '  <h2>このManager大項目を課長/Leaderへ送りますか？</h2>',
+  4782:       '  <p class="aicm-selected-note">確定するとDBへ保存されます。ステータスを assigned_to_leader / handed_off に更新し、その後Leader中項目/成果物要件/Worker作業単位を自動作成します。</p>',
+  4783:       '  <dl class="aicm-core-detail-list">',
+  4784:       '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
+  4785:       '    <dt>課長/Leader</dt><dd>' + escapeHtml(payload.leader || "未設定") + '</dd>',
+  4786:       '    <dt>状態</dt><dd>' + escapeHtml(payload.status || "") + '</dd>',
+  4787:       '    <dt>期限</dt><dd>' + escapeHtml(payload.due || "未設定") + '</dd>',
+  4788:       '  </dl>',
+  4789:       payload.description ? '<p class="aicm-selected-note">' + escapeHtml(payload.description) + '</p>' : '',
+  4790:       '  <div class="aicm-dashboard-action-row">',
+  4791:       '    <button type="button" data-core-action="pmlw-major-leader-handoff-execute">課長へ送るを確定</button>',
+  4792:       '    <button type="button" data-core-action="pmlw-major-leader-handoff-cancel">キャンセル</button>',
+  4793:       '  </div>',
+  4794:       '</section>'
+  4795:     ].join("");
+  4796:   }
+  4797: 
+  4798:   function aicmCancelMajorLeaderHandoffConfirmR8S() {
+  4799:     state.managerMajorLeaderHandoffConfirm = null;
+  4800:     state.screen = "task-ledger";
+  4801:     setMessage("ok", "課長へ送るをキャンセルしました。");
+  4802:     render();
+  4803:   }
+  4804: 
+  4805:   function aicmLeaderHandoffApiErrorTextR8S(response, json, rawText) {
+  4806:     var parts = [];
+  4807:     if (response && response.status) parts.push("HTTP " + response.status);
+---- line 4792 ----
+  4776:     if (!payload) return "";
+  4777: 
+  4778:     return [
+  4779:       '<section id="aicm-manager-major-leader-handoff-confirm" class="aicm-core-card" style="border:2px solid #2563eb;">',
+  4780:       '  <p class="aicm-eyebrow">課長へ送る確認</p>',
+  4781:       '  <h2>このManager大項目を課長/Leaderへ送りますか？</h2>',
+  4782:       '  <p class="aicm-selected-note">確定するとDBへ保存されます。ステータスを assigned_to_leader / handed_off に更新し、その後Leader中項目/成果物要件/Worker作業単位を自動作成します。</p>',
+  4783:       '  <dl class="aicm-core-detail-list">',
+  4784:       '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
+  4785:       '    <dt>課長/Leader</dt><dd>' + escapeHtml(payload.leader || "未設定") + '</dd>',
+  4786:       '    <dt>状態</dt><dd>' + escapeHtml(payload.status || "") + '</dd>',
+  4787:       '    <dt>期限</dt><dd>' + escapeHtml(payload.due || "未設定") + '</dd>',
+  4788:       '  </dl>',
+  4789:       payload.description ? '<p class="aicm-selected-note">' + escapeHtml(payload.description) + '</p>' : '',
+  4790:       '  <div class="aicm-dashboard-action-row">',
+  4791:       '    <button type="button" data-core-action="pmlw-major-leader-handoff-execute">課長へ送るを確定</button>',
+  4792:       '    <button type="button" data-core-action="pmlw-major-leader-handoff-cancel">キャンセル</button>',
+  4793:       '  </div>',
+  4794:       '</section>'
+  4795:     ].join("");
+  4796:   }
+  4797: 
+  4798:   function aicmCancelMajorLeaderHandoffConfirmR8S() {
+  4799:     state.managerMajorLeaderHandoffConfirm = null;
+  4800:     state.screen = "task-ledger";
+  4801:     setMessage("ok", "課長へ送るをキャンセルしました。");
+  4802:     render();
+  4803:   }
+  4804: 
+  4805:   function aicmLeaderHandoffApiErrorTextR8S(response, json, rawText) {
+  4806:     var parts = [];
+  4807:     if (response && response.status) parts.push("HTTP " + response.status);
+  4808:     if (json && json.result && json.result !== "ok") parts.push("result=" + String(json.result));
+---- line 5130 ----
+  5114:       var majorId = aicmAxuR1MajorId(row);
+  5115:       var summary = aicmMajorItemSummaryR8O(row);
+  5116:       var displayNo = start + index + 1;
+  5117: 
+  5118:       return [
+  5119:         '<article class="aicm-core-card aicm-major-item-row">',
+  5120:         '  <p class="aicm-eyebrow">Manager大項目 #' + escapeHtml(String(displayNo)) + '</p>',
+  5121:         '  <h3>' + escapeHtml(summary.title) + '</h3>',
+  5122:         summary.description ? '  <p class="aicm-selected-note">' + escapeHtml(summary.description) + '</p>' : '',
+  5123:         '  <dl class="aicm-core-detail-list">',
+  5124:         '    <dt>課長/Leader</dt><dd>' + escapeHtml(summary.leader) + '</dd>',
+  5125:         '    <dt>優先度</dt><dd>' + escapeHtml(summary.priority) + '</dd>',
+  5126:         '    <dt>期限</dt><dd>' + escapeHtml(summary.due) + '</dd>',
+  5127:         '    <dt>状態</dt><dd>' + escapeHtml(summary.status) + '</dd>',
+  5128:         '  </dl>',
+  5129:         '  <div class="aicm-dashboard-action-row">',
+  5130:         '    <button type="button" data-core-action="pmlw-major-leader-handoff" data-major-id="' + escapeHtml(majorId) + '">課長へ送る</button>',
+  5131:         '    <button type="button" data-core-action="pmlw-major-delete-open" data-major-id="' + escapeHtml(majorId) + '">削除</button>',
+  5132:         '  </div>',
+  5133:         '</article>'
+  5134:       ].join("");
+  5135:     }).join("");
+  5136: 
+  5137:     return [
+  5138:       confirmCard,
+  5139:       pager,
+  5140:       '<div class="aicm-manager-major-list">',
+  5141:       cards,
+  5142:       '</div>',
+  5143:       pager
+  5144:     ].join("");
+  5145:   }
+  5146: 
+---- line 6647 ----
+  6631:     row.assigned_leader_label ||
+  6632:     row.leader_robot_label ||
+  6633:     "課長/Leader"
+  6634:   ).trim();
+  6635: 
+  6636:   return [
+  6637:     '<section class="aicm-core-card aicm-leader-handoff-confirm-r8s" style="border:2px solid #f59e0b;">',
+  6638:     '  <p class="aicm-eyebrow">課長へ送る確認</p>',
+  6639:     '  <h2>このManager大項目を課長へ送りますか？</h2>',
+  6640:     '  <p class="aicm-selected-note">DB更新前の確認カードです。内容を確認してから確定してください。</p>',
+  6641:     '  <dl class="aicm-core-detail-list">',
+  6642:     '    <dt>対象</dt><dd>' + esc(title) + '</dd>',
+  6643:     '    <dt>課長/Leader</dt><dd>' + esc(leader) + '</dd>',
+  6644:     '    <dt>Manager大項目ID</dt><dd>' + esc(majorId || '-') + '</dd>',
+  6645:     '  </dl>',
+  6646:     '  <div class="aicm-dashboard-action-row">',
+  6647:     '    <button type="button" data-core-action="r8z-v9f4b-leader-handoff-confirm-cancel">キャンセル</button>',
+  6648:     '    <button type="button" data-core-action="r8z-v9f4b-leader-handoff-confirm-execute" data-major-id="' + esc(majorId) + '">確認して課長へ送る</button>',
+  6649:     '  </div>',
+  6650:     '</section>'
+  6651:   ].join("");
+  6652: }
+  6653: 
+  6654: function aicmInjectLeaderHandoffConfirmCardR8SV9F4B(html) {
+  6655:   var source = String(html || "");
+  6656:   var card = aicmRenderLeaderHandoffConfirmCardR8SV9F4B();
+  6657: 
+  6658:   if (!card) return source;
+  6659:   if (source.indexOf("aicm-leader-handoff-confirm-r8s") >= 0) return source;
+  6660: 
+  6661:   var anchor = '<p class="aicm-eyebrow">Manager大項目</p>';
+  6662:   var idx = source.indexOf(anchor);
+  6663: 
+---- line 6648 ----
+  6632:     row.leader_robot_label ||
+  6633:     "課長/Leader"
+  6634:   ).trim();
+  6635: 
+  6636:   return [
+  6637:     '<section class="aicm-core-card aicm-leader-handoff-confirm-r8s" style="border:2px solid #f59e0b;">',
+  6638:     '  <p class="aicm-eyebrow">課長へ送る確認</p>',
+  6639:     '  <h2>このManager大項目を課長へ送りますか？</h2>',
+  6640:     '  <p class="aicm-selected-note">DB更新前の確認カードです。内容を確認してから確定してください。</p>',
+  6641:     '  <dl class="aicm-core-detail-list">',
+  6642:     '    <dt>対象</dt><dd>' + esc(title) + '</dd>',
+  6643:     '    <dt>課長/Leader</dt><dd>' + esc(leader) + '</dd>',
+  6644:     '    <dt>Manager大項目ID</dt><dd>' + esc(majorId || '-') + '</dd>',
+  6645:     '  </dl>',
+  6646:     '  <div class="aicm-dashboard-action-row">',
+  6647:     '    <button type="button" data-core-action="r8z-v9f4b-leader-handoff-confirm-cancel">キャンセル</button>',
+  6648:     '    <button type="button" data-core-action="r8z-v9f4b-leader-handoff-confirm-execute" data-major-id="' + esc(majorId) + '">確認して課長へ送る</button>',
+  6649:     '  </div>',
+  6650:     '</section>'
+  6651:   ].join("");
+  6652: }
+  6653: 
+  6654: function aicmInjectLeaderHandoffConfirmCardR8SV9F4B(html) {
+  6655:   var source = String(html || "");
+  6656:   var card = aicmRenderLeaderHandoffConfirmCardR8SV9F4B();
+  6657: 
+  6658:   if (!card) return source;
+  6659:   if (source.indexOf("aicm-leader-handoff-confirm-r8s") >= 0) return source;
+  6660: 
+  6661:   var anchor = '<p class="aicm-eyebrow">Manager大項目</p>';
+  6662:   var idx = source.indexOf(anchor);
+  6663: 
+  6664:   if (idx >= 0) {
+---- line 6708 ----
+  6692: 
+  6693:     if (typeof document !== "undefined" && document.addEventListener && typeof window !== "undefined") {
+  6694:       if (!window.__aicmR8zV9f4bLeaderHandoffClickBridgeInstalled) {
+  6695:         window.__aicmR8zV9f4bLeaderHandoffClickBridgeInstalled = true;
+  6696: 
+  6697:         document.addEventListener("click", function aicmR8zV9f4bLeaderHandoffClickBridge(ev) {
+  6698:           try {
+  6699:             var target = ev && ev.target;
+  6700:             var btn = target && typeof target.closest === "function"
+  6701:               ? target.closest("[data-core-action]")
+  6702:               : null;
+  6703: 
+  6704:             if (!btn || !btn.getAttribute) return;
+  6705: 
+  6706:             var action = String(btn.getAttribute("data-core-action") || "").trim();
+  6707: 
+  6708:             if (action === "pmlw-major-leader-handoff") {
+  6709:               if (typeof aicmOpenLeaderHandoffConfirmR8S === "function") {
+  6710:                 ev.preventDefault();
+  6711:                 ev.stopPropagation();
+  6712:                 aicmOpenLeaderHandoffConfirmR8S(ev, btn);
+  6713:               }
+  6714:               return;
+  6715:             }
+  6716: 
+  6717:             if (action === "r8z-v9f4b-leader-handoff-confirm-cancel") {
+  6718:               ev.preventDefault();
+  6719:               ev.stopPropagation();
+  6720:               if (state) state.managerMajorLeaderHandoffConfirm = null;
+  6721: 
+  6722:               if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  6723:                 aicmRenderTaskLedgerSafeR8V4("r8z_v9f4b_confirm_cancel");
+  6724:               } else if (typeof render === "function") {
+---- line 6717 ----
+  6701:               ? target.closest("[data-core-action]")
+  6702:               : null;
+  6703: 
+  6704:             if (!btn || !btn.getAttribute) return;
+  6705: 
+  6706:             var action = String(btn.getAttribute("data-core-action") || "").trim();
+  6707: 
+  6708:             if (action === "pmlw-major-leader-handoff") {
+  6709:               if (typeof aicmOpenLeaderHandoffConfirmR8S === "function") {
+  6710:                 ev.preventDefault();
+  6711:                 ev.stopPropagation();
+  6712:                 aicmOpenLeaderHandoffConfirmR8S(ev, btn);
+  6713:               }
+  6714:               return;
+  6715:             }
+  6716: 
+  6717:             if (action === "r8z-v9f4b-leader-handoff-confirm-cancel") {
+  6718:               ev.preventDefault();
+  6719:               ev.stopPropagation();
+  6720:               if (state) state.managerMajorLeaderHandoffConfirm = null;
+  6721: 
+  6722:               if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  6723:                 aicmRenderTaskLedgerSafeR8V4("r8z_v9f4b_confirm_cancel");
+  6724:               } else if (typeof render === "function") {
+  6725:                 render();
+  6726:               }
+  6727:               return;
+  6728:             }
+  6729: 
+  6730:             if (action === "r8z-v9f4b-leader-handoff-confirm-execute") {
+  6731:               if (typeof aicmExecuteLeaderHandoffConfirmR8S === "function") {
+  6732:                 ev.preventDefault();
+  6733:                 ev.stopPropagation();
+---- line 6730 ----
+  6714:               return;
+  6715:             }
+  6716: 
+  6717:             if (action === "r8z-v9f4b-leader-handoff-confirm-cancel") {
+  6718:               ev.preventDefault();
+  6719:               ev.stopPropagation();
+  6720:               if (state) state.managerMajorLeaderHandoffConfirm = null;
+  6721: 
+  6722:               if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  6723:                 aicmRenderTaskLedgerSafeR8V4("r8z_v9f4b_confirm_cancel");
+  6724:               } else if (typeof render === "function") {
+  6725:                 render();
+  6726:               }
+  6727:               return;
+  6728:             }
+  6729: 
+  6730:             if (action === "r8z-v9f4b-leader-handoff-confirm-execute") {
+  6731:               if (typeof aicmExecuteLeaderHandoffConfirmR8S === "function") {
+  6732:                 ev.preventDefault();
+  6733:                 ev.stopPropagation();
+  6734:                 aicmExecuteLeaderHandoffConfirmR8S();
+  6735:               }
+  6736:             }
+  6737:           } catch (error) {
+  6738:             try {
+  6739:               if (typeof setMessage === "function") {
+  6740:                 setMessage("error", error && error.message ? error.message : "課長へ送る確認の操作に失敗しました。");
+  6741:               }
+  6742:               if (typeof render === "function") render();
+  6743:             } catch (_) {}
+  6744:           }
+  6745:         }, true);
+  6746:       }
+---- line 8680 ----
+  8664:     }
+  8665: // AICM_R8_NAV_TASK_LEDGER_V3_CLEAN_ACTION_HANDLER_END
+  8666: 
+  8667:     
+  8668: // AICM_R8_V7_CLEAN2_DELETE_ACTION_HELPER_ACTION_HANDLER_START
+  8669:     if (action === "pmlw-major-page-prev") {
+  8670:       aicmMoveMajorItemPageFromActionR8V7C2(-1);
+  8671:       return;
+  8672:     }
+  8673: 
+  8674:     if (action === "pmlw-major-page-next") {
+  8675:       aicmMoveMajorItemPageFromActionR8V7C2(1);
+  8676:       return;
+  8677:     }
+  8678: 
+  8679:     // AICM_R8S_LEADER_HANDOFF_CONFIRM_FLOW_ACTION_HANDLER_START
+  8680:     if (action === "pmlw-major-leader-handoff") {
+  8681:       aicmOpenMajorLeaderHandoffConfirmR8S(event, button);
+  8682:       return;
+  8683:     }
+  8684: 
+  8685:     if (action === "pmlw-major-leader-handoff-cancel") {
+  8686:       aicmCancelMajorLeaderHandoffConfirmR8S();
+  8687:       return;
+  8688:     }
+  8689: 
+  8690:     if (action === "pmlw-major-leader-handoff-execute") {
+  8691:       aicmExecuteMajorLeaderHandoffConfirmR8S();
+  8692:       return;
+  8693:     }
+  8694: // AICM_R8S_LEADER_HANDOFF_CONFIRM_FLOW_ACTION_HANDLER_END
+  8695: 
+  8696:     if (action === "pmlw-major-delete-open") {
+---- line 8685 ----
+  8669:     if (action === "pmlw-major-page-prev") {
+  8670:       aicmMoveMajorItemPageFromActionR8V7C2(-1);
+  8671:       return;
+  8672:     }
+  8673: 
+  8674:     if (action === "pmlw-major-page-next") {
+  8675:       aicmMoveMajorItemPageFromActionR8V7C2(1);
+  8676:       return;
+  8677:     }
+  8678: 
+  8679:     // AICM_R8S_LEADER_HANDOFF_CONFIRM_FLOW_ACTION_HANDLER_START
+  8680:     if (action === "pmlw-major-leader-handoff") {
+  8681:       aicmOpenMajorLeaderHandoffConfirmR8S(event, button);
+  8682:       return;
+  8683:     }
+  8684: 
+  8685:     if (action === "pmlw-major-leader-handoff-cancel") {
+  8686:       aicmCancelMajorLeaderHandoffConfirmR8S();
+  8687:       return;
+  8688:     }
+  8689: 
+  8690:     if (action === "pmlw-major-leader-handoff-execute") {
+  8691:       aicmExecuteMajorLeaderHandoffConfirmR8S();
+  8692:       return;
+  8693:     }
+  8694: // AICM_R8S_LEADER_HANDOFF_CONFIRM_FLOW_ACTION_HANDLER_END
+  8695: 
+  8696:     if (action === "pmlw-major-delete-open") {
+  8697:       aicmOpenMajorDeleteConfirmFromActionR8V7C2(event, button);
+  8698:       return;
+  8699:     }
+  8700: 
+  8701:     if (action === "pmlw-major-delete-cancel") {
+---- line 8690 ----
+  8674:     if (action === "pmlw-major-page-next") {
+  8675:       aicmMoveMajorItemPageFromActionR8V7C2(1);
+  8676:       return;
+  8677:     }
+  8678: 
+  8679:     // AICM_R8S_LEADER_HANDOFF_CONFIRM_FLOW_ACTION_HANDLER_START
+  8680:     if (action === "pmlw-major-leader-handoff") {
+  8681:       aicmOpenMajorLeaderHandoffConfirmR8S(event, button);
+  8682:       return;
+  8683:     }
+  8684: 
+  8685:     if (action === "pmlw-major-leader-handoff-cancel") {
+  8686:       aicmCancelMajorLeaderHandoffConfirmR8S();
+  8687:       return;
+  8688:     }
+  8689: 
+  8690:     if (action === "pmlw-major-leader-handoff-execute") {
+  8691:       aicmExecuteMajorLeaderHandoffConfirmR8S();
+  8692:       return;
+  8693:     }
+  8694: // AICM_R8S_LEADER_HANDOFF_CONFIRM_FLOW_ACTION_HANDLER_END
+  8695: 
+  8696:     if (action === "pmlw-major-delete-open") {
+  8697:       aicmOpenMajorDeleteConfirmFromActionR8V7C2(event, button);
+  8698:       return;
+  8699:     }
+  8700: 
+  8701:     if (action === "pmlw-major-delete-cancel") {
+  8702:       aicmCancelMajorDeleteConfirmFromActionR8V7C2();
+  8703:       return;
+  8704:     }
+  8705: 
+  8706:     if (action === "pmlw-major-delete-execute") {
+
+REQUEST_JSON_BLOCK
+function requestJson(url, body) {
+    var options = body ? {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    } : {
+      method: "GET"
+    };
+
+    return window.fetch(url, options)
+      .then(function (response) {
+        return response.json().then(function (json) {
+          if (!response.ok || !json || json.result !== "ok") {
+            throw new Error(json && json.error_message ? json.error_message : "API error");
+          }
+          return json;
+        });
+      });
+  }
