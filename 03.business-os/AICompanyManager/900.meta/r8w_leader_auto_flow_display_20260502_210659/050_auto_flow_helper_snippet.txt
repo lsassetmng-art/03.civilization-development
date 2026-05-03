@@ -1,0 +1,251 @@
+    var seen = {};
+    var selectedCompanyId = aicmLeaderAutoSelectedCompanyIdR8W();
+
+    function add(list) {
+      if (!Array.isArray(list)) return;
+      for (var i = 0; i < list.length; i += 1) {
+        var row = list[i];
+        if (!row || typeof row !== "object") continue;
+
+        var rowCompanyId = aicmLeaderAutoTextR8W(row.aicm_user_company_id);
+        if (selectedCompanyId && rowCompanyId && selectedCompanyId !== rowCompanyId) continue;
+
+        var id = aicmLeaderAutoMajorIdR8W(row);
+        var key = id || ("auto_row_" + rows.length);
+        if (seen[key]) continue;
+        seen[key] = true;
+        rows.push(row);
+      }
+    }
+
+    add(ctx.pmlw_major_items);
+    add(ctx.pmlwMajorItems);
+    add(ctx.manager_major_items);
+    add(ctx.managerMajorItems);
+    add(ctx.major_items);
+    add(ctx.majorItems);
+
+    return rows;
+  }
+
+  function aicmLeaderAutoFlowRowsR8W() {
+    var rows = aicmLeaderAutoAllMajorRowsR8W().filter(function (row) {
+      var handoff = aicmLeaderAutoTextR8W(row && row.handoff_status_code).toLowerCase();
+      var decomposition = aicmLeaderAutoTextR8W(row && row.decomposition_status_code).toLowerCase();
+
+      if (handoff === "archived" || decomposition === "archived") return false;
+      if (handoff === "deleted" || decomposition === "deleted") return false;
+
+      return handoff === "handed_off" || decomposition === "assigned_to_leader";
+    });
+
+    rows.sort(function (a, b) {
+      var au = aicmLeaderAutoTextR8W(a && (a.updated_at || a.created_at));
+      var bu = aicmLeaderAutoTextR8W(b && (b.updated_at || b.created_at));
+      if (au && bu && au !== bu) return au < bu ? 1 : -1;
+
+      var ad = Number(a && a.display_order);
+      var bd = Number(b && b.display_order);
+      if (!Number.isFinite(ad)) ad = 999999;
+      if (!Number.isFinite(bd)) bd = 999999;
+      return ad - bd;
+    });
+
+    return rows;
+  }
+
+  function aicmLeaderAutoFlowStatusLabelR8W(row) {
+    var handoff = aicmLeaderAutoTextR8W(row && row.handoff_status_code).toLowerCase();
+    var decomposition = aicmLeaderAutoTextR8W(row && row.decomposition_status_code).toLowerCase();
+
+    if (decomposition === "assigned_to_leader" || handoff === "handed_off") {
+      return "自動分解待ち";
+    }
+
+    return "自動処理対象";
+  }
+
+  function aicmLeaderAutoPriorityLabelR8W(value) {
+    var code = aicmLeaderAutoTextR8W(value).toLowerCase();
+    if (code === "urgent") return "緊急";
+    if (code === "high") return "高";
+    if (code === "normal") return "通常";
+    if (code === "low") return "低";
+    return code || "未設定";
+  }
+
+  function aicmRenderLeaderAutoFlowRowsR8W(rows) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return '<div class="aicm-empty-state"><strong>自動処理対象はまだありません</strong><p>課長へ送った大項目がここに表示されます。</p></div>';
+    }
+
+    var limit = 5;
+    var visible = rows.slice(0, limit);
+    var cards = visible.map(function (row, index) {
+      var title = aicmLeaderAutoTextR8W(row && (row.major_item_name || row.deliverable_name || row.task_name)) || "Manager大項目";
+      var description = aicmLeaderAutoTextR8W(row && (row.major_item_description || row.task_description || row.note));
+      var leader = aicmLeaderAutoTextR8W(row && (row.assigned_leader_label || row.leader_label || row.responsible_robot_label)) || "自動割当";
+      var due = aicmLeaderAutoTextR8W(row && row.due_date) || "未設定";
+      var status = aicmLeaderAutoFlowStatusLabelR8W(row);
+
+      return [
+        '<article class="aicm-ledger-row">',
+        '  <p class="aicm-eyebrow">自動処理対象 #' + escapeHtml(String(index + 1)) + '</p>',
+        '  <h3>' + escapeHtml(title) + '</h3>',
+        description ? '  <p class="aicm-selected-note">' + escapeHtml(description) + '</p>' : '',
+        '  <dl class="aicm-ledger-meta">',
+        '    <div><dt>自動状態</dt><dd>' + escapeHtml(status) + '</dd></div>',
+        '    <div><dt>課長/Leader</dt><dd>' + escapeHtml(leader) + '</dd></div>',
+        '    <div><dt>優先度</dt><dd>' + escapeHtml(aicmLeaderAutoPriorityLabelR8W(row && row.priority_code)) + '</dd></div>',
+        '    <div><dt>期限</dt><dd>' + escapeHtml(due) + '</dd></div>',
+        '  </dl>',
+        '</article>'
+      ].join("");
+    }).join("");
+
+    var more = rows.length > limit ? '<p class="aicm-selected-note">ほか ' + escapeHtml(String(rows.length - limit)) + '件はサマリ詳細で確認できます。</p>' : '';
+
+    return [
+      '<div class="aicm-ledger-list">',
+      cards,
+      '</div>',
+      more
+    ].join("");
+  }
+
+  function aicmRenderLeaderAutoFlowStatusR8W() {
+    var rows = aicmLeaderAutoFlowRowsR8W();
+
+    return [
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Leader以降自動処理</p>',
+      '  <h2>課長以降は自動処理</h2>',
+      '  <p class="aicm-selected-note">課長へ送ったManager大項目は、ユーザー操作なしでLeader分解・Worker展開へ進む前提です。ここでは自動処理対象の状態だけを確認します。</p>',
+      '  <p class="aicm-selected-note">自動分解対象: <strong>' + escapeHtml(String(rows.length)) + '件</strong></p>',
+      aicmRenderLeaderAutoFlowRowsR8W(rows),
+      '</section>'
+    ].join("");
+  }
+// AICM_R8W_LEADER_AUTO_FLOW_DISPLAY_HELPER_END
+
+function renderTaskLedgerPlaceholder() {
+    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: screen
+    var company = typeof selectedCompany === "function" ? selectedCompany() : null;
+    var companyId = company && company.aicm_user_company_id ? company.aicm_user_company_id : "";
+    var rows = aicmGetManagerMajorRowsForSelectedCompany(companyId);
+    
+
+    // AICM_R8V_REMOVE_LEADER_INBOX_UI_START
+  // Leader受信箱 routine section removed.
+  // Manager大項目サマリの Leader受信済み 件数/詳細を正面表示として使う。
+// AICM_R8V_REMOVE_LEADER_INBOX_UI_END
+return renderShell([
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+      '  <h2>部門別タスク台帳</h2>',
+      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+      '  <p class="aicm-selected-note">未実行のManager大項目だけをDB/contextから表示します。CSV取り込みは部長/Manager分解済み大項目の新規追加です。</p>',
+'  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="task-ledger-refresh">登録済み大項目をリロード</button>',
+      '  </div>',
+      '</section>',
+      aicmRenderManagerMajorSummarySectionR8U(),
+      aicmRenderLeaderAutoFlowStatusR8W(),
+      renderCsvImportCard(company),
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Manager大項目</p>',
+      '  <h2>登録済み大項目</h2>',
+      aicmRenderManagerMajorRows(rows),
+      '</section>'
+    ].join(""));
+  }
+
+  
+// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+// Human review queue UI.
+// Human review only shows delivery summaries / exception summaries.
+// AI review remains internal; the UI displays ai_review_result_text summary only.
+
+function aicmHumanReviewOwnerId() {
+    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+    return "00000000-0000-4000-8000-000000000001";
+  }
+
+  function aicmHumanReviewRows() {
+    var ctx = state.context || state || {};
+    var rows = ctx.review_wait_items || state.review_wait_items || [];
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  function aicmHumanReviewRowsForCompany(companyId) {
+    return aicmHumanReviewRows().filter(function (row) {
+      return !companyId || row.aicm_user_company_id === companyId;
+    });
+  }
+
+  async function aicmHumanReviewPostJson(path, body) {
+    var response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    });
+
+    var text = await response.text();
+    var json = {};
+
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (_) {
+      json = { result: "error", message: text || "Invalid server response" };
+    }
+
+    if (!response.ok || (json.result && json.result !== "ok")) {
+      throw new Error(json.message || json.error || ("API failed: " + path));
+    }
+
+    return json;
+  }
+
+  async function aicmHumanReviewReload() {
+    if (typeof aicmPmlwReloadContext === "function") {
+      await aicmReloadTaskLedgerContext();
+      return;
+    }
+
+    if (typeof loadContext === "function") {
+      await loadContext();
+      return;
+    }
+
+    var owner = encodeURIComponent(aicmHumanReviewOwnerId());
+    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+    var json = await response.json();
+
+    if (json && json.result === "ok") state.context = json;
+    // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_CALL
+    if (typeof aicmHydrateManagerMajorContextArraysR8M === "function") {
+      aicmHydrateManagerMajorContextArraysR8M(
+        typeof json !== "undefined" ? json :
+        (typeof data !== "undefined" ? data :
+        (typeof contextJson !== "undefined" ? contextJson :
+        (typeof ctx !== "undefined" ? ctx : null)))
+      );
+    }
+    if (typeof render === "function") render();
+  }
+
+  async function approveHumanReviewFromAction(el) {
+    var reviewId = el && el.getAttribute ? el.getAttribute("data-review-id") : "";
+
+    if (!reviewId) {
+      setMessage("error", "レビュー項目を特定できません。");
+      return;
+    }
+
+    try {
+      await aicmHumanReviewPostJson("/api/aicm/v2/human-review/approve", {
+        owner_civilization_id: aicmHumanReviewOwnerId(),
+        aicm_human_review_item_id: reviewId,
+        human_reviewer_label: "user",

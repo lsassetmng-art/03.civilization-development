@@ -1,0 +1,84 @@
+===== aicmR8zV7RenderReviewList L9551-L9633 =====
+  9551: function aicmR8zV7RenderReviewList(appState) {
+  9552:     appState = appState || {};
+  9553:     var list = rows(appState);
+  9554: 
+  9555:     if (!list.length) hydrateIfNeeded(appState);
+  9556: 
+  9557:     var debug = [
+  9558:       "selectedCompanyId=" + companyId(appState),
+  9559:       "owner=" + ownerId(appState),
+  9560:       "rows=" + String(list.length),
+  9561:       appState.aicmR8zV7Hydrating ? "hydrating=YES" : "hydrating=NO",
+  9562:       appState.aicmR8zV7HydrationError ? "error=" + t(appState.aicmR8zV7HydrationError) : ""
+  9563:     ].filter(Boolean).join(" / ");
+  9564: 
+  9565:     var html = [
+  9566:       '<section class="aicm-core-card aicm-review-list-stable-r8z-v7">',
+  9567:       '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+  9568:       '  <h2>納品サマリー確認</h2>',
+  9569:       '  <p class="aicm-selected-note">対象会社: <strong>' + esc(companyName(appState)) + '</strong></p>',
+  9570:       '  <p class="aicm-selected-note">レビュー・承認待ち: <strong>' + esc(String(list.length)) + '件</strong></p>',
+  9571:       '  <p class="aicm-selected-note">R8Z-V7: ' + esc(debug) + '</p>'
+  9572:     ];
+  9573: 
+  9574:     if (!list.length) {
+  9575:       html.push(
+  9576:         '  <article class="aicm-core-card">',
+  9577:         '    <strong>レビュー・承認待ちはありません</strong>',
+  9578:         '    <p>context反映待ちです。数秒後に再描画されます。</p>',
+  9579:         '  </article>',
+  9580:         '</section>'
+  9581:       );
+  9582:       return html.join("");
+  9583:     }
+  9584: 
+  9585:     list.forEach(function (row, index) {
+  9586:       var id = first(row, ["aicm_human_review_item_id", "review_id", "id"], "");
+  9587:       var title = first(row, ["review_title", "title"], "レビュー項目");
+  9588:       var kind = first(row, ["review_kind_label", "review_kind_code"], "納品サマリー");
+  9589:       var artifact = first(row, ["artifact_kind_label", "artifact_kind_code"], "delivery_package");
+  9590:       var priority = first(row, ["priority_label", "priority_code"], "-");
+  9591:       var summary = first(row, [
+  9592:         "delivery_summary_text",
+  9593:         "delivery_summary_preview",
+  9594:         "result_summary_text",
+  9595:         "ai_review_result_text",
+  9596:         "review_summary_text",
+  9597:         "summary"
+  9598:       ], "要約未設定");
+  9599:       var requestId = first(row, ["source_request_id", "request_id"], "");
+  9600:       var workerUnitId = first(row, ["related_worker_work_unit_id"], "");
+  9601: 
+  9602:       html.push(
+  9603:         '  <article class="aicm-core-card aicm-review-card">',
+  9604:         '    <div class="aicm-review-head">',
+  9605:         '      <div>',
+  9606:         '        <p class="aicm-eyebrow">レビュー #' + esc(String(index + 1)) + '</p>',
+  9607:         '        <h3>' + esc(title) + '</h3>',
+  9608:         '      </div>',
+  9609:         '      <strong>' + esc(statusLabel(row)) + '</strong>',
+  9610:         '    </div>',
+  9611:         '    <div class="aicm-review-meta">',
+  9612:         '      <span>種別: ' + esc(kind) + '</span>',
+  9613:         '      <span>成果物: ' + esc(artifact) + '</span>',
+  9614:         '      <span>優先度: ' + esc(priority) + '</span>',
+  9615:         requestId ? '      <span>request_id: ' + esc(requestId) + '</span>' : '',
+  9616:         workerUnitId ? '      <span>worker_unit: ' + esc(workerUnitId) + '</span>' : '',
+  9617:         '    </div>',
+  9618:         '    <section class="aicm-review-summary">',
+  9619:         '      <h3>納品サマリー</h3>',
+  9620:         '      <p>' + esc(summary) + '</p>',
+  9621:         '    </section>',
+  9622:         '    <div class="aicm-dashboard-action-row">',
+  9623:         '      <button type="button" data-core-action="human-review-approve" data-review-id="' + esc(id) + '">承認</button>',
+  9624:         '      <button type="button" data-core-action="human-review-return" data-review-id="' + esc(id) + '">差し戻し</button>',
+  9625:         '    </div>',
+  9626:         '  </article>'
+  9627:       );
+  9628:     });
+  9629: 
+  9630:     html.push('</section>');
+  9631:     return html.join("");
+  9632:   };
+  9633: 

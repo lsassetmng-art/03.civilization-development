@@ -1,0 +1,506 @@
+
+===== SERVER SNIPPET: pmlw_major @ line 770 =====
+   762:     "      AND t.task_status_code <> 'archived'",
+   763:     "  ),",
+   764:     // AICM_PMLW_GETCONTEXT_SQL_EXTENSION_AQP_AQS_V1
+   765:     "  'pmlw_president_policies', (",
+   766:     "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.display_order ASC, p.updated_at DESC, p.created_at DESC), '[]'::jsonb)",
+   767:     "    FROM business.vw_aicm_pmlw_president_policy_display p",
+   768:     "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+   769:     "  ),",
+   770:     "  'pmlw_major_items', (",
+   771:     "    SELECT COALESCE(jsonb_agg(to_jsonb(m) ORDER BY m.display_order ASC, m.updated_at DESC, m.created_at DESC), '[]'::jsonb)",
+   772:     "    FROM business.vw_aicm_pmlw_major_work_display m",
+   773:     "    WHERE m.owner_civilization_id::text = " + sqlLiteral(owner),
+   774:     "  ),",
+   775:     "  'pmlw_middle_items', (",
+   776:     "    SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY l.display_order ASC, l.updated_at DESC, l.created_at DESC), '[]'::jsonb)",
+   777:     "    FROM business.vw_aicm_pmlw_leader_middle_display l",
+   778:     "    WHERE l.owner_civilization_id::text = " + sqlLiteral(owner),
+   779:     "  ),",
+   780:     "  'pmlw_deliverable_requirements', (",
+   781:     "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.display_order ASC, r.updated_at DESC, r.created_at DESC), '[]'::jsonb)",
+   782:     "    FROM business.vw_aicm_pmlw_deliverable_requirement_display r",
+
+===== SERVER SNIPPET: pmlw_major @ line 772 =====
+   764:     // AICM_PMLW_GETCONTEXT_SQL_EXTENSION_AQP_AQS_V1
+   765:     "  'pmlw_president_policies', (",
+   766:     "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.display_order ASC, p.updated_at DESC, p.created_at DESC), '[]'::jsonb)",
+   767:     "    FROM business.vw_aicm_pmlw_president_policy_display p",
+   768:     "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+   769:     "  ),",
+   770:     "  'pmlw_major_items', (",
+   771:     "    SELECT COALESCE(jsonb_agg(to_jsonb(m) ORDER BY m.display_order ASC, m.updated_at DESC, m.created_at DESC), '[]'::jsonb)",
+   772:     "    FROM business.vw_aicm_pmlw_major_work_display m",
+   773:     "    WHERE m.owner_civilization_id::text = " + sqlLiteral(owner),
+   774:     "  ),",
+   775:     "  'pmlw_middle_items', (",
+   776:     "    SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY l.display_order ASC, l.updated_at DESC, l.created_at DESC), '[]'::jsonb)",
+   777:     "    FROM business.vw_aicm_pmlw_leader_middle_display l",
+   778:     "    WHERE l.owner_civilization_id::text = " + sqlLiteral(owner),
+   779:     "  ),",
+   780:     "  'pmlw_deliverable_requirements', (",
+   781:     "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.display_order ASC, r.updated_at DESC, r.created_at DESC), '[]'::jsonb)",
+   782:     "    FROM business.vw_aicm_pmlw_deliverable_requirement_display r",
+   783:     "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+   784:     "  ),",
+
+===== SERVER SNIPPET: manager_major @ line 288 =====
+   280: 
+   281: function createManagerMajorItem(body) {
+   282:   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+   283:   const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+   284:   const majorName = requiredText(body.major_item_name || body.deliverable_name || body.task_name, "major_item_name");
+   285: 
+   286:   const sql = [
+   287:     "WITH inserted AS (",
+   288:     "  INSERT INTO business.aicm_manager_major_work_item (",
+   289:     "    owner_civilization_id, aicm_user_company_id, aicm_president_policy_id,",
+   290:     "    aicm_user_company_department_id, aicm_user_company_section_id,",
+   291:     "    major_item_name, major_item_description, source_route_code,",
+   292:     "    manager_robot_label, assigned_leader_label,",
+   293:     "    decomposition_status_code, handoff_status_code, priority_code, due_date,",
+   294:     "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+   295:     "  ) VALUES (",
+   296:     "    " + sqlLiteral(owner) + "::uuid,",
+   297:     "    " + sqlLiteral(companyId) + "::uuid,",
+   298:     "    " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id) + ",",
+   299:     "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+   300:     "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+
+===== SERVER SNIPPET: manager_major @ line 321 =====
+   313:     "    " + aicmPmlwTextSql(body.note) + ",",
+   314:     "    " + aicmPmlwTextSql(body.handoff_link),
+   315:     "  )",
+   316:     "  RETURNING *",
+   317:     ")",
+   318:     "SELECT jsonb_build_object(",
+   319:     "  'result', 'ok',",
+   320:     "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+   321:     "  'manager_major_item', to_jsonb(inserted)",
+   322:     ")::text",
+   323:     "FROM inserted;"
+   324:   ].join("\n");
+   325: 
+   326:   return runPsqlJson(sql);
+   327: }
+   328: 
+   329: function updateManagerMajorItem(body) {
+   330:   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+   331:   const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+   332:   const updates = [];
+   333: 
+
+===== SERVER SNIPPET: manager_major @ line 331 =====
+   323:     "FROM inserted;"
+   324:   ].join("\n");
+   325: 
+   326:   return runPsqlJson(sql);
+   327: }
+   328: 
+   329: function updateManagerMajorItem(body) {
+   330:   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+   331:   const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+   332:   const updates = [];
+   333: 
+   334:   if (body.major_item_name !== undefined) updates.push("major_item_name = " + sqlLiteral(String(body.major_item_name || "").trim()));
+   335:   if (body.major_item_description !== undefined) updates.push("major_item_description = " + aicmPmlwTextSql(body.major_item_description));
+   336:   if (body.aicm_president_policy_id !== undefined) updates.push("aicm_president_policy_id = " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id));
+   337:   if (body.aicm_user_company_department_id !== undefined) updates.push("aicm_user_company_department_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id));
+   338:   if (body.aicm_user_company_section_id !== undefined) updates.push("aicm_user_company_section_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id));
+   339:   if (body.manager_robot_label !== undefined) updates.push("manager_robot_label = " + aicmPmlwTextSql(body.manager_robot_label));
+   340:   if (body.assigned_leader_label !== undefined) updates.push("assigned_leader_label = " + aicmPmlwTextSql(body.assigned_leader_label));
+   341:   if (body.decomposition_status_code !== undefined) updates.push("decomposition_status_code = " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)));
+   342:   if (body.handoff_status_code !== undefined) updates.push("handoff_status_code = " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)));
+   343:   if (body.priority_code !== undefined) updates.push("priority_code = " + sqlLiteral(aicmPmlwPriority(body.priority_code)));
+
+===== SERVER SNIPPET: manager_major @ line 331 =====
+   323:     "FROM inserted;"
+   324:   ].join("\n");
+   325: 
+   326:   return runPsqlJson(sql);
+   327: }
+   328: 
+   329: function updateManagerMajorItem(body) {
+   330:   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+   331:   const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+   332:   const updates = [];
+   333: 
+   334:   if (body.major_item_name !== undefined) updates.push("major_item_name = " + sqlLiteral(String(body.major_item_name || "").trim()));
+   335:   if (body.major_item_description !== undefined) updates.push("major_item_description = " + aicmPmlwTextSql(body.major_item_description));
+   336:   if (body.aicm_president_policy_id !== undefined) updates.push("aicm_president_policy_id = " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id));
+   337:   if (body.aicm_user_company_department_id !== undefined) updates.push("aicm_user_company_department_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id));
+   338:   if (body.aicm_user_company_section_id !== undefined) updates.push("aicm_user_company_section_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id));
+   339:   if (body.manager_robot_label !== undefined) updates.push("manager_robot_label = " + aicmPmlwTextSql(body.manager_robot_label));
+   340:   if (body.assigned_leader_label !== undefined) updates.push("assigned_leader_label = " + aicmPmlwTextSql(body.assigned_leader_label));
+   341:   if (body.decomposition_status_code !== undefined) updates.push("decomposition_status_code = " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)));
+   342:   if (body.handoff_status_code !== undefined) updates.push("handoff_status_code = " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)));
+   343:   if (body.priority_code !== undefined) updates.push("priority_code = " + sqlLiteral(aicmPmlwPriority(body.priority_code)));
+
+===== SERVER SNIPPET: manager_major @ line 355 =====
+   347:   if (body.applicable_rules_text !== undefined) updates.push("applicable_rules_text = " + aicmPmlwTextSql(body.applicable_rules_text));
+   348:   if (body.note !== undefined) updates.push("note = " + aicmPmlwTextSql(body.note));
+   349:   if (body.handoff_link !== undefined) updates.push("handoff_link = " + aicmPmlwTextSql(body.handoff_link));
+   350: 
+   351:   updates.push("updated_at = now()");
+   352: 
+   353:   const sql = [
+   354:     "WITH updated AS (",
+   355:     "  UPDATE business.aicm_manager_major_work_item",
+   356:     "  SET " + updates.join(", "),
+   357:     "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+   358:     "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+   359:     "  RETURNING *",
+   360:     ")",
+   361:     "SELECT jsonb_build_object(",
+   362:     "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+   363:     "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+   364:     "  'manager_major_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+   365:     ")::text;"
+   366:   ].join("\n");
+   367: 
+
+===== SERVER SNIPPET: manager_major @ line 357 =====
+   349:   if (body.handoff_link !== undefined) updates.push("handoff_link = " + aicmPmlwTextSql(body.handoff_link));
+   350: 
+   351:   updates.push("updated_at = now()");
+   352: 
+   353:   const sql = [
+   354:     "WITH updated AS (",
+   355:     "  UPDATE business.aicm_manager_major_work_item",
+   356:     "  SET " + updates.join(", "),
+   357:     "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+   358:     "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+   359:     "  RETURNING *",
+   360:     ")",
+   361:     "SELECT jsonb_build_object(",
+   362:     "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+   363:     "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+   364:     "  'manager_major_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+   365:     ")::text;"
+   366:   ].join("\n");
+   367: 
+   368:   return runPsqlJson(sql);
+   369: }
+
+===== SERVER SNIPPET: major_items @ line 401 =====
+   393: }
+   394: 
+   395: function importManagerMajorItemsCsv(body) {
+   396:   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+   397:   const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+   398:   const rows = aicmPmlwCsvRows(body);
+   399: 
+   400:   if (rows.length === 0) {
+   401:     return { result: "ok", api_identifier: SERVER_MARK, inserted_count: 0, manager_major_items: [] };
+   402:   }
+   403: 
+   404:   const values = rows.map((row, index) => [
+   405:     "(",
+   406:     index,
+   407:     ", " + sqlLiteral(owner) + "::uuid",
+   408:     ", " + sqlLiteral(companyId) + "::uuid",
+   409:     ", " + sqlLiteral(row.department_name),
+   410:     ", " + sqlLiteral(row.section_name),
+   411:     ", " + sqlLiteral(row.major_item_name),
+   412:     ", " + sqlLiteral(row.major_item_description),
+   413:     ", " + sqlLiteral(row.assigned_leader_label),
+
+===== SERVER SNIPPET: major_items @ line 465 =====
+   457:     "         'not_started', 'draft', priority_code, due_date, note, 100 + row_order",
+   458:     "  FROM resolved_section",
+   459:     "  RETURNING *",
+   460:     ")",
+   461:     "SELECT jsonb_build_object(",
+   462:     "  'result', 'ok',",
+   463:     "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+   464:     "  'inserted_count', (SELECT count(*) FROM inserted),",
+   465:     "  'manager_major_items', COALESCE((SELECT jsonb_agg(to_jsonb(inserted) ORDER BY display_order, created_at) FROM inserted), '[]'::jsonb)",
+   466:     ")::text;"
+   467:   ].join("\n");
+   468: 
+   469:   return runPsqlJson(sql);
+   470: }
+   471: 
+   472: 
+   473: 
+   474: // AICM_HUMAN_REVIEW_QUEUE_ARN_ARQ_V1
+   475: // Human review queue functions.
+   476: // Human review is limited to delivery summaries and exception summaries.
+   477: // AI review remains internal; only ai_review_result_text summary is shown.
+
+===== SERVER SNIPPET: major_items @ line 770 =====
+   762:     "      AND t.task_status_code <> 'archived'",
+   763:     "  ),",
+   764:     // AICM_PMLW_GETCONTEXT_SQL_EXTENSION_AQP_AQS_V1
+   765:     "  'pmlw_president_policies', (",
+   766:     "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.display_order ASC, p.updated_at DESC, p.created_at DESC), '[]'::jsonb)",
+   767:     "    FROM business.vw_aicm_pmlw_president_policy_display p",
+   768:     "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+   769:     "  ),",
+   770:     "  'pmlw_major_items', (",
+   771:     "    SELECT COALESCE(jsonb_agg(to_jsonb(m) ORDER BY m.display_order ASC, m.updated_at DESC, m.created_at DESC), '[]'::jsonb)",
+   772:     "    FROM business.vw_aicm_pmlw_major_work_display m",
+   773:     "    WHERE m.owner_civilization_id::text = " + sqlLiteral(owner),
+   774:     "  ),",
+   775:     "  'pmlw_middle_items', (",
+   776:     "    SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY l.display_order ASC, l.updated_at DESC, l.created_at DESC), '[]'::jsonb)",
+   777:     "    FROM business.vw_aicm_pmlw_leader_middle_display l",
+   778:     "    WHERE l.owner_civilization_id::text = " + sqlLiteral(owner),
+   779:     "  ),",
+   780:     "  'pmlw_deliverable_requirements', (",
+   781:     "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.display_order ASC, r.updated_at DESC, r.created_at DESC), '[]'::jsonb)",
+   782:     "    FROM business.vw_aicm_pmlw_deliverable_requirement_display r",
+
+===== SERVER SNIPPET: task-ledger @ line 1739 =====
+  1731: 
+  1732:     if (route === "/api/aicm/v2/section/create" && req.method === "POST") {
+  1733:       const payload = createSection(await readBody(req));
+  1734:       sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+  1735:       return true;
+  1736:     }
+  1737: 
+  1738:     
+  1739:     if (route === "/api/aicm/v2/task-ledger/create" && req.method === "POST") {
+  1740:       const payload = createTaskLedger(await readBody(req));
+  1741:       sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+  1742:       return true;
+  1743:     }
+  1744: 
+  1745:     if (route === "/api/aicm/v2/placement/sync-role-settings" && req.method === "POST") {
+  1746:       const payload = syncRoleSettings(await readBody(req));
+  1747:       sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+  1748:       return true;
+  1749:     }
+  1750: 
+  1751: if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
+
+===== SERVER SNIPPET: csv @ line 456 =====
+   448:     "  FROM resolved r",
+   449:     "), inserted AS (",
+   450:     "  INSERT INTO business.aicm_manager_major_work_item (",
+   451:     "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+   452:     "    major_item_name, major_item_description, source_route_code, assigned_leader_label,",
+   453:     "    decomposition_status_code, handoff_status_code, priority_code, due_date, note, display_order",
+   454:     "  )",
+   455:     "  SELECT owner_civilization_id, aicm_user_company_id, department_id, section_id,",
+   456:     "         major_item_name, major_item_description, 'csv_import', assigned_leader_label,",
+   457:     "         'not_started', 'draft', priority_code, due_date, note, 100 + row_order",
+   458:     "  FROM resolved_section",
+   459:     "  RETURNING *",
+   460:     ")",
+   461:     "SELECT jsonb_build_object(",
+   462:     "  'result', 'ok',",
+   463:     "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+   464:     "  'inserted_count', (SELECT count(*) FROM inserted),",
+   465:     "  'manager_major_items', COALESCE((SELECT jsonb_agg(to_jsonb(inserted) ORDER BY display_order, created_at) FROM inserted), '[]'::jsonb)",
+   466:     ")::text;"
+   467:   ].join("\n");
+   468: 
+
+===== SERVER SNIPPET: csv @ line 1663 =====
+  1655: 
+  1656:     if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+  1657:       const body = await readBody(req);
+  1658:       sendJson(res, 200, archiveManagerMajorItem(body));
+  1659:       return true;
+  1660:     }
+  1661: 
+  1662: // AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+  1663:     if (route === "/api/aicm/v2/manager-major/import-csv" && req.method === "POST") {
+  1664:       const body = await readBody(req);
+  1665:       sendJson(res, 200, importManagerMajorItemsCsv(body));
+  1666:       return true;
+  1667:     }
+  1668: 
+  1669: 
+  1670:     if (route === "/api/aicm/v2/human-review/create" && req.method === "POST") {
+  1671:       const body = await readBody(req);
+  1672:       sendJson(res, 200, createHumanReviewItem(body));
+  1673:       return true;
+  1674:     }
+  1675: 
+
+===== SERVER SNIPPET: POST @ line 31 =====
+    23:   ".svg": "image/svg+xml; charset=utf-8",
+    24:   ".ico": "image/x-icon"
+    25: };
+    26: 
+    27: function sendJson(res, statusCode, payload) {
+    28:   res.writeHead(statusCode, {
+    29:     "content-type": "application/json; charset=utf-8",
+    30:     "access-control-allow-origin": "*",
+    31:     "access-control-allow-methods": "GET,POST,OPTIONS",
+    32:     "access-control-allow-headers": "content-type",
+    33:     "cache-control": "no-store"
+    34:   });
+    35:   res.end(JSON.stringify(payload, null, 2));
+    36: }
+    37: 
+    38: function sendText(res, statusCode, contentType, text) {
+    39:   res.writeHead(statusCode, {
+    40:     "content-type": contentType,
+    41:     "cache-control": "no-store"
+    42:   });
+    43:   res.end(text);
+
+===== SERVER SNIPPET: POST @ line 1495 =====
+  1487:     source_request_ref: sourceRequestRef,
+  1488:     requested_by_ref: requestedByRef,
+  1489:     idempotency_key: idempotencyKey
+  1490:   };
+  1491: 
+  1492:   const url = baseUrl + "/aiworker/v1/runtime-execution/request";
+  1493: 
+  1494:   const response = await fetch(url, {
+  1495:     method: "POST",
+  1496:     headers: {
+  1497:       "Authorization": "Bearer " + token,
+  1498:       "Content-Type": "application/json",
+  1499:       "Idempotency-Key": idempotencyKey
+  1500:     },
+  1501:     body: JSON.stringify(outboundBody)
+  1502:   });
+  1503: 
+  1504:   const responseText = await response.text();
+  1505:   let responseJson = null;
+  1506: 
+  1507:   try {
+
+===== SERVER SNIPPET: POST @ line 1638 =====
+  1630: 
+  1631:   try {
+  1632:     if (req.method === "OPTIONS") {
+  1633:       sendJson(res, 200, { result: "ok", api_identifier: SERVER_MARK });
+  1634:       return true;
+  1635:     }
+  1636: 
+  1637:     
+  1638:     if (route === "/api/aicm/v2/president-policy/create" && req.method === "POST") {
+  1639:       const body = await readBody(req);
+  1640:       sendJson(res, 200, createPresidentPolicy(body));
+  1641:       return true;
+  1642:     }
+  1643: 
+  1644:     if (route === "/api/aicm/v2/manager-major/create" && req.method === "POST") {
+  1645:       const body = await readBody(req);
+  1646:       sendJson(res, 200, createManagerMajorItem(body));
+  1647:       return true;
+  1648:     }
+  1649: 
+  1650:     if (route === "/api/aicm/v2/manager-major/update" && req.method === "POST") {
+
+===== SERVER SNIPPET: POST @ line 1644 =====
+  1636: 
+  1637:     
+  1638:     if (route === "/api/aicm/v2/president-policy/create" && req.method === "POST") {
+  1639:       const body = await readBody(req);
+  1640:       sendJson(res, 200, createPresidentPolicy(body));
+  1641:       return true;
+  1642:     }
+  1643: 
+  1644:     if (route === "/api/aicm/v2/manager-major/create" && req.method === "POST") {
+  1645:       const body = await readBody(req);
+  1646:       sendJson(res, 200, createManagerMajorItem(body));
+  1647:       return true;
+  1648:     }
+  1649: 
+  1650:     if (route === "/api/aicm/v2/manager-major/update" && req.method === "POST") {
+  1651:       const body = await readBody(req);
+  1652:       sendJson(res, 200, updateManagerMajorItem(body));
+  1653:       return true;
+  1654:     }
+  1655: 
+  1656:     if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+
+===== SERVER SNIPPET: POST @ line 1650 =====
+  1642:     }
+  1643: 
+  1644:     if (route === "/api/aicm/v2/manager-major/create" && req.method === "POST") {
+  1645:       const body = await readBody(req);
+  1646:       sendJson(res, 200, createManagerMajorItem(body));
+  1647:       return true;
+  1648:     }
+  1649: 
+  1650:     if (route === "/api/aicm/v2/manager-major/update" && req.method === "POST") {
+  1651:       const body = await readBody(req);
+  1652:       sendJson(res, 200, updateManagerMajorItem(body));
+  1653:       return true;
+  1654:     }
+  1655: 
+  1656:     if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+  1657:       const body = await readBody(req);
+  1658:       sendJson(res, 200, archiveManagerMajorItem(body));
+  1659:       return true;
+  1660:     }
+  1661: 
+  1662: // AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+
+===== SERVER SNIPPET: POST @ line 1656 =====
+  1648:     }
+  1649: 
+  1650:     if (route === "/api/aicm/v2/manager-major/update" && req.method === "POST") {
+  1651:       const body = await readBody(req);
+  1652:       sendJson(res, 200, updateManagerMajorItem(body));
+  1653:       return true;
+  1654:     }
+  1655: 
+  1656:     if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+  1657:       const body = await readBody(req);
+  1658:       sendJson(res, 200, archiveManagerMajorItem(body));
+  1659:       return true;
+  1660:     }
+  1661: 
+  1662: // AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+  1663:     if (route === "/api/aicm/v2/manager-major/import-csv" && req.method === "POST") {
+  1664:       const body = await readBody(req);
+  1665:       sendJson(res, 200, importManagerMajorItemsCsv(body));
+  1666:       return true;
+  1667:     }
+  1668: 
+
+===== SERVER SNIPPET: url.pathname @ line 1629 =====
+  1621:     api_identifier: SERVER_MARK,
+  1622:     upstream_status_code: response.status,
+  1623:     upstream_path: pathname,
+  1624:     payload
+  1625:   };
+  1626: }
+  1627: 
+  1628: async function handleApi(req, res, url) {
+  1629:   const route = url.pathname;
+  1630: 
+  1631:   try {
+  1632:     if (req.method === "OPTIONS") {
+  1633:       sendJson(res, 200, { result: "ok", api_identifier: SERVER_MARK });
+  1634:       return true;
+  1635:     }
+  1636: 
+  1637:     
+  1638:     if (route === "/api/aicm/v2/president-policy/create" && req.method === "POST") {
+  1639:       const body = await readBody(req);
+  1640:       sendJson(res, 200, createPresidentPolicy(body));
+  1641:       return true;
+
+===== SERVER SNIPPET: url.pathname @ line 1812 =====
+  1804:   if (!full.startsWith(APP_ROOT)) {
+  1805:     return null;
+  1806:   }
+  1807: 
+  1808:   return full;
+  1809: }
+  1810: 
+  1811: function serveStatic(req, res, url) {
+  1812:   const filePath = safeStaticPath(url.pathname);
+  1813: 
+  1814:   if (!filePath) {
+  1815:     sendText(res, 403, "text/plain; charset=utf-8", "Forbidden");
+  1816:     return;
+  1817:   }
+  1818: 
+  1819:   fs.readFile(filePath, (error, data) => {
+  1820:     if (error) {
+  1821:       sendText(res, 404, "text/plain; charset=utf-8", "Not found");
+  1822:       return;
+  1823:     }
+  1824: 

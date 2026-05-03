@@ -1295,6 +1295,16 @@ function aicmV12IsRobotCompatibleWithTargetRole(robot, targetRole) {
   }
 
   function renderPreview(target) {
+    /* AICM_GATE_ROBOT_PLACEMENT_PAYLOAD_PREVIEW_AKR_AKU_V1
+     * 本番UIではロボット配置 payload preview / debug panel を描画しない。
+     * payload build / validation / normalizer は残す。
+     * デバッグ表示が必要な時だけ console 等で:
+     * window.AICM_DEV_DEBUG_SURFACE_ENABLED = true
+     */
+    if (!window.AICM_DEV_DEBUG_SURFACE_ENABLED) {
+      return;
+    }
+
     var card = cardForTarget(target);
     var payload, existing, html, statusClass, detailsWasOpen;
 
@@ -1335,6 +1345,16 @@ function aicmV12IsRobotCompatibleWithTargetRole(robot, targetRole) {
   }
 
   function renderAll() {
+    /* AICM_GATE_ROBOT_PLACEMENT_PAYLOAD_PREVIEW_AKR_AKU_V1
+     * 本番UIではロボット配置 payload preview / debug panel を描画しない。
+     * payload build / validation / normalizer は残す。
+     * デバッグ表示が必要な時だけ console 等で:
+     * window.AICM_DEV_DEBUG_SURFACE_ENABLED = true
+     */
+    if (!window.AICM_DEV_DEBUG_SURFACE_ENABLED) {
+      return;
+    }
+
     try {
       injectStyle();
       TARGETS.forEach(renderPreview);

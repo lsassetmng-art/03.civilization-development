@@ -1,0 +1,311 @@
+    ].join("");
+  }
+// AICM_R8T_LEADER_INBOX_DISPLAY_HELPER_END
+
+// AICM_R8U_MANAGER_MAJOR_SUMMARY_HELPER_START
+  function aicmSummaryTextR8U(value) {
+    if (value === null || typeof value === "undefined") return "";
+    return String(value).trim();
+  }
+
+  function aicmSummaryMajorIdR8U(row) {
+    var r = row && typeof row === "object" ? row : {};
+    return aicmSummaryTextR8U(
+      r.aicm_manager_major_work_item_id ||
+      r.manager_major_work_item_id ||
+      r.majorId ||
+      r.major_id ||
+      r.id
+    );
+  }
+
+  function aicmSummarySelectedCompanyIdR8U() {
+    if (state && state.selectedCompanyId) return aicmSummaryTextR8U(state.selectedCompanyId);
+    if (typeof selectedCompany === "function") {
+      var company = selectedCompany();
+      if (company && company.aicm_user_company_id) return aicmSummaryTextR8U(company.aicm_user_company_id);
+    }
+    return "";
+  }
+
+  function aicmManagerMajorSummaryRowsR8U() {
+    var ctx = state && state.context ? state.context : {};
+    var rows = [];
+    var seen = {};
+    var selectedCompanyId = aicmSummarySelectedCompanyIdR8U();
+
+    function add(list) {
+      if (!Array.isArray(list)) return;
+      for (var i = 0; i < list.length; i += 1) {
+        var row = list[i];
+        if (!row || typeof row !== "object") continue;
+
+        var rowCompanyId = aicmSummaryTextR8U(row.aicm_user_company_id);
+        if (selectedCompanyId && rowCompanyId && selectedCompanyId !== rowCompanyId) continue;
+
+        var id = aicmSummaryMajorIdR8U(row);
+        var key = id || ("summary_row_" + rows.length);
+        if (seen[key]) continue;
+        seen[key] = true;
+        rows.push(row);
+      }
+    }
+
+    add(ctx.pmlw_major_items);
+    add(ctx.pmlwMajorItems);
+    add(ctx.manager_major_items);
+    add(ctx.managerMajorItems);
+    add(ctx.major_items);
+    add(ctx.majorItems);
+
+    return rows;
+  }
+
+  function aicmManagerMajorSummaryBucketR8U(row) {
+    var handoff = aicmSummaryTextR8U(row && row.handoff_status_code).toLowerCase();
+    var decomposition = aicmSummaryTextR8U(row && row.decomposition_status_code).toLowerCase();
+    var deleted = aicmSummaryTextR8U(row && (row.deleted_flag || row.is_deleted)).toLowerCase();
+    var archived = aicmSummaryTextR8U(row && (row.archived_flag || row.is_archived)).toLowerCase();
+
+    if (deleted === "true" || deleted === "1") return "archived";
+    if (archived === "true" || archived === "1") return "archived";
+    if (handoff === "archived" || decomposition === "archived" || handoff === "deleted" || decomposition === "deleted") return "archived";
+
+    if (
+      handoff === "completed" ||
+      handoff === "done" ||
+      decomposition === "completed" ||
+      decomposition === "complete" ||
+      decomposition === "done" ||
+      decomposition === "decomposed"
+    ) {
+      return "completed";
+    }
+
+    if (
+      decomposition === "leader_decomposing" ||
+      decomposition === "worker_assigned" ||
+      decomposition === "in_progress" ||
+      handoff === "accepted" ||
+      handoff === "in_progress"
+    ) {
+      return "auto_processing";
+    }
+
+    if (handoff === "handed_off" || decomposition === "assigned_to_leader") {
+      return "leader_received";
+    }
+
+    if (
+      handoff === "draft" ||
+      handoff === "ready_handoff" ||
+      decomposition === "not_started" ||
+      (!handoff && !decomposition)
+    ) {
+      return "pending";
+    }
+
+    return "other";
+  }
+
+  function aicmManagerMajorSummaryBucketsR8U() {
+    return [
+      { code: "pending", label: "未引き継ぎ", note: "Manager大項目として登録済み。まだ課長へ送っていない件数。" },
+      { code: "leader_received", label: "Leader受信済み", note: "課長/Leaderへ送信済み。以降は自動処理対象。" },
+      { code: "auto_processing", label: "自動処理中", note: "Leader以降の自動分解・Worker展開中の件数。" },
+      { code: "completed", label: "完了/分解済み", note: "分解または後続処理が完了した件数。" },
+      { code: "archived", label: "削除済み", note: "削除済みまたはアーカイブ済みの件数。" },
+      { code: "other", label: "その他", note: "想定外または移行中ステータスの件数。" }
+    ];
+  }
+
+  function aicmManagerMajorSummaryCountsR8U() {
+    var rows = aicmManagerMajorSummaryRowsR8U();
+    var buckets = aicmManagerMajorSummaryBucketsR8U();
+    var map = {};
+
+    for (var i = 0; i < buckets.length; i += 1) {
+      map[buckets[i].code] = {
+        code: buckets[i].code,
+        label: buckets[i].label,
+        note: buckets[i].note,
+        count: 0,
+        rows: []
+      };
+    }
+
+    for (var j = 0; j < rows.length; j += 1) {
+      var row = rows[j];
+      var code = aicmManagerMajorSummaryBucketR8U(row);
+      if (!map[code]) code = "other";
+      map[code].count += 1;
+      map[code].rows.push(row);
+    }
+
+    return {
+      total: rows.length,
+      buckets: buckets.map(function (bucket) { return map[bucket.code]; }),
+      map: map
+    };
+  }
+
+  function aicmManagerMajorSummaryPriorityLabelR8U(value) {
+    var code = aicmSummaryTextR8U(value).toLowerCase();
+    if (code === "urgent") return "緊急";
+    if (code === "high") return "高";
+    if (code === "normal") return "通常";
+    if (code === "low") return "低";
+    return code || "未設定";
+  }
+
+  function aicmRenderManagerMajorSummaryDetailRowsR8U(rows, label) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return '<div class="aicm-empty-state"><strong>該当する大項目はありません</strong><p>' + escapeHtml(label || "選択条件") + 'の行はありません。</p></div>';
+    }
+
+    var limit = 20;
+    var visible = rows.slice(0, limit);
+    var cards = visible.map(function (row, index) {
+      var title = aicmSummaryTextR8U(row && (row.major_item_name || row.deliverable_name || row.task_name)) || "Manager大項目";
+      var description = aicmSummaryTextR8U(row && (row.major_item_description || row.task_description || row.note));
+      var leader = aicmSummaryTextR8U(row && (row.assigned_leader_label || row.leader_label || row.responsible_robot_label)) || "未設定";
+      var due = aicmSummaryTextR8U(row && row.due_date) || "未設定";
+      var handoff = aicmSummaryTextR8U(row && row.handoff_status_code) || "未設定";
+      var decomposition = aicmSummaryTextR8U(row && row.decomposition_status_code) || "未設定";
+
+      return [
+        '<article class="aicm-ledger-row">',
+        '  <p class="aicm-eyebrow">詳細 #' + escapeHtml(String(index + 1)) + '</p>',
+        '  <h3>' + escapeHtml(title) + '</h3>',
+        description ? '  <p class="aicm-selected-note">' + escapeHtml(description) + '</p>' : '',
+        '  <dl class="aicm-ledger-meta">',
+        '    <div><dt>課長/Leader</dt><dd>' + escapeHtml(leader) + '</dd></div>',
+        '    <div><dt>優先度</dt><dd>' + escapeHtml(aicmManagerMajorSummaryPriorityLabelR8U(row && row.priority_code)) + '</dd></div>',
+        '    <div><dt>期限</dt><dd>' + escapeHtml(due) + '</dd></div>',
+        '    <div><dt>状態</dt><dd>' + escapeHtml(decomposition + " / " + handoff) + '</dd></div>',
+        '  </dl>',
+        '</article>'
+      ].join("");
+    }).join("");
+
+    var more = rows.length > limit ? '<p class="aicm-selected-note">表示は先頭' + escapeHtml(String(limit)) + '件です。全件確認は次工程で詳細画面化します。</p>' : '';
+
+    return [
+      '<div class="aicm-ledger-list">',
+      cards,
+      '</div>',
+      more
+    ].join("");
+  }
+
+  function aicmRenderManagerMajorSummaryDetailR8U(summary) {
+    var filter = aicmSummaryTextR8U(state && state.managerMajorSummaryFilterR8U);
+    if (!filter) {
+      return '<p class="aicm-selected-note">件数カードを押すと、その分類の詳細をここで確認できます。</p>';
+    }
+
+    var bucket = summary.map[filter] || summary.map.other;
+    var label = bucket ? bucket.label : "詳細";
+    var rows = bucket ? bucket.rows : [];
+
+    return [
+      '<section class="aicm-core-card" style="border:1px solid #c7d2fe;">',
+      '  <p class="aicm-eyebrow">サマリ詳細</p>',
+      '  <h3>' + escapeHtml(label) + ' の詳細</h3>',
+      '  <p class="aicm-selected-note">対象: <strong>' + escapeHtml(String(rows.length)) + '件</strong></p>',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="manager-major-summary-filter-clear">詳細表示を閉じる</button>',
+      '  </div>',
+      aicmRenderManagerMajorSummaryDetailRowsR8U(rows, label),
+      '</section>'
+    ].join("");
+  }
+
+  function aicmRenderManagerMajorSummarySectionR8U() {
+    var summary = aicmManagerMajorSummaryCountsR8U();
+    var cards = summary.buckets.map(function (bucket) {
+      var selected = aicmSummaryTextR8U(state && state.managerMajorSummaryFilterR8U) === bucket.code;
+      return [
+        '<button type="button" data-core-action="manager-major-summary-filter" data-summary-filter="' + escapeHtml(bucket.code) + '" style="text-align:left;display:block;">',
+        '  <span style="display:block;font-size:12px;color:#64748b;font-weight:900;">' + escapeHtml(bucket.label) + '</span>',
+        '  <strong style="display:block;font-size:24px;margin-top:4px;">' + escapeHtml(String(bucket.count)) + '件</strong>',
+        '  <span style="display:block;font-size:12px;margin-top:4px;color:#64748b;">' + escapeHtml(selected ? "選択中" : bucket.note) + '</span>',
+        '</button>'
+      ].join("");
+    }).join("");
+
+    return [
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Manager大項目サマリ</p>',
+      '  <h2>大項目 件数サマリ</h2>',
+      '  <p class="aicm-selected-note">Manager大項目から現在の状態別件数を表示します。件数カードを押すと詳細を確認できます。</p>',
+      '  <p class="aicm-selected-note">合計: <strong>' + escapeHtml(String(summary.total)) + '件</strong></p>',
+      '  <div class="aicm-dashboard-action-row">',
+      cards,
+      '  </div>',
+      aicmRenderManagerMajorSummaryDetailR8U(summary),
+      '</section>'
+    ].join("");
+  }
+
+  function aicmManagerMajorSummaryActionTargetR8U(ev, btn) {
+    if (typeof aicmActionTargetSafe === "function") {
+      var safeTarget = aicmActionTargetSafe(ev, btn);
+      if (safeTarget && safeTarget.getAttribute) return safeTarget;
+    }
+
+    if (btn && btn.getAttribute) return btn;
+
+    if (ev && ev.target && ev.target.closest) {
+      var closest = ev.target.closest("[data-core-action]");
+      if (closest && closest.getAttribute) return closest;
+    }
+
+    return null;
+  }
+// AICM_R8U_MANAGER_MAJOR_SUMMARY_HELPER_END
+
+function renderTaskLedgerPlaceholder() {
+    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: screen
+    var company = typeof selectedCompany === "function" ? selectedCompany() : null;
+    var companyId = company && company.aicm_user_company_id ? company.aicm_user_company_id : "";
+    var rows = aicmGetManagerMajorRowsForSelectedCompany(companyId);
+    
+
+    return renderShell([
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+      '  <h2>部門別タスク台帳</h2>',
+      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+      '  <p class="aicm-selected-note">未実行のManager大項目だけをDB/contextから表示します。CSV取り込みは部長/Manager分解済み大項目の新規追加です。</p>',
+'  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="task-ledger-refresh">登録済み大項目をリロード</button>',
+      '  </div>',
+      '</section>',
+      aicmRenderManagerMajorSummarySectionR8U(),
+      renderCsvImportCard(company),
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Manager大項目</p>',
+      '  <h2>登録済み大項目</h2>',
+      aicmRenderManagerMajorRows(rows),
+      '</section>',
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Leader受信箱</p>',
+      '  <h2>課長/Leader受信箱</h2>',
+      '  <p class="aicm-selected-note">課長へ送ったManager大項目を表示します。次工程で中項目へ分解します。</p>',
+      aicmRenderLeaderInboxR8T(),
+      '</section>'
+    ].join(""));
+  }
+
+  
+// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+// Human review queue UI.
+// Human review only shows delivery summaries / exception summaries.
+// AI review remains internal; the UI displays ai_review_result_text summary only.
+
+function aicmHumanReviewOwnerId() {
+    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+    return "00000000-0000-4000-8000-000000000001";

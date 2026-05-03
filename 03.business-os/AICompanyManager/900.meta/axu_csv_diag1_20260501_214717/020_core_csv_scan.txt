@@ -1,0 +1,2353 @@
+============================================================
+CORE CSV UI / parser scan
+============================================================
+3420-      var ch = value[i];
+3421-      var next = value[i + 1];
+3422-
+3423-      if (inQuotes && ch === '"' && next === '"') {
+3424-        cell += '"';
+3425-        i += 1;
+3426-        continue;
+3427-      }
+3428-
+3429-      if (ch === '"') {
+3430-        inQuotes = !inQuotes;
+3431-        continue;
+3432-      }
+3433-
+3434-      if (!inQuotes && ch === ",") {
+3435-        row.push(cell);
+3436-        cell = "";
+3437-        continue;
+3438-      }
+3439-
+3440-      if (!inQuotes && (ch === "\n" || ch === "\r")) {
+3441-        if (ch === "\r" && next === "\n") i += 1;
+3442-        row.push(cell);
+3443-        cell = "";
+3444-
+3445-        if (row.some(function (v) { return String(v || "").trim() !== ""; })) {
+3446-          rows.push(row);
+3447-        }
+3448-
+3449-        row = [];
+3450-        continue;
+3451-      }
+3452-
+3453-      cell += ch;
+3454-    }
+3455-
+3456-    row.push(cell);
+3457-    if (row.some(function (v) { return String(v || "").trim() !== ""; })) {
+3458-      rows.push(row);
+3459-    }
+3460-
+3461-    if (rows.length < 2) return [];
+3462-
+3463-    var headers = rows[0].map(function (v) {
+3464-      return String(v || "").trim();
+3465-    });
+3466-
+3467-    return rows.slice(1).map(function (values) {
+3468-      var obj = {};
+3469-      headers.forEach(function (header, index) {
+3470-        obj[header] = String(values[index] || "").trim();
+3471-      });
+3472-      return obj;
+3473-    }).filter(function (obj) {
+3474-      return Object.keys(obj).some(function (key) {
+3475-        return String(obj[key] || "").trim() !== "";
+3476-      });
+3477-    });
+3478-  }
+3479-
+3480-  async function importTaskLedgerCsvToPmlwMajor() {
+3481-    var company = selectedCompany();
+3482-
+3483-    if (!company) {
+3484-      setMessage("error", "AI企業を選択してください。");
+3485-      return;
+3486-    }
+3487-
+3488-    var text = String(state.csvImportText || "").trim();
+3489-
+3490-    if (!text) {
+3491-      setMessage("error", "CSVファイルを読み込んでください。");
+3492-      return;
+3493-    }
+3494-
+3495-    try {
+3496-      var rows = parseAicmCsv(text);
+3497-
+3498-      if (!rows.length) {
+3499-        setMessage("error", "取り込めるCSV行がありません。");
+3500-        return;
+3501-      }
+3502-
+3503-      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+3504-        owner_civilization_id: aicmPmlwOwnerId(),
+3505-        aicm_user_company_id: company.aicm_user_company_id,
+3506-        rows: rows
+3507-      });
+3508-
+3509-      var count = result.inserted_count || 0;
+3510-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+3511-      setMessage("ok", state.csvImportLastResult);
+3512-
+3513-      await aicmPmlwReloadContext();
+3514-    } catch (error) {
+3515-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3516-    }
+3517-  }
+3518-
+3519-
+3520:  function renderCsvImportCard(company) {
+3521-    var fileName = state.csvImportFileName || "未選択";
+3522-    var lastResult = state.csvImportLastResult || "";
+3523-
+3524-    return [
+3525-      '<section class="aicm-core-card aicm-csv-panel">',
+3526-      '  <p class="aicm-eyebrow">CSV取り込み</p>',
+3527-      '  <h2>ChatGPTでCSV作成・取り込み</h2>',
+3528-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3529-      '  <div class="aicm-csv-flow">',
+3530-      '    <div class="aicm-csv-flow-step aicm-csv-flow-main">',
+3531-      '      <div><strong>ChatGPT用プロンプト</strong><p>部長/Managerが分解した大項目CSVをChatGPTで作成します。</p></div>',
+3532-      '      <button type="button" data-core-action="task-ledger-chatgpt-prompt">ChatGPT用プロンプト</button>',
+3533-      '    </div>',
+3534-      '    <div class="aicm-csv-flow-step">',
+3535-      '      <div><strong>CSVファイル読込</strong><p>作成したCSVファイルを選択します。</p></div>',
+3536-      '      <button type="button" data-core-action="task-ledger-csv-file-open">CSVファイル読込</button>',
+3537-      '    </div>',
+3538-      '    <div class="aicm-csv-file-name">ファイル名: <strong>' + escapeHtml(fileName) + '</strong></div>',
+3539-      '    <div class="aicm-csv-flow-step">',
+3540-      '      <div><strong>CSV取り込み実行</strong><p>部長/Manager分解済みの大項目CSVを部門別タスク台帳へ登録します。</p></div>',
+3541-      '      <button type="button" data-core-action="task-ledger-csv-import">CSV取り込み実行</button>',
+3542-      '    </div>',
+3543-      '  </div>',
+3544-      '  <input id="aicm-ledger-csv-file" class="aicm-hidden-file" type="file" accept=".csv,text/csv" data-core-file="task-ledger-csv">',
+3545-      lastResult ? '<p class="aicm-selected-note">' + escapeHtml(lastResult) + '</p>' : '',
+3546-      '</section>'
+3547-    ].join("");
+3548-  }
+3549-
+3550-  
+3551-function renderCsvPreviewTable(preview) {
+3552-    return "";
+3553-  }
+3554-
+3555-  
+3556-function renderCsvTemplatePanel() {
+3557-    return "";
+3558-  }
+3559-
+3560-
+3561-function downloadTextFile(filename, text, mimeType) {
+3562-    var blob = new Blob([String(text || "")], { type: mimeType || "text/plain;charset=utf-8" });
+3563-    var url = URL.createObjectURL(blob);
+3564-    var a = document.createElement("a");
+3565-    a.href = url;
+3566-    a.download = filename;
+3567-    document.body.appendChild(a);
+3568-    a.click();
+3569-    a.remove();
+3570-    setTimeout(function () {
+3571-      URL.revokeObjectURL(url);
+3572-    }, 1000);
+3573-  }
+3574-
+3575-  async function readTaskLedgerCsvFile(file) {
+3576-    if (!file) return;
+3577-
+3578-    try {
+3579-      var text = await file.text();
+3580-      state.csvImportText = text;
+3581-      state.csvImportFileName = file.name || "selected.csv";
+3582-      state.csvImportPreview = [];
+3583-      state.csvImportLastResult = "";
+3584-      setMessage("ok", "CSVファイルを読み込みました: " + state.csvImportFileName);
+3585-    } catch (error) {
+3586-      state.csvImportText = "";
+3587-      state.csvImportFileName = "";
+3588-      state.csvImportPreview = [];
+3589-      state.csvImportLastResult = "";
+3590-      setMessage("error", "CSVファイル読込に失敗しました。");
+3591-    }
+3592-
+3593-    render();
+3594-  }
+3595-
+3596-  function openTaskLedgerCsvFilePicker() {
+3597-    var input = document.getElementById("aicm-ledger-csv-file");
+3598-    if (input) input.click();
+3599-  }
+3600-
+3601-  async function openTaskLedgerChatGptPrompt() {
+3602-    var text = taskLedgerCsvPromptText();
+3603-
+3604-    try {
+3605-      if (navigator.clipboard && navigator.clipboard.writeText) {
+3606-        await navigator.clipboard.writeText(text);
+3607-        setMessage("ok", "ChatGPT用プロンプトをコピーしました。");
+3608-        render();
+3609-        return;
+3610-      }
+3611-    } catch (error) {
+3612-    }
+3613-
+3614-    downloadTextFile("aicm_task_ledger_chatgpt_prompt.txt", text, "text/plain;charset=utf-8");
+3615-    setMessage("ok", "ChatGPT用プロンプトファイルを作成しました。");
+3616-    render();
+3617-  }
+3618-
+3619-
+3620-  function previewTaskLedgerCsv() {
+--
+3943-
+3944-    if (!rows.length) return "";
+3945-
+3946-    return [
+3947-      '<section class="aicm-core-card aicm-axu-r1b-leader-handoff-panel">',
+3948-      '  <p class="aicm-eyebrow">Manager大項目</p>',
+3949-      '  <h2>課長への引渡し</h2>',
+3950-      '  <p class="aicm-selected-note">Manager大項目を課長/Leaderへ送ります。Worker Runtime request はまだ作成しません。</p>',
+3951-      rows.map(function (row) {
+3952-        var majorId = typeof aicmAxuR1MajorId === "function" ? aicmAxuR1MajorId(row) : "";
+3953-        var title = row.major_item_name || row.deliverable_name || row.task_name || "Manager大項目";
+3954-        var leader = row.assigned_leader_label || row.leader_label || "Leader未設定";
+3955-        var status = row.decomposition_status_code || "-";
+3956-        var handoff = row.handoff_status_code || "-";
+3957-
+3958-        return [
+3959-          '<article class="aicm-org-update-row">',
+3960-          '  <div>',
+3961-          '    <strong>' + escapeHtml(title) + '</strong>',
+3962-          '    <p>Leader: ' + escapeHtml(leader) + ' / 状態: ' + escapeHtml(status) + ' / 引渡し: ' + escapeHtml(handoff) + '</p>',
+3963-          '  </div>',
+3964-          '  <button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + escapeHtml(majorId) + '">課長へ送る</button>',
+3965-          '</article>'
+3966-        ].join("");
+3967-      }).join(""),
+3968-      '</section>'
+3969-    ].join("");
+3970-  }
+3971-
+3972-
+3973-function renderPmlwMajorRowsBaseAxuR1B(rows) {
+3974-    if (!rows.length) {
+3975-      return [
+3976-        '<div class="aicm-empty-state">',
+3977-        '  <strong>登録済み大項目はまだありません</strong>',
+3978-        '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+3979-        '</div>'
+3980-      ].join("");
+3981-    }
+3982-
+3983-    return [
+3984-      '<div class="aicm-table-wrap">',
+3985-      '  <table class="aicm-core-table">',
+3986-      '    <thead>',
+3987-      '      <tr>',
+3988-      '        <th>方針元</th>',
+3989-      '        <th>大項目</th>',
+3990-      '        <th>部門</th>',
+3991-      '        <th>課</th>',
+3992-      '        <th>Leader</th>',
+3993-      '        <th>分解状態</th>',
+3994-      '        <th>引渡し</th>',
+3995-      '        <th>優先度</th>',
+3996-      '        <th>期限</th>',
+3997-      '        <th>操作</th>',
+3998-      '      </tr>',
+3999-      '    </thead>',
+4000-      '    <tbody>',
+4001-      rows.map(function (row) {
+4002-        return [
+4003-          '      <tr>',
+4004-          '        <td>' + escapeHtml(pmlwValue(row.policy_title, row.source_route_code || "-")) + '</td>',
+4005-          '        <td><strong>' + escapeHtml(pmlwValue(row.major_item_name, "-")) + '</strong><small>' + escapeHtml(pmlwValue(row.major_item_description, "")) + '</small></td>',
+4006-          '        <td>' + escapeHtml(pmlwValue(row.department_name, "未割当")) + '</td>',
+4007-          '        <td>' + escapeHtml(pmlwValue(row.section_name, "未割当")) + '</td>',
+4008-          '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+4009-          '        <td>' + escapeHtml(pmlwStatusLabel(row.decomposition_status_code)) + '</td>',
+4010-          '        <td>' + escapeHtml(pmlwStatusLabel(row.handoff_status_code)) + '</td>',
+4011-          '        <td>' + escapeHtml(pmlwStatusLabel(row.priority_code)) + '</td>',
+4012-          '        <td>' + escapeHtml(pmlwValue(row.due_date, "-")) + '</td>',
+4013-          '        <td><button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + escapeHtml(aicmAxuR1MajorId(row)) + '">課長へ送る</button></td>',
+4014-          '      </tr>'
+4015-        ].join("");
+4016-      }).join(""),
+4017-      '    </tbody>',
+4018-      '  </table>',
+4019-      '</div>'
+4020-    ].join("");
+4021-  }
+4022-
+4023-function renderPmlwMajorRows(rows) {
+4024-    // AICM_AXU_MAINT_R2_PMLW_ROWS_PARAM_V1
+4025-    var safeRows = Array.isArray(rows) ? rows : [];
+4026-    return renderPmlwMajorRowsBaseAxuR1B(safeRows);
+4027-  }
+4028-
+4029-
+4030-  
+4031-
+4032-function renderTaskLedgerPlaceholder() {
+4033-    var company = selectedCompany();
+4034-    var rows = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+4035-
+4036-    return renderShell([
+4037-      '<section class="aicm-core-card">',
+4038-      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+4039-      '  <h2>部門別タスク台帳</h2>',
+4040-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+4041-      '  <p class="aicm-selected-note">President方針やユーザー依頼を、Managerが大項目として整理し、部門・課・Leaderへ引き渡すための台帳です。</p>',
+4042-      '</section>',
+4043:      renderCsvImportCard(company),
+4044-      '<section class="aicm-core-card">',
+4045-      '  <p class="aicm-eyebrow">Manager大項目</p>',
+4046-      '  <h2>登録済み大項目</h2>',
+4047-      renderPmlwMajorRows(rows),
+4048-      '</section>'
+4049-    ].join(""));
+4050-  }
+4051-
+4052-  
+4053-// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+4054-// Human review queue UI.
+4055-// Human review only shows delivery summaries / exception summaries.
+4056-// AI review remains internal; the UI displays ai_review_result_text summary only.
+4057-
+4058-function aicmHumanReviewOwnerId() {
+4059-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+4060-    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+4061-    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+4062-    return "00000000-0000-4000-8000-000000000001";
+4063-  }
+4064-
+4065-  function aicmHumanReviewRows() {
+4066-    var ctx = state.context || state || {};
+4067-    var rows = ctx.review_wait_items || state.review_wait_items || [];
+4068-    return Array.isArray(rows) ? rows : [];
+4069-  }
+4070-
+4071-  function aicmHumanReviewRowsForCompany(companyId) {
+4072-    return aicmHumanReviewRows().filter(function (row) {
+4073-      return !companyId || row.aicm_user_company_id === companyId;
+4074-    });
+4075-  }
+4076-
+4077-  async function aicmHumanReviewPostJson(path, body) {
+4078-    var response = await fetch(path, {
+4079-      method: "POST",
+4080-      headers: { "Content-Type": "application/json" },
+4081-      body: JSON.stringify(body || {})
+4082-    });
+4083-
+4084-    var text = await response.text();
+4085-    var json = {};
+4086-
+4087-    try {
+4088-      json = text ? JSON.parse(text) : {};
+4089-    } catch (_) {
+4090-      json = { result: "error", message: text || "Invalid server response" };
+4091-    }
+4092-
+4093-    if (!response.ok || (json.result && json.result !== "ok")) {
+4094-      throw new Error(json.message || json.error || ("API failed: " + path));
+4095-    }
+4096-
+4097-    return json;
+4098-  }
+4099-
+4100-  async function aicmHumanReviewReload() {
+4101-    if (typeof aicmPmlwReloadContext === "function") {
+4102-      await aicmPmlwReloadContext();
+4103-      return;
+4104-    }
+4105-
+4106-    if (typeof loadContext === "function") {
+4107-      await loadContext();
+4108-      return;
+4109-    }
+4110-
+4111-    var owner = encodeURIComponent(aicmHumanReviewOwnerId());
+4112-    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+4113-    var json = await response.json();
+4114-
+4115-    if (json && json.result === "ok") state.context = json;
+4116-    if (typeof render === "function") render();
+4117-  }
+4118-
+4119-  async function approveHumanReviewFromAction(el) {
+4120-    var reviewId = el && el.getAttribute ? el.getAttribute("data-review-id") : "";
+4121-
+4122-    if (!reviewId) {
+4123-      setMessage("error", "レビュー項目を特定できません。");
+4124-      return;
+4125-    }
+4126-
+4127-    try {
+4128-      await aicmHumanReviewPostJson("/api/aicm/v2/human-review/approve", {
+4129-        owner_civilization_id: aicmHumanReviewOwnerId(),
+4130-        aicm_human_review_item_id: reviewId,
+4131-        human_reviewer_label: "user",
+4132-        human_review_note: ""
+4133-      });
+4134-
+4135-      setMessage("ok", "レビューを承認しました。");
+4136-      await aicmHumanReviewReload();
+4137-    } catch (error) {
+4138-      setMessage("error", error && error.message ? error.message : "承認に失敗しました。");
+4139-    }
+4140-  }
+4141-
+4142-  async function returnHumanReviewFromAction(el) {
+4143-    var reviewId = el && el.getAttribute ? el.getAttribute("data-review-id") : "";
+
+3456-    row.push(cell);
+3457-    if (row.some(function (v) { return String(v || "").trim() !== ""; })) {
+3458-      rows.push(row);
+3459-    }
+3460-
+3461-    if (rows.length < 2) return [];
+3462-
+3463-    var headers = rows[0].map(function (v) {
+3464-      return String(v || "").trim();
+3465-    });
+3466-
+3467-    return rows.slice(1).map(function (values) {
+3468-      var obj = {};
+3469-      headers.forEach(function (header, index) {
+3470-        obj[header] = String(values[index] || "").trim();
+3471-      });
+3472-      return obj;
+3473-    }).filter(function (obj) {
+3474-      return Object.keys(obj).some(function (key) {
+3475-        return String(obj[key] || "").trim() !== "";
+3476-      });
+3477-    });
+3478-  }
+3479-
+3480-  async function importTaskLedgerCsvToPmlwMajor() {
+3481-    var company = selectedCompany();
+3482-
+3483-    if (!company) {
+3484-      setMessage("error", "AI企業を選択してください。");
+3485-      return;
+3486-    }
+3487-
+3488-    var text = String(state.csvImportText || "").trim();
+3489-
+3490-    if (!text) {
+3491-      setMessage("error", "CSVファイルを読み込んでください。");
+3492-      return;
+3493-    }
+3494-
+3495-    try {
+3496-      var rows = parseAicmCsv(text);
+3497-
+3498-      if (!rows.length) {
+3499-        setMessage("error", "取り込めるCSV行がありません。");
+3500-        return;
+3501-      }
+3502-
+3503-      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+3504-        owner_civilization_id: aicmPmlwOwnerId(),
+3505-        aicm_user_company_id: company.aicm_user_company_id,
+3506-        rows: rows
+3507-      });
+3508-
+3509-      var count = result.inserted_count || 0;
+3510-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+3511-      setMessage("ok", state.csvImportLastResult);
+3512-
+3513-      await aicmPmlwReloadContext();
+3514-    } catch (error) {
+3515-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3516-    }
+3517-  }
+3518-
+3519-
+3520-  function renderCsvImportCard(company) {
+3521-    var fileName = state.csvImportFileName || "未選択";
+3522-    var lastResult = state.csvImportLastResult || "";
+3523-
+3524-    return [
+3525-      '<section class="aicm-core-card aicm-csv-panel">',
+3526-      '  <p class="aicm-eyebrow">CSV取り込み</p>',
+3527-      '  <h2>ChatGPTでCSV作成・取り込み</h2>',
+3528-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3529-      '  <div class="aicm-csv-flow">',
+3530-      '    <div class="aicm-csv-flow-step aicm-csv-flow-main">',
+3531-      '      <div><strong>ChatGPT用プロンプト</strong><p>部長/Managerが分解した大項目CSVをChatGPTで作成します。</p></div>',
+3532-      '      <button type="button" data-core-action="task-ledger-chatgpt-prompt">ChatGPT用プロンプト</button>',
+3533-      '    </div>',
+3534-      '    <div class="aicm-csv-flow-step">',
+3535-      '      <div><strong>CSVファイル読込</strong><p>作成したCSVファイルを選択します。</p></div>',
+3536:      '      <button type="button" data-core-action="task-ledger-csv-file-open">CSVファイル読込</button>',
+3537-      '    </div>',
+3538-      '    <div class="aicm-csv-file-name">ファイル名: <strong>' + escapeHtml(fileName) + '</strong></div>',
+3539-      '    <div class="aicm-csv-flow-step">',
+3540-      '      <div><strong>CSV取り込み実行</strong><p>部長/Manager分解済みの大項目CSVを部門別タスク台帳へ登録します。</p></div>',
+3541-      '      <button type="button" data-core-action="task-ledger-csv-import">CSV取り込み実行</button>',
+3542-      '    </div>',
+3543-      '  </div>',
+3544-      '  <input id="aicm-ledger-csv-file" class="aicm-hidden-file" type="file" accept=".csv,text/csv" data-core-file="task-ledger-csv">',
+3545-      lastResult ? '<p class="aicm-selected-note">' + escapeHtml(lastResult) + '</p>' : '',
+3546-      '</section>'
+3547-    ].join("");
+3548-  }
+3549-
+3550-  
+3551-function renderCsvPreviewTable(preview) {
+3552-    return "";
+3553-  }
+3554-
+3555-  
+3556-function renderCsvTemplatePanel() {
+3557-    return "";
+3558-  }
+3559-
+3560-
+3561-function downloadTextFile(filename, text, mimeType) {
+3562-    var blob = new Blob([String(text || "")], { type: mimeType || "text/plain;charset=utf-8" });
+3563-    var url = URL.createObjectURL(blob);
+3564-    var a = document.createElement("a");
+3565-    a.href = url;
+3566-    a.download = filename;
+3567-    document.body.appendChild(a);
+3568-    a.click();
+3569-    a.remove();
+3570-    setTimeout(function () {
+3571-      URL.revokeObjectURL(url);
+3572-    }, 1000);
+3573-  }
+3574-
+3575-  async function readTaskLedgerCsvFile(file) {
+3576-    if (!file) return;
+3577-
+3578-    try {
+3579-      var text = await file.text();
+3580-      state.csvImportText = text;
+3581-      state.csvImportFileName = file.name || "selected.csv";
+3582-      state.csvImportPreview = [];
+3583-      state.csvImportLastResult = "";
+3584-      setMessage("ok", "CSVファイルを読み込みました: " + state.csvImportFileName);
+3585-    } catch (error) {
+3586-      state.csvImportText = "";
+3587-      state.csvImportFileName = "";
+3588-      state.csvImportPreview = [];
+3589-      state.csvImportLastResult = "";
+3590-      setMessage("error", "CSVファイル読込に失敗しました。");
+3591-    }
+3592-
+3593-    render();
+3594-  }
+3595-
+3596-  function openTaskLedgerCsvFilePicker() {
+3597-    var input = document.getElementById("aicm-ledger-csv-file");
+3598-    if (input) input.click();
+3599-  }
+3600-
+3601-  async function openTaskLedgerChatGptPrompt() {
+3602-    var text = taskLedgerCsvPromptText();
+3603-
+3604-    try {
+3605-      if (navigator.clipboard && navigator.clipboard.writeText) {
+3606-        await navigator.clipboard.writeText(text);
+3607-        setMessage("ok", "ChatGPT用プロンプトをコピーしました。");
+3608-        render();
+3609-        return;
+3610-      }
+3611-    } catch (error) {
+3612-    }
+3613-
+3614-    downloadTextFile("aicm_task_ledger_chatgpt_prompt.txt", text, "text/plain;charset=utf-8");
+3615-    setMessage("ok", "ChatGPT用プロンプトファイルを作成しました。");
+3616-    render();
+--
+5171-        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",
+5172-        internalNickname: fieldValue(form, "internalNickname")
+5173-      });
+5174-    } else {
+5175-      task = Promise.reject(new Error("未知のフォームです。"));
+5176-    }
+5177-
+5178-    state.loading = true;
+5179-    render();
+5180-
+5181-    task.catch(function (error) {
+5182-      state.loading = false;
+5183-      state.errorMessage = publicErrorMessage(error);
+5184-      render();
+5185-    });
+5186-  }
+5187-
+5188-  function handleRootClick(event) {
+5189-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+5190-  var aicmRawClickTarget = event.target;
+5191-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+5192-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+5193-    : aicmRawClickTarget;
+5194-
+5195-    var button = aicmActionTarget.closest("[data-core-action]");
+5196-    if (!button) {
+5197-      // AICM_AXU_R1C_SCREEN_ONLY_NAV_FALLBACK
+5198-      var aicmScreenOnlyTarget = aicmActionTarget && aicmActionTarget.closest
+5199-        ? aicmActionTarget.closest("[data-screen]")
+5200-        : null;
+5201-
+5202-      if (aicmScreenOnlyTarget && aicmScreenOnlyTarget.getAttribute) {
+5203-        var aicmScreenOnlyName = String(aicmScreenOnlyTarget.getAttribute("data-screen") || "").trim();
+5204-
+5205-        if (aicmScreenOnlyName) {
+5206-          state.screen = aicmScreenOnlyName;
+5207-          if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5208-          if (typeof render === "function") render();
+5209-          return;
+5210-        }
+5211-      }
+5212-
+5213-      return;
+5214-    }
+5215-
+5216-    var action = button.getAttribute("data-core-action") || "";
+5217-
+5218-    // AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+5219-    if (action === "pmlw-major-leader-handoff") {
+5220-      aicmAxuR1OpenLeaderHandoffConfirm(button);
+5221-      return;
+5222-    }
+5223-
+5224-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+5225-    if (action === "worker-runtime-status-refresh") {
+5226-      aicmRuntimeStatusRefresh();
+5227-      return;
+5228-    }
+5229-
+5230-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+5231-    if (action === "worker-runtime-confirm") {
+5232-      confirmWorkerRuntimeRequestFromForm();
+5233-      return;
+5234-    }
+5235-
+5236-    if (action === "worker-runtime-execute") {
+5237-      executeWorkerRuntimeConfirm();
+5238-      return;
+5239-    }
+5240-
+5241-    if (action === "worker-runtime-cancel") {
+5242-      cancelWorkerRuntimeConfirm();
+5243-      return;
+5244-    }
+5245-
+5246-            if (action === "task-ledger-fill-csv-template") {
+5247-      fillTaskLedgerCsvTemplate();
+5248-      return;
+5249-    }
+5250-
+5251:        if (action === "task-ledger-csv-file-open") {
+5252-      openTaskLedgerCsvFilePicker();
+5253-      return;
+5254-    }
+5255-
+5256-    if (action === "task-ledger-chatgpt-prompt") {
+5257-      handleTaskLedgerChatGptPrompt();
+5258-      return;
+5259-    }
+5260-if (action === "task-ledger-csv-preview") {
+5261-      previewTaskLedgerCsv();
+5262-      return;
+5263-    }
+5264-
+5265-    if (action === "task-ledger-csv-import") {
+5266-      importTaskLedgerCsvToPmlwMajor();
+5267-      return;
+5268-    }
+5269-if (action === "task-ledger-create") {
+5270-      createTaskLedgerFromForm();
+5271-      return;
+5272-    }
+5273-if (action === "human-review-approve") {
+5274-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5275-      return;
+5276-    }
+5277-
+5278-    if (action === "human-review-return") {
+5279-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5280-      return;
+5281-    }
+5282-
+5283-    if (action === "department-update-select") {
+5284-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5285-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+5286-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5287-      if (typeof render === "function") render();
+5288-      return;
+5289-    }
+5290-
+5291-    if (action === "department-update-clear") {
+5292-      state.editingDepartmentId = "";
+5293-      if (typeof render === "function") render();
+5294-      return;
+5295-    }
+5296-
+5297-    if (action === "section-update-select") {
+5298-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5299-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+5300-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5301-      if (typeof render === "function") render();
+5302-      return;
+5303-    }
+5304-
+5305-    if (action === "section-update-clear") {
+5306-      state.editingSectionId = "";
+5307-      if (typeof render === "function") render();
+5308-      return;
+5309-    }
+5310-
+5311-    if (action === "company-update-save") {
+5312-      saveCompanyUpdateFromForm();
+5313-      return;
+5314-    }
+5315-
+5316-    if (action === "department-update-save") {
+5317-      saveDepartmentUpdateFromForm();
+5318-      return;
+5319-    }
+5320-
+5321-    if (action === "section-update-save") {
+5322-      saveSectionUpdateFromForm();
+5323-      return;
+5324-    }
+5325-
+5326-    if (action === "org-update-confirm-execute") {
+5327-      executeAicmOrgUpdateConfirm();
+5328-      return;
+5329-    }
+5330-
+5331-    if (action === "org-update-confirm-cancel") {
+
+3461-    if (rows.length < 2) return [];
+3462-
+3463-    var headers = rows[0].map(function (v) {
+3464-      return String(v || "").trim();
+3465-    });
+3466-
+3467-    return rows.slice(1).map(function (values) {
+3468-      var obj = {};
+3469-      headers.forEach(function (header, index) {
+3470-        obj[header] = String(values[index] || "").trim();
+3471-      });
+3472-      return obj;
+3473-    }).filter(function (obj) {
+3474-      return Object.keys(obj).some(function (key) {
+3475-        return String(obj[key] || "").trim() !== "";
+3476-      });
+3477-    });
+3478-  }
+3479-
+3480-  async function importTaskLedgerCsvToPmlwMajor() {
+3481-    var company = selectedCompany();
+3482-
+3483-    if (!company) {
+3484-      setMessage("error", "AI企業を選択してください。");
+3485-      return;
+3486-    }
+3487-
+3488-    var text = String(state.csvImportText || "").trim();
+3489-
+3490-    if (!text) {
+3491-      setMessage("error", "CSVファイルを読み込んでください。");
+3492-      return;
+3493-    }
+3494-
+3495-    try {
+3496-      var rows = parseAicmCsv(text);
+3497-
+3498-      if (!rows.length) {
+3499-        setMessage("error", "取り込めるCSV行がありません。");
+3500-        return;
+3501-      }
+3502-
+3503-      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+3504-        owner_civilization_id: aicmPmlwOwnerId(),
+3505-        aicm_user_company_id: company.aicm_user_company_id,
+3506-        rows: rows
+3507-      });
+3508-
+3509-      var count = result.inserted_count || 0;
+3510-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+3511-      setMessage("ok", state.csvImportLastResult);
+3512-
+3513-      await aicmPmlwReloadContext();
+3514-    } catch (error) {
+3515-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3516-    }
+3517-  }
+3518-
+3519-
+3520-  function renderCsvImportCard(company) {
+3521-    var fileName = state.csvImportFileName || "未選択";
+3522-    var lastResult = state.csvImportLastResult || "";
+3523-
+3524-    return [
+3525-      '<section class="aicm-core-card aicm-csv-panel">',
+3526-      '  <p class="aicm-eyebrow">CSV取り込み</p>',
+3527-      '  <h2>ChatGPTでCSV作成・取り込み</h2>',
+3528-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3529-      '  <div class="aicm-csv-flow">',
+3530-      '    <div class="aicm-csv-flow-step aicm-csv-flow-main">',
+3531-      '      <div><strong>ChatGPT用プロンプト</strong><p>部長/Managerが分解した大項目CSVをChatGPTで作成します。</p></div>',
+3532-      '      <button type="button" data-core-action="task-ledger-chatgpt-prompt">ChatGPT用プロンプト</button>',
+3533-      '    </div>',
+3534-      '    <div class="aicm-csv-flow-step">',
+3535-      '      <div><strong>CSVファイル読込</strong><p>作成したCSVファイルを選択します。</p></div>',
+3536-      '      <button type="button" data-core-action="task-ledger-csv-file-open">CSVファイル読込</button>',
+3537-      '    </div>',
+3538-      '    <div class="aicm-csv-file-name">ファイル名: <strong>' + escapeHtml(fileName) + '</strong></div>',
+3539-      '    <div class="aicm-csv-flow-step">',
+3540-      '      <div><strong>CSV取り込み実行</strong><p>部長/Manager分解済みの大項目CSVを部門別タスク台帳へ登録します。</p></div>',
+3541:      '      <button type="button" data-core-action="task-ledger-csv-import">CSV取り込み実行</button>',
+3542-      '    </div>',
+3543-      '  </div>',
+3544-      '  <input id="aicm-ledger-csv-file" class="aicm-hidden-file" type="file" accept=".csv,text/csv" data-core-file="task-ledger-csv">',
+3545-      lastResult ? '<p class="aicm-selected-note">' + escapeHtml(lastResult) + '</p>' : '',
+3546-      '</section>'
+3547-    ].join("");
+3548-  }
+3549-
+3550-  
+3551-function renderCsvPreviewTable(preview) {
+3552-    return "";
+3553-  }
+3554-
+3555-  
+3556-function renderCsvTemplatePanel() {
+3557-    return "";
+3558-  }
+3559-
+3560-
+3561-function downloadTextFile(filename, text, mimeType) {
+3562-    var blob = new Blob([String(text || "")], { type: mimeType || "text/plain;charset=utf-8" });
+3563-    var url = URL.createObjectURL(blob);
+3564-    var a = document.createElement("a");
+3565-    a.href = url;
+3566-    a.download = filename;
+3567-    document.body.appendChild(a);
+3568-    a.click();
+3569-    a.remove();
+3570-    setTimeout(function () {
+3571-      URL.revokeObjectURL(url);
+3572-    }, 1000);
+3573-  }
+3574-
+3575-  async function readTaskLedgerCsvFile(file) {
+3576-    if (!file) return;
+3577-
+3578-    try {
+3579-      var text = await file.text();
+3580-      state.csvImportText = text;
+3581-      state.csvImportFileName = file.name || "selected.csv";
+3582-      state.csvImportPreview = [];
+3583-      state.csvImportLastResult = "";
+3584-      setMessage("ok", "CSVファイルを読み込みました: " + state.csvImportFileName);
+3585-    } catch (error) {
+3586-      state.csvImportText = "";
+3587-      state.csvImportFileName = "";
+3588-      state.csvImportPreview = [];
+3589-      state.csvImportLastResult = "";
+3590-      setMessage("error", "CSVファイル読込に失敗しました。");
+3591-    }
+3592-
+3593-    render();
+3594-  }
+3595-
+3596-  function openTaskLedgerCsvFilePicker() {
+3597-    var input = document.getElementById("aicm-ledger-csv-file");
+3598-    if (input) input.click();
+3599-  }
+3600-
+3601-  async function openTaskLedgerChatGptPrompt() {
+3602-    var text = taskLedgerCsvPromptText();
+3603-
+3604-    try {
+3605-      if (navigator.clipboard && navigator.clipboard.writeText) {
+3606-        await navigator.clipboard.writeText(text);
+3607-        setMessage("ok", "ChatGPT用プロンプトをコピーしました。");
+3608-        render();
+3609-        return;
+3610-      }
+3611-    } catch (error) {
+3612-    }
+3613-
+3614-    downloadTextFile("aicm_task_ledger_chatgpt_prompt.txt", text, "text/plain;charset=utf-8");
+3615-    setMessage("ok", "ChatGPT用プロンプトファイルを作成しました。");
+3616-    render();
+3617-  }
+3618-
+3619-
+3620-  function previewTaskLedgerCsv() {
+3621-    try {
+--
+5185-    });
+5186-  }
+5187-
+5188-  function handleRootClick(event) {
+5189-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+5190-  var aicmRawClickTarget = event.target;
+5191-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+5192-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+5193-    : aicmRawClickTarget;
+5194-
+5195-    var button = aicmActionTarget.closest("[data-core-action]");
+5196-    if (!button) {
+5197-      // AICM_AXU_R1C_SCREEN_ONLY_NAV_FALLBACK
+5198-      var aicmScreenOnlyTarget = aicmActionTarget && aicmActionTarget.closest
+5199-        ? aicmActionTarget.closest("[data-screen]")
+5200-        : null;
+5201-
+5202-      if (aicmScreenOnlyTarget && aicmScreenOnlyTarget.getAttribute) {
+5203-        var aicmScreenOnlyName = String(aicmScreenOnlyTarget.getAttribute("data-screen") || "").trim();
+5204-
+5205-        if (aicmScreenOnlyName) {
+5206-          state.screen = aicmScreenOnlyName;
+5207-          if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5208-          if (typeof render === "function") render();
+5209-          return;
+5210-        }
+5211-      }
+5212-
+5213-      return;
+5214-    }
+5215-
+5216-    var action = button.getAttribute("data-core-action") || "";
+5217-
+5218-    // AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+5219-    if (action === "pmlw-major-leader-handoff") {
+5220-      aicmAxuR1OpenLeaderHandoffConfirm(button);
+5221-      return;
+5222-    }
+5223-
+5224-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+5225-    if (action === "worker-runtime-status-refresh") {
+5226-      aicmRuntimeStatusRefresh();
+5227-      return;
+5228-    }
+5229-
+5230-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+5231-    if (action === "worker-runtime-confirm") {
+5232-      confirmWorkerRuntimeRequestFromForm();
+5233-      return;
+5234-    }
+5235-
+5236-    if (action === "worker-runtime-execute") {
+5237-      executeWorkerRuntimeConfirm();
+5238-      return;
+5239-    }
+5240-
+5241-    if (action === "worker-runtime-cancel") {
+5242-      cancelWorkerRuntimeConfirm();
+5243-      return;
+5244-    }
+5245-
+5246-            if (action === "task-ledger-fill-csv-template") {
+5247-      fillTaskLedgerCsvTemplate();
+5248-      return;
+5249-    }
+5250-
+5251-        if (action === "task-ledger-csv-file-open") {
+5252-      openTaskLedgerCsvFilePicker();
+5253-      return;
+5254-    }
+5255-
+5256-    if (action === "task-ledger-chatgpt-prompt") {
+5257-      handleTaskLedgerChatGptPrompt();
+5258-      return;
+5259-    }
+5260-if (action === "task-ledger-csv-preview") {
+5261-      previewTaskLedgerCsv();
+5262-      return;
+5263-    }
+5264-
+5265:    if (action === "task-ledger-csv-import") {
+5266-      importTaskLedgerCsvToPmlwMajor();
+5267-      return;
+5268-    }
+5269-if (action === "task-ledger-create") {
+5270-      createTaskLedgerFromForm();
+5271-      return;
+5272-    }
+5273-if (action === "human-review-approve") {
+5274-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5275-      return;
+5276-    }
+5277-
+5278-    if (action === "human-review-return") {
+5279-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5280-      return;
+5281-    }
+5282-
+5283-    if (action === "department-update-select") {
+5284-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5285-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+5286-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5287-      if (typeof render === "function") render();
+5288-      return;
+5289-    }
+5290-
+5291-    if (action === "department-update-clear") {
+5292-      state.editingDepartmentId = "";
+5293-      if (typeof render === "function") render();
+5294-      return;
+5295-    }
+5296-
+5297-    if (action === "section-update-select") {
+5298-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5299-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+5300-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5301-      if (typeof render === "function") render();
+5302-      return;
+5303-    }
+5304-
+5305-    if (action === "section-update-clear") {
+5306-      state.editingSectionId = "";
+5307-      if (typeof render === "function") render();
+5308-      return;
+5309-    }
+5310-
+5311-    if (action === "company-update-save") {
+5312-      saveCompanyUpdateFromForm();
+5313-      return;
+5314-    }
+5315-
+5316-    if (action === "department-update-save") {
+5317-      saveDepartmentUpdateFromForm();
+5318-      return;
+5319-    }
+5320-
+5321-    if (action === "section-update-save") {
+5322-      saveSectionUpdateFromForm();
+5323-      return;
+5324-    }
+5325-
+5326-    if (action === "org-update-confirm-execute") {
+5327-      executeAicmOrgUpdateConfirm();
+5328-      return;
+5329-    }
+5330-
+5331-    if (action === "org-update-confirm-cancel") {
+5332-      cancelAicmOrgUpdateConfirm();
+5333-      return;
+5334-    }
+5335-
+5336-    if (action === "company-edit-open") {
+5337-      state.screen = "company-edit";
+5338-      if (typeof render === "function") render();
+5339-      return;
+5340-    }
+5341-
+5342-    if (action === "department-edit-pick") {
+5343-      var actionTarget = aicmActionTargetSafe(event, button);
+5344-      state.editingDepartmentId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-department-id") || "") : "";
+5345-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+
+3464-      return String(v || "").trim();
+3465-    });
+3466-
+3467-    return rows.slice(1).map(function (values) {
+3468-      var obj = {};
+3469-      headers.forEach(function (header, index) {
+3470-        obj[header] = String(values[index] || "").trim();
+3471-      });
+3472-      return obj;
+3473-    }).filter(function (obj) {
+3474-      return Object.keys(obj).some(function (key) {
+3475-        return String(obj[key] || "").trim() !== "";
+3476-      });
+3477-    });
+3478-  }
+3479-
+3480-  async function importTaskLedgerCsvToPmlwMajor() {
+3481-    var company = selectedCompany();
+3482-
+3483-    if (!company) {
+3484-      setMessage("error", "AI企業を選択してください。");
+3485-      return;
+3486-    }
+3487-
+3488-    var text = String(state.csvImportText || "").trim();
+3489-
+3490-    if (!text) {
+3491-      setMessage("error", "CSVファイルを読み込んでください。");
+3492-      return;
+3493-    }
+3494-
+3495-    try {
+3496-      var rows = parseAicmCsv(text);
+3497-
+3498-      if (!rows.length) {
+3499-        setMessage("error", "取り込めるCSV行がありません。");
+3500-        return;
+3501-      }
+3502-
+3503-      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+3504-        owner_civilization_id: aicmPmlwOwnerId(),
+3505-        aicm_user_company_id: company.aicm_user_company_id,
+3506-        rows: rows
+3507-      });
+3508-
+3509-      var count = result.inserted_count || 0;
+3510-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+3511-      setMessage("ok", state.csvImportLastResult);
+3512-
+3513-      await aicmPmlwReloadContext();
+3514-    } catch (error) {
+3515-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3516-    }
+3517-  }
+3518-
+3519-
+3520-  function renderCsvImportCard(company) {
+3521-    var fileName = state.csvImportFileName || "未選択";
+3522-    var lastResult = state.csvImportLastResult || "";
+3523-
+3524-    return [
+3525-      '<section class="aicm-core-card aicm-csv-panel">',
+3526-      '  <p class="aicm-eyebrow">CSV取り込み</p>',
+3527-      '  <h2>ChatGPTでCSV作成・取り込み</h2>',
+3528-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3529-      '  <div class="aicm-csv-flow">',
+3530-      '    <div class="aicm-csv-flow-step aicm-csv-flow-main">',
+3531-      '      <div><strong>ChatGPT用プロンプト</strong><p>部長/Managerが分解した大項目CSVをChatGPTで作成します。</p></div>',
+3532-      '      <button type="button" data-core-action="task-ledger-chatgpt-prompt">ChatGPT用プロンプト</button>',
+3533-      '    </div>',
+3534-      '    <div class="aicm-csv-flow-step">',
+3535-      '      <div><strong>CSVファイル読込</strong><p>作成したCSVファイルを選択します。</p></div>',
+3536-      '      <button type="button" data-core-action="task-ledger-csv-file-open">CSVファイル読込</button>',
+3537-      '    </div>',
+3538-      '    <div class="aicm-csv-file-name">ファイル名: <strong>' + escapeHtml(fileName) + '</strong></div>',
+3539-      '    <div class="aicm-csv-flow-step">',
+3540-      '      <div><strong>CSV取り込み実行</strong><p>部長/Manager分解済みの大項目CSVを部門別タスク台帳へ登録します。</p></div>',
+3541-      '      <button type="button" data-core-action="task-ledger-csv-import">CSV取り込み実行</button>',
+3542-      '    </div>',
+3543-      '  </div>',
+3544:      '  <input id="aicm-ledger-csv-file" class="aicm-hidden-file" type="file" accept=".csv,text/csv" data-core-file="task-ledger-csv">',
+3545-      lastResult ? '<p class="aicm-selected-note">' + escapeHtml(lastResult) + '</p>' : '',
+3546-      '</section>'
+3547-    ].join("");
+3548-  }
+3549-
+3550-  
+3551-function renderCsvPreviewTable(preview) {
+3552-    return "";
+3553-  }
+3554-
+3555-  
+3556-function renderCsvTemplatePanel() {
+3557-    return "";
+3558-  }
+3559-
+3560-
+3561-function downloadTextFile(filename, text, mimeType) {
+3562-    var blob = new Blob([String(text || "")], { type: mimeType || "text/plain;charset=utf-8" });
+3563-    var url = URL.createObjectURL(blob);
+3564-    var a = document.createElement("a");
+3565-    a.href = url;
+3566-    a.download = filename;
+3567-    document.body.appendChild(a);
+3568-    a.click();
+3569-    a.remove();
+3570-    setTimeout(function () {
+3571-      URL.revokeObjectURL(url);
+3572-    }, 1000);
+3573-  }
+3574-
+3575-  async function readTaskLedgerCsvFile(file) {
+3576-    if (!file) return;
+3577-
+3578-    try {
+3579-      var text = await file.text();
+3580-      state.csvImportText = text;
+3581-      state.csvImportFileName = file.name || "selected.csv";
+3582-      state.csvImportPreview = [];
+3583-      state.csvImportLastResult = "";
+3584-      setMessage("ok", "CSVファイルを読み込みました: " + state.csvImportFileName);
+3585-    } catch (error) {
+3586-      state.csvImportText = "";
+3587-      state.csvImportFileName = "";
+3588-      state.csvImportPreview = [];
+3589-      state.csvImportLastResult = "";
+3590-      setMessage("error", "CSVファイル読込に失敗しました。");
+3591-    }
+3592-
+3593-    render();
+3594-  }
+3595-
+3596-  function openTaskLedgerCsvFilePicker() {
+3597:    var input = document.getElementById("aicm-ledger-csv-file");
+3598-    if (input) input.click();
+3599-  }
+3600-
+3601-  async function openTaskLedgerChatGptPrompt() {
+3602-    var text = taskLedgerCsvPromptText();
+3603-
+3604-    try {
+3605-      if (navigator.clipboard && navigator.clipboard.writeText) {
+3606-        await navigator.clipboard.writeText(text);
+3607-        setMessage("ok", "ChatGPT用プロンプトをコピーしました。");
+3608-        render();
+3609-        return;
+3610-      }
+3611-    } catch (error) {
+3612-    }
+3613-
+3614-    downloadTextFile("aicm_task_ledger_chatgpt_prompt.txt", text, "text/plain;charset=utf-8");
+3615-    setMessage("ok", "ChatGPT用プロンプトファイルを作成しました。");
+3616-    render();
+3617-  }
+3618-
+3619-
+3620-  function previewTaskLedgerCsv() {
+3621-    try {
+3622-      state.csvImportPreview = buildTaskLedgerCsvPreview();
+3623-      setMessage("ok", "CSVを確認しました。");
+3624-    } catch (error) {
+3625-      state.csvImportPreview = [];
+3626-      setMessage("error", error && error.message ? error.message : "CSV確認に失敗しました。");
+3627-    }
+3628-    render();
+3629-  }
+3630-
+3631-  async function fillTaskLedgerCsvTemplate() {
+3632-    var el = document.getElementById("aicm-ledger-csv-text");
+3633-    if (el) {
+3634-      el.value = taskLedgerCsvTemplateText();
+3635-      setMessage("ok", "CSV入力例を確認しました。");
+3636-    }
+3637-    render();
+3638-  }
+3639-
+3640-
+3641-async function importTaskLedgerCsv() {
+3642-    var preview = [];
+3643-
+3644-    try {
+3645-      preview = buildTaskLedgerCsvPreview();
+3646-    } catch (error) {
+3647-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3648-      render();
+3649-      return;
+3650-    }
+3651-
+3652-    var invalidRows = preview.filter(function (row) { return !row.valid; });
+3653-    if (invalidRows.length) {
+3654-      var message = invalidRows.slice(0, 3).map(function (row) {
+3655-        return "行" + row.row_number + ": " + row.errors.join(" / ");
+3656-      }).join(" / ");
+3657-
+3658-      setMessage("error", "CSV取り込み前チェックでエラーがあります。 " + message);
+3659-      render();
+3660-      return;
+3661-    }
+3662-
+3663-    var success = 0;
+3664-    var failed = 0;
+3665-    var messages = [];
+3666-
+3667-    for (var i = 0; i < preview.length; i++) {
+3668-      var row = preview[i];
+3669-
+3670-      try {
+3671-        var response = await fetch("/api/aicm/v2/task-ledger/create", {
+3672-          method: "POST",
+3673-          headers: { "content-type": "application/json" },
+3674-          body: JSON.stringify(row.payload)
+3675-        });
+3676-
+3677-        var json = await response.json();
+
+3464-      return String(v || "").trim();
+3465-    });
+3466-
+3467-    return rows.slice(1).map(function (values) {
+3468-      var obj = {};
+3469-      headers.forEach(function (header, index) {
+3470-        obj[header] = String(values[index] || "").trim();
+3471-      });
+3472-      return obj;
+3473-    }).filter(function (obj) {
+3474-      return Object.keys(obj).some(function (key) {
+3475-        return String(obj[key] || "").trim() !== "";
+3476-      });
+3477-    });
+3478-  }
+3479-
+3480-  async function importTaskLedgerCsvToPmlwMajor() {
+3481-    var company = selectedCompany();
+3482-
+3483-    if (!company) {
+3484-      setMessage("error", "AI企業を選択してください。");
+3485-      return;
+3486-    }
+3487-
+3488-    var text = String(state.csvImportText || "").trim();
+3489-
+3490-    if (!text) {
+3491-      setMessage("error", "CSVファイルを読み込んでください。");
+3492-      return;
+3493-    }
+3494-
+3495-    try {
+3496-      var rows = parseAicmCsv(text);
+3497-
+3498-      if (!rows.length) {
+3499-        setMessage("error", "取り込めるCSV行がありません。");
+3500-        return;
+3501-      }
+3502-
+3503-      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+3504-        owner_civilization_id: aicmPmlwOwnerId(),
+3505-        aicm_user_company_id: company.aicm_user_company_id,
+3506-        rows: rows
+3507-      });
+3508-
+3509-      var count = result.inserted_count || 0;
+3510-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+3511-      setMessage("ok", state.csvImportLastResult);
+3512-
+3513-      await aicmPmlwReloadContext();
+3514-    } catch (error) {
+3515-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3516-    }
+3517-  }
+3518-
+3519-
+3520-  function renderCsvImportCard(company) {
+3521-    var fileName = state.csvImportFileName || "未選択";
+3522-    var lastResult = state.csvImportLastResult || "";
+3523-
+3524-    return [
+3525-      '<section class="aicm-core-card aicm-csv-panel">',
+3526-      '  <p class="aicm-eyebrow">CSV取り込み</p>',
+3527-      '  <h2>ChatGPTでCSV作成・取り込み</h2>',
+3528-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3529-      '  <div class="aicm-csv-flow">',
+3530-      '    <div class="aicm-csv-flow-step aicm-csv-flow-main">',
+3531-      '      <div><strong>ChatGPT用プロンプト</strong><p>部長/Managerが分解した大項目CSVをChatGPTで作成します。</p></div>',
+3532-      '      <button type="button" data-core-action="task-ledger-chatgpt-prompt">ChatGPT用プロンプト</button>',
+3533-      '    </div>',
+3534-      '    <div class="aicm-csv-flow-step">',
+3535-      '      <div><strong>CSVファイル読込</strong><p>作成したCSVファイルを選択します。</p></div>',
+3536-      '      <button type="button" data-core-action="task-ledger-csv-file-open">CSVファイル読込</button>',
+3537-      '    </div>',
+3538-      '    <div class="aicm-csv-file-name">ファイル名: <strong>' + escapeHtml(fileName) + '</strong></div>',
+3539-      '    <div class="aicm-csv-flow-step">',
+3540-      '      <div><strong>CSV取り込み実行</strong><p>部長/Manager分解済みの大項目CSVを部門別タスク台帳へ登録します。</p></div>',
+3541-      '      <button type="button" data-core-action="task-ledger-csv-import">CSV取り込み実行</button>',
+3542-      '    </div>',
+3543-      '  </div>',
+3544:      '  <input id="aicm-ledger-csv-file" class="aicm-hidden-file" type="file" accept=".csv,text/csv" data-core-file="task-ledger-csv">',
+3545-      lastResult ? '<p class="aicm-selected-note">' + escapeHtml(lastResult) + '</p>' : '',
+3546-      '</section>'
+3547-    ].join("");
+3548-  }
+3549-
+3550-  
+3551-function renderCsvPreviewTable(preview) {
+3552-    return "";
+3553-  }
+3554-
+3555-  
+3556-function renderCsvTemplatePanel() {
+3557-    return "";
+3558-  }
+3559-
+3560-
+3561-function downloadTextFile(filename, text, mimeType) {
+3562-    var blob = new Blob([String(text || "")], { type: mimeType || "text/plain;charset=utf-8" });
+3563-    var url = URL.createObjectURL(blob);
+3564-    var a = document.createElement("a");
+3565-    a.href = url;
+3566-    a.download = filename;
+3567-    document.body.appendChild(a);
+3568-    a.click();
+3569-    a.remove();
+3570-    setTimeout(function () {
+3571-      URL.revokeObjectURL(url);
+3572-    }, 1000);
+3573-  }
+3574-
+3575-  async function readTaskLedgerCsvFile(file) {
+3576-    if (!file) return;
+3577-
+3578-    try {
+3579-      var text = await file.text();
+3580-      state.csvImportText = text;
+3581-      state.csvImportFileName = file.name || "selected.csv";
+3582-      state.csvImportPreview = [];
+3583-      state.csvImportLastResult = "";
+3584-      setMessage("ok", "CSVファイルを読み込みました: " + state.csvImportFileName);
+3585-    } catch (error) {
+3586-      state.csvImportText = "";
+3587-      state.csvImportFileName = "";
+3588-      state.csvImportPreview = [];
+3589-      state.csvImportLastResult = "";
+3590-      setMessage("error", "CSVファイル読込に失敗しました。");
+3591-    }
+3592-
+3593-    render();
+3594-  }
+3595-
+3596-  function openTaskLedgerCsvFilePicker() {
+3597-    var input = document.getElementById("aicm-ledger-csv-file");
+3598-    if (input) input.click();
+3599-  }
+3600-
+3601-  async function openTaskLedgerChatGptPrompt() {
+3602-    var text = taskLedgerCsvPromptText();
+3603-
+3604-    try {
+3605-      if (navigator.clipboard && navigator.clipboard.writeText) {
+3606-        await navigator.clipboard.writeText(text);
+3607-        setMessage("ok", "ChatGPT用プロンプトをコピーしました。");
+3608-        render();
+3609-        return;
+3610-      }
+3611-    } catch (error) {
+3612-    }
+3613-
+3614-    downloadTextFile("aicm_task_ledger_chatgpt_prompt.txt", text, "text/plain;charset=utf-8");
+3615-    setMessage("ok", "ChatGPT用プロンプトファイルを作成しました。");
+3616-    render();
+3617-  }
+3618-
+3619-
+3620-  function previewTaskLedgerCsv() {
+3621-    try {
+3622-      state.csvImportPreview = buildTaskLedgerCsvPreview();
+3623-      setMessage("ok", "CSVを確認しました。");
+3624-    } catch (error) {
+
+3041-      var json = await response.json();
+3042-
+3043-      if (!response.ok || !json || json.result !== "ok") {
+3044-        throw new Error((json && json.error_message) || "台帳行追加に失敗しました。");
+3045-      }
+3046-
+3047-      setMessage("ok", "部門別タスク台帳に追加しました。");
+3048-
+3049-      if (typeof loadContext === "function") {
+3050-        await loadContext();
+3051-      }
+3052-
+3053-      state.screen = "task-ledger";
+3054-      render();
+3055-    } catch (error) {
+3056-      setMessage("error", error && error.message ? error.message : "台帳行追加に失敗しました。");
+3057-      render();
+3058-    }
+3059-  }
+3060-
+3061-  function ownerCivilizationId() {
+3062-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+3063-    if (typeof OWNER_CIVILIZATION_ID !== "undefined") return OWNER_CIVILIZATION_ID;
+3064-    return "00000000-0000-4000-8000-000000000001";
+3065-  }
+3066-
+3067-  function valueOf(id) {
+3068-    var el = document.getElementById(id);
+3069-    return el ? String(el.value || "") : "";
+3070-  }
+3071-
+3072-
+3073-  
+3074-
+3075-function taskLedgerCsvColumns() {
+3076-    return [
+3077-      "department_name",
+3078-      "section_name",
+3079-      "deliverable_name",
+3080-      "task_name",
+3081-      "work_type_code",
+3082-      "responsible_role_code",
+3083-      "task_status_code",
+3084-      "priority_code",
+3085-      "due_date",
+3086-      "reference_files_text",
+3087-      "supplemental_materials_text",
+3088-      "applicable_rules_text",
+3089-      "note",
+3090-      "handoff_link"
+3091-    ];
+3092-  }
+3093-
+3094-  function taskLedgerCsvTemplateText() {
+3095-    return [
+3096-      taskLedgerCsvColumns().join(","),
+3097-      [
+3098-        "開発部",
+3099-        "UI課",
+3100-        "部門別タスク台帳UI",
+3101-        "CSV取り込み画面を実装",
+3102-        "implementation",
+3103-        "Leader",
+3104-        "todo",
+3105-        "normal",
+3106-        "",
+3107-        "",
+3108-        "画面スクショ",
+3109-        "会社共通ルール",
+3110-        "CSV作成後に取り込み",
+3111-        ""
+3112-      ].join(",")
+3113-    ].join("\n");
+3114-  }
+3115-
+3116-  function taskLedgerCsvPromptText() {
+3117-    return [
+3118-      "以下のCSVカラムで、AICompanyManagerの部門別タスク台帳に取り込む行を作成してください。",
+3119-      "出力はCSVのみ。説明文やMarkdownコードブロックは不要です。",
+3120-      "",
+3121-      "必須カラム:",
+3122-      taskLedgerCsvColumns().join(","),
+3123-      "",
+3124-      "ルール:",
+3125-      "- department_name は既存の部門名に合わせる",
+3126-      "- section_name は任意。部門直下なら空欄",
+3127-      "- deliverable_name と task_name は必須",
+3128-      "- work_type_code は design / implementation / test / review / handoff のいずれか",
+3129-      "- responsible_role_code は Manager / Leader / Worker / President のいずれか",
+3130-      "- task_status_code は todo / in_progress / review_waiting / done のいずれか",
+3131-      "- priority_code は low / normal / high のいずれか",
+3132-      "- due_date は YYYY-MM-DD または空欄",
+3133-      "- reference_files_text は参照ファイル",
+3134-      "- supplemental_materials_text は補足資料",
+3135-      "- applicable_rules_text は適用ルール",
+3136-      "- note は短い補足",
+3137-      "- handoff_link は任意"
+3138-    ].join("\n");
+3139-  }
+3140-
+3141:  function parseCsv(text) {
+3142-    var rows = [];
+3143-    var row = [];
+3144-    var field = "";
+3145-    var inQuote = false;
+3146-
+3147-    text = String(text || "").replace(/^\uFEFF/, "");
+3148-
+3149-    for (var i = 0; i < text.length; i++) {
+3150-      var ch = text[i];
+3151-      var next = text[i + 1];
+3152-
+3153-      if (inQuote) {
+3154-        if (ch === '"' && next === '"') {
+3155-          field += '"';
+3156-          i++;
+3157-        } else if (ch === '"') {
+3158-          inQuote = false;
+3159-        } else {
+3160-          field += ch;
+3161-        }
+3162-        continue;
+3163-      }
+3164-
+3165-      if (ch === '"') {
+3166-        inQuote = true;
+3167-        continue;
+3168-      }
+3169-
+3170-      if (ch === ",") {
+3171-        row.push(field);
+3172-        field = "";
+3173-        continue;
+3174-      }
+3175-
+3176-      if (ch === "\n") {
+3177-        row.push(field);
+3178-        rows.push(row);
+3179-        row = [];
+3180-        field = "";
+3181-        continue;
+3182-      }
+3183-
+3184-      if (ch === "\r") {
+3185-        continue;
+3186-      }
+3187-
+3188-      field += ch;
+3189-    }
+3190-
+3191-    row.push(field);
+3192-    rows.push(row);
+3193-
+3194-    return rows.filter(function (items) {
+3195-      return items.some(function (item) {
+3196-        return String(item || "").trim() !== "";
+3197-      });
+3198-    });
+3199-  }
+3200-
+3201-  function csvRowsToObjects(rows) {
+3202-    if (!rows.length) return [];
+3203-    var headers = rows[0].map(function (h) {
+3204-      return String(h || "").trim();
+3205-    });
+3206-
+3207-    return rows.slice(1).map(function (items, index) {
+3208-      var obj = { row_number: index + 2 };
+3209-      headers.forEach(function (header, i) {
+3210-        obj[header] = String(items[i] || "").trim();
+3211-      });
+3212-      return obj;
+3213-    });
+3214-  }
+3215-
+3216-  function findDepartmentByName(company, name) {
+3217-    var text = String(name || "").trim();
+3218-    if (!company || !text) return null;
+3219-
+3220-    var departments = companyDepartments(company.aicm_user_company_id);
+3221-    return departments.find(function (department) {
+3222-      return String(department.department_name || "").trim() === text;
+3223-    }) || null;
+3224-  }
+3225-
+3226-  function findSectionByName(departmentId, name) {
+3227-    var text = String(name || "").trim();
+3228-    if (!text) return null;
+3229-
+3230-    return state.context.sections.find(function (section) {
+3231-      return String(section.aicm_user_company_department_id || "") === String(departmentId || "")
+3232-        && String(section.section_name || "").trim() === text;
+3233-    }) || null;
+3234-  }
+3235-
+3236-  
+3237-function buildTaskLedgerCsvPreview() {
+3238-    var company = selectedCompany();
+3239-    var text = String(state.csvImportText || "");
+3240:    var parsedRows = parseCsv(text);
+3241-    var objects = csvRowsToObjects(parsedRows);
+3242-    var requiredHeaders = taskLedgerCsvColumns();
+3243-
+3244-    if (!company) {
+3245-      throw new Error("先にAI企業を選択してください。");
+3246-    }
+3247-
+3248-    if (parsedRows.length < 2) {
+3249-      throw new Error("CSVファイルを読み込んでください。");
+3250-    }
+3251-
+3252-    var headers = parsedRows[0].map(function (h) {
+3253-      return String(h || "").trim();
+3254-    });
+3255-
+3256-    var missing = requiredHeaders.filter(function (header) {
+3257-      return headers.indexOf(header) < 0;
+3258-    });
+3259-
+3260-    if (missing.length) {
+3261-      throw new Error("CSVカラム不足: " + missing.join(", "));
+3262-    }
+3263-
+3264-    return objects.map(function (row) {
+3265-      var errors = [];
+3266-      var department = findDepartmentByName(company, row.department_name);
+3267-      var section = null;
+3268-
+3269-      if (!department) {
+3270-        errors.push("部門が見つかりません: " + (row.department_name || "(空欄)"));
+3271-      } else if (row.section_name) {
+3272-        section = findSectionByName(department.aicm_user_company_department_id, row.section_name);
+3273-        if (!section) {
+3274-          errors.push("課が見つかりません: " + row.section_name);
+3275-        }
+3276-      }
+3277-
+3278-      if (!row.deliverable_name) errors.push("成果物名が空欄です");
+3279-      if (!row.task_name) errors.push("作業名が空欄です");
+3280-
+3281-      return {
+3282-        row_number: row.row_number,
+3283-        source: row,
+3284-        valid: errors.length === 0,
+3285-        errors: errors,
+3286-        payload: {
+3287-          owner_civilization_id: ownerCivilizationId(),
+3288-          aicm_user_company_id: company.aicm_user_company_id,
+3289-          aicm_user_company_department_id: department ? department.aicm_user_company_department_id : "",
+3290-          aicm_user_company_section_id: section ? section.aicm_user_company_section_id : "",
+3291-          deliverable_name: row.deliverable_name || "",
+3292-          task_name: row.task_name || "",
+3293-          work_type_code: row.work_type_code || "design",
+3294-          responsible_role_code: row.responsible_role_code || "Manager",
+3295-          task_status_code: row.task_status_code || "todo",
+3296-          priority_code: row.priority_code || "normal",
+3297-          due_date: row.due_date || "",
+3298-          reference_files_text: row.reference_files_text || "",
+3299-          supplemental_materials_text: row.supplemental_materials_text || "",
+3300-          applicable_rules_text: row.applicable_rules_text || "",
+3301-          note: row.note || "",
+3302-          handoff_link: row.handoff_link || ""
+3303-        }
+3304-      };
+3305-    });
+3306-  }
+3307-
+3308-  
+3309-
+3310-
+3311-
+3312-// AICM_PMLW_CSV_CONNECT_ARB_ARE_V1
+3313-// PMLW CSV/UI connector. Uses existing clean core state and selectedCompany().
+3314-function aicmPmlwOwnerId() {
+3315-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+3316-    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+3317-    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+3318-    return "00000000-0000-4000-8000-000000000001";
+3319-  }
+3320-
+3321-  async function aicmPmlwPostJson(path, body) {
+3322-    var response = await fetch(path, {
+3323-      method: "POST",
+3324-      headers: { "Content-Type": "application/json" },
+3325-      body: JSON.stringify(body || {})
+3326-    });
+3327-
+3328-    var text = await response.text();
+3329-    var json = {};
+3330-
+3331-    try {
+3332-      json = text ? JSON.parse(text) : {};
+3333-    } catch (_) {
+3334-      json = { result: "error", message: text || "Invalid server response" };
+3335-    }
+3336-
+3337-    if (!response.ok || (json.result && json.result !== "ok")) {
+3338-      throw new Error(json.message || json.error || ("API failed: " + path));
+3339-    }
+3340-
+
+
+3139-  }
+3140-
+3141-  function parseCsv(text) {
+3142-    var rows = [];
+3143-    var row = [];
+3144-    var field = "";
+3145-    var inQuote = false;
+3146-
+3147-    text = String(text || "").replace(/^\uFEFF/, "");
+3148-
+3149-    for (var i = 0; i < text.length; i++) {
+3150-      var ch = text[i];
+3151-      var next = text[i + 1];
+3152-
+3153-      if (inQuote) {
+3154-        if (ch === '"' && next === '"') {
+3155-          field += '"';
+3156-          i++;
+3157-        } else if (ch === '"') {
+3158-          inQuote = false;
+3159-        } else {
+3160-          field += ch;
+3161-        }
+3162-        continue;
+3163-      }
+3164-
+3165-      if (ch === '"') {
+3166-        inQuote = true;
+3167-        continue;
+3168-      }
+3169-
+3170-      if (ch === ",") {
+3171-        row.push(field);
+3172-        field = "";
+3173-        continue;
+3174-      }
+3175-
+3176-      if (ch === "\n") {
+3177-        row.push(field);
+3178-        rows.push(row);
+3179-        row = [];
+3180-        field = "";
+3181-        continue;
+3182-      }
+3183-
+3184-      if (ch === "\r") {
+3185-        continue;
+3186-      }
+3187-
+3188-      field += ch;
+3189-    }
+3190-
+3191-    row.push(field);
+3192-    rows.push(row);
+3193-
+3194-    return rows.filter(function (items) {
+3195-      return items.some(function (item) {
+3196-        return String(item || "").trim() !== "";
+3197-      });
+3198-    });
+3199-  }
+3200-
+3201-  function csvRowsToObjects(rows) {
+3202-    if (!rows.length) return [];
+3203-    var headers = rows[0].map(function (h) {
+3204-      return String(h || "").trim();
+3205-    });
+3206-
+3207-    return rows.slice(1).map(function (items, index) {
+3208-      var obj = { row_number: index + 2 };
+3209-      headers.forEach(function (header, i) {
+3210-        obj[header] = String(items[i] || "").trim();
+3211-      });
+3212-      return obj;
+3213-    });
+3214-  }
+3215-
+3216-  function findDepartmentByName(company, name) {
+3217-    var text = String(name || "").trim();
+3218-    if (!company || !text) return null;
+3219-
+3220-    var departments = companyDepartments(company.aicm_user_company_id);
+3221-    return departments.find(function (department) {
+3222-      return String(department.department_name || "").trim() === text;
+3223-    }) || null;
+3224-  }
+3225-
+3226-  function findSectionByName(departmentId, name) {
+3227-    var text = String(name || "").trim();
+3228-    if (!text) return null;
+3229-
+3230-    return state.context.sections.find(function (section) {
+3231-      return String(section.aicm_user_company_department_id || "") === String(departmentId || "")
+3232-        && String(section.section_name || "").trim() === text;
+3233-    }) || null;
+3234-  }
+3235-
+3236-  
+3237-function buildTaskLedgerCsvPreview() {
+3238-    var company = selectedCompany();
+3239:    var text = String(state.csvImportText || "");
+3240-    var parsedRows = parseCsv(text);
+3241-    var objects = csvRowsToObjects(parsedRows);
+3242-    var requiredHeaders = taskLedgerCsvColumns();
+3243-
+3244-    if (!company) {
+3245-      throw new Error("先にAI企業を選択してください。");
+3246-    }
+3247-
+3248-    if (parsedRows.length < 2) {
+3249-      throw new Error("CSVファイルを読み込んでください。");
+3250-    }
+3251-
+3252-    var headers = parsedRows[0].map(function (h) {
+3253-      return String(h || "").trim();
+3254-    });
+3255-
+3256-    var missing = requiredHeaders.filter(function (header) {
+3257-      return headers.indexOf(header) < 0;
+3258-    });
+3259-
+3260-    if (missing.length) {
+3261-      throw new Error("CSVカラム不足: " + missing.join(", "));
+3262-    }
+3263-
+3264-    return objects.map(function (row) {
+3265-      var errors = [];
+3266-      var department = findDepartmentByName(company, row.department_name);
+3267-      var section = null;
+3268-
+3269-      if (!department) {
+3270-        errors.push("部門が見つかりません: " + (row.department_name || "(空欄)"));
+3271-      } else if (row.section_name) {
+3272-        section = findSectionByName(department.aicm_user_company_department_id, row.section_name);
+3273-        if (!section) {
+3274-          errors.push("課が見つかりません: " + row.section_name);
+3275-        }
+3276-      }
+3277-
+3278-      if (!row.deliverable_name) errors.push("成果物名が空欄です");
+3279-      if (!row.task_name) errors.push("作業名が空欄です");
+3280-
+3281-      return {
+3282-        row_number: row.row_number,
+3283-        source: row,
+3284-        valid: errors.length === 0,
+3285-        errors: errors,
+3286-        payload: {
+3287-          owner_civilization_id: ownerCivilizationId(),
+3288-          aicm_user_company_id: company.aicm_user_company_id,
+3289-          aicm_user_company_department_id: department ? department.aicm_user_company_department_id : "",
+3290-          aicm_user_company_section_id: section ? section.aicm_user_company_section_id : "",
+3291-          deliverable_name: row.deliverable_name || "",
+3292-          task_name: row.task_name || "",
+3293-          work_type_code: row.work_type_code || "design",
+3294-          responsible_role_code: row.responsible_role_code || "Manager",
+3295-          task_status_code: row.task_status_code || "todo",
+3296-          priority_code: row.priority_code || "normal",
+3297-          due_date: row.due_date || "",
+3298-          reference_files_text: row.reference_files_text || "",
+3299-          supplemental_materials_text: row.supplemental_materials_text || "",
+3300-          applicable_rules_text: row.applicable_rules_text || "",
+3301-          note: row.note || "",
+3302-          handoff_link: row.handoff_link || ""
+3303-        }
+3304-      };
+3305-    });
+3306-  }
+3307-
+3308-  
+3309-
+3310-
+3311-
+3312-// AICM_PMLW_CSV_CONNECT_ARB_ARE_V1
+3313-// PMLW CSV/UI connector. Uses existing clean core state and selectedCompany().
+3314-function aicmPmlwOwnerId() {
+3315-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+3316-    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+3317-    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+3318-    return "00000000-0000-4000-8000-000000000001";
+3319-  }
+3320-
+3321-  async function aicmPmlwPostJson(path, body) {
+3322-    var response = await fetch(path, {
+3323-      method: "POST",
+3324-      headers: { "Content-Type": "application/json" },
+3325-      body: JSON.stringify(body || {})
+3326-    });
+3327-
+3328-    var text = await response.text();
+3329-    var json = {};
+3330-
+3331-    try {
+3332-      json = text ? JSON.parse(text) : {};
+3333-    } catch (_) {
+3334-      json = { result: "error", message: text || "Invalid server response" };
+3335-    }
+3336-
+3337-    if (!response.ok || (json.result && json.result !== "ok")) {
+3338-      throw new Error(json.message || json.error || ("API failed: " + path));
+3339-    }
+--
+3388-      "開発部,UI課,銀行業務UI整理,銀行業務に必要なUI領域を大項目として整理する,,normal,,"
+3389-    ].join("\n");
+3390-  }
+3391-
+3392-  async function handleTaskLedgerChatGptPrompt() {
+3393-    var text = aicmPmlwCsvPromptText();
+3394-
+3395-    try {
+3396-      if (navigator.clipboard && navigator.clipboard.writeText) {
+3397-        await navigator.clipboard.writeText(text);
+3398-        setMessage("ok", "ChatGPT用プロンプトをコピーしました。");
+3399-        return;
+3400-      }
+3401-    } catch (_) {}
+3402-
+3403-    if (typeof downloadTextFile === "function") {
+3404-      downloadTextFile("aicm_manager_major_csv_prompt.txt", text, "text/plain;charset=utf-8");
+3405-      setMessage("ok", "ChatGPT用プロンプトファイルを作成しました。");
+3406-      return;
+3407-    }
+3408-
+3409-    setMessage("error", "プロンプトのコピーに失敗しました。");
+3410-  }
+3411-
+3412-  function parseAicmCsv(text) {
+3413-    var rows = [];
+3414-    var row = [];
+3415-    var cell = "";
+3416-    var inQuotes = false;
+3417-    var value = String(text || "");
+3418-
+3419-    for (var i = 0; i < value.length; i += 1) {
+3420-      var ch = value[i];
+3421-      var next = value[i + 1];
+3422-
+3423-      if (inQuotes && ch === '"' && next === '"') {
+3424-        cell += '"';
+3425-        i += 1;
+3426-        continue;
+3427-      }
+3428-
+3429-      if (ch === '"') {
+3430-        inQuotes = !inQuotes;
+3431-        continue;
+3432-      }
+3433-
+3434-      if (!inQuotes && ch === ",") {
+3435-        row.push(cell);
+3436-        cell = "";
+3437-        continue;
+3438-      }
+3439-
+3440-      if (!inQuotes && (ch === "\n" || ch === "\r")) {
+3441-        if (ch === "\r" && next === "\n") i += 1;
+3442-        row.push(cell);
+3443-        cell = "";
+3444-
+3445-        if (row.some(function (v) { return String(v || "").trim() !== ""; })) {
+3446-          rows.push(row);
+3447-        }
+3448-
+3449-        row = [];
+3450-        continue;
+3451-      }
+3452-
+3453-      cell += ch;
+3454-    }
+3455-
+3456-    row.push(cell);
+3457-    if (row.some(function (v) { return String(v || "").trim() !== ""; })) {
+3458-      rows.push(row);
+3459-    }
+3460-
+3461-    if (rows.length < 2) return [];
+3462-
+3463-    var headers = rows[0].map(function (v) {
+3464-      return String(v || "").trim();
+3465-    });
+3466-
+3467-    return rows.slice(1).map(function (values) {
+3468-      var obj = {};
+3469-      headers.forEach(function (header, index) {
+3470-        obj[header] = String(values[index] || "").trim();
+3471-      });
+3472-      return obj;
+3473-    }).filter(function (obj) {
+3474-      return Object.keys(obj).some(function (key) {
+3475-        return String(obj[key] || "").trim() !== "";
+3476-      });
+3477-    });
+3478-  }
+3479-
+3480-  async function importTaskLedgerCsvToPmlwMajor() {
+3481-    var company = selectedCompany();
+3482-
+3483-    if (!company) {
+3484-      setMessage("error", "AI企業を選択してください。");
+3485-      return;
+3486-    }
+3487-
+3488:    var text = String(state.csvImportText || "").trim();
+3489-
+3490-    if (!text) {
+3491-      setMessage("error", "CSVファイルを読み込んでください。");
+3492-      return;
+3493-    }
+3494-
+3495-    try {
+3496-      var rows = parseAicmCsv(text);
+3497-
+3498-      if (!rows.length) {
+3499-        setMessage("error", "取り込めるCSV行がありません。");
+3500-        return;
+3501-      }
+3502-
+3503-      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+3504-        owner_civilization_id: aicmPmlwOwnerId(),
+3505-        aicm_user_company_id: company.aicm_user_company_id,
+3506-        rows: rows
+3507-      });
+3508-
+3509-      var count = result.inserted_count || 0;
+3510:      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+3511:      setMessage("ok", state.csvImportLastResult);
+3512-
+3513-      await aicmPmlwReloadContext();
+3514-    } catch (error) {
+3515-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3516-    }
+3517-  }
+3518-
+3519-
+3520-  function renderCsvImportCard(company) {
+3521:    var fileName = state.csvImportFileName || "未選択";
+3522:    var lastResult = state.csvImportLastResult || "";
+3523-
+3524-    return [
+3525-      '<section class="aicm-core-card aicm-csv-panel">',
+3526-      '  <p class="aicm-eyebrow">CSV取り込み</p>',
+3527-      '  <h2>ChatGPTでCSV作成・取り込み</h2>',
+3528-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3529-      '  <div class="aicm-csv-flow">',
+3530-      '    <div class="aicm-csv-flow-step aicm-csv-flow-main">',
+3531-      '      <div><strong>ChatGPT用プロンプト</strong><p>部長/Managerが分解した大項目CSVをChatGPTで作成します。</p></div>',
+3532-      '      <button type="button" data-core-action="task-ledger-chatgpt-prompt">ChatGPT用プロンプト</button>',
+3533-      '    </div>',
+3534-      '    <div class="aicm-csv-flow-step">',
+3535-      '      <div><strong>CSVファイル読込</strong><p>作成したCSVファイルを選択します。</p></div>',
+3536-      '      <button type="button" data-core-action="task-ledger-csv-file-open">CSVファイル読込</button>',
+3537-      '    </div>',
+3538-      '    <div class="aicm-csv-file-name">ファイル名: <strong>' + escapeHtml(fileName) + '</strong></div>',
+3539-      '    <div class="aicm-csv-flow-step">',
+3540-      '      <div><strong>CSV取り込み実行</strong><p>部長/Manager分解済みの大項目CSVを部門別タスク台帳へ登録します。</p></div>',
+3541-      '      <button type="button" data-core-action="task-ledger-csv-import">CSV取り込み実行</button>',
+3542-      '    </div>',
+3543-      '  </div>',
+3544-      '  <input id="aicm-ledger-csv-file" class="aicm-hidden-file" type="file" accept=".csv,text/csv" data-core-file="task-ledger-csv">',
+3545-      lastResult ? '<p class="aicm-selected-note">' + escapeHtml(lastResult) + '</p>' : '',
+3546-      '</section>'
+3547-    ].join("");
+3548-  }
+3549-
+3550-  
+3551-function renderCsvPreviewTable(preview) {
+3552-    return "";
+3553-  }
+3554-
+3555-  
+3556-function renderCsvTemplatePanel() {
+3557-    return "";
+3558-  }
+3559-
+3560-
+3561-function downloadTextFile(filename, text, mimeType) {
+3562-    var blob = new Blob([String(text || "")], { type: mimeType || "text/plain;charset=utf-8" });
+3563-    var url = URL.createObjectURL(blob);
+3564-    var a = document.createElement("a");
+3565-    a.href = url;
+3566-    a.download = filename;
+3567-    document.body.appendChild(a);
+3568-    a.click();
+3569-    a.remove();
+3570-    setTimeout(function () {
+3571-      URL.revokeObjectURL(url);
+3572-    }, 1000);
+3573-  }
+3574-
+3575-  async function readTaskLedgerCsvFile(file) {
+3576-    if (!file) return;
+3577-
+3578-    try {
+3579-      var text = await file.text();
+3580:      state.csvImportText = text;
+3581:      state.csvImportFileName = file.name || "selected.csv";
+3582:      state.csvImportPreview = [];
+3583:      state.csvImportLastResult = "";
+3584:      setMessage("ok", "CSVファイルを読み込みました: " + state.csvImportFileName);
+3585-    } catch (error) {
+3586:      state.csvImportText = "";
+3587:      state.csvImportFileName = "";
+3588:      state.csvImportPreview = [];
+3589:      state.csvImportLastResult = "";
+3590-      setMessage("error", "CSVファイル読込に失敗しました。");
+3591-    }
+3592-
+3593-    render();
+3594-  }
+3595-
+3596-  function openTaskLedgerCsvFilePicker() {
+3597-    var input = document.getElementById("aicm-ledger-csv-file");
+3598-    if (input) input.click();
+3599-  }
+3600-
+3601-  async function openTaskLedgerChatGptPrompt() {
+3602-    var text = taskLedgerCsvPromptText();
+3603-
+3604-    try {
+3605-      if (navigator.clipboard && navigator.clipboard.writeText) {
+3606-        await navigator.clipboard.writeText(text);
+3607-        setMessage("ok", "ChatGPT用プロンプトをコピーしました。");
+3608-        render();
+3609-        return;
+3610-      }
+3611-    } catch (error) {
+3612-    }
+3613-
+3614-    downloadTextFile("aicm_task_ledger_chatgpt_prompt.txt", text, "text/plain;charset=utf-8");
+3615-    setMessage("ok", "ChatGPT用プロンプトファイルを作成しました。");
+3616-    render();
+3617-  }
+3618-
+3619-
+3620-  function previewTaskLedgerCsv() {
+3621-    try {
+3622:      state.csvImportPreview = buildTaskLedgerCsvPreview();
+3623-      setMessage("ok", "CSVを確認しました。");
+3624-    } catch (error) {
+3625:      state.csvImportPreview = [];
+3626-      setMessage("error", error && error.message ? error.message : "CSV確認に失敗しました。");
+3627-    }
+3628-    render();
+3629-  }
+3630-
+3631-  async function fillTaskLedgerCsvTemplate() {
+3632-    var el = document.getElementById("aicm-ledger-csv-text");
+3633-    if (el) {
+3634-      el.value = taskLedgerCsvTemplateText();
+3635-      setMessage("ok", "CSV入力例を確認しました。");
+3636-    }
+3637-    render();
+3638-  }
+3639-
+3640-
+3641-async function importTaskLedgerCsv() {
+3642-    var preview = [];
+3643-
+3644-    try {
+3645-      preview = buildTaskLedgerCsvPreview();
+3646-    } catch (error) {
+3647-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3648-      render();
+3649-      return;
+3650-    }
+3651-
+3652-    var invalidRows = preview.filter(function (row) { return !row.valid; });
+3653-    if (invalidRows.length) {
+3654-      var message = invalidRows.slice(0, 3).map(function (row) {
+3655-        return "行" + row.row_number + ": " + row.errors.join(" / ");
+3656-      }).join(" / ");
+3657-
+3658-      setMessage("error", "CSV取り込み前チェックでエラーがあります。 " + message);
+3659-      render();
+3660-      return;
+3661-    }
+3662-
+3663-    var success = 0;
+3664-    var failed = 0;
+3665-    var messages = [];
+3666-
+3667-    for (var i = 0; i < preview.length; i++) {
+3668-      var row = preview[i];
+3669-
+3670-      try {
+3671-        var response = await fetch("/api/aicm/v2/task-ledger/create", {
+3672-          method: "POST",
+3673-          headers: { "content-type": "application/json" },
+3674-          body: JSON.stringify(row.payload)
+3675-        });
+3676-
+3677-        var json = await response.json();
+3678-
+3679-        if (!response.ok || !json || json.result !== "ok") {
+3680-          throw new Error((json && json.error_message) || "取り込み失敗");
+3681-        }
+3682-
+3683-        success++;
+3684-      } catch (error) {
+3685-        failed++;
+3686-        messages.push("行" + row.row_number + ": " + (error && error.message ? error.message : "取り込み失敗"));
+3687-      }
+3688-    }
+3689-
+3690-    if (typeof loadContext === "function") {
+3691-      await loadContext();
+3692-    }
+3693-
+3694-    if (failed > 0) {
+3695:      state.csvImportLastResult = "CSV取り込み: 成功 " + success + "件 / 失敗 " + failed + "件";
+3696:      setMessage("error", state.csvImportLastResult + "。 " + messages.slice(0, 3).join(" / "));
+3697-    } else {
+3698:      state.csvImportLastResult = "CSV取り込み完了: " + success + "件";
+3699:      state.csvImportText = "";
+3700:      state.csvImportFileName = "";
+3701:      setMessage("ok", state.csvImportLastResult);
+3702-    }
+3703-
+3704:    state.csvImportPreview = [];
+3705-    state.screen = "task-ledger";
+3706-    render();
+3707-  }
+3708-
+3709-
+3710-  
+3711-
+3712-function pmlwMajorRowsForCompany(companyId) {
+3713-    return (state.context.pmlw_major_items || []).filter(function (row) {
+3714-      return String(row.aicm_user_company_id || "") === String(companyId || "");
+3715-    });
+3716-  }
+3717-
+3718-  function pmlwValue(value, fallback) {
+3719-    var text = String(value || "").trim();
+3720-    return text || fallback || "-";
+3721-  }
+3722-
+3723-  function pmlwStatusLabel(value) {
+3724-    var map = {
+3725-      not_started: "未着手",
+3726-      assigned_to_leader: "Leader割当済",
+3727-      leader_decomposing: "Leader分解中",
+3728-      decomposed: "分解済",
+3729-      returned: "差戻し",
+3730-      archived: "削除済",
+3731-      draft: "下書き",
+3732-      ready_handoff: "引渡し準備",
+3733-      handed_off: "引渡し済",
+3734-      accepted: "受領済",
+3735-      completed: "完了",
+3736-      low: "低",
+3737-      normal: "通常",
+3738-      high: "高",
+3739-      urgent: "緊急"
+3740-    };
+3741-
+3742-    return map[value] || pmlwValue(value, "-");
+3743-  }
+3744-
+3745-  
+3746-// AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+3747-// Manager大項目 -> 課長/Leader引渡し。
+3748-// Worker Runtime requestはここでは作らない。
+3749-// DB書込は既存確認画面を通して /api/aicm/v2/manager-major/update で実行する。
+3750-function aicmAxuR1Text(value) {
+3751-    return String(value === undefined || value === null ? "" : value).trim();
+3752-  }
+3753-
+3754-function aicmAxuR1OwnerId() {
+3755-    if (state && state.ownerCivilizationId) return aicmAxuR1Text(state.ownerCivilizationId);
+3756-    if (state && state.context && state.context.owner_civilization_id) return aicmAxuR1Text(state.context.owner_civilization_id);
+3757-    return "00000000-0000-4000-8000-000000000001";
+3758-  }
+3759-
+3760-function aicmAxuR1MajorId(row) {
+3761-    row = row || {};
+3762-    return aicmAxuR1Text(
+3763-      row.aicm_manager_major_work_item_id ||
+3764-      row.manager_major_work_item_id ||
+3765-      row.major_work_item_id ||
+3766-      row.id
+3767-    );
+3768-  }
+3769-
+3770-function aicmAxuR1FindMajorById(majorId) {
+3771-    var rows = state && state.context && Array.isArray(state.context.pmlw_major_items)
+3772-      ? state.context.pmlw_major_items
+3773-      : [];
+3774-
+3775-    var id = aicmAxuR1Text(majorId);
+3776-
+3777-    for (var i = 0; i < rows.length; i += 1) {
+3778-      if (aicmAxuR1MajorId(rows[i]) === id) return rows[i];
+3779-    }
+3780-
+3781-    return null;
+3782-  }
+3783-
+3784-function aicmAxuR1PlacementRoleText(row) {
+3785-    row = row || {};
+3786-    return [
+3787-      row.role_code,
+3788-      row.placement_role_code,
+3789-      row.assignment_role_code,
+3790-      row.worker_role_code,
+3791-      row.role_name,
+3792-      row.role_label,
+3793-      row.display_role,
+3794-      row.role_display_name,
+3795-      row.display_label
+3796-    ].map(aicmAxuR1Text).join(" ").toLowerCase();
+3797-  }
+3798-
+3799-function aicmAxuR1IsActiveLeaderPlacement(row) {
+3800-    row = row || {};
+3801-    var status = aicmAxuR1Text(row.status_code || row.placement_status_code || "active").toLowerCase();
+3802-    var roleText = aicmAxuR1PlacementRoleText(row);
+3803-
+3804-    if (status && status !== "active") return false;

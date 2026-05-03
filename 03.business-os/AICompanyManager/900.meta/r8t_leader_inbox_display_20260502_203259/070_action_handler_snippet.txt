@@ -1,0 +1,61 @@
+        '</div>'
+      ].join("");
+    }
+
+    var cards = rows.map(function (row, index) {
+      var majorId = aicmLeaderInboxMajorIdR8T(row);
+      var title = aicmLeaderInboxTextR8T(row && (row.major_item_name || row.deliverable_name || row.task_name)) || "Manager大項目";
+      var description = aicmLeaderInboxTextR8T(row && (row.major_item_description || row.task_description || row.note));
+      var leader = aicmLeaderInboxTextR8T(row && (row.assigned_leader_label || row.leader_label || row.responsible_robot_label)) || "未設定";
+      var due = aicmLeaderInboxTextR8T(row && row.due_date) || "未設定";
+      var handoff = aicmLeaderInboxTextR8T(row && row.handoff_status_code) || "handed_off";
+      var decomposition = aicmLeaderInboxTextR8T(row && row.decomposition_status_code) || "assigned_to_leader";
+
+      return [
+        '<article class="aicm-ledger-row">',
+        '  <p class="aicm-eyebrow">Leader受信 #' + escapeHtml(String(index + 1)) + '</p>',
+        '  <h3>' + escapeHtml(title) + '</h3>',
+        description ? '  <p class="aicm-selected-note">' + escapeHtml(description) + '</p>' : '',
+        '  <dl class="aicm-ledger-meta">',
+        '    <div><dt>課長/Leader</dt><dd>' + escapeHtml(leader) + '</dd></div>',
+        '    <div><dt>優先度</dt><dd>' + escapeHtml(aicmLeaderInboxPriorityLabelR8T(row && row.priority_code)) + '</dd></div>',
+        '    <div><dt>期限</dt><dd>' + escapeHtml(due) + '</dd></div>',
+        '    <div><dt>状態</dt><dd>' + escapeHtml(decomposition + " / " + handoff) + '</dd></div>',
+        '  </dl>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="leader-inbox-middle-breakdown-open" data-major-id="' + escapeHtml(majorId) + '">中項目へ分解</button>',
+        '  </div>',
+        '</article>'
+      ].join("");
+    }).join("");
+
+    return [
+      '<p class="aicm-selected-note">Leader受信箱: <strong>' + escapeHtml(String(rows.length)) + '件</strong></p>',
+      '<div class="aicm-ledger-list">',
+      cards,
+      '</div>'
+    ].join("");
+  }
+// AICM_R8T_LEADER_INBOX_DISPLAY_HELPER_END
+
+function renderTaskLedgerPlaceholder() {
+    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: screen
+    var company = typeof selectedCompany === "function" ? selectedCompany() : null;
+    var companyId = company && company.aicm_user_company_id ? company.aicm_user_company_id : "";
+    var rows = aicmGetManagerMajorRowsForSelectedCompany(companyId);
+    
+
+    return renderShell([
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+      '  <h2>部門別タスク台帳</h2>',
+      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+      '  <p class="aicm-selected-note">未実行のManager大項目だけをDB/contextから表示します。CSV取り込みは部長/Manager分解済み大項目の新規追加です。</p>',
+'  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="task-ledger-refresh">登録済み大項目をリロード</button>',
+      '  </div>',
+      '</section>',
+      renderCsvImportCard(company),
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Manager大項目</p>',
+      '  <h2>登録済み大項目</h2>',

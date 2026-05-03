@@ -1,0 +1,243 @@
+============================================================
+Diff scan against APM backup
+============================================================
+--- /data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/task_ledger_chatgpt_prompt_first_csv_ui_20260430_143659/aicm-production-core.before_apm_app.js	2026-04-30 14:36:59.396665048 +0900
++++ /data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/assets/js/aicm-production-core.js	2026-04-30 14:36:59.840665048 +0900
+@@ -1096,9 +1096,10 @@
+     }) || null;
+   }
+ 
+-  function buildTaskLedgerCsvPreview() {
++  
++function buildTaskLedgerCsvPreview() {
+     var company = selectedCompany();
+-    var text = valueOf("aicm-ledger-csv-text");
++    var text = String(state.csvImportText || "");
+     var parsedRows = parseCsv(text);
+     var objects = csvRowsToObjects(parsedRows);
+     var requiredHeaders = taskLedgerCsvColumns();
+@@ -1108,7 +1109,7 @@
+     }
+ 
+     if (parsedRows.length < 2) {
+-      throw new Error("CSVヘッダーと1行以上のデータを貼り付けてください。");
++      throw new Error("CSVファイルを読み込んでください。");
+     }
+ 
+     var headers = parsedRows[0].map(function (h) {
+@@ -1167,67 +1168,111 @@
+     });
+   }
+ 
+-  function renderCsvImportCard(company) {
+-    var preview = Array.isArray(state.csvImportPreview) ? state.csvImportPreview : [];
+-    var validCount = preview.filter(function (row) { return row.valid; }).length;
+-    var errorCount = preview.length - validCount;
++  
++function renderCsvImportCard(company) {
++    var fileName = state.csvImportFileName || "未選択";
++    var lastResult = state.csvImportLastResult || "";
+ 
+     return [
+       '<section class="aicm-core-card aicm-csv-panel">',
+       '  <p class="aicm-eyebrow">CSV取り込み</p>',
+-      '  <h2>CSV取り込み</h2>',
++      '  <h2>ChatGPTでCSV作成・取り込み</h2>',
+       company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+-      '  <label>CSV貼り付け<textarea id="aicm-ledger-csv-text" rows="8" placeholder="' + escapeHtml(taskLedgerCsvTemplateText()) + '"></textarea></label>',
+-      '  <div class="aicm-dashboard-action-row">',
+-      '    <button type="button" data-core-action="task-ledger-fill-csv-template">CSVテンプレを入れる</button>',
+-      '    <button type="button" data-core-action="task-ledger-csv-preview">プレビュー</button>',
+-      preview.length ? '    <button type="button" data-core-action="task-ledger-csv-import">インポート実行</button>' : '',
++      '  <div class="aicm-csv-flow">',
++      '    <div class="aicm-csv-flow-step aicm-csv-flow-main">',
++      '      <span>1</span>',
++      '      <div><strong>ChatGPT用プロンプト</strong><p>台帳CSVをChatGPTに作らせるためのプロンプトをコピーまたはファイル作成します。</p></div>',
++      '      <button type="button" data-core-action="task-ledger-chatgpt-prompt">ChatGPT用プロンプト</button>',
++      '    </div>',
++      '    <div class="aicm-csv-flow-step">',
++      '      <span>2</span>',
++      '      <div><strong>CSVファイル読込</strong><p>ChatGPTで作成したCSVファイルを読み込みます。</p></div>',
++      '      <button type="button" data-core-action="task-ledger-csv-file-open">CSVファイル読込</button>',
++      '    </div>',
++      '    <div class="aicm-csv-file-name"><span>ファイル名</span><strong>' + escapeHtml(fileName) + '</strong></div>',
++      '    <div class="aicm-csv-flow-step">',
++      '      <span>3</span>',
++      '      <div><strong>CSV取り込み実行</strong><p>読み込んだCSVを部門別タスク台帳へ登録します。</p></div>',
++      '      <button type="button" data-core-action="task-ledger-csv-import">CSV取り込み実行</button>',
++      '    </div>',
+       '  </div>',
+-      preview.length ? '<p class="aicm-selected-note">プレビュー: 有効 ' + validCount + '件 / エラー ' + errorCount + '件</p>' : '',
+-      renderCsvPreviewTable(preview),
+-      renderCsvTemplatePanel(),
++      '  <input id="aicm-ledger-csv-file" class="aicm-hidden-file" type="file" accept=".csv,text/csv" data-core-file="task-ledger-csv">',
++      lastResult ? '<p class="aicm-selected-note">' + escapeHtml(lastResult) + '</p>' : '',
+       '</section>'
+     ].join("");
+   }
+ 
+-  function renderCsvPreviewTable(preview) {
+-    if (!preview || !preview.length) return "";
++  
++function renderCsvPreviewTable(preview) {
++    return "";
++  }
+ 
+-    return [
+-      '<div class="aicm-csv-preview">',
+-      '  <table>',
+-      '    <thead><tr><th>行</th><th>判定</th><th>部門</th><th>課</th><th>成果物</th><th>作業</th></tr></thead>',
+-      '    <tbody>',
+-      preview.map(function (row) {
+-        return [
+-          '<tr class="' + (row.valid ? 'is-valid' : 'is-error') + '">',
+-          '  <td>' + row.row_number + '</td>',
+-          '  <td>' + (row.valid ? 'OK' : escapeHtml(row.errors.join(" / "))) + '</td>',
+-          '  <td>' + escapeHtml(row.source.department_name || "") + '</td>',
+-          '  <td>' + escapeHtml(row.source.section_name || "") + '</td>',
+-          '  <td>' + escapeHtml(row.source.deliverable_name || "") + '</td>',
+-          '  <td>' + escapeHtml(row.source.task_name || "") + '</td>',
+-          '</tr>'
+-        ].join("");
+-      }).join(""),
+-      '    </tbody>',
+-      '  </table>',
+-      '</div>'
+-    ].join("");
++  
++function renderCsvTemplatePanel() {
++    return "";
+   }
+ 
+-  function renderCsvTemplatePanel() {
+-    return [
+-      '<details class="aicm-csv-template">',
+-      '  <summary>CSV作成テンプレ / ChatGPT用プロンプト</summary>',
+-      '  <label>CSVカラム<textarea readonly rows="3">' + escapeHtml(taskLedgerCsvColumns().join(",")) + '</textarea></label>',
+-      '  <label>CSVテンプレ<textarea readonly rows="4">' + escapeHtml(taskLedgerCsvTemplateText()) + '</textarea></label>',
+-      '  <label>ChatGPT用プロンプト<textarea readonly rows="10">' + escapeHtml(taskLedgerCsvPromptText()) + '</textarea></label>',
+-      '</details>'
+-    ].join("");
++  async 
++function downloadTextFile(filename, text, mimeType) {
++    var blob = new Blob([String(text || "")], { type: mimeType || "text/plain;charset=utf-8" });
++    var url = URL.createObjectURL(blob);
++    var a = document.createElement("a");
++    a.href = url;
++    a.download = filename;
++    document.body.appendChild(a);
++    a.click();
++    a.remove();
++    setTimeout(function () {
++      URL.revokeObjectURL(url);
++    }, 1000);
++  }
++
++  async function readTaskLedgerCsvFile(file) {
++    if (!file) return;
++
++    try {
++      var text = await file.text();
++      state.csvImportText = text;
++      state.csvImportFileName = file.name || "selected.csv";
++      state.csvImportPreview = [];
++      state.csvImportLastResult = "";
++      setMessage("ok", "CSVファイルを読み込みました: " + state.csvImportFileName);
++    } catch (error) {
++      state.csvImportText = "";
++      state.csvImportFileName = "";
++      state.csvImportPreview = [];
++      state.csvImportLastResult = "";
++      setMessage("error", "CSVファイル読込に失敗しました。");
++    }
++
++    render();
++  }
++
++  function openTaskLedgerCsvFilePicker() {
++    var input = document.getElementById("aicm-ledger-csv-file");
++    if (input) input.click();
++  }
++
++  async function openTaskLedgerChatGptPrompt() {
++    var text = taskLedgerCsvPromptText();
++
++    try {
++      if (navigator.clipboard && navigator.clipboard.writeText) {
++        await navigator.clipboard.writeText(text);
++        setMessage("ok", "ChatGPT用プロンプトをコピーしました。");
++        render();
++        return;
++      }
++    } catch (error) {
++    }
++
++    downloadTextFile("aicm_task_ledger_chatgpt_prompt.txt", text, "text/plain;charset=utf-8");
++    setMessage("ok", "ChatGPT用プロンプトファイルを作成しました。");
++    render();
+   }
+ 
+-  async function previewTaskLedgerCsv() {
++
++  function previewTaskLedgerCsv() {
+     try {
+       state.csvImportPreview = buildTaskLedgerCsvPreview();
+       setMessage("ok", "CSVプレビューを作成しました。");
+@@ -1247,12 +1292,25 @@
+     render();
+   }
+ 
+-  async function importTaskLedgerCsv() {
+-    var preview = Array.isArray(state.csvImportPreview) ? state.csvImportPreview : [];
+-    var validRows = preview.filter(function (row) { return row.valid; });
++  async 
++async function importTaskLedgerCsv() {
++    var preview = [];
++
++    try {
++      preview = buildTaskLedgerCsvPreview();
++    } catch (error) {
++      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
++      render();
++      return;
++    }
++
++    var invalidRows = preview.filter(function (row) { return !row.valid; });
++    if (invalidRows.length) {
++      var message = invalidRows.slice(0, 3).map(function (row) {
++        return "行" + row.row_number + ": " + row.errors.join(" / ");
++      }).join(" / ");
+ 
+-    if (!validRows.length) {
+-      setMessage("error", "インポート可能な行がありません。");
++      setMessage("error", "CSV取り込み前チェックでエラーがあります。 " + message);
+       render();
+       return;
+     }
+@@ -1261,8 +1319,8 @@
+     var failed = 0;
+     var messages = [];
+ 
+-    for (var i = 0; i < validRows.length; i++) {
+-      var row = validRows[i];
++    for (var i = 0; i < preview.length; i++) {
++      var row = preview[i];
+ 
+       try {
+         var response = await fetch("/api/aicm/v2/task-ledger/create", {
+@@ -1288,14 +1346,17 @@
+       await loadContext();
+     }
+ 
+-    state.csvImportPreview = [];
+-
+     if (failed > 0) {
+-      setMessage("error", "CSV取り込み: 成功 " + success + "件 / 失敗 " + failed + "件。 " + messages.slice(0, 3).join(" / "));
++      state.csvImportLastResult = "CSV取り込み: 成功 " + success + "件 / 失敗 " + failed + "件";
++      setMessage("error", state.csvImportLastResult + "。 " + messages.slice(0, 3).join(" / "));
+     } else {
+-      setMessage("ok", "CSV取り込み完了: " + success + "件");
++      state.csvImportLastResult = "CSV取り込み完了: " + success + "件";
++      state.csvImportText = "";
++      state.csvImportFileName = "";
++      setMessage("ok", state.csvImportLastResult);

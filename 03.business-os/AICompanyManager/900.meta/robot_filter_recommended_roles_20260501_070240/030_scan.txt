@@ -1,0 +1,326 @@
+============================================================
+AXP scan
+============================================================
+
+---- patched aicmRobotMatchesInlineRole ----
+1599-  }
+1600-
+1601-function aicmRobotValue(row) {
+1602-    if (!row || typeof row !== "object") return "";
+1603-
+1604-    return String(
+1605-      row.robot_pool_id ||
+1606-      row.business_robot_pool_id ||
+1607-      row.aicm_robot_pool_id ||
+1608-      row.worker_pool_id ||
+1609-      row.placement_robot_pool_id ||
+1610-      row.aiworker_model_id ||
+1611-      row.aiworker_model_code ||
+1612-      row.model_id ||
+1613-      row.model_code ||
+1614-      row.robot_id ||
+1615-      row.id ||
+1616-      ""
+1617-    );
+1618-  }
+1619-
+1620-
+1621-function aicmRobotRoleText(row) {
+1622-    if (!row || typeof row !== "object") return "";
+1623-
+1624-    var recommended = row.recommended_role_codes;
+1625-    var recommendedText = "";
+1626-
+1627-    if (Array.isArray(recommended)) {
+1628-      recommendedText = recommended.join(" ");
+1629-    } else if (recommended && typeof recommended === "object") {
+1630-      try {
+1631-        recommendedText = JSON.stringify(recommended);
+1632-      } catch (_) {
+1633-        recommendedText = "";
+1634-      }
+1635-    } else {
+1636-      recommendedText = String(recommended || "");
+1637-    }
+1638-
+1639-    return [
+1640-      recommendedText,
+1641-      row.role_code,
+1642-      row.placement_role_code,
+1643-      row.assignment_role_code,
+1644-      row.eligible_role_code,
+1645-      row.available_role_code,
+1646-      row.assignment_mode_code,
+1647-      row.role_name,
+1648-      row.role_label,
+1649-      row.position_code,
+1650-      row.position_label,
+1651-      row.role_display_name,
+1652-      row.selector_label,
+1653-      row.display_name,
+1654-      row.aiworker_model_code,
+1655-      row.aiworker_model_name,
+1656-      row.model_line_code,
+1657-      row.model_code,
+1658-      row.model_name,
+1659-      row.series_code,
+1660-      row.series_name,
+1661-      row.aiworker_series_code,
+1662-      row.manufacturer_code,
+1663-      row.robot_type_code,
+1664-      row.robot_type_label
+1665-    ].filter(Boolean).join(" ").toLowerCase();
+1666-  }
+1667-
+1668-function aicmRobotMatchesInlineRole(row, roleCode) {
+1669:    // AICM_ROBOT_FILTER_RECOMMENDED_ROLE_CODES_AXP_V1
+1670-    // Canonical source:
+1671-    // business.vw_ai_company_manager_system_robot_selector_options.recommended_role_codes
+1672-    //
+1673-    // Do not infer candidates from display_name / aiworker_model_code text.
+1674-    // Example:
+1675-    // - HD-R5P President must not appear in Manager unless Manager is explicitly recommended.
+1676-    // - BYD2-003 Leader3 must not appear in Worker unless Worker is explicitly recommended.
+1677-    // - HD-R2G General must not appear in Leader just because TacticalLeader contains "Leader".
+1678-
+1679-    function normalize(value) {
+1680-      return String(value || "").trim().toLowerCase();
+1681-    }
+1682-
+1683-    function canonicalRole(value) {
+1684-      var text = normalize(value);
+1685-
+1686-      if (text === "president" || text === "社長" || text === "プレジデント") return "president";
+1687-      if (text === "manager" || text === "部長" || text === "マネージャ" || text === "マネージャー") return "manager";
+1688-      if (text === "leader" || text === "課長" || text === "リーダ" || text === "リーダー") return "leader";
+1689-      if (text === "worker" || text === "従業員" || text === "ワーカー") return "worker";
+1690-
+1691-      return text;
+1692-    }
+1693-
+1694-    function addRole(list, value) {
+1695-      if (value === undefined || value === null) return;
+1696-
+1697-      if (Array.isArray(value)) {
+1698-        value.forEach(function (item) {
+1699-          addRole(list, item);
+1700-        });
+1701-        return;
+1702-      }
+1703-
+1704-      var raw = String(value || "").trim();
+1705-      if (!raw) return;
+1706-
+1707-      raw
+1708-        .replace(/^\{/, "")
+1709-        .replace(/\}$/, "")
+1710-        .split(/[;,|]/)
+1711-        .forEach(function (part) {
+1712-          var canonical = canonicalRole(part);
+1713-          if (canonical) list.push(canonical);
+1714-        });
+1715-    }
+1716-
+1717-    var roles = [];
+1718-
+1719-    addRole(roles, row && row.recommended_role_codes);
+1720-    addRole(roles, row && row.recommendedRoleCodes);
+1721-
+1722-    // Optional compatibility with direct robot_pool columns when a future context includes them.
+1723-    addRole(roles, row && row.placement_role_code_1);
+1724-    addRole(roles, row && row.placement_role_code_2);
+1725-    addRole(roles, row && row.placement_role_code_3);
+1726-
+1727-    // Optional compatibility with singular explicit role fields.
+1728-    // These are accepted only as exact role fields, not display/model text.
+1729-    addRole(roles, row && row.eligible_role_code);
+1730-    addRole(roles, row && row.available_role_code);
+1731-
+1732-    var wanted = canonicalRole(roleCode);
+1733-
+1734-    if (!wanted || !roles.length) {
+1735-      return false;
+1736-    }
+1737-
+1738-    return roles.indexOf(wanted) >= 0;
+1739-  }
+
+---- aicmInlineRobotRows caller ----
+1748-      row.internal_nickname ||
+1749-      row.placement_nickname ||
+1750-      row.robot_internal_nickname ||
+1751-      row.aiworker_model_name ||
+1752-      row.model_name ||
+1753-      row.robot_name ||
+1754-      row.robot_pool_label ||
+1755-      row.aiworker_model_code ||
+1756-      row.model_code ||
+1757-      row.robot_pool_id ||
+1758-      row.robot_id ||
+1759-      row.id ||
+1760-      "ロボット"
+1761-    );
+1762-
+1763-    var code = row.aiworker_model_code || row.model_code || "";
+1764-    var qty = row.usable_quantity;
+1765-
+1766-    var label = String(base);
+1767-
+1768-    if (code && label.indexOf(String(code)) < 0) {
+1769-      label += " / " + String(code);
+1770-    }
+1771-
+1772-    if (qty !== undefined && qty !== null && String(qty) !== "") {
+1773-      label += " / 利用可能:" + String(qty);
+1774-    }
+1775-
+1776-    return label;
+1777-  }
+1778-
+1779-
+1780-// AICM_EXPAND_ROBOT_CANDIDATES_ATY_AUB_V1
+1781-
+1782-// AICM_RECOMMENDED_ONLY_ROBOT_COMBOS_AUK_AUN_V1
+1783:function aicmInlineRobotRows(roleCode) {
+1784-    var all = aicmRobotCatalogSafe().filter(function (row) {
+1785-      return aicmRobotValue(row);
+1786-    });
+1787-
+1788-    var recommended = all.filter(function (row) {
+1789-      return aicmRobotMatchesInlineRole(row, roleCode);
+1790-    });
+1791-
+1792-    var seen = Object.create(null);
+1793-    var rows = [];
+1794-
+1795-    recommended.forEach(function (row) {
+1796-      var key = aicmRobotValue(row);
+1797-      if (!key || seen[key]) return;
+1798-      seen[key] = true;
+1799-      rows.push(row);
+1800-    });
+1801-
+1802-    return rows;
+1803-  }
+1804-
+1805-
+1806-
+1807-
+1808-// AICM_ROLE_PLACEMENT_READBACK_AXN_V1
+1809-// Read back saved AICompanyManager role placements into edit forms.
+1810-// Source: state.context.placements from business.vw_aicm_user_company_worker_placement_display.
+1811-// This is UI prefill only. It does not write DB.
+1812-function aicmAxnText(value) {
+1813-    return String(value || "").trim();
+1814-  }
+1815-
+1816-function aicmAxnLower(value) {
+1817-    return aicmAxnText(value).toLowerCase();
+1818-  }
+
+---- robot option label/value ----
+1576-      candidates.push(ctx.robot_pool);
+1577-      candidates.push(ctx.robot_pool_items);
+1578-      candidates.push(ctx.available_robots);
+1579-      candidates.push(ctx.availableRobots);
+1580-      candidates.push(ctx.worker_robot_catalog);
+1581-      candidates.push(ctx.aiworker_catalog);
+1582-    }
+1583-
+1584-    if (state && typeof state === "object") {
+1585-      candidates.push(state.robot_catalog);
+1586-      candidates.push(state.robotCatalog);
+1587-      candidates.push(state.robots);
+1588-      candidates.push(state.available_robots);
+1589-      candidates.push(state.context && state.context.robot_catalog);
+1590-      candidates.push(state.ctx && state.ctx.robot_catalog);
+1591-      candidates.push(state.data && state.data.robot_catalog);
+1592-    }
+1593-
+1594-    for (var i = 0; i < candidates.length; i++) {
+1595-      if (Array.isArray(candidates[i]) && candidates[i].length > 0) return candidates[i];
+1596-    }
+1597-
+1598-    return [];
+1599-  }
+1600-
+1601:function aicmRobotValue(row) {
+1602-    if (!row || typeof row !== "object") return "";
+1603-
+1604-    return String(
+1605-      row.robot_pool_id ||
+1606-      row.business_robot_pool_id ||
+1607-      row.aicm_robot_pool_id ||
+1608-      row.worker_pool_id ||
+1609-      row.placement_robot_pool_id ||
+1610-      row.aiworker_model_id ||
+1611-      row.aiworker_model_code ||
+1612-      row.model_id ||
+1613-      row.model_code ||
+1614-      row.robot_id ||
+1615-      row.id ||
+1616-      ""
+1617-    );
+1618-  }
+1619-
+1620-
+1621-function aicmRobotRoleText(row) {
+1622-    if (!row || typeof row !== "object") return "";
+1623-
+1624-    var recommended = row.recommended_role_codes;
+1625-    var recommendedText = "";
+1626-
+--
+1717-    var roles = [];
+1718-
+1719-    addRole(roles, row && row.recommended_role_codes);
+1720-    addRole(roles, row && row.recommendedRoleCodes);
+1721-
+1722-    // Optional compatibility with direct robot_pool columns when a future context includes them.
+1723-    addRole(roles, row && row.placement_role_code_1);
+1724-    addRole(roles, row && row.placement_role_code_2);
+1725-    addRole(roles, row && row.placement_role_code_3);
+1726-
+1727-    // Optional compatibility with singular explicit role fields.
+1728-    // These are accepted only as exact role fields, not display/model text.
+1729-    addRole(roles, row && row.eligible_role_code);
+1730-    addRole(roles, row && row.available_role_code);
+1731-
+1732-    var wanted = canonicalRole(roleCode);
+1733-
+1734-    if (!wanted || !roles.length) {
+1735-      return false;
+1736-    }
+1737-
+1738-    return roles.indexOf(wanted) >= 0;
+1739-  }
+1740-
+1741-
+1742:function aicmRobotOptionLabel(row) {
+1743-    if (!row) return "未設定";
+1744-
+1745-    var base = (
+1746-      row.selector_label ||
+1747-      row.display_name ||
+1748-      row.internal_nickname ||
+1749-      row.placement_nickname ||
+1750-      row.robot_internal_nickname ||
+1751-      row.aiworker_model_name ||
+1752-      row.model_name ||
+1753-      row.robot_name ||
+1754-      row.robot_pool_label ||
+1755-      row.aiworker_model_code ||
+1756-      row.model_code ||
+1757-      row.robot_pool_id ||
+1758-      row.robot_id ||
+1759-      row.id ||
+1760-      "ロボット"
+1761-    );
+1762-
+1763-    var code = row.aiworker_model_code || row.model_code || "";
+1764-    var qty = row.usable_quantity;
+1765-
+1766-    var label = String(base);
+1767-
+
+---- stale risky matching near aicmRobotMatchesInlineRole should be absent ----

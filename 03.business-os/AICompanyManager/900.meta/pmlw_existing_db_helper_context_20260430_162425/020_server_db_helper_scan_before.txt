@@ -1,0 +1,52 @@
+============================================================
+Server DB helper scan before patch
+============================================================
+--- imports ---
+1:import http from "node:http";
+2:import fs from "node:fs";
+3:import path from "node:path";
+4:import { fileURLToPath } from "node:url";
+5:import { execFileSync } from "node:child_process";
+
+--- possible DB helpers / query calls ---
+21:  ".jpg": "image/jpeg",
+67:  const pgProtocol = "post" + "gres(?:ql)?://";
+68:  raw = raw.replace(new RegExp(pgProtocol + "[^\\s'\\\"]+", "g"), "[DB_CONNECTION_REDACTED]");
+426:  const robotPoolId = String(body.robot_pool_id || "").trim();
+432:  const robotPoolSql = robotPoolId ? sqlLiteral(robotPoolId) + "::uuid" : "NULL";
+458:    "    " + robotPoolSql + ",",
+
+--- context response area ---
+165:function getContext(ownerCivilizationId) {
+166:  const owner = requiredUuid(ownerCivilizationId, "owner_civilization_id");
+172:    "  'owner_civilization_id', " + sqlLiteral(owner) + ",",
+173:    "  'companies', (",
+176:    "    WHERE c.owner_civilization_id::text = " + sqlLiteral(owner),
+179:    "  'departments', (",
+182:    "    WHERE d.owner_civilization_id::text = " + sqlLiteral(owner),
+185:    "  'sections', (",
+188:    "    WHERE s.owner_civilization_id::text = " + sqlLiteral(owner),
+191:    "  'placements', (",
+194:    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+197:    "  'task_ledger', (",
+199:    "    FROM business.vw_aicm_user_company_department_task_ledger_display t",
+200:    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+203:    "  'robot_catalog', (",
+214:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+221:    "    owner_civilization_id, company_name, business_domain, company_status, selected_flag",
+243:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+252:    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+258:    "    owner_civilization_id, aicm_user_company_id, department_name, purpose, department_status",
+289:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+299:    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+306:    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, section_name, purpose, section_status",
+339:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+362:    "  WHERE d.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+369:    "  INSERT INTO business.aicm_user_company_department_task_ledger (",
+370:    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+401:    "      'task_ledger', to_jsonb(inserted)",
+417:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+438:    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+444:    "    owner_civilization_id, aicm_user_company_id,",
+495:    if (route === "/api/aicm/v2/context" && req.method === "GET") {
+496:      sendJson(res, 200, getContext(url.searchParams.get("owner_civilization_id") || ""));

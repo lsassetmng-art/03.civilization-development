@@ -1,0 +1,929 @@
+============================================================
+server worker runtime scan
+============================================================
+1194-  ].join("")).join(",\n    ") : "";
+1195-
+1196-  const insertCte = insertRows.length ? [
+1197-    "), insert_rows(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id, robot_pool_id, aiworker_model_code, internal_nickname) AS (",
+1198-    "  VALUES",
+1199-    "    " + insertValues,
+1200-    "), inserted AS (",
+1201-    "  INSERT INTO business.aicm_user_company_worker_placement (",
+1202-    "    owner_civilization_id, aicm_user_company_id,",
+1203-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1204-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1205-    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1206-    "  )",
+1207-    "  SELECT",
+1208-    "  -- AICM_ROLE_SYNC_UUID_CAST_AXM_V1",
+1209-    "    " + sqlLiteral(owner) + "::uuid,",
+1210-    "    c.aicm_user_company_id,",
+1211-    "    i.aicm_user_company_department_id::uuid,",
+1212-    "    i.aicm_user_company_section_id::uuid,",
+1213-    "    i.target_level_code,",
+1214-    "    i.target_id,",
+1215-    "    'AICompanyManager',",
+1216-    "    i.role_code,",
+1217-    "    i.robot_pool_id::uuid,",
+1218-    "    i.aiworker_model_code,",
+1219-    "    i.internal_nickname,",
+1220-    "    1,",
+1221-    "    'unlimited_system_use',",
+1222-    "    'active'",
+1223-    "  FROM insert_rows i",
+1224-    "  CROSS JOIN company_ok c",
+1225-    "  RETURNING *"
+1226-  ].join("\n") : [
+1227-    "), inserted AS (",
+1228-    "  SELECT *",
+1229-    "  FROM business.aicm_user_company_worker_placement",
+1230-    "  WHERE false"
+1231-  ].join("\n");
+1232-
+1233-  const sql = [
+1234-    "WITH company_ok AS (",
+1235-    "  SELECT aicm_user_company_id",
+1236-    "  FROM business.aicm_user_company",
+1237-    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1238-    "    AND aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1239-    "    AND company_status = 'active'",
+1240-    "  LIMIT 1",
+1241-    "), target_keys(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id) AS (",
+1242-    "  VALUES",
+1243-    "    " + targetValues,
+1244-    "), archived AS (",
+1245-    "  UPDATE business.aicm_user_company_worker_placement p",
+1246-    "  SET status_code = 'archived',",
+1247-    "      updated_at = now(),",
+1248-    "      metadata_jsonb = COALESCE(p.metadata_jsonb, '{}'::jsonb) || jsonb_build_object('archived_by', 'AICompanyManager.role_settings_sync', 'archived_at', now()::text)",
+1249-    "  FROM target_keys k",
+1250-    "  WHERE p.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1251-    "    AND p.aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1252-    "    AND p.app_code = 'AICompanyManager'",
+1253-    "    AND p.status_code = 'active'",
+1254-    "    AND lower(p.target_level_code) = lower(k.target_level_code)",
+1255-    "    AND p.target_id = k.target_id",
+1256-    "    AND lower(p.role_code) = lower(k.role_code)",
+1257-    "  RETURNING p.*",
+1258-    insertCte,
+1259-    ")",
+1260-    "SELECT jsonb_build_object(",
+1261-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM company_ok) THEN 'ok' ELSE 'error' END,",
+1262-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1263-    "  'archived_count', (SELECT count(*) FROM archived),",
+1264-    "  'inserted_count', (SELECT count(*) FROM inserted),",
+1265-    "  'placements', COALESCE((SELECT jsonb_agg(to_jsonb(inserted) ORDER BY created_at, aicm_user_company_worker_placement_id) FROM inserted), '[]'::jsonb),",
+1266-    "  'error_message', CASE WHEN EXISTS (SELECT 1 FROM company_ok) THEN '' ELSE '先にv2のAI企業を作成・選択してください。' END",
+1267-    ")::text;"
+1268-  ].join("\n");
+1269-
+1270-  return runPsqlJson(sql);
+1271-}
+1272-
+1273-
+1274:// AICM_WORKER_RUNTIME_REQUEST_AXS_V1
+1275-// Server-side bridge from AICompanyManager to AIWorkerOS Runtime Execution.
+1276-// UI must never receive PERSONA_AIWORKEROS_AUTH_TOKEN.
+1277-// This function does local placement validation, then forwards a sanitized request to AIWorkerOS.
+1278-function aicmWorkerRuntimeText(value) {
+1279-  return String(value || "").trim();
+1280-}
+1281-
+1282-function aicmWorkerRuntimeDefault(value, fallback) {
+1283-  const text = aicmWorkerRuntimeText(value);
+1284-  return text || fallback;
+1285-}
+1286-
+1287-function aicmWorkerRuntimeOptionalUuidSql(value) {
+1288-  const text = aicmWorkerRuntimeText(value);
+1289-  return /^[0-9a-fA-F-]{36}$/.test(text) ? sqlLiteral(text) + "::uuid" : "NULL";
+1290-}
+1291-
+1292-function aicmWorkerRuntimeBaseUrl() {
+1293-  const base = aicmWorkerRuntimeText(process.env.PERSONA_AIWORKEROS_BASE_URL);
+1294-  if (!base) {
+1295-    throw new Error("PERSONA_AIWORKEROS_BASE_URL is not set");
+1296-  }
+1297-  return base.replace(/\/+$/, "");
+1298-}
+1299-
+1300-function aicmWorkerRuntimeAuthToken() {
+1301-  const token = aicmWorkerRuntimeText(process.env.PERSONA_AIWORKEROS_AUTH_TOKEN);
+1302-  if (!token) {
+1303-    throw new Error("PERSONA_AIWORKEROS_AUTH_TOKEN is not set");
+1304-  }
+1305-  return token;
+1306-}
+1307-
+1308-function getAicmWorkerRuntimePlacement(body) {
+1309-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1310-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1311-  const placementId = requiredUuid(body.aicm_user_company_worker_placement_id, "aicm_user_company_worker_placement_id");
+1312-
+1313-  const sql = [
+1314-    "WITH placement AS (",
+1315-    "  SELECT",
+1316-    "    p.aicm_user_company_worker_placement_id,",
+1317-    "    p.owner_civilization_id,",
+1318-    "    p.aicm_user_company_id,",
+1319-    "    p.aicm_user_company_department_id,",
+1320-    "    p.aicm_user_company_section_id,",
+1321-    "    p.target_level_code,",
+1322-    "    p.target_id,",
+1323-    "    p.app_code,",
+1324-    "    p.role_code,",
+1325-    "    p.robot_pool_id,",
+1326-    "    p.aiworker_model_code,",
+1327-    "    p.internal_nickname,",
+1328-    "    p.status_code,",
+1329-    "    COALESCE(v.display_label, NULLIF(p.internal_nickname, '') || '@' || p.role_code, p.aiworker_model_code || '@' || p.role_code) AS display_label",
+1330-    "  FROM business.aicm_user_company_worker_placement p",
+1331-    "  LEFT JOIN business.vw_aicm_user_company_worker_placement_display v",
+1332-    "    ON v.aicm_user_company_worker_placement_id = p.aicm_user_company_worker_placement_id",
+1333-    "  WHERE p.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1334-    "    AND p.aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1335-    "    AND p.aicm_user_company_worker_placement_id = " + sqlLiteral(placementId) + "::uuid",
+1336-    "    AND p.app_code = 'AICompanyManager'",
+1337-    "    AND p.status_code = 'active'",
+1338-    "    AND lower(p.role_code) = lower('Worker')",
+1339-    "  LIMIT 1",
+1340-    ")",
+1341-    "SELECT jsonb_build_object(",
+1342-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM placement) THEN 'ok' ELSE 'not_found' END,",
+1343-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1344-    "  'placement', COALESCE((SELECT to_jsonb(placement) FROM placement), '{}'::jsonb)",
+1345-    ")::text;"
+1346-  ].join("\n");
+1347-
+1348-  return runPsqlJson(sql);
+1349-}
+1350-
+1351-function aicmWorkerRuntimeBuildIdempotencyKey(body, placement) {
+1352-  const provided = aicmWorkerRuntimeText(body.idempotency_key);
+1353-  if (provided) return provided;
+1354-
+752-    "      AND t.task_status_code <> 'archived'",
+753-    "  ),",
+754-    // AICM_PMLW_GETCONTEXT_SQL_EXTENSION_AQP_AQS_V1
+755-    "  'pmlw_president_policies', (",
+756-    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.display_order ASC, p.updated_at DESC, p.created_at DESC), '[]'::jsonb)",
+757-    "    FROM business.vw_aicm_pmlw_president_policy_display p",
+758-    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+759-    "  ),",
+760-    "  'pmlw_major_items', (",
+761-    "    SELECT COALESCE(jsonb_agg(to_jsonb(m) ORDER BY m.display_order ASC, m.updated_at DESC, m.created_at DESC), '[]'::jsonb)",
+762-    "    FROM business.vw_aicm_pmlw_major_work_display m",
+763-    "    WHERE m.owner_civilization_id::text = " + sqlLiteral(owner),
+764-    "  ),",
+765-    "  'pmlw_middle_items', (",
+766-    "    SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY l.display_order ASC, l.updated_at DESC, l.created_at DESC), '[]'::jsonb)",
+767-    "    FROM business.vw_aicm_pmlw_leader_middle_display l",
+768-    "    WHERE l.owner_civilization_id::text = " + sqlLiteral(owner),
+769-    "  ),",
+770-    "  'pmlw_deliverable_requirements', (",
+771-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.display_order ASC, r.updated_at DESC, r.created_at DESC), '[]'::jsonb)",
+772-    "    FROM business.vw_aicm_pmlw_deliverable_requirement_display r",
+773-    "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+774-    "  ),",
+775-    "  'pmlw_worker_work_units', (",
+776-    "    SELECT COALESCE(jsonb_agg(to_jsonb(w) ORDER BY w.display_order ASC, w.updated_at DESC, w.created_at DESC), '[]'::jsonb)",
+777-    "    FROM business.vw_aicm_pmlw_worker_work_unit_display w",
+778-    "    WHERE w.owner_civilization_id::text = " + sqlLiteral(owner),
+779-    "  ),",
+780-    "  'pmlw_workflow_tree', (",
+781-    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.last_updated_at DESC NULLS LAST), '[]'::jsonb)",
+782-    "    FROM business.vw_aicm_pmlw_workflow_tree t",
+783-    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+784-    "  ),",
+785-    // AICM_HUMAN_REVIEW_QUEUE_ARN_ARQ_V1_CONTEXT
+786-    "  'review_wait_items', (",
+787-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.priority_code DESC, r.requested_at DESC, r.created_at DESC), '[]'::jsonb)",
+788-    "    FROM business.vw_aicm_human_review_wait_display r",
+789-    "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+790-    "  ),",
+791-    "  'robot_catalog', (",
+792:    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.aiworker_model_code), '[]'::jsonb)",
+793-    "    FROM business.vw_ai_company_manager_system_robot_selector_options r",
+794-    "  )",
+795-    ")::text;"
+796-  ].join("\n");
+797-
+798-  return runPsqlJson(sql);
+799-}
+800-
+801-function createCompany(body) {
+802-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+803-  const name = requiredText(body.company_name, "company_name");
+804-  const domain = String(body.business_domain || "");
+805-
+806-  const sql = [
+807-    "WITH inserted AS (",
+808-    "  INSERT INTO business.aicm_user_company (",
+809-    "    owner_civilization_id, company_name, business_domain, company_status, selected_flag",
+810-    "  ) VALUES (",
+811-    "    " + sqlLiteral(owner) + "::uuid,",
+812-    "    " + sqlLiteral(name) + ",",
+813-    "    " + sqlLiteral(domain) + ",",
+814-    "    'active',",
+815-    "    true",
+816-    "  )",
+817-    "  RETURNING *",
+818-    ")",
+819-    "SELECT jsonb_build_object(",
+820-    "  'result', 'ok',",
+821-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+822-    "  'company', to_jsonb(inserted)",
+823-    ")::text",
+824-    "FROM inserted;"
+825-  ].join("\n");
+826-
+827-  return runPsqlJson(sql);
+828-}
+829-
+830-function createDepartment(body) {
+831-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+832-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+--
+968-    "    " + sqlLiteral(deliverableName) + ",",
+969-    "    " + sqlLiteral(taskName) + ",",
+970-    "    " + sqlLiteral(workTypeCode) + ",",
+971-    "    " + sqlLiteral(responsibleRoleCode) + ",",
+972-    "    " + sqlLiteral(responsibleRobotLabel) + ",",
+973-    "    " + sqlLiteral(taskStatusCode) + ",",
+974-    "    " + sqlLiteral(priorityCode) + ",",
+975-    "    " + dueDateSql + ",",
+976-    "    " + sqlLiteral(body.reference_files_text || "") + ",",
+977-    "    " + sqlLiteral(body.supplemental_materials_text || "") + ",",
+978-    "    " + sqlLiteral(body.applicable_rules_text || "") + ",",
+979-    "    " + sqlLiteral(body.note || "") + ",",
+980-    "    " + sqlLiteral(body.handoff_link || "") + "",
+981-    "  FROM department_ok",
+982-    "  RETURNING *",
+983-    ")",
+984-    "SELECT CASE",
+985-    "  WHEN EXISTS (SELECT 1 FROM inserted) THEN",
+986-    "    (SELECT jsonb_build_object(",
+987-    "      'result', 'ok',",
+988-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+989-    "      'task_ledger', to_jsonb(inserted)",
+990-    "    ) FROM inserted)::text",
+991-    "  ELSE",
+992-    "    jsonb_build_object(",
+993-    "      'result', 'error',",
+994-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+995-    "      'error_message', '先にv2のAI企業と部門を作成・選択してください。'",
+996-    "    )::text",
+997-    "END;"
+998-  ].join("\n");
+999-
+1000-  return runPsqlJson(sql);
+1001-}
+1002-
+1003-
+1004-function createPlacement(body) {
+1005-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1006-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1007-  const roleCode = requiredText(body.role_code, "role_code");
+1008:  const modelCode = requiredText(body.aiworker_model_code, "aiworker_model_code");
+1009-
+1010-  const departmentId = String(body.aicm_user_company_department_id || "").trim();
+1011-  const sectionId = String(body.aicm_user_company_section_id || "").trim();
+1012-  const targetLevelCode = requiredText(body.target_level_code || "company", "target_level_code");
+1013-  const targetId = String(body.target_id || "").trim();
+1014-  const robotPoolId = String(body.robot_pool_id || "").trim();
+1015-  const nickname = String(body.internal_nickname || "");
+1016-
+1017-  const departmentSql = departmentId ? sqlLiteral(departmentId) + "::uuid" : "NULL";
+1018-  const sectionSql = sectionId ? sqlLiteral(sectionId) + "::uuid" : "NULL";
+1019-  const targetSql = targetId ? sqlLiteral(targetId) + "::uuid" : "NULL";
+1020-  const robotPoolSql = robotPoolId ? sqlLiteral(robotPoolId) + "::uuid" : "NULL";
+1021-
+1022-  const sql = [
+1023-    "WITH company_ok AS (",
+1024-    "  SELECT aicm_user_company_id",
+1025-    "  FROM business.aicm_user_company",
+1026-    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1027-    "    AND aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1028-    "    AND company_status = 'active'",
+1029-    "  LIMIT 1",
+1030-    "), inserted AS (",
+1031-    "  INSERT INTO business.aicm_user_company_worker_placement (",
+1032-    "    owner_civilization_id, aicm_user_company_id,",
+1033-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1034-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1035:    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1036-    "  )",
+1037-    "  SELECT",
+1038-    "    " + sqlLiteral(owner) + "::uuid,",
+1039-    "    aicm_user_company_id,",
+1040-    "    " + departmentSql + ",",
+1041-    "    " + sectionSql + ",",
+1042-    "    " + sqlLiteral(targetLevelCode) + ",",
+1043-    "    " + targetSql + ",",
+1044-    "    'AICompanyManager',",
+1045-    "    " + sqlLiteral(roleCode) + ",",
+1046-    "    " + robotPoolSql + ",",
+1047-    "    " + sqlLiteral(modelCode) + ",",
+1048-    "    " + sqlLiteral(nickname) + ",",
+1049-    "    1,",
+1050-    "    'unlimited_system_use',",
+1051-    "    'active'",
+1052-    "  FROM company_ok",
+1053-    "  RETURNING *",
+1054-    ")",
+1055-    "SELECT CASE",
+1056-    "  WHEN EXISTS (SELECT 1 FROM inserted) THEN",
+1057-    "    (SELECT jsonb_build_object(",
+1058-    "      'result', 'ok',",
+1059-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1060-    "      'placement', to_jsonb(inserted)",
+1061-    "    ) FROM inserted)::text",
+1062-    "  ELSE",
+1063-    "    jsonb_build_object(",
+1064-    "      'result', 'error',",
+1065-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1066-    "      'error_message', '先にv2のAI企業を作成・選択してください。'",
+1067-    "    )::text",
+1068-    "END;"
+1069-  ].join("\n");
+1070-
+1071-  return runPsqlJson(sql);
+1072-}
+1073-
+1074-
+1075-
+1076-// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+1077-// Synchronize President / Manager / Leader / Worker role settings.
+1078-// Canonical table: business.aicm_user_company_worker_placement.
+1079-// This endpoint archives current active placements for each submitted target+role,
+1080-// then recreates submitted active rows. This prevents duplicate single-slot assignments.
+1081-function aicmRoleSyncOptionalUuidSql(value) {
+1082-  const text = String(value || "").trim();
+1083-  return /^[0-9a-fA-F-]{36}$/.test(text) ? sqlLiteral(text) + "::uuid" : "NULL";
+1084-}
+1085-
+1086-function aicmRoleSyncRole(value) {
+1087-  const text = String(value || "").trim().toLowerCase();
+1088-  if (text === "president") return "President";
+1089-  if (text === "manager") return "Manager";
+1090-  if (text === "leader") return "Leader";
+1091-  if (text === "worker" || text === "employee") return "Worker";
+1092-  throw new Error("invalid role_code");
+1093-}
+1094-
+1095-function aicmRoleSyncTargetLevel(value) {
+1096-  const text = String(value || "").trim().toLowerCase();
+1097-  if (text === "company") return "company";
+1098-  if (text === "department") return "department";
+1099-  if (text === "section" || text === "organization") return "section";
+1100-  throw new Error("invalid target_level_code");
+1101-}
+1102-
+1103-function aicmRoleSyncRows(body) {
+1104-  const rows = Array.isArray(body.role_placements) ? body.role_placements : [];
+1105-  return rows.slice(0, 30).map((row, index) => {
+1106-    const roleCode = aicmRoleSyncRole(row.role_code || row.roleCode);
+1107-    const targetLevelCode = aicmRoleSyncTargetLevel(row.target_level_code || row.targetLevelCode);
+1108-    return {
+1109-      row_order: index,
+1110-      role_code: roleCode,
+1111-      target_level_code: targetLevelCode,
+1112-      aicm_user_company_department_id: String(row.aicm_user_company_department_id || row.departmentId || "").trim(),
+1113-      aicm_user_company_section_id: String(row.aicm_user_company_section_id || row.sectionId || row.organizationId || "").trim(),
+1114-      target_id: String(row.target_id || row.targetId || "").trim(),
+1115-      robot_pool_id: String(row.robot_pool_id || row.robotPoolId || "").trim(),
+1116:      aiworker_model_code: String(row.aiworker_model_code || row.aiworkerModelCode || "").trim(),
+1117-      internal_nickname: String(row.internal_nickname || row.internalNickname || "").trim()
+1118-    };
+1119-  });
+1120-}
+1121-
+1122-function syncRoleSettings(body) {
+1123-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1124-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1125-  const submittedRows = aicmRoleSyncRows(body);
+1126-
+1127-  const targetKeys = [];
+1128-  const insertRows = [];
+1129-
+1130-  for (const row of submittedRows) {
+1131-    const targetId = row.target_id ||
+1132-      (row.target_level_code === "company" ? companyId : "") ||
+1133-      (row.target_level_code === "department" ? row.aicm_user_company_department_id : "") ||
+1134-      (row.target_level_code === "section" ? row.aicm_user_company_section_id : "");
+1135-
+1136-    if (!targetId) continue;
+1137-
+1138-    const key = [row.target_level_code, targetId, row.role_code].join("|");
+1139-
+1140-    if (!targetKeys.some((item) => item.key === key)) {
+1141-      targetKeys.push({
+1142-        key,
+1143-        target_level_code: row.target_level_code,
+1144-        target_id: targetId,
+1145-        role_code: row.role_code,
+1146-        aicm_user_company_department_id: row.aicm_user_company_department_id,
+1147-        aicm_user_company_section_id: row.aicm_user_company_section_id
+1148-      });
+1149-    }
+1150-
+1151:    if (!row.robot_pool_id && !row.aiworker_model_code) continue;
+1152-
+1153-    insertRows.push({
+1154-      ...row,
+1155-      target_id: targetId,
+1156:      aiworker_model_code: row.aiworker_model_code || "unknown"
+1157-    });
+1158-  }
+1159-
+1160-  if (targetKeys.length === 0) {
+1161-    return {
+1162-      result: "ok",
+1163-      api_identifier: SERVER_MARK,
+1164-      archived_count: 0,
+1165-      inserted_count: 0,
+1166-      placements: [],
+1167-      note: "no role placement targets"
+1168-    };
+1169-  }
+1170-
+1171-  const targetValues = targetKeys.map((row, index) => [
+1172-    "(",
+1173-    String(index),
+1174-    ", " + sqlLiteral(row.target_level_code),
+1175-    ", " + sqlLiteral(row.target_id) + "::uuid",
+1176-    ", " + sqlLiteral(row.role_code),
+1177-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_department_id),
+1178-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_section_id),
+1179-    ")"
+1180-  ].join("")).join(",\n    ");
+1181-
+1182-  const insertValues = insertRows.length ? insertRows.map((row, index) => [
+1183-    "(",
+1184-    String(index),
+1185-    ", " + sqlLiteral(row.target_level_code),
+1186-    ", " + sqlLiteral(row.target_id) + "::uuid",
+1187-    ", " + sqlLiteral(row.role_code),
+1188-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_department_id),
+1189-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_section_id),
+1190-    ", " + aicmRoleSyncOptionalUuidSql(row.robot_pool_id),
+1191:    ", " + sqlLiteral(row.aiworker_model_code),
+1192-    ", " + sqlLiteral(row.internal_nickname),
+1193-    ")"
+1194-  ].join("")).join(",\n    ") : "";
+1195-
+1196-  const insertCte = insertRows.length ? [
+1197:    "), insert_rows(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id, robot_pool_id, aiworker_model_code, internal_nickname) AS (",
+1198-    "  VALUES",
+1199-    "    " + insertValues,
+1200-    "), inserted AS (",
+1201-    "  INSERT INTO business.aicm_user_company_worker_placement (",
+1202-    "    owner_civilization_id, aicm_user_company_id,",
+1203-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1204-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1205:    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1206-    "  )",
+1207-    "  SELECT",
+1208-    "  -- AICM_ROLE_SYNC_UUID_CAST_AXM_V1",
+1209-    "    " + sqlLiteral(owner) + "::uuid,",
+1210-    "    c.aicm_user_company_id,",
+1211-    "    i.aicm_user_company_department_id::uuid,",
+1212-    "    i.aicm_user_company_section_id::uuid,",
+1213-    "    i.target_level_code,",
+1214-    "    i.target_id,",
+1215-    "    'AICompanyManager',",
+1216-    "    i.role_code,",
+1217-    "    i.robot_pool_id::uuid,",
+1218:    "    i.aiworker_model_code,",
+1219-    "    i.internal_nickname,",
+1220-    "    1,",
+1221-    "    'unlimited_system_use',",
+1222-    "    'active'",
+1223-    "  FROM insert_rows i",
+1224-    "  CROSS JOIN company_ok c",
+1225-    "  RETURNING *"
+1226-  ].join("\n") : [
+1227-    "), inserted AS (",
+1228-    "  SELECT *",
+1229-    "  FROM business.aicm_user_company_worker_placement",
+1230-    "  WHERE false"
+1231-  ].join("\n");
+1232-
+1233-  const sql = [
+1234-    "WITH company_ok AS (",
+1235-    "  SELECT aicm_user_company_id",
+1236-    "  FROM business.aicm_user_company",
+1237-    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1238-    "    AND aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1239-    "    AND company_status = 'active'",
+1240-    "  LIMIT 1",
+1241-    "), target_keys(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id) AS (",
+1242-    "  VALUES",
+1243-    "    " + targetValues,
+1244-    "), archived AS (",
+1245-    "  UPDATE business.aicm_user_company_worker_placement p",
+1246-    "  SET status_code = 'archived',",
+1247-    "      updated_at = now(),",
+1248-    "      metadata_jsonb = COALESCE(p.metadata_jsonb, '{}'::jsonb) || jsonb_build_object('archived_by', 'AICompanyManager.role_settings_sync', 'archived_at', now()::text)",
+1249-    "  FROM target_keys k",
+1250-    "  WHERE p.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1251-    "    AND p.aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1252-    "    AND p.app_code = 'AICompanyManager'",
+1253-    "    AND p.status_code = 'active'",
+1254-    "    AND lower(p.target_level_code) = lower(k.target_level_code)",
+1255-    "    AND p.target_id = k.target_id",
+1256-    "    AND lower(p.role_code) = lower(k.role_code)",
+1257-    "  RETURNING p.*",
+1258-    insertCte,
+--
+1286-
+1287-function aicmWorkerRuntimeOptionalUuidSql(value) {
+1288-  const text = aicmWorkerRuntimeText(value);
+1289-  return /^[0-9a-fA-F-]{36}$/.test(text) ? sqlLiteral(text) + "::uuid" : "NULL";
+1290-}
+1291-
+1292-function aicmWorkerRuntimeBaseUrl() {
+1293-  const base = aicmWorkerRuntimeText(process.env.PERSONA_AIWORKEROS_BASE_URL);
+1294-  if (!base) {
+1295-    throw new Error("PERSONA_AIWORKEROS_BASE_URL is not set");
+1296-  }
+1297-  return base.replace(/\/+$/, "");
+1298-}
+1299-
+1300-function aicmWorkerRuntimeAuthToken() {
+1301-  const token = aicmWorkerRuntimeText(process.env.PERSONA_AIWORKEROS_AUTH_TOKEN);
+1302-  if (!token) {
+1303-    throw new Error("PERSONA_AIWORKEROS_AUTH_TOKEN is not set");
+1304-  }
+1305-  return token;
+1306-}
+1307-
+1308-function getAicmWorkerRuntimePlacement(body) {
+1309-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1310-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1311-  const placementId = requiredUuid(body.aicm_user_company_worker_placement_id, "aicm_user_company_worker_placement_id");
+1312-
+1313-  const sql = [
+1314-    "WITH placement AS (",
+1315-    "  SELECT",
+1316-    "    p.aicm_user_company_worker_placement_id,",
+1317-    "    p.owner_civilization_id,",
+1318-    "    p.aicm_user_company_id,",
+1319-    "    p.aicm_user_company_department_id,",
+1320-    "    p.aicm_user_company_section_id,",
+1321-    "    p.target_level_code,",
+1322-    "    p.target_id,",
+1323-    "    p.app_code,",
+1324-    "    p.role_code,",
+1325-    "    p.robot_pool_id,",
+1326:    "    p.aiworker_model_code,",
+1327-    "    p.internal_nickname,",
+1328-    "    p.status_code,",
+1329:    "    COALESCE(v.display_label, NULLIF(p.internal_nickname, '') || '@' || p.role_code, p.aiworker_model_code || '@' || p.role_code) AS display_label",
+1330-    "  FROM business.aicm_user_company_worker_placement p",
+1331-    "  LEFT JOIN business.vw_aicm_user_company_worker_placement_display v",
+1332-    "    ON v.aicm_user_company_worker_placement_id = p.aicm_user_company_worker_placement_id",
+1333-    "  WHERE p.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1334-    "    AND p.aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1335-    "    AND p.aicm_user_company_worker_placement_id = " + sqlLiteral(placementId) + "::uuid",
+1336-    "    AND p.app_code = 'AICompanyManager'",
+1337-    "    AND p.status_code = 'active'",
+1338-    "    AND lower(p.role_code) = lower('Worker')",
+1339-    "  LIMIT 1",
+1340-    ")",
+1341-    "SELECT jsonb_build_object(",
+1342-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM placement) THEN 'ok' ELSE 'not_found' END,",
+1343-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1344-    "  'placement', COALESCE((SELECT to_jsonb(placement) FROM placement), '{}'::jsonb)",
+1345-    ")::text;"
+1346-  ].join("\n");
+1347-
+1348-  return runPsqlJson(sql);
+1349-}
+1350-
+1351-function aicmWorkerRuntimeBuildIdempotencyKey(body, placement) {
+1352-  const provided = aicmWorkerRuntimeText(body.idempotency_key);
+1353-  if (provided) return provided;
+1354-
+1355-  const sourceRequestRef = aicmWorkerRuntimeDefault(body.source_request_ref, "manual:" + Date.now());
+1356-  const placementId = aicmWorkerRuntimeText(placement.aicm_user_company_worker_placement_id);
+1357-  return "aicm:" + sourceRequestRef + ":" + placementId;
+1358-}
+1359-
+1360-async function createWorkerRuntimeRequest(body) {
+1361-  body = body || {};
+1362-
+1363-  const placementResult = getAicmWorkerRuntimePlacement(body);
+1364-  if (!placementResult || placementResult.result !== "ok" || !placementResult.placement) {
+1365-    return {
+1366-      result: "error",
+1367-      api_identifier: SERVER_MARK,
+1368-      error_message: "有効なWorker配置が見つかりません。"
+1369-    };
+1370-  }
+1371-
+1372-  const placement = placementResult.placement;
+1373-  const baseUrl = aicmWorkerRuntimeBaseUrl();
+1374-  const token = aicmWorkerRuntimeAuthToken();
+1375-
+1376-  const modelCode = aicmWorkerRuntimeDefault(
+1377:    body.model_code || body.aiworker_model_code,
+1378:    placement.aiworker_model_code
+1379-  );
+1380-
+1381-  const appSurfaceCode = aicmWorkerRuntimeDefault(
+1382-    body.app_surface_code,
+1383-    "ai_company_manager_worker_execution"
+1384-  );
+1385-
+1386-  const taskDomainCode = aicmWorkerRuntimeDefault(
+1387-    body.task_domain_code,
+1388-    "business_operation"
+1389-  );
+1390-
+1391-  const taskTitle = requiredText(body.task_title || body.title, "task_title");
+1392-  const taskInstruction = requiredText(body.task_instruction_ja || body.task_instruction || body.instruction, "task_instruction_ja");
+1393-
+1394-  const sourceAppRef = aicmWorkerRuntimeDefault(body.source_app_ref, "AICompanyManager");
+1395-  const sourceRequestRef = aicmWorkerRuntimeDefault(body.source_request_ref, "manual:" + Date.now());
+1396-  const requestedByRef = aicmWorkerRuntimeDefault(body.requested_by_ref, "human");
+1397-  const idempotencyKey = aicmWorkerRuntimeBuildIdempotencyKey(body, placement);
+1398-
+1399-  const outboundBody = {
+1400-    app_surface_code: appSurfaceCode,
+1401:    model_code: modelCode,
+1402-    task_domain_code: taskDomainCode,
+1403-    task_title: taskTitle,
+1404-    task_instruction_ja: taskInstruction,
+1405-    source_app_ref: sourceAppRef,
+1406-    source_request_ref: sourceRequestRef,
+1407-    requested_by_ref: requestedByRef,
+1408-    idempotency_key: idempotencyKey
+1409-  };
+1410-
+1411-  const url = baseUrl + "/aiworker/v1/runtime-execution/request";
+1412-
+1413-  const response = await fetch(url, {
+1414-    method: "POST",
+1415-    headers: {
+1416-      "Authorization": "Bearer " + token,
+1417-      "Content-Type": "application/json",
+1418-      "Idempotency-Key": idempotencyKey
+1419-    },
+1420-    body: JSON.stringify(outboundBody)
+1421-  });
+1422-
+1423-  const responseText = await response.text();
+1424-  let responseJson = null;
+1425-
+1426-  try {
+1427-    responseJson = responseText ? JSON.parse(responseText) : {};
+1428-  } catch (error) {
+1429-    responseJson = {
+1430-      raw_response_text: responseText
+1431-    };
+1432-  }
+1433-
+1434-  if (!response.ok) {
+1435-    return {
+1436-      result: "error",
+1437-      api_identifier: SERVER_MARK,
+1438-      http_status_code: response.status,
+1439-      error_message: responseJson.error_message || responseJson.message || responseJson.error || "AIWorkerOS runtime request failed",
+1440-      aiworker_response: responseJson
+1441-    };
+1442-  }
+1443-
+1444-  const requestId =
+1445-    responseJson.request_id ||
+1446-    (responseJson.runtime_request && responseJson.runtime_request.request_id) ||
+1447-    (responseJson.request && responseJson.request.request_id) ||
+1448-    "";
+1449-
+1450-  const requestStatusCode =
+1451-    responseJson.request_status_code ||
+1452-    (responseJson.runtime_request && responseJson.runtime_request.request_status_code) ||
+1453-    (responseJson.request && responseJson.request.request_status_code) ||
+1454-    "";
+1455-
+1456-  return {
+1457-    result: "ok",
+1458-    api_identifier: SERVER_MARK,
+1459-    worker_placement: {
+1460-      aicm_user_company_worker_placement_id: placement.aicm_user_company_worker_placement_id,
+1461-      display_label: placement.display_label,
+1462:      aiworker_model_code: placement.aiworker_model_code,
+1463-      role_code: placement.role_code
+1464-    },
+1465-    runtime_request: {
+1466-      request_id: requestId,
+1467-      request_status_code: requestStatusCode,
+1468-      app_surface_code: appSurfaceCode,
+1469:      model_code: modelCode,
+1470-      task_domain_code: taskDomainCode,
+1471-      task_title: taskTitle,
+1472-      source_app_ref: sourceAppRef,
+1473-      source_request_ref: sourceRequestRef,
+1474-      idempotency_key: idempotencyKey
+1475-    },
+1476-    aiworker_response: responseJson
+1477-  };
+1478-}
+1479-
+1480-
+1481-async function handleApi(req, res, url) {
+1482-  const route = url.pathname;
+1483-
+1484-  try {
+1485-    if (req.method === "OPTIONS") {
+1486-      sendJson(res, 200, { result: "ok", api_identifier: SERVER_MARK });
+1487-      return true;
+1488-    }
+1489-
+1490-    
+1491-    if (route === "/api/aicm/v2/president-policy/create" && req.method === "POST") {
+1492-      const body = await readBody(req);
+1493-      sendJson(res, 200, createPresidentPolicy(body));
+1494-      return true;
+1495-    }
+1496-
+1497-    if (route === "/api/aicm/v2/manager-major/create" && req.method === "POST") {
+1498-      const body = await readBody(req);
+1499-      sendJson(res, 200, createManagerMajorItem(body));
+1500-      return true;
+1501-    }
+1502-
+1503-    if (route === "/api/aicm/v2/manager-major/update" && req.method === "POST") {
+1504-      const body = await readBody(req);
+1505-      sendJson(res, 200, updateManagerMajorItem(body));
+1506-      return true;
+1507-    }
+1508-
+1509-    if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+1342-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM placement) THEN 'ok' ELSE 'not_found' END,",
+1343-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1344-    "  'placement', COALESCE((SELECT to_jsonb(placement) FROM placement), '{}'::jsonb)",
+1345-    ")::text;"
+1346-  ].join("\n");
+1347-
+1348-  return runPsqlJson(sql);
+1349-}
+1350-
+1351-function aicmWorkerRuntimeBuildIdempotencyKey(body, placement) {
+1352-  const provided = aicmWorkerRuntimeText(body.idempotency_key);
+1353-  if (provided) return provided;
+1354-
+1355-  const sourceRequestRef = aicmWorkerRuntimeDefault(body.source_request_ref, "manual:" + Date.now());
+1356-  const placementId = aicmWorkerRuntimeText(placement.aicm_user_company_worker_placement_id);
+1357-  return "aicm:" + sourceRequestRef + ":" + placementId;
+1358-}
+1359-
+1360-async function createWorkerRuntimeRequest(body) {
+1361-  body = body || {};
+1362-
+1363-  const placementResult = getAicmWorkerRuntimePlacement(body);
+1364-  if (!placementResult || placementResult.result !== "ok" || !placementResult.placement) {
+1365-    return {
+1366-      result: "error",
+1367-      api_identifier: SERVER_MARK,
+1368-      error_message: "有効なWorker配置が見つかりません。"
+1369-    };
+1370-  }
+1371-
+1372-  const placement = placementResult.placement;
+1373-  const baseUrl = aicmWorkerRuntimeBaseUrl();
+1374-  const token = aicmWorkerRuntimeAuthToken();
+1375-
+1376-  const modelCode = aicmWorkerRuntimeDefault(
+1377-    body.model_code || body.aiworker_model_code,
+1378-    placement.aiworker_model_code
+1379-  );
+1380-
+1381-  const appSurfaceCode = aicmWorkerRuntimeDefault(
+1382:    body.app_surface_code,
+1383-    "ai_company_manager_worker_execution"
+1384-  );
+1385-
+1386-  const taskDomainCode = aicmWorkerRuntimeDefault(
+1387-    body.task_domain_code,
+1388-    "business_operation"
+1389-  );
+1390-
+1391-  const taskTitle = requiredText(body.task_title || body.title, "task_title");
+1392-  const taskInstruction = requiredText(body.task_instruction_ja || body.task_instruction || body.instruction, "task_instruction_ja");
+1393-
+1394-  const sourceAppRef = aicmWorkerRuntimeDefault(body.source_app_ref, "AICompanyManager");
+1395-  const sourceRequestRef = aicmWorkerRuntimeDefault(body.source_request_ref, "manual:" + Date.now());
+1396-  const requestedByRef = aicmWorkerRuntimeDefault(body.requested_by_ref, "human");
+1397-  const idempotencyKey = aicmWorkerRuntimeBuildIdempotencyKey(body, placement);
+1398-
+1399-  const outboundBody = {
+1400:    app_surface_code: appSurfaceCode,
+1401-    model_code: modelCode,
+1402-    task_domain_code: taskDomainCode,
+1403-    task_title: taskTitle,
+1404-    task_instruction_ja: taskInstruction,
+1405-    source_app_ref: sourceAppRef,
+1406-    source_request_ref: sourceRequestRef,
+1407-    requested_by_ref: requestedByRef,
+1408-    idempotency_key: idempotencyKey
+1409-  };
+1410-
+1411-  const url = baseUrl + "/aiworker/v1/runtime-execution/request";
+1412-
+1413-  const response = await fetch(url, {
+1414-    method: "POST",
+1415-    headers: {
+1416-      "Authorization": "Bearer " + token,
+1417-      "Content-Type": "application/json",
+1418-      "Idempotency-Key": idempotencyKey
+1419-    },
+1420-    body: JSON.stringify(outboundBody)
+1421-  });
+1422-
+1423-  const responseText = await response.text();
+1424-  let responseJson = null;
+1425-
+1426-  try {
+1427-    responseJson = responseText ? JSON.parse(responseText) : {};
+1428-  } catch (error) {
+1429-    responseJson = {
+1430-      raw_response_text: responseText
+1431-    };
+1432-  }
+1433-
+1434-  if (!response.ok) {
+1435-    return {
+1436-      result: "error",
+1437-      api_identifier: SERVER_MARK,
+1438-      http_status_code: response.status,
+1439-      error_message: responseJson.error_message || responseJson.message || responseJson.error || "AIWorkerOS runtime request failed",
+1440-      aiworker_response: responseJson
+1441-    };
+1442-  }
+1443-
+1444-  const requestId =
+1445-    responseJson.request_id ||
+1446-    (responseJson.runtime_request && responseJson.runtime_request.request_id) ||
+1447-    (responseJson.request && responseJson.request.request_id) ||
+1448-    "";
+1449-
+1450-  const requestStatusCode =
+1451-    responseJson.request_status_code ||
+1452-    (responseJson.runtime_request && responseJson.runtime_request.request_status_code) ||
+1453-    (responseJson.request && responseJson.request.request_status_code) ||
+1454-    "";
+1455-
+1456-  return {
+1457-    result: "ok",
+1458-    api_identifier: SERVER_MARK,
+1459-    worker_placement: {
+1460-      aicm_user_company_worker_placement_id: placement.aicm_user_company_worker_placement_id,
+1461-      display_label: placement.display_label,
+1462-      aiworker_model_code: placement.aiworker_model_code,
+1463-      role_code: placement.role_code
+1464-    },
+1465-    runtime_request: {
+1466-      request_id: requestId,
+1467-      request_status_code: requestStatusCode,
+1468:      app_surface_code: appSurfaceCode,
+1469-      model_code: modelCode,
+1470-      task_domain_code: taskDomainCode,
+1471-      task_title: taskTitle,
+1472-      source_app_ref: sourceAppRef,
+1473-      source_request_ref: sourceRequestRef,
+1474-      idempotency_key: idempotencyKey
+1475-    },
+1476-    aiworker_response: responseJson
+1477-  };
+1478-}
+1479-
+1480-
+1481-async function handleApi(req, res, url) {
+1482-  const route = url.pathname;
+1483-
+1484-  try {
+1485-    if (req.method === "OPTIONS") {
+1486-      sendJson(res, 200, { result: "ok", api_identifier: SERVER_MARK });
+1487-      return true;
+1488-    }
+1489-
+1490-    
+1491-    if (route === "/api/aicm/v2/president-policy/create" && req.method === "POST") {
+1492-      const body = await readBody(req);
+1493-      sendJson(res, 200, createPresidentPolicy(body));
+1494-      return true;
+1495-    }
+1496-
+1497-    if (route === "/api/aicm/v2/manager-major/create" && req.method === "POST") {
+1498-      const body = await readBody(req);
+1499-      sendJson(res, 200, createManagerMajorItem(body));
+1500-      return true;
+1501-    }
+1502-
+1503-    if (route === "/api/aicm/v2/manager-major/update" && req.method === "POST") {
+1504-      const body = await readBody(req);
+1505-      sendJson(res, 200, updateManagerMajorItem(body));
+1506-      return true;
+1507-    }
+1508-

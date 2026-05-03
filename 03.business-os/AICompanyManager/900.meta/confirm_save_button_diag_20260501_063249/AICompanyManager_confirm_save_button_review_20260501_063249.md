@@ -1,0 +1,1151 @@
+# AICompanyManager Confirm Save Button Review
+
+generated_at: 2026-05-01 06:32:50 +0900
+patch: NO
+api_post: NO
+db_write: NO
+
+## Summary
+
+- SERVER_PIDS=20438
+- INDEX_HTTP_CODE=200
+- CORE_HTTP_CODE=200
+- LATEST_SERVER_LOG=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/fix_role_sync_owner_resolver_20260501_063057/040_server.log
+
+## Node check
+```text
+============================================================
+node --check
+============================================================
+SERVER_NODE_CHECK_CODE=0
+CORE_NODE_CHECK_CODE=0
+```
+
+## Core scan
+```text
+============================================================
+Confirm save button / click handler scan
+============================================================
+
+---- confirmation button render ----
+833-      ].join("");
+834-    }).join("");
+835-  }
+836-
+837-  
+838-function renderAicmOrgUpdateConfirmation(payload) {
+839-    payload = payload || {};
+840-
+841-    return renderShell([
+842-      '<section class="aicm-core-card">',
+843-      '  <p class="aicm-eyebrow">確認画面</p>',
+844-      '  <h2>' + escapeHtml(payload.title || "変更内容の確認") + '</h2>',
+845-      '  <p class="aicm-selected-note">この操作はDBへ保存されます。内容を確認してから確定してください。</p>',
+846-      '</section>',
+847-      aicmAvdSummaryHtml(payload),
+848-      '<section class="aicm-core-card aicm-operation-card">',
+849-      '  <p class="aicm-eyebrow">操作</p>',
+850-      '  <div class="aicm-dashboard-action-row">',
+851:      '    <button type="button" data-core-action="org-update-confirm-execute">確定して保存</button>',
+852-      '    <button type="button" data-core-action="org-update-confirm-cancel">戻る</button>',
+853-      '  </div>',
+854-      '</section>'
+855-    ].join(""));
+856-  }
+857-
+858-
+859-  function aicmOrgShowUpdateConfirm(payload) {
+860-    state.pendingOrgUpdate = payload || null;
+861-    var root = document.getElementById("aicm-root");
+862-    if (!root) {
+863-      setMessage("error", "確認画面を表示できません。");
+864-      return;
+865-    }
+866-
+867-    root.innerHTML = renderAicmOrgUpdateConfirmation(payload || {});
+868-  }
+869-
+--
+3902-      return;
+3903-    }
+3904-
+3905-    if (action === "company-update-save") {
+3906-      saveCompanyUpdateFromForm();
+3907-      return;
+3908-    }
+3909-
+3910-    if (action === "department-update-save") {
+3911-      saveDepartmentUpdateFromForm();
+3912-      return;
+3913-    }
+3914-
+3915-    if (action === "section-update-save") {
+3916-      saveSectionUpdateFromForm();
+3917-      return;
+3918-    }
+3919-
+3920:    if (action === "org-update-confirm-execute") {
+3921-      executeAicmOrgUpdateConfirm();
+3922-      return;
+3923-    }
+3924-
+3925-    if (action === "org-update-confirm-cancel") {
+3926-      cancelAicmOrgUpdateConfirm();
+3927-      return;
+3928-    }
+3929-
+3930-    if (action === "company-edit-open") {
+3931-      state.screen = "company-edit";
+3932-      if (typeof render === "function") render();
+3933-      return;
+3934-    }
+3935-
+3936-    if (action === "department-edit-pick") {
+3937-      var actionTarget = aicmActionTargetSafe(event, button);
+3938-      state.editingDepartmentId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-department-id") || "") : "";
+
+---- handleRootClick full relevant area ----
+3758-
+3759-root.innerHTML = html;
+3760-  }
+3761-
+3762-  function fieldValue(form, name) {
+3763-    var field = form.elements[name];
+3764-    return field && typeof field.value === "string" ? field.value.trim() : "";
+3765-  }
+3766-
+3767-  function submitForm(form) {
+3768-    var formName = form.getAttribute("data-core-form") || "";
+3769-    state.errorMessage = "";
+3770-    state.noticeMessage = "";
+3771-
+3772-    var task;
+3773-
+3774-    if (formName === "company-create") {
+3775-      task = createCompany({
+3776-        companyName: fieldValue(form, "companyName"),
+3777-        businessDomain: fieldValue(form, "businessDomain")
+3778-      });
+3779-    } else if (formName === "department-create") {
+3780-      task = createDepartment({
+3781-        departmentName: fieldValue(form, "departmentName"),
+3782-        purpose: fieldValue(form, "purpose")
+3783-      });
+3784-    } else if (formName === "section-create") {
+3785-      task = createSection({
+3786-        sectionName: fieldValue(form, "sectionName"),
+3787-        purpose: fieldValue(form, "purpose")
+3788-      });
+3789-    } else if (formName === "placement-create") {
+3790-      var robotSelect = form.elements.robotPoolId;
+3791-      var selectedRobot = robotSelect && robotSelect.selectedOptions ? robotSelect.selectedOptions[0] : null;
+3792-      var targetLevelCode = fieldValue(form, "targetLevelCode");
+3793-      var sectionId = fieldValue(form, "sectionId");
+3794-      var targetId = state.selectedCompanyId;
+3795-
+3796-      if (targetLevelCode === "department") {
+3797-        targetId = state.selectedDepartmentId;
+3798-      }
+3799-
+3800-      if (targetLevelCode === "section") {
+3801-        targetId = sectionId;
+3802-      }
+3803-
+3804-      task = createPlacement({
+3805-        departmentId: state.selectedDepartmentId,
+3806-        sectionId: sectionId,
+3807-        targetLevelCode: targetLevelCode,
+3808-        targetId: targetId,
+3809-        roleCode: fieldValue(form, "roleCode"),
+3810-        robotPoolId: fieldValue(form, "robotPoolId"),
+3811-        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",
+3812-        internalNickname: fieldValue(form, "internalNickname")
+3813-      });
+3814-    } else {
+3815-      task = Promise.reject(new Error("未知のフォームです。"));
+3816-    }
+3817-
+3818-    state.loading = true;
+3819-    render();
+3820-
+3821-    task.catch(function (error) {
+3822-      state.loading = false;
+3823-      state.errorMessage = publicErrorMessage(error);
+3824-      render();
+3825-    });
+3826-  }
+3827-
+3828:  function handleRootClick(event) {
+3829-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+3830-  var aicmRawClickTarget = event.target;
+3831-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+3832-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+3833-    : aicmRawClickTarget;
+3834-
+3835-    var button = aicmActionTarget.closest("[data-core-action]");
+3836-    if (!button) return;
+3837-
+3838-    var action = button.getAttribute("data-core-action") || "";
+3839-
+3840-            if (action === "task-ledger-fill-csv-template") {
+3841-      fillTaskLedgerCsvTemplate();
+3842-      return;
+3843-    }
+3844-
+3845-        if (action === "task-ledger-csv-file-open") {
+3846-      openTaskLedgerCsvFilePicker();
+3847-      return;
+3848-    }
+3849-
+3850-    if (action === "task-ledger-chatgpt-prompt") {
+3851-      handleTaskLedgerChatGptPrompt();
+3852-      return;
+3853-    }
+3854-if (action === "task-ledger-csv-preview") {
+3855-      previewTaskLedgerCsv();
+3856-      return;
+3857-    }
+3858-
+3859-    if (action === "task-ledger-csv-import") {
+3860-      importTaskLedgerCsvToPmlwMajor();
+3861-      return;
+3862-    }
+3863-if (action === "task-ledger-create") {
+3864-      createTaskLedgerFromForm();
+3865-      return;
+3866-    }
+3867-if (action === "human-review-approve") {
+3868-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+3869-      return;
+3870-    }
+3871-
+3872-    if (action === "human-review-return") {
+3873-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+3874-      return;
+3875-    }
+3876-
+3877-    if (action === "department-update-select") {
+3878-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+3879-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+3880-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+3881-      if (typeof render === "function") render();
+3882-      return;
+3883-    }
+3884-
+3885-    if (action === "department-update-clear") {
+3886-      state.editingDepartmentId = "";
+3887-      if (typeof render === "function") render();
+3888-      return;
+3889-    }
+3890-
+3891-    if (action === "section-update-select") {
+3892-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+3893-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+3894-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+3895-      if (typeof render === "function") render();
+3896-      return;
+3897-    }
+3898-
+
+---- executeAicmOrgUpdateConfirm ----
+780-      '    <button type="button" data-core-action="section-update-clear">一覧へ戻る</button>',
+781-      '  </div>',
+782-      '</section>'
+783-    ].join("");
+784-  }
+785-
+786-  function renderAicmCompanyUpdateScreen() {
+787-    return renderShell(renderCompanyUpdateForm(aicmOrgSelectedCompany()));
+788-  }
+789-
+790-  function renderAicmDepartmentUpdateScreen() {
+791-    var company = aicmOrgSelectedCompany();
+792-    var selectedId = state.editingDepartmentId || "";
+793-    var selected = selectedId ? aicmOrgDepartmentById(selectedId) : null;
+794-    var rows = company ? aicmOrgDepartmentsForCompany(company.aicm_user_company_id) : [];
+795-    return renderShell(selected ? renderDepartmentUpdateForm(selected) : renderDepartmentUpdatePicker(company, rows));
+796-  }
+797-
+798-  function renderAicmSectionUpdateScreen() {
+799-    var company = aicmOrgSelectedCompany();
+800-    var selectedId = state.editingSectionId || "";
+801-    var selected = selectedId ? aicmOrgSectionById(selectedId) : null;
+802-    var rows = company ? aicmOrgSectionsForCompany(company.aicm_user_company_id) : [];
+803-    return renderShell(selected ? renderSectionUpdateForm(selected) : renderSectionUpdatePicker(company, rows));
+804-  }
+805-
+806-// AICM_DB_WRITE_CONFIRMATION_REQUIRED_ARY_ASB_V1
+807-// DB write operations must pass through a visible confirmation screen before POST.
+808-
+809-function aicmOrgUpdateLabel(kind) {
+810-    if (kind === "company") return "企業変更";
+811-    if (kind === "department") return "部門変更";
+812-    if (kind === "section") return "課変更";
+813-    return "変更";
+814-  }
+815-
+816-  function aicmOrgUpdateBodyRows(body) {
+817-    var keys = Object.keys(body || {}).filter(function (key) {
+818-      return key !== "owner_civilization_id" &&
+819-        key.indexOf("_id") === -1 &&
+820-        key !== "aicm_user_company_id" &&
+821-        key !== "aicm_user_company_department_id" &&
+822-        key !== "aicm_user_company_section_id";
+823-    });
+824-
+825-    if (!keys.length) return '<p class="aicm-core-empty">表示できる変更項目がありません。</p>';
+826-
+827-    return keys.map(function (key) {
+828-      return [
+829-        '<div class="aicm-confirm-row">',
+830-        '  <strong>' + escapeHtml(key) + '</strong>',
+831-        '  <p>' + escapeHtml(String(body[key] || "")) + '</p>',
+832-        '</div>'
+833-      ].join("");
+834-    }).join("");
+835-  }
+836-
+837-  
+838-function renderAicmOrgUpdateConfirmation(payload) {
+839-    payload = payload || {};
+840-
+841-    return renderShell([
+842-      '<section class="aicm-core-card">',
+843-      '  <p class="aicm-eyebrow">確認画面</p>',
+844-      '  <h2>' + escapeHtml(payload.title || "変更内容の確認") + '</h2>',
+845-      '  <p class="aicm-selected-note">この操作はDBへ保存されます。内容を確認してから確定してください。</p>',
+846-      '</section>',
+847-      aicmAvdSummaryHtml(payload),
+848-      '<section class="aicm-core-card aicm-operation-card">',
+849-      '  <p class="aicm-eyebrow">操作</p>',
+850-      '  <div class="aicm-dashboard-action-row">',
+851-      '    <button type="button" data-core-action="org-update-confirm-execute">確定して保存</button>',
+852-      '    <button type="button" data-core-action="org-update-confirm-cancel">戻る</button>',
+853-      '  </div>',
+854-      '</section>'
+855-    ].join(""));
+856-  }
+857-
+858-
+859-  function aicmOrgShowUpdateConfirm(payload) {
+860-    state.pendingOrgUpdate = payload || null;
+861-    var root = document.getElementById("aicm-root");
+862-    if (!root) {
+863-      setMessage("error", "確認画面を表示できません。");
+864-      return;
+865-    }
+866-
+867-    root.innerHTML = renderAicmOrgUpdateConfirmation(payload || {});
+868-  }
+869-
+870:  async function executeAicmOrgUpdateConfirm() {
+871-    var payload = state.pendingOrgUpdate || null;
+872-
+873-    if (!payload || !payload.endpoint || !payload.body) {
+874-      setMessage("error", "確認対象がありません。");
+875-      return;
+876-    }
+877-
+878-    try {
+879-      await aicmOrgPostJson(payload.endpoint, payload.body);
+880-            // AICM_AXC_EXECUTE_ROLE_PLACEMENT_SYNC_AFTER_MAIN_UPDATE
+881-      await aicmAxcSyncRolePlacementsForPayload(payload);
+882-state.pendingOrgUpdate = null;
+883-
+884-      if (payload.kind === "department") state.editingDepartmentId = "";
+885-      if (payload.kind === "section") state.editingSectionId = "";
+886-
+887-      setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
+888-      await aicmOrgReloadContext();
+889-    } catch (error) {
+890-      setMessage("error", error && error.message ? error.message : "保存に失敗しました。");
+891-    }
+892-  }
+893-
+894-  function cancelAicmOrgUpdateConfirm() {
+895-    var payload = state.pendingOrgUpdate || {};
+896-    state.pendingOrgUpdate = null;
+897-
+898-    if (payload.returnScreen) {
+899-      state.screen = payload.returnScreen;
+900-    }
+901-
+902-    if (typeof render === "function") render();
+903-  }
+904-
+905-
+906-  
+907-
+908-// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+909-// Role settings are saved through a dedicated placement sync endpoint after the main entity update succeeds.
+910-// Main company/department/section fields remain separate from robot placement truth.
+911-function aicmAxcUuidLike(value) {
+912-  return /^[0-9a-fA-F-]{36}$/.test(String(value || "").trim());
+913-}
+914-
+915-function aicmAxcFindElement(ids) {
+916-  for (var i = 0; i < ids.length; i += 1) {
+917-    var el = document.getElementById(ids[i]);
+918-    if (el) return el;
+919-  }
+920-  return null;
+921-}
+922-
+923-function aicmAxcCatalogRowByValue(value) {
+924-  var text = String(value || "").trim();
+925-  if (!text) return null;
+926-  var rows = typeof aicmRobotCatalogSafe === "function" ? aicmRobotCatalogSafe() : [];
+927-  for (var i = 0; i < rows.length; i += 1) {
+928-    var row = rows[i] || {};
+929-    var values = [
+930-      typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "",
+931-      row.robot_pool_id,
+932-      row.business_robot_pool_id,
+933-      row.aicm_robot_pool_id,
+934-      row.worker_pool_id,
+935-      row.placement_robot_pool_id,
+936-      row.aiworker_model_code,
+937-      row.model_code,
+938-      row.robot_id
+939-    ].map(function (item) { return String(item || "").trim(); });
+940-
+941-    if (values.indexOf(text) >= 0) return row;
+942-  }
+943-  return null;
+944-}
+945-
+946-function aicmAxcSelectedRobotMeta(selectOrId) {
+947-  var el = typeof selectOrId === "string" ? document.getElementById(selectOrId) : selectOrId;
+948-  if (!el) return null;
+949-
+950-  var selectedValue = String(el.value || "").trim();
+951-  var opt = el.options && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
+952-  var row = aicmAxcCatalogRowByValue(selectedValue) || {};
+953-
+954-  var robotPoolId = String(
+955-    row.robot_pool_id ||
+956-    row.business_robot_pool_id ||
+957-    row.aicm_robot_pool_id ||
+958-    row.worker_pool_id ||
+959-    row.placement_robot_pool_id ||
+960-    (aicmAxcUuidLike(selectedValue) ? selectedValue : "")
+
+---- aicmOrgShowUpdateConfirm / pendingOrgUpdate ----
+798-  function renderAicmSectionUpdateScreen() {
+799-    var company = aicmOrgSelectedCompany();
+800-    var selectedId = state.editingSectionId || "";
+801-    var selected = selectedId ? aicmOrgSectionById(selectedId) : null;
+802-    var rows = company ? aicmOrgSectionsForCompany(company.aicm_user_company_id) : [];
+803-    return renderShell(selected ? renderSectionUpdateForm(selected) : renderSectionUpdatePicker(company, rows));
+804-  }
+805-
+806-// AICM_DB_WRITE_CONFIRMATION_REQUIRED_ARY_ASB_V1
+807-// DB write operations must pass through a visible confirmation screen before POST.
+808-
+809-function aicmOrgUpdateLabel(kind) {
+810-    if (kind === "company") return "企業変更";
+811-    if (kind === "department") return "部門変更";
+812-    if (kind === "section") return "課変更";
+813-    return "変更";
+814-  }
+815-
+816-  function aicmOrgUpdateBodyRows(body) {
+817-    var keys = Object.keys(body || {}).filter(function (key) {
+818-      return key !== "owner_civilization_id" &&
+819-        key.indexOf("_id") === -1 &&
+820-        key !== "aicm_user_company_id" &&
+821-        key !== "aicm_user_company_department_id" &&
+822-        key !== "aicm_user_company_section_id";
+823-    });
+824-
+825-    if (!keys.length) return '<p class="aicm-core-empty">表示できる変更項目がありません。</p>';
+826-
+827-    return keys.map(function (key) {
+828-      return [
+829-        '<div class="aicm-confirm-row">',
+830-        '  <strong>' + escapeHtml(key) + '</strong>',
+831-        '  <p>' + escapeHtml(String(body[key] || "")) + '</p>',
+832-        '</div>'
+833-      ].join("");
+834-    }).join("");
+835-  }
+836-
+837-  
+838:function renderAicmOrgUpdateConfirmation(payload) {
+839-    payload = payload || {};
+840-
+841-    return renderShell([
+842-      '<section class="aicm-core-card">',
+843-      '  <p class="aicm-eyebrow">確認画面</p>',
+844-      '  <h2>' + escapeHtml(payload.title || "変更内容の確認") + '</h2>',
+845-      '  <p class="aicm-selected-note">この操作はDBへ保存されます。内容を確認してから確定してください。</p>',
+846-      '</section>',
+847-      aicmAvdSummaryHtml(payload),
+848-      '<section class="aicm-core-card aicm-operation-card">',
+849-      '  <p class="aicm-eyebrow">操作</p>',
+850-      '  <div class="aicm-dashboard-action-row">',
+851-      '    <button type="button" data-core-action="org-update-confirm-execute">確定して保存</button>',
+852-      '    <button type="button" data-core-action="org-update-confirm-cancel">戻る</button>',
+853-      '  </div>',
+854-      '</section>'
+855-    ].join(""));
+856-  }
+857-
+858-
+859:  function aicmOrgShowUpdateConfirm(payload) {
+860:    state.pendingOrgUpdate = payload || null;
+861-    var root = document.getElementById("aicm-root");
+862-    if (!root) {
+863-      setMessage("error", "確認画面を表示できません。");
+864-      return;
+865-    }
+866-
+867:    root.innerHTML = renderAicmOrgUpdateConfirmation(payload || {});
+868-  }
+869-
+870-  async function executeAicmOrgUpdateConfirm() {
+871:    var payload = state.pendingOrgUpdate || null;
+872-
+873-    if (!payload || !payload.endpoint || !payload.body) {
+874-      setMessage("error", "確認対象がありません。");
+875-      return;
+876-    }
+877-
+878-    try {
+879-      await aicmOrgPostJson(payload.endpoint, payload.body);
+880-            // AICM_AXC_EXECUTE_ROLE_PLACEMENT_SYNC_AFTER_MAIN_UPDATE
+881-      await aicmAxcSyncRolePlacementsForPayload(payload);
+882:state.pendingOrgUpdate = null;
+883-
+884-      if (payload.kind === "department") state.editingDepartmentId = "";
+885-      if (payload.kind === "section") state.editingSectionId = "";
+886-
+887-      setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
+888-      await aicmOrgReloadContext();
+889-    } catch (error) {
+890-      setMessage("error", error && error.message ? error.message : "保存に失敗しました。");
+891-    }
+892-  }
+893-
+894-  function cancelAicmOrgUpdateConfirm() {
+895:    var payload = state.pendingOrgUpdate || {};
+896:    state.pendingOrgUpdate = null;
+897-
+898-    if (payload.returnScreen) {
+899-      state.screen = payload.returnScreen;
+900-    }
+901-
+902-    if (typeof render === "function") render();
+903-  }
+904-
+905-
+906-  
+907-
+908-// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+909-// Role settings are saved through a dedicated placement sync endpoint after the main entity update succeeds.
+910-// Main company/department/section fields remain separate from robot placement truth.
+911-function aicmAxcUuidLike(value) {
+912-  return /^[0-9a-fA-F-]{36}$/.test(String(value || "").trim());
+913-}
+914-
+915-function aicmAxcFindElement(ids) {
+916-  for (var i = 0; i < ids.length; i += 1) {
+917-    var el = document.getElementById(ids[i]);
+918-    if (el) return el;
+919-  }
+920-  return null;
+921-}
+922-
+923-function aicmAxcCatalogRowByValue(value) {
+924-  var text = String(value || "").trim();
+925-  if (!text) return null;
+926-  var rows = typeof aicmRobotCatalogSafe === "function" ? aicmRobotCatalogSafe() : [];
+927-  for (var i = 0; i < rows.length; i += 1) {
+928-    var row = rows[i] || {};
+929-    var values = [
+930-      typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "",
+931-      row.robot_pool_id,
+932-      row.business_robot_pool_id,
+933-      row.aicm_robot_pool_id,
+934-      row.worker_pool_id,
+935-      row.placement_robot_pool_id,
+936-      row.aiworker_model_code,
+--
+2034-
+2035-      while (index < 30) {
+2036-        var robotEl = findByIds([
+2037-          "aicm-inline-worker-" + String(index) + "-robot",
+2038-          "aicm-role-worker-robot-" + String(index),
+2039-          "aicm-role-worker-section-robot-" + String(index),
+2040-          "aicm-role-worker-section-new-robot-" + String(index)
+2041-        ]);
+2042-
+2043-        var nickEl = findByIds([
+2044-          "aicm-inline-worker-" + String(index) + "-nickname",
+2045-          "aicm-role-worker-nickname-" + String(index),
+2046-          "aicm-role-worker-section-nickname-" + String(index),
+2047-          "aicm-role-worker-section-new-nickname-" + String(index)
+2048-        ]);
+2049-
+2050-        if (!robotEl && !nickEl) break;
+2051-
+2052-        var robotLabel = selectedLabelFromElement(robotEl);
+2053-        var nickname = nickEl ? String(nickEl.value || "").trim() : "";
+2054-
+2055-        if (robotLabel || nickname) {
+2056-          workerRows.push((robotLabel || "未設定") + (nickname ? " / " + nickname : ""));
+2057-        }
+2058-
+2059-        index += 1;
+2060-      }
+2061-
+2062-      rows.push(["従業員設定", workerRows.length ? workerRows.join("\n") : "未設定"]);
+2063-    }
+2064-
+2065-    return rows;
+2066-  }
+2067-
+2068-function aicmAvdShowDbConfirm(payload) {
+2069-    if (!payload || !payload.endpoint || !payload.body) {
+2070-      setMessage("error", "確認画面を表示できません。");
+2071-      return;
+2072-    }
+2073-
+2074:    if (typeof aicmOrgShowUpdateConfirm === "function") {
+2075:      aicmOrgShowUpdateConfirm(payload);
+2076-      return;
+2077-    }
+2078-
+2079-    if (typeof state !== "undefined") {
+2080:      state.pendingOrgUpdate = payload;
+2081-    }
+2082-
+2083-    var root = document.getElementById("aicm-root");
+2084-    if (!root) return;
+2085-
+2086:    root.innerHTML = renderAicmOrgUpdateConfirmation(payload);
+2087-  }
+2088-
+2089-function aicmAvdSummaryHtml(payload) {
+2090-    var rows = payload && Array.isArray(payload.summary_rows) ? payload.summary_rows : [];
+2091-
+2092-    if (!rows.length) return "";
+2093-
+2094-    return [
+2095-      '<section class="aicm-core-card">',
+2096-      '  <p class="aicm-eyebrow">保存内容</p>',
+2097-      '  <h2>確認対象</h2>',
+2098-      '  <dl class="aicm-summary-list">',
+2099-      rows.map(function (row) {
+2100-        return '<div><dt>' + escapeHtml(row[0] || "") + '</dt><dd>' + escapeHtml(row[1] || "") + '</dd></div>';
+2101-      }).join(""),
+2102-      '  </dl>',
+2103-      '</section>'
+2104-    ].join("");
+2105-  }
+2106-
+2107-
+2108-  
+2109-function renderCompanyEditPlaceholder() {
+2110-    var company = aicmAvdCurrentCompany();
+2111-
+2112-    if (!company) {
+2113-      return renderShell([
+2114-        '<section class="aicm-core-card">',
+2115-        '  <p class="aicm-eyebrow">企業変更</p>',
+2116-        '  <h2>AI企業が選択されていません</h2>',
+2117-        '  <p class="aicm-core-empty">AI企業ダッシュボードで企業を作成または選択してください。</p>',
+2118-        '  <div class="aicm-dashboard-action-row">',
+2119-        '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+2120-        '  </div>',
+2121-        '</section>'
+2122-      ].join(""));
+2123-    }
+2124-
+2125-    return renderShell([
+2126-      '<section class="aicm-core-card">',
+
+---- role sync client function ----
+1012-
+1013-function aicmAxcDepartmentRolePlacements(department) {
+1014-  var selected = aicmAxcSelectedRobotMeta("aicm-department-manager-robot");
+1015-  if (!department || !selected) return [];
+1016-  var row = aicmAxcBuildRolePlacement({
+1017-    role_code: "Manager",
+1018-    target_level_code: "department",
+1019-    target_id: department.aicm_user_company_department_id,
+1020-    aicm_user_company_department_id: department.aicm_user_company_department_id,
+1021-    robot_pool_id: selected.robot_pool_id,
+1022-    aiworker_model_code: selected.aiworker_model_code,
+1023-    internal_nickname: aicmAxcInputValue("aicm-department-manager-robot-nickname")
+1024-  });
+1025-  return row ? [row] : [];
+1026-}
+1027-
+1028-function aicmAxcSectionRolePlacements(section) {
+1029-  var rows = [];
+1030-  if (!section) return rows;
+1031-
+1032-  var leader = aicmAxcSelectedRobotMeta("aicm-section-leader-robot");
+1033-  var leaderRow = aicmAxcBuildRolePlacement({
+1034-    role_code: "Leader",
+1035-    target_level_code: "section",
+1036-    target_id: section.aicm_user_company_section_id,
+1037-    aicm_user_company_department_id: section.aicm_user_company_department_id,
+1038-    aicm_user_company_section_id: section.aicm_user_company_section_id,
+1039-    robot_pool_id: leader ? leader.robot_pool_id : "",
+1040-    aiworker_model_code: leader ? leader.aiworker_model_code : "",
+1041-    internal_nickname: aicmAxcInputValue("aicm-section-leader-robot-nickname")
+1042-  });
+1043-  if (leaderRow) rows.push(leaderRow);
+1044-
+1045-  var index = 0;
+1046-  while (index < 30) {
+1047-    var robotEl = aicmAxcFindElement([
+1048-      "aicm-inline-worker-" + String(index) + "-robot",
+1049-      "aicm-role-worker-robot-" + String(index),
+1050-      "aicm-role-worker-section-robot-" + String(index),
+1051-      "aicm-role-worker-section-new-robot-" + String(index)
+1052-    ]);
+1053-
+1054-    var nickEl = aicmAxcFindElement([
+1055-      "aicm-inline-worker-" + String(index) + "-nickname",
+1056-      "aicm-role-worker-nickname-" + String(index),
+1057-      "aicm-role-worker-section-nickname-" + String(index),
+1058-      "aicm-role-worker-section-new-nickname-" + String(index)
+1059-    ]);
+1060-
+1061-    if (!robotEl && !nickEl) break;
+1062-
+1063-    var worker = aicmAxcSelectedRobotMeta(robotEl);
+1064-    var workerRow = aicmAxcBuildRolePlacement({
+1065-      role_code: "Worker",
+1066-      target_level_code: "section",
+1067-      target_id: section.aicm_user_company_section_id,
+1068-      aicm_user_company_department_id: section.aicm_user_company_department_id,
+1069-      aicm_user_company_section_id: section.aicm_user_company_section_id,
+1070-      robot_pool_id: worker ? worker.robot_pool_id : "",
+1071-      aiworker_model_code: worker ? worker.aiworker_model_code : "",
+1072-      internal_nickname: nickEl ? String(nickEl.value || "").trim() : ""
+1073-    });
+1074-    if (workerRow) rows.push(workerRow);
+1075-
+1076-    index += 1;
+1077-  }
+1078-
+1079-  return rows;
+1080-}
+1081-
+1082:async function aicmAxcSyncRolePlacementsForPayload(payload) {
+1083-  // AICM_ROLE_SYNC_REQUEST_BODY_AXH_R1_V1
+1084-  var rows = payload && Array.isArray(payload.rolePlacements) ? payload.rolePlacements : [];
+1085-
+1086-  if (!rows.length) {
+1087-    return { result: "ok", skipped: true };
+1088-  }
+1089-
+1090-  var body = payload.body || {};
+1091-  var companyId = body.aicm_user_company_id || "";
+1092-
+1093-  if (!companyId && state && state.selectedCompanyId) {
+1094-    companyId = state.selectedCompanyId;
+1095-  }
+1096-
+1097-  return requestJson("/api/aicm/v2/placement/sync-role-settings", {
+1098-    // AICM_ROLE_SYNC_OWNER_RESOLVER_AXK_V1
+1099-    owner_civilization_id: (
+1100-      typeof aicmAvdOwnerId === "function"
+1101-        ? aicmAvdOwnerId()
+1102-        : ((typeof state !== "undefined" && state && state.ownerCivilizationId) ? state.ownerCivilizationId : "")
+1103-    ),
+1104-    aicm_user_company_id: companyId,
+1105-    role_placements: rows
+1106-  });
+1107-}
+1108-
+1109-
+1110-function saveCompanyUpdateFromForm() {
+1111-    var companyId = aicmAvdTextById("aicm-company-edit-id");
+1112-
+1113-    if (!companyId) {
+1114-      setMessage("error", "変更対象の企業が見つかりません。");
+1115-      return;
+1116-    }
+1117-
+1118-    var body = {
+1119-      owner_civilization_id: aicmAvdOwnerId(),
+1120-      aicm_user_company_id: companyId,
+1121-      company_name: aicmAvdTextById("aicm-company-edit-name"),
+1122-      business_domain: aicmAvdTextById("aicm-company-edit-domain"),
+1123-      company_status: aicmAvdTextById("aicm-company-edit-status") || "active"
+1124-    };
+1125-
+1126-    var rows = [
+1127-      ["操作", "企業変更"],
+1128-      ["企業名", body.company_name],
+1129-      ["事業領域", body.business_domain || "未設定"],
+1130-      ["状態", body.company_status]
+1131-    ].concat(aicmAvdRoleSummaryRows("company"));
+1132-
+1133-    aicmAvdShowDbConfirm({
+1134-      kind: "company-update",
+1135-      title: "企業変更",
+1136-      endpoint: "/api/aicm/v2/company/update",
+1137-      body: body,
+1138-      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1139-      rolePlacements: aicmAxcCompanyRolePlacements({
+1140-        aicm_user_company_id: body.aicm_user_company_id
+1141-      }),
+1142-      summary_rows: rows
+1143-    });
+1144-  }
+1145-
+1146-
+1147-function saveDepartmentUpdateFromForm() {
+1148-    var departmentId = aicmAvdTextById("aicm-department-edit-id");
+1149-    var companyId = aicmAvdTextById("aicm-department-edit-company-id");
+1150-
+1151-    if (!departmentId || !companyId) {
+1152-      setMessage("error", "変更対象の部門が見つかりません。");
+
+---- request helpers ----
+grep: Unmatched ( or \(
+
+---- owner resolvers ----
+grep: Unmatched ( or \(
+
+---- suspicious stale refs ----
+117:      method: "POST",
+119:      body: JSON.stringify(body)
+600:      method: "POST",
+602:      body: JSON.stringify(body || {})
+2576:        method: "POST",
+2578:        body: JSON.stringify(payload)
+2863:      method: "POST",
+2865:      body: JSON.stringify(body || {})
+3212:          method: "POST",
+3214:          body: JSON.stringify(row.payload)
+3383:      method: "POST",
+3385:      body: JSON.stringify(body || {})
+3868:      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+3873:      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+
+---- root event listeners ----
+4128-      ".aicm-review-summary p{margin:0;color:#334155;white-space:pre-wrap}",
+4129-
+4130-      ".aicm-org-update-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px;border:1px solid #e5e7eb;border-radius:16px;background:#f8fafc;margin-top:10px}",
+4131-      ".aicm-org-update-row p{margin:4px 0 0;color:#64748b}",
+4132-
+4133-      ".aicm-confirm-card{display:grid;gap:14px}",
+4134-      ".aicm-confirm-list{display:grid;gap:10px}",
+4135-      ".aicm-confirm-row{padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f8fafc}",
+4136-      ".aicm-confirm-row p{margin:4px 0 0;color:#334155;white-space:pre-wrap}",
+4137-
+4138-      ".aicm-company-overview-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}",
+4139-      ".aicm-company-overview-stat{padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f8fafc}",
+4140-      ".aicm-company-overview-stat span{display:block;color:#64748b;font-size:13px;font-weight:700}",
+4141-      ".aicm-company-overview-stat strong{display:block;margin-top:4px;font-size:20px}",
+4142-      "@media(min-width:820px){.aicm-dashboard-main-grid{grid-template-columns:minmax(0,1fr) minmax(320px,.75fr)}}",
+4143-      "@media(max-width:720px){.aicm-core{padding:18px}.aicm-core-header h1{font-size:30px}.aicm-card-title-row{flex-direction:column}.aicm-core-tabs button{flex:1 1 auto}}"
+4144-    ].join("\n");
+4145-    document.head.appendChild(style);
+4146-  }
+4147-
+4148:  function boot() {
+4149-    root = document.getElementById("aicm-root");
+4150-
+4151-    if (!root) {
+4152-      root = document.createElement("div");
+4153-      root.id = "aicm-root";
+4154-      document.body.appendChild(root);
+4155-    }
+4156-
+4157-    injectMinimalCss();
+4158-
+4159:      root.addEventListener("change", function (event) {
+4160-    var target = event.target;
+4161-    if (target && target.getAttribute && target.getAttribute("data-core-file") === "task-ledger-csv") {
+4162-      readTaskLedgerCsvFile(target.files && target.files[0]);
+4163-    }
+4164-  });
+4165:root.addEventListener("click", handleRootClick);
+4166:    root.addEventListener("change", handleRootChange);
+4167:    root.addEventListener("submit", handleRootSubmit);
+4168-
+4169-    writeStorage(STORAGE.ownerCivilizationId, state.ownerCivilizationId);
+4170-
+4171-    render();
+4172-    loadContext();
+4173-  }
+4174-
+4175-  if (document.readyState === "loading") {
+4176:    document.addEventListener("DOMContentLoaded", boot, { once: true });
+4177-  } else {
+4178-    boot();
+4179-  }
+4180-})();
+```
+
+## Server scan
+```text
+============================================================
+Server placement sync scan
+============================================================
+
+---- syncRoleSettings ----
+1032-    "    owner_civilization_id, aicm_user_company_id,",
+1033-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1034-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1035-    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1036-    "  )",
+1037-    "  SELECT",
+1038-    "    " + sqlLiteral(owner) + "::uuid,",
+1039-    "    aicm_user_company_id,",
+1040-    "    " + departmentSql + ",",
+1041-    "    " + sectionSql + ",",
+1042-    "    " + sqlLiteral(targetLevelCode) + ",",
+1043-    "    " + targetSql + ",",
+1044-    "    'AICompanyManager',",
+1045-    "    " + sqlLiteral(roleCode) + ",",
+1046-    "    " + robotPoolSql + ",",
+1047-    "    " + sqlLiteral(modelCode) + ",",
+1048-    "    " + sqlLiteral(nickname) + ",",
+1049-    "    1,",
+1050-    "    'unlimited_system_use',",
+1051-    "    'active'",
+1052-    "  FROM company_ok",
+1053-    "  RETURNING *",
+1054-    ")",
+1055-    "SELECT CASE",
+1056-    "  WHEN EXISTS (SELECT 1 FROM inserted) THEN",
+1057-    "    (SELECT jsonb_build_object(",
+1058-    "      'result', 'ok',",
+1059-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1060-    "      'placement', to_jsonb(inserted)",
+1061-    "    ) FROM inserted)::text",
+1062-    "  ELSE",
+1063-    "    jsonb_build_object(",
+1064-    "      'result', 'error',",
+1065-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1066-    "      'error_message', '先にv2のAI企業を作成・選択してください。'",
+1067-    "    )::text",
+1068-    "END;"
+1069-  ].join("\n");
+1070-
+1071-  return runPsqlJson(sql);
+1072-}
+1073-
+1074-
+1075-
+1076-// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+1077-// Synchronize President / Manager / Leader / Worker role settings.
+1078-// Canonical table: business.aicm_user_company_worker_placement.
+1079-// This endpoint archives current active placements for each submitted target+role,
+1080-// then recreates submitted active rows. This prevents duplicate single-slot assignments.
+1081-function aicmRoleSyncOptionalUuidSql(value) {
+1082-  const text = String(value || "").trim();
+1083-  return /^[0-9a-fA-F-]{36}$/.test(text) ? sqlLiteral(text) + "::uuid" : "NULL";
+1084-}
+1085-
+1086-function aicmRoleSyncRole(value) {
+1087-  const text = String(value || "").trim().toLowerCase();
+1088-  if (text === "president") return "President";
+1089-  if (text === "manager") return "Manager";
+1090-  if (text === "leader") return "Leader";
+1091-  if (text === "worker" || text === "employee") return "Worker";
+1092-  throw new Error("invalid role_code");
+1093-}
+1094-
+1095-function aicmRoleSyncTargetLevel(value) {
+1096-  const text = String(value || "").trim().toLowerCase();
+1097-  if (text === "company") return "company";
+1098-  if (text === "department") return "department";
+1099-  if (text === "section" || text === "organization") return "section";
+1100-  throw new Error("invalid target_level_code");
+1101-}
+1102-
+1103-function aicmRoleSyncRows(body) {
+1104-  const rows = Array.isArray(body.role_placements) ? body.role_placements : [];
+1105-  return rows.slice(0, 30).map((row, index) => {
+1106-    const roleCode = aicmRoleSyncRole(row.role_code || row.roleCode);
+1107-    const targetLevelCode = aicmRoleSyncTargetLevel(row.target_level_code || row.targetLevelCode);
+1108-    return {
+1109-      row_order: index,
+1110-      role_code: roleCode,
+1111-      target_level_code: targetLevelCode,
+1112-      aicm_user_company_department_id: String(row.aicm_user_company_department_id || row.departmentId || "").trim(),
+1113-      aicm_user_company_section_id: String(row.aicm_user_company_section_id || row.sectionId || row.organizationId || "").trim(),
+1114-      target_id: String(row.target_id || row.targetId || "").trim(),
+1115-      robot_pool_id: String(row.robot_pool_id || row.robotPoolId || "").trim(),
+1116-      aiworker_model_code: String(row.aiworker_model_code || row.aiworkerModelCode || "").trim(),
+1117-      internal_nickname: String(row.internal_nickname || row.internalNickname || "").trim()
+1118-    };
+1119-  });
+1120-}
+1121-
+1122:function syncRoleSettings(body) {
+1123-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1124-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1125-  const submittedRows = aicmRoleSyncRows(body);
+1126-
+1127-  const targetKeys = [];
+1128-  const insertRows = [];
+1129-
+1130-  for (const row of submittedRows) {
+1131-    const targetId = row.target_id ||
+1132-      (row.target_level_code === "company" ? companyId : "") ||
+1133-      (row.target_level_code === "department" ? row.aicm_user_company_department_id : "") ||
+1134-      (row.target_level_code === "section" ? row.aicm_user_company_section_id : "");
+1135-
+1136-    if (!targetId) continue;
+1137-
+1138-    const key = [row.target_level_code, targetId, row.role_code].join("|");
+1139-
+1140-    if (!targetKeys.some((item) => item.key === key)) {
+1141-      targetKeys.push({
+1142-        key,
+1143-        target_level_code: row.target_level_code,
+1144-        target_id: targetId,
+1145-        role_code: row.role_code,
+1146-        aicm_user_company_department_id: row.aicm_user_company_department_id,
+1147-        aicm_user_company_section_id: row.aicm_user_company_section_id
+1148-      });
+1149-    }
+1150-
+1151-    if (!row.robot_pool_id && !row.aiworker_model_code) continue;
+1152-
+1153-    insertRows.push({
+1154-      ...row,
+1155-      target_id: targetId,
+1156-      aiworker_model_code: row.aiworker_model_code || "unknown"
+1157-    });
+1158-  }
+1159-
+1160-  if (targetKeys.length === 0) {
+1161-    return {
+1162-      result: "ok",
+1163-      api_identifier: SERVER_MARK,
+1164-      archived_count: 0,
+1165-      inserted_count: 0,
+1166-      placements: [],
+1167-      note: "no role placement targets"
+1168-    };
+1169-  }
+1170-
+1171-  const targetValues = targetKeys.map((row, index) => [
+1172-    "(",
+1173-    String(index),
+1174-    ", " + sqlLiteral(row.target_level_code),
+1175-    ", " + sqlLiteral(row.target_id) + "::uuid",
+1176-    ", " + sqlLiteral(row.role_code),
+1177-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_department_id),
+1178-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_section_id),
+1179-    ")"
+1180-  ].join("")).join(",\n    ");
+1181-
+1182-  const insertValues = insertRows.length ? insertRows.map((row, index) => [
+1183-    "(",
+1184-    String(index),
+1185-    ", " + sqlLiteral(row.target_level_code),
+1186-    ", " + sqlLiteral(row.target_id) + "::uuid",
+1187-    ", " + sqlLiteral(row.role_code),
+1188-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_department_id),
+1189-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_section_id),
+1190-    ", " + aicmRoleSyncOptionalUuidSql(row.robot_pool_id),
+1191-    ", " + sqlLiteral(row.aiworker_model_code),
+1192-    ", " + sqlLiteral(row.internal_nickname),
+1193-    ")"
+1194-  ].join("")).join(",\n    ") : "";
+1195-
+1196-  const insertCte = insertRows.length ? [
+1197-    "), insert_rows(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id, robot_pool_id, aiworker_model_code, internal_nickname) AS (",
+1198-    "  VALUES",
+1199-    "    " + insertValues,
+1200-    "), inserted AS (",
+1201-    "  INSERT INTO business.aicm_user_company_worker_placement (",
+1202-    "    owner_civilization_id, aicm_user_company_id,",
+1203-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1204-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1205-    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1206-    "  )",
+1207-    "  SELECT",
+1208-    "    " + sqlLiteral(owner) + "::uuid,",
+1209-    "    c.aicm_user_company_id,",
+1210-    "    i.aicm_user_company_department_id,",
+1211-    "    i.aicm_user_company_section_id,",
+1212-    "    i.target_level_code,",
+
+---- placement sync route ----
+1363-
+1364-    if (route === "/api/aicm/v2/company/create" && req.method === "POST") {
+1365-      sendJson(res, 200, createCompany(await readBody(req)));
+1366-      return true;
+1367-    }
+1368-
+1369-    if (route === "/api/aicm/v2/department/create" && req.method === "POST") {
+1370-      const payload = createDepartment(await readBody(req));
+1371-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1372-      return true;
+1373-    }
+1374-
+1375-    if (route === "/api/aicm/v2/section/create" && req.method === "POST") {
+1376-      const payload = createSection(await readBody(req));
+1377-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1378-      return true;
+1379-    }
+1380-
+1381-    
+1382-    if (route === "/api/aicm/v2/task-ledger/create" && req.method === "POST") {
+1383-      const payload = createTaskLedger(await readBody(req));
+1384-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1385-      return true;
+1386-    }
+1387-
+1388:    if (route === "/api/aicm/v2/placement/sync-role-settings" && req.method === "POST") {
+1389-      const payload = syncRoleSettings(await readBody(req));
+1390-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1391-      return true;
+1392-    }
+1393-
+1394-if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
+1395-      const payload = createPlacement(await readBody(req));
+1396-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1397-      return true;
+1398-    }
+1399-
+1400-    if (route.startsWith("/api/aicm/v2/")) {
+1401-      sendJson(res, 404, {
+1402-        result: "error",
+1403-        api_identifier: SERVER_MARK,
+1404-        error_message: "unknown v2 endpoint"
+1405-      });
+1406-      return true;
+1407-    }
+1408-
+1409-    return false;
+1410-  } catch (error) {
+1411-    sendJson(res, 500, {
+1412-      result: "error",
+1413-      api_identifier: SERVER_MARK,
+
+---- sendJson/return discipline ----
+grep: Unmatched ( or \(
+```
+
+## Latest server log tail
+```text
+LATEST_SERVER_LOG=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/fix_role_sync_owner_resolver_20260501_063057/040_server.log
+
+AICompanyManager clean v2 API server candidate listening on http://127.0.0.1:8794
+ERROR:  column "aicm_user_company_department_id" is of type uuid but expression is of type text
+LINE 38:     i.aicm_user_company_department_id,
+             ^
+HINT:  You will need to rewrite or cast the expression.
+```
+
+## HTTP
+```text
+SERVER_PIDS=20438
+INDEX_HTTP_CODE=200
+CORE_HTTP_CODE=200
+```

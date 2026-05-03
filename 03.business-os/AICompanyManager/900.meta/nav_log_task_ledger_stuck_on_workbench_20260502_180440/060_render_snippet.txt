@@ -1,0 +1,151 @@
+      '  <p class="aicm-selected-note">CSVは、Manager/部長による大項目分解結果を代替入力するルートです。CSV取り込み後、登録済み大項目から課長へ引き継ぎます。</p>',
+      '</section>',
+      '<section class="aicm-core-card aicm-operation-card">',
+      '  <p class="aicm-eyebrow">操作</p>',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="task-ledger-open">部門別タスク台帳へ</button>',
+      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+      '  </div>',
+      '</section>'
+    ].join(""));
+  }
+
+function renderAicmBusinessStartDashboardCard() {
+    var company = null;
+    if (typeof selectedCompany === "function") company = selectedCompany();
+    if (!company && typeof aicmOrgSelectedCompany === "function") company = aicmOrgSelectedCompany();
+
+    return [
+      '<section class="aicm-core-card aicm-operation-card">',
+      '  <p class="aicm-eyebrow">AI企業業務開始</p>',
+      '  <h2>President起点で業務を開始</h2>',
+      company ? '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || "") + '</strong></p>' : '  <p class="aicm-core-empty">AI企業を選択してください。</p>',
+      '  <p class="aicm-selected-note">Presidentが業務を送り、Manager/部長が大項目へ分解し、課長へ引き継ぐ正本ルートです。</p>',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="go" data-screen="ai-business-start">AI企業業務開始</button>',
+      '  </div>',
+      '</section>'
+    ].join("");
+  }
+
+function render() {
+    if (!root) return;
+
+    var html = "";
+
+    if (state.screen === "company-new") {
+      html = renderCompanyNew();
+    } else if (state.screen === "department-new") {
+      html = renderDepartmentNew();
+    } else if (state.screen === "section-new") {
+      html = renderSectionNew();
+    } else if (state.screen === "placement-new") {
+      html = renderPlacementNew();
+    } else if (state.screen === "worker-runtime-confirm") {
+      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+      html = renderWorkerRuntimeConfirm();
+    } else if (state.screen === "worker-runtime-request") {
+      html = renderWorkerRuntimeRequest();
+    } else if (state.screen === "settings") {
+      html = renderSettings();
+    } else if (state.screen === "department-edit") {
+      html = renderDepartmentEditPlaceholder();
+    } else if (state.screen === "section-edit") {
+      html = renderSectionEditPlaceholder();
+    } else if (state.screen === "ai-business-start") {
+      html = renderAicmBusinessStartScreen();
+    } else if (state.screen === "task-ledger") {
+      html = renderTaskLedgerPlaceholder();
+    } else if (state.screen === "review-list") {
+      html = renderReviewListPlaceholder();
+    } else {
+      html = renderDashboard();
+    }
+
+    
+    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+    if (
+      state &&
+      (
+        state.screen === "company-edit" ||
+        state.screen === "company-change" ||
+        state.screen === "company-update"
+      )
+    ) {
+      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+      html = renderCompanyEditPlaceholder();
+    }
+
+
+    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+    if (state && state.screen === "company-edit") {
+      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+      html = renderCompanyEditPlaceholder();
+    }
+
+    if (state && state.screen === "department-edit") {
+      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+      html = renderDepartmentEditPlaceholder();
+    }
+
+    if (state && state.screen === "section-edit") {
+      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+      html = renderSectionEditPlaceholder();
+    }
+
+
+    // AICM_INLINE_ROLE_ADD_SCREEN_INJECTION_ATQ_ATT
+    if (typeof aicmInjectInlineRoleSettingsForAddScreens === "function") {
+      html = aicmInjectInlineRoleSettingsForAddScreens(html);
+    }
+
+root.innerHTML = html;
+  }
+
+  function fieldValue(form, name) {
+    var field = form.elements[name];
+    return field && typeof field.value === "string" ? field.value.trim() : "";
+  }
+
+  function submitForm(form) {
+    var formName = form.getAttribute("data-core-form") || "";
+    state.errorMessage = "";
+    state.noticeMessage = "";
+
+    var task;
+
+    if (formName === "company-create") {
+      task = createCompany({
+        companyName: fieldValue(form, "companyName"),
+        businessDomain: fieldValue(form, "businessDomain")
+      });
+    } else if (formName === "department-create") {
+      task = createDepartment({
+        departmentName: fieldValue(form, "departmentName"),
+        purpose: fieldValue(form, "purpose")
+      });
+    } else if (formName === "section-create") {
+      task = createSection({
+        sectionName: fieldValue(form, "sectionName"),
+        purpose: fieldValue(form, "purpose")
+      });
+    } else if (formName === "placement-create") {
+      var robotSelect = form.elements.robotPoolId;
+      var selectedRobot = robotSelect && robotSelect.selectedOptions ? robotSelect.selectedOptions[0] : null;
+      var targetLevelCode = fieldValue(form, "targetLevelCode");
+      var sectionId = fieldValue(form, "sectionId");
+      var targetId = state.selectedCompanyId;
+
+      if (targetLevelCode === "department") {
+        targetId = state.selectedDepartmentId;
+      }
+
+      if (targetLevelCode === "section") {
+        targetId = sectionId;
+      }
+
+      task = createPlacement({
+        departmentId: state.selectedDepartmentId,
+        sectionId: sectionId,
+        targetLevelCode: targetLevelCode,
+        targetId: targetId,

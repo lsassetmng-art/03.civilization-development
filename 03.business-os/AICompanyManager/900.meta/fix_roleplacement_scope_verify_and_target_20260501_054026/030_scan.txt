@@ -1,0 +1,258 @@
+============================================================
+AXG-R1 + AXF scan
+============================================================
+
+---- rolePlacements payloads ----
+1116-
+1117-    var rows = [
+1118-      ["操作", "企業変更"],
+1119-      ["企業名", body.company_name],
+1120-      ["事業領域", body.business_domain || "未設定"],
+1121-      ["状態", body.company_status]
+1122-    ].concat(aicmAvdRoleSummaryRows("company"));
+1123-
+1124-    aicmAvdShowDbConfirm({
+1125-      kind: "company-update",
+1126-      title: "企業変更",
+1127-      endpoint: "/api/aicm/v2/company/update",
+1128-      body: body,
+1129-      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1130:      rolePlacements: aicmAxcCompanyRolePlacements({
+1131-        aicm_user_company_id: body.aicm_user_company_id
+1132-      }),
+1133-      summary_rows: rows
+1134-    });
+1135-  }
+1136-
+1137-
+1138-function saveDepartmentUpdateFromForm() {
+1139-    var departmentId = aicmAvdTextById("aicm-department-edit-id");
+1140-    var companyId = aicmAvdTextById("aicm-department-edit-company-id");
+1141-
+1142-    if (!departmentId || !companyId) {
+1143-      setMessage("error", "変更対象の部門が見つかりません。");
+1144-      return;
+--
+1155-
+1156-    var rows = [
+1157-      ["操作", "部門変更"],
+1158-      ["部門名", body.department_name],
+1159-      ["目的", body.purpose || "未設定"],
+1160-      ["状態", body.department_status]
+1161-    ].concat(aicmAvdRoleSummaryRows("department"));
+1162-
+1163-    aicmAvdShowDbConfirm({
+1164-      kind: "department-update",
+1165-      title: "部門変更",
+1166-      endpoint: "/api/aicm/v2/department/update",
+1167-      body: body,
+1168-      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1169:      rolePlacements: aicmAxcDepartmentRolePlacements({
+1170-        aicm_user_company_department_id: body.aicm_user_company_department_id
+1171-      }),
+1172-      summary_rows: rows
+1173-    });
+1174-  }
+1175-
+1176-
+1177-function saveSectionUpdateFromForm() {
+1178-    var sectionId = aicmAvdTextById("aicm-section-edit-id");
+1179-    var companyId = aicmAvdTextById("aicm-section-edit-company-id");
+1180-    var departmentId = aicmAvdTextById("aicm-section-edit-department-id");
+1181-
+1182-    if (!sectionId || !companyId || !departmentId) {
+1183-      setMessage("error", "変更対象の課が見つかりません。");
+--
+1196-
+1197-    var rows = [
+1198-      ["操作", "課変更"],
+1199-      ["課名", body.section_name],
+1200-      ["目的", body.purpose || "未設定"],
+1201-      ["状態", body.section_status]
+1202-    ].concat(aicmAvdRoleSummaryRows("section"));
+1203-
+1204-    aicmAvdShowDbConfirm({
+1205-      kind: "section-update",
+1206-      title: "課変更",
+1207-      endpoint: "/api/aicm/v2/section/update",
+1208-      body: body,
+1209-      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1210:      rolePlacements: aicmAxcSectionRolePlacements({
+1211-        aicm_user_company_section_id: body.aicm_user_company_section_id,
+1212-        aicm_user_company_department_id: body.aicm_user_company_department_id || (
+1213-          typeof aicmOrgSectionById === "function" && body.aicm_user_company_section_id
+1214-            ? ((aicmOrgSectionById(body.aicm_user_company_section_id) || {}).aicm_user_company_department_id || "")
+1215-            : ""
+1216-        )
+1217-      }),
+1218-      summary_rows: rows
+1219-    });
+1220-  }
+1221-
+1222-
+1223-
+1224-  
+
+---- role placement builder function definitions ----
+993-    robot_pool_id: row.robot_pool_id || "",
+994-    aiworker_model_code: row.aiworker_model_code || "unknown",
+995-    internal_nickname: row.internal_nickname || ""
+996-  };
+997-}
+998-
+999:function aicmAxcCompanyRolePlacements(company) {
+1000-  var selected = aicmAxcSelectedRobotMeta("aicm-company-president-robot");
+1001-  if (!company || !selected) return [];
+1002-  var row = aicmAxcBuildRolePlacement({
+1003-    role_code: "President",
+1004-    target_level_code: "company",
+1005-    target_id: company.aicm_user_company_id,
+--
+1007-    aiworker_model_code: selected.aiworker_model_code,
+1008-    internal_nickname: aicmAxcInputValue("aicm-company-president-robot-nickname")
+1009-  });
+1010-  return row ? [row] : [];
+1011-}
+1012-
+1013:function aicmAxcDepartmentRolePlacements(department) {
+1014-  var selected = aicmAxcSelectedRobotMeta("aicm-department-manager-robot");
+1015-  if (!department || !selected) return [];
+1016-  var row = aicmAxcBuildRolePlacement({
+1017-    role_code: "Manager",
+1018-    target_level_code: "department",
+1019-    target_id: department.aicm_user_company_department_id,
+--
+1022-    aiworker_model_code: selected.aiworker_model_code,
+1023-    internal_nickname: aicmAxcInputValue("aicm-department-manager-robot-nickname")
+1024-  });
+1025-  return row ? [row] : [];
+1026-}
+1027-
+1028:function aicmAxcSectionRolePlacements(section) {
+1029-  var rows = [];
+1030-  if (!section) return rows;
+1031-
+1032-  var leader = aicmAxcSelectedRobotMeta("aicm-section-leader-robot");
+1033-  var leaderRow = aicmAxcBuildRolePlacement({
+1034-    role_code: "Leader",
+
+---- change button target fix ----
+690-      '  <p class="aicm-eyebrow">部門変更</p>',
+691-      '  <h2>変更する部門を選択</h2>',
+692-      '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || '') + '</strong></p>',
+693-      rows.map(function (row) {
+694-        return [
+695-          '<article class="aicm-org-update-row">',
+696-          '  <div>',
+697-          '    <strong>' + escapeHtml(row.department_name || '部門') + '</strong>',
+698-          '    <p>' + escapeHtml(row.purpose || '') + '</p>',
+699-          '  </div>',
+700:          '  <button type="button" data-core-action="department-update-select" data-department-id="' + escapeHtml(row.aicm_user_company_department_id || '') + '">変更</button>',
+701-          '</article>'
+702-        ].join("");
+703-      }).join(""),
+704-      '</section>'
+705-    ].join("");
+706-  }
+707-
+708-  function renderDepartmentUpdateForm(department) {
+709-    return [
+710-      '<section class="aicm-core-card">',
+--
+3808-if (action === "human-review-approve") {
+3809-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+3810-      return;
+3811-    }
+3812-
+3813-    if (action === "human-review-return") {
+3814-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+3815-      return;
+3816-    }
+3817-
+3818:    if (action === "department-update-select") {
+3819-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+3820-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+3821-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+3822-      if (typeof render === "function") render();
+3823-      return;
+3824-    }
+3825-
+3826-    if (action === "department-update-clear") {
+3827-      state.editingDepartmentId = "";
+3828-      if (typeof render === "function") render();
+747-      '  <h2>変更する課を選択</h2>',
+748-      '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || '') + '</strong></p>',
+749-      rows.map(function (row) {
+750-        var dept = aicmOrgDepartmentById(row.aicm_user_company_department_id) || {};
+751-        return [
+752-          '<article class="aicm-org-update-row">',
+753-          '  <div>',
+754-          '    <strong>' + escapeHtml(row.section_name || '課') + '</strong>',
+755-          '    <p>' + escapeHtml(dept.department_name || '') + (row.purpose ? ' / ' + escapeHtml(row.purpose || '') : '') + '</p>',
+756-          '  </div>',
+757:          '  <button type="button" data-core-action="section-update-select" data-section-id="' + escapeHtml(row.aicm_user_company_section_id || '') + '">変更</button>',
+758-          '</article>'
+759-        ].join("");
+760-      }).join(""),
+761-      '</section>'
+762-    ].join("");
+763-  }
+764-
+765-  function renderSectionUpdateForm(section) {
+766-    return [
+767-      '<section class="aicm-core-card">',
+--
+3822-      if (typeof render === "function") render();
+3823-      return;
+3824-    }
+3825-
+3826-    if (action === "department-update-clear") {
+3827-      state.editingDepartmentId = "";
+3828-      if (typeof render === "function") render();
+3829-      return;
+3830-    }
+3831-
+3832:    if (action === "section-update-select") {
+3833-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+3834-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+3835-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+3836-      if (typeof render === "function") render();
+3837-      return;
+3838-    }
+3839-
+3840-    if (action === "section-update-clear") {
+3841-      state.editingSectionId = "";
+3842-      if (typeof render === "function") render();
+3811-    }
+3812-
+3813-    if (action === "human-review-return") {
+3814-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+3815-      return;
+3816-    }
+3817-
+3818-    if (action === "department-update-select") {
+3819:      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+3820-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+3821-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+3822-      if (typeof render === "function") render();
+3823-      return;
+3824-    }
+3825-
+3826-    if (action === "department-update-clear") {
+3827-      state.editingDepartmentId = "";
+3828-      if (typeof render === "function") render();
+3829-      return;
+3830-    }
+3831-
+3832-    if (action === "section-update-select") {
+3833:      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+3834-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+3835-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+3836-      if (typeof render === "function") render();
+3837-      return;
+3838-    }
+3839-
+3840-    if (action === "section-update-clear") {
+3841-      state.editingSectionId = "";
+
+---- old payload bad calls should be empty ----

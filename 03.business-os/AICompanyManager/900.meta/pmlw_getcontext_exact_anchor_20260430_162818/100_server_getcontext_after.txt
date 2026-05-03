@@ -1,0 +1,111 @@
+============================================================
+getContext after
+============================================================
+203:    // AICM_PMLW_GETCONTEXT_SQL_EXTENSION_AQP_AQS_V1
+204:    "  'pmlw_president_policies', (",
+206:    "    FROM business.vw_aicm_pmlw_president_policy_display p",
+209:    "  'pmlw_major_items', (",
+211:    "    FROM business.vw_aicm_pmlw_major_work_display m",
+216:    "    FROM business.vw_aicm_pmlw_leader_middle_display l",
+221:    "    FROM business.vw_aicm_pmlw_deliverable_requirement_display r",
+226:    "    FROM business.vw_aicm_pmlw_worker_work_unit_display w",
+229:    "  'pmlw_workflow_tree', (",
+231:    "    FROM business.vw_aicm_pmlw_workflow_tree t",
+457:  const robotPoolId = String(body.robot_pool_id || "").trim();
+463:  const robotPoolSql = robotPoolId ? sqlLiteral(robotPoolId) + "::uuid" : "NULL";
+489:    "    " + robotPoolSql + ",",
+
+============================================================
+getContext excerpt
+============================================================
+   165	function getContext(ownerCivilizationId) {
+   166	  const owner = requiredUuid(ownerCivilizationId, "owner_civilization_id");
+   167	
+   168	  const sql = [
+   169	    "SELECT jsonb_build_object(",
+   170	    "  'result', 'ok',",
+   171	    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+   172	    "  'owner_civilization_id', " + sqlLiteral(owner) + ",",
+   173	    "  'companies', (",
+   174	    "    SELECT COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.created_at DESC), '[]'::jsonb)",
+   175	    "    FROM business.aicm_user_company c",
+   176	    "    WHERE c.owner_civilization_id::text = " + sqlLiteral(owner),
+   177	    "      AND c.company_status = 'active'",
+   178	    "  ),",
+   179	    "  'departments', (",
+   180	    "    SELECT COALESCE(jsonb_agg(to_jsonb(d) ORDER BY d.display_order, d.created_at), '[]'::jsonb)",
+   181	    "    FROM business.aicm_user_company_department d",
+   182	    "    WHERE d.owner_civilization_id::text = " + sqlLiteral(owner),
+   183	    "      AND d.department_status = 'active'",
+   184	    "  ),",
+   185	    "  'sections', (",
+   186	    "    SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY s.display_order, s.created_at), '[]'::jsonb)",
+   187	    "    FROM business.aicm_user_company_section s",
+   188	    "    WHERE s.owner_civilization_id::text = " + sqlLiteral(owner),
+   189	    "      AND s.section_status = 'active'",
+   190	    "  ),",
+   191	    "  'placements', (",
+   192	    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.created_at DESC), '[]'::jsonb)",
+   193	    "    FROM business.vw_aicm_user_company_worker_placement_display p",
+   194	    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+   195	    "      AND p.status_code = 'active'",
+   196	    "  ),",
+   197	    "  'task_ledger', (",
+   198	    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.display_order, t.created_at DESC), '[]'::jsonb)",
+   199	    "    FROM business.vw_aicm_user_company_department_task_ledger_display t",
+   200	    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+   201	    "      AND t.task_status_code <> 'archived'",
+   202	    "  ),",
+   203	    // AICM_PMLW_GETCONTEXT_SQL_EXTENSION_AQP_AQS_V1
+   204	    "  'pmlw_president_policies', (",
+   205	    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.display_order ASC, p.updated_at DESC, p.created_at DESC), '[]'::jsonb)",
+   206	    "    FROM business.vw_aicm_pmlw_president_policy_display p",
+   207	    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+   208	    "  ),",
+   209	    "  'pmlw_major_items', (",
+   210	    "    SELECT COALESCE(jsonb_agg(to_jsonb(m) ORDER BY m.display_order ASC, m.updated_at DESC, m.created_at DESC), '[]'::jsonb)",
+   211	    "    FROM business.vw_aicm_pmlw_major_work_display m",
+   212	    "    WHERE m.owner_civilization_id::text = " + sqlLiteral(owner),
+   213	    "  ),",
+   214	    "  'pmlw_middle_items', (",
+   215	    "    SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY l.display_order ASC, l.updated_at DESC, l.created_at DESC), '[]'::jsonb)",
+   216	    "    FROM business.vw_aicm_pmlw_leader_middle_display l",
+   217	    "    WHERE l.owner_civilization_id::text = " + sqlLiteral(owner),
+   218	    "  ),",
+   219	    "  'pmlw_deliverable_requirements', (",
+   220	    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.display_order ASC, r.updated_at DESC, r.created_at DESC), '[]'::jsonb)",
+   221	    "    FROM business.vw_aicm_pmlw_deliverable_requirement_display r",
+   222	    "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+   223	    "  ),",
+   224	    "  'pmlw_worker_work_units', (",
+   225	    "    SELECT COALESCE(jsonb_agg(to_jsonb(w) ORDER BY w.display_order ASC, w.updated_at DESC, w.created_at DESC), '[]'::jsonb)",
+   226	    "    FROM business.vw_aicm_pmlw_worker_work_unit_display w",
+   227	    "    WHERE w.owner_civilization_id::text = " + sqlLiteral(owner),
+   228	    "  ),",
+   229	    "  'pmlw_workflow_tree', (",
+   230	    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.last_updated_at DESC NULLS LAST), '[]'::jsonb)",
+   231	    "    FROM business.vw_aicm_pmlw_workflow_tree t",
+   232	    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+   233	    "  ),",
+   234	    "  'robot_catalog', (",
+   235	    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.aiworker_model_code), '[]'::jsonb)",
+   236	    "    FROM business.vw_ai_company_manager_system_robot_selector_options r",
+   237	    "  )",
+   238	    ")::text;"
+   239	  ].join("\n");
+   240	
+   241	  return runPsqlJson(sql);
+   242	}
+   243	
+   244	function createCompany(body) {
+   245	  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+   246	  const name = requiredText(body.company_name, "company_name");
+   247	  const domain = String(body.business_domain || "");
+   248	
+   249	  const sql = [
+   250	    "WITH inserted AS (",
+   251	    "  INSERT INTO business.aicm_user_company (",
+   252	    "    owner_civilization_id, company_name, business_domain, company_status, selected_flag",
+   253	    "  ) VALUES (",
+   254	    "    " + sqlLiteral(owner) + "::uuid,",
+   255	    "    " + sqlLiteral(name) + ",",

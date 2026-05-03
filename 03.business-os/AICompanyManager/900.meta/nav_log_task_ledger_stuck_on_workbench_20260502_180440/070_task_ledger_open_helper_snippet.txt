@@ -1,0 +1,111 @@
+        '  </dl>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="pmlw-major-leader-handoff" data-major-id="' + escapeHtml(majorId) + '">課長へ送る</button>',
+        '    <button type="button" data-core-action="pmlw-major-delete-open" data-major-id="' + escapeHtml(majorId) + '">削除</button>',
+        '  </div>',
+        '</article>'
+      ].join("");
+    }).join("");
+
+    return [
+      confirmCard,
+      pager,
+      '<div class="aicm-manager-major-list">',
+      cards,
+      '</div>',
+      pager
+    ].join("");
+  }
+  
+// AICM_R8_NAV_TASK_LEDGER_V3_CLEAN_HELPER_START
+  function aicmOpenTaskLedgerScreenR8V3Clean() {
+    state.screen = "task-ledger";
+    state.managerMajorDeleteConfirm = null;
+
+    if (typeof setMessage === "function") {
+      setMessage("ok", "部門別タスク台帳を表示します。");
+    }
+
+    render();
+
+    Promise.resolve()
+      .then(function () {
+        if (typeof aicmReloadTaskLedgerContext === "function") {
+          return aicmReloadTaskLedgerContext();
+        }
+        return null;
+      })
+      .then(function () {
+        state.screen = "task-ledger";
+        render();
+      })
+      .catch(function (error) {
+        state.screen = "task-ledger";
+
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "部門別タスク台帳の読込に失敗しました。");
+        }
+
+        render();
+      });
+  }
+// AICM_R8_NAV_TASK_LEDGER_V3_CLEAN_HELPER_END
+
+  async function aicmReloadTaskLedgerContext() {
+    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: reload
+    state.screen = "task-ledger";
+    state.errorMessage = "";
+
+    if (typeof loadContext === "function") {
+      await loadContext();
+      // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_RELOAD_CALL
+      if (typeof aicmFetchAndHydrateManagerMajorContextR8M === "function") {
+        await aicmFetchAndHydrateManagerMajorContextR8M();
+      }
+    }
+
+    state.screen = "task-ledger";
+
+    if (typeof render === "function") {
+      render();
+    }
+  }
+
+
+  function aicmHydrateManagerMajorContextArraysR8M(rawContext) {
+    // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_V1
+    var raw = rawContext && typeof rawContext === "object" ? rawContext : {};
+    var target = state && state.context && typeof state.context === "object" ? state.context : {};
+
+    if (state) {
+      state.context = target;
+    }
+
+    function arrayFrom(names) {
+      for (var i = 0; i < names.length; i += 1) {
+        var name = names[i];
+
+        if (Array.isArray(raw[name])) {
+          return raw[name];
+        }
+
+        if (Array.isArray(target[name])) {
+          return target[name];
+        }
+      }
+
+      return [];
+    }
+
+    var pmlwMajorItems = arrayFrom(["pmlw_major_items", "pmlwMajorItems"]);
+    var managerMajorItems = arrayFrom(["manager_major_items", "managerMajorItems"]);
+    var majorItems = arrayFrom(["major_items", "majorItems"]);
+    var taskLedger = arrayFrom(["task_ledger", "taskLedger"]);
+    var robotCatalog = arrayFrom(["robot_catalog", "robotCatalog"]);
+
+    target.pmlw_major_items = pmlwMajorItems;
+    target.pmlwMajorItems = pmlwMajorItems;
+
+    target.manager_major_items = managerMajorItems;
+    target.managerMajorItems = managerMajorItems;
+

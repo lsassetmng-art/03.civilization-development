@@ -1,0 +1,297 @@
+
+============================================================
+0. ROADMAP
+============================================================
+対象:
+- AICompanyManager
+
+現在位置:
+- current core / served core とも一致
+- isPendingMajor 定義は1つ存在
+- ただし aicmRenderManagerMajorRows 側からは scope 外のため ReferenceError
+- 既存の正本helper aicmIsPendingManagerMajorRowR8V6 がある
+
+今回の修正:
+1. helper追加はしない
+2. aicmRenderManagerMajorRows 内の scope外 isPendingMajor(row) 呼び出しだけを
+   aicmIsPendingManagerMajorRowR8V6(row) に差し替える
+3. node --check
+4. server再起動
+5. context / context-script / served core確認
+6. 成功したら画面自動起動
+
+禁止:
+- DB write
+- API POST
+- server patch
+- 新規helper追加
+- render関数丸ごと置換
+
+============================================================
+1. ENV
+============================================================
+PHASE=R8Z-V9D1 task-ledger isPendingMajor scope callsite fix
+APP_ROOT=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager
+CORE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/assets/js/aicm-production-core.js
+SERVER=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/server/aicm-local-ui-api-server.mjs
+AICM_BASE_URL=http://127.0.0.1:8794
+OWNER_ID=00000000-0000-4000-8000-000000000001
+COMPANY_ID=8b9be487-7b74-4517-9b59-6c84a82ae6aa
+RUN_DIR=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/r8z_v9d1_is_pending_major_scope_callsite_fix_20260503_110515
+DB_WRITE=NO
+API_POST=NO
+SERVER_PATCH=NO
+CORE_PATCH=YES
+SUCCESS_BROWSER_OPEN=YES
+PASS: core exists
+PASS: server exists
+
+============================================================
+2. precheck syntax
+============================================================
+PASS: precheck core syntax PASS
+PASS: precheck server syntax PASS
+
+============================================================
+3. backup core
+============================================================
+PASS: core backup created: /data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/r8z_v9d1_is_pending_major_scope_callsite_fix_20260503_110515/aicm-production-core.before_r8z_v9d1.js
+
+============================================================
+4. patch core callsite only
+============================================================
+PATCH_APPLIED: aicmRenderManagerMajorRows callsite replaced only
+PASS: V9D1 callsite patch applied
+
+============================================================
+5. postcheck syntax / rollback gate
+============================================================
+PASS: post-patch core syntax PASS
+PASS: server unchanged syntax PASS
+
+============================================================
+6. static verify
+============================================================
+TOTAL_ISPENDING_REF_COUNT=3
+TOTAL_ISPENDING_DEF_COUNT=1
+RENDER_FUNC_HAS_BAD_ISPENDING_CALL=false
+RENDER_FUNC_HAS_CANONICAL_HELPER_CALL=true
+V9D1_MARKER_COUNT=1
+PASS: bad isPendingMajor call removed from aicmRenderManagerMajorRows
+PASS: canonical helper call exists in aicmRenderManagerMajorRows
+
+============================================================
+7. snippet
+============================================================
+4421-        cancelled: true,
+4422-        canceled: true,
+4423-        archived: true
+4424-      };
+4425-
+4426-      if (closed[handoff]) return false;
+4427-      if (closed[decomposition]) return false;
+4428-
+4429-      return true;
+4430-    }
+4431-
+4432-    function rowOrder(row) {
+4433-      var n = Number(row && (row.display_order || row.sort_order || row.row_order || 0));
+4434-      return Number.isFinite(n) ? n : 0;
+4435-    }
+4436-
+4437-    var rows = []
+4438-      .concat(asArray(ctx.pmlw_major_items))
+4439-      .concat(asArray(ctx.manager_major_items))
+4440-      .concat(asArray(ctx.major_items));
+4441-
+4442-    rows = rows.filter(function (row) {
+4443-      if (!row) return false;
+4444-
+4445-      var cid = rowCompanyId(row);
+4446-
+4447-      if (selectedId && cid && cid !== selectedId) return false;
+4448-
+4449:      return isPendingMajor(row);
+4450-    });
+4451-
+4452-    rows.sort(function (a, b) {
+4453-      var ao = rowOrder(a);
+4454-      var bo = rowOrder(b);
+4455-
+4456-      if (ao !== bo) return ao - bo;
+4457-
+4458-      var an = String((a && (a.major_item_name || a.title || a.task_name || a.deliverable_name)) || "");
+4459-      var bn = String((b && (b.major_item_name || b.title || b.task_name || b.deliverable_name)) || "");
+4460-
+4461-      return an.localeCompare(bn, "ja");
+4462-    });
+4463-
+4464-    return rows;
+4465-  }
+4466-
+4467-
+4468-
+4469-
+4470-
+4471-// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_START
+4472:  function aicmIsPendingManagerMajorRowR8V6(row) {
+4473-    if (!row || typeof row !== "object") return false;
+4474-
+4475-    var handoff = String(row.handoff_status_code || "").toLowerCase();
+4476-    var decomposition = String(row.decomposition_status_code || "").toLowerCase();
+4477-    var deleted = String(row.deleted_flag || row.is_deleted || "").toLowerCase();
+4478-    var archived = String(row.archived_flag || row.is_archived || "").toLowerCase();
+4479-
+4480-    if (deleted === "true" || deleted === "1") return false;
+4481-    if (archived === "true" || archived === "1") return false;
+4482-
+4483-    if (
+4484-      handoff === "archived" ||
+4485-      handoff === "deleted" ||
+4486-      handoff === "cancelled" ||
+4487-      handoff === "canceled" ||
+4488-      handoff === "sent" ||
+4489-      handoff === "handed_off" ||
+4490-      handoff === "completed" ||
+4491-      handoff === "done"
+4492-    ) {
+4493-      return false;
+4494-    }
+4495-
+4496-    if (
+4497-      decomposition === "completed" ||
+4498-      decomposition === "complete" ||
+4499-      decomposition === "done"
+4500-    ) {
+--
+4928-        })
+4929-      });
+4930-
+4931-      var json = null;
+4932-      try {
+4933-        json = await response.json();
+4934-      } catch (_) {
+4935-        json = null;
+4936-      }
+4937-
+4938-      if (!response.ok || (json && json.result && json.result !== "ok")) {
+4939-        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+4940-      }
+4941-
+4942-      state.managerMajorDeleteConfirm = null;
+4943-      setMessage("ok", "大項目を削除済みにしました。");
+4944-      await aicmReloadTaskLedgerContext();
+4945-      state.screen = "task-ledger";
+4946-      render();
+4947-    } catch (error) {
+4948-      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+4949-      render();
+4950-    }
+4951-  }
+4952-// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+4953-
+4954-
+4955-  
+4956:function aicmRenderManagerMajorRows(rows) {
+4957-    var sourceRows = Array.isArray(rows) ? rows : [];
+4958-    var pendingRows = sourceRows.filter(function (row) {
+4959:      // AICM_R8Z_V9D1_IS_PENDING_MAJOR_SCOPE_CALLSITE_FIX: use existing visible canonical helper, not the scope-local isPendingMajor
+4960-      if (typeof aicmIsPendingManagerMajorRowR8V6 === "function") {
+4961:        return aicmIsPendingManagerMajorRowR8V6(row);
+4962-      }
+4963-      return !!row;
+4964-    });
+4965-
+4966-    var confirmCard = aicmRenderMajorItemDeleteConfirmCardR8P();
+4967-
+4968-    if (!pendingRows.length) {
+4969-      return [
+4970-        confirmCard,
+4971-        '<div class="aicm-core-empty">',
+4972-        '  <strong>登録済み大項目はまだありません</strong>',
+4973-        '  <p>CSV取り込み後、未実行/未引き継ぎのManager大項目だけが表示されます。</p>',
+4974-        '</div>'
+4975-      ].join("");
+4976-    }
+4977-
+4978-    var pageSize = aicmMajorItemPageSizeR8O();
+4979-    var totalRows = pendingRows.length;
+4980-    var totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+4981-    var page = aicmMajorItemCurrentPageR8O(totalRows);
+4982-    var start = (page - 1) * pageSize;
+4983-    var pageRows = pendingRows.slice(start, start + pageSize);
+4984-
+4985-    var pager = [
+4986-      '<div class="aicm-dashboard-action-row">',
+4987-      '  <button type="button" data-core-action="pmlw-major-page-prev"' + (page <= 1 ? ' disabled' : '') + '>前ページ</button>',
+4988-      '  <span class="aicm-selected-note">ページ ' + escapeHtml(String(page)) + ' / ' + escapeHtml(String(totalPages)) + '　表示 ' + escapeHtml(String(start + 1)) + '-' + escapeHtml(String(start + pageRows.length)) + ' / ' + escapeHtml(String(totalRows)) + '件</span>',
+4989-      '  <button type="button" data-core-action="pmlw-major-page-next"' + (page >= totalPages ? ' disabled' : '') + '>次ページ</button>',
+
+============================================================
+8. restart server
+============================================================
+PASS: no lsof pid on port
+ROOT_HTTP=200
+PASS: server reachable after restart
+
+============================================================
+9. context / context-script verify
+============================================================
+CONTEXT_HTTP=200
+result=ok
+review_wait_items_count=2
+title_1=納品サマリー確認: AI企業業務開始導線の整備 作業
+title_2=納品サマリー確認: Manager大項目台帳運用の整備 作業
+contains_ai_company_start=true
+contains_manager_major=true
+PASS: context review_wait_items=2
+CONTEXT_SCRIPT_HTTP=200
+PASS: context-script 200 with review_wait_items
+
+============================================================
+10. served core verify
+============================================================
+SERVED_HTTP=200
+DISK_SHA=3e377a7c7da6f934c21f1c987508ffb970df21718b465713a27cbe7ee6d59d31
+SERVED_SHA=3e377a7c7da6f934c21f1c987508ffb970df21718b465713a27cbe7ee6d59d31
+SERVED_V9D1_MARKER_COUNT=1
+PASS: served core matches disk
+PASS: served core contains V9D1 marker
+
+============================================================
+11. final / browser open
+============================================================
+REVIEW_COUNT=2
+CONTEXT_SCRIPT_HTTP=200
+BAD_CALL_IN_RENDER=false
+HELPER_CALL_IN_RENDER=true
+V9D1_MARKER_COUNT=1
+BROWSER_URL=http://127.0.0.1:8794/?v=r8z_v9d1_20260503_110515
+PASS_COUNT=16
+WARN_COUNT=0
+FAIL_COUNT=0
+FINAL_JUDGEMENT=V9D1_TASK_LEDGER_SCOPE_CALLSITE_FIXED_BROWSER_OPENED
+REPORT=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/r8z_v9d1_is_pending_major_scope_callsite_fix_20260503_110515/000_R8Z_V9D1_IS_PENDING_MAJOR_SCOPE_CALLSITE_FIX_REPORT.md
+BACKUP_CORE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/r8z_v9d1_is_pending_major_scope_callsite_fix_20260503_110515/aicm-production-core.before_r8z_v9d1.js
+CORE_SNIP=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/r8z_v9d1_is_pending_major_scope_callsite_fix_20260503_110515/070_core_v9d1_snip.txt
+SERVER_LOG=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/r8z_v9d1_is_pending_major_scope_callsite_fix_20260503_110515/080_server.log
+DB_WRITE=NO
+API_POST=NO
+SERVER_PATCH=NO
+CORE_PATCH=YES
+SUCCESS_BROWSER_OPEN=YES
+BROWSER_OPEN=termux-open-url
+
+BROWSER_CHECK:
+1. 部門別タスク台帳:
+   期待:
+   - TASK LEDGER RENDER ERROR が消える
+   - isPendingMajor is not defined が出ない
+
+2. レビュー・承認待ち:
+   まだ v9-script-start の可能性あり。
+   台帳復旧確認後に、review callback側を続けて直す。
+
+Rollback:
+  cp -f "/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/r8z_v9d1_is_pending_major_scope_callsite_fix_20260503_110515/aicm-production-core.before_r8z_v9d1.js" "/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/assets/js/aicm-production-core.js"
+  node --check "/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/assets/js/aicm-production-core.js"

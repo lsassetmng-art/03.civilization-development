@@ -1,0 +1,44 @@
+# AICompanyManager Phase ANM-ANP
+# Remove last forbidden marker from clean production core
+
+generated_at: 2026-04-30 11:17:01 +0900
+
+PASS_COUNT=14
+WARN_COUNT=0
+FAIL_COUNT=0
+FINAL_STATUS=LAST_CLEAN_CORE_FORBIDDEN_MARKER_REMOVED_REVIEW_REQUIRED
+
+SCOPE=CLEAN_CORE_CANDIDATE_ONLY
+MODIFY_CLEAN_CORE=YES
+MODIFY_EXISTING_INDEX=NO
+MODIFY_EXISTING_SERVER=NO
+MODIFY_OLD_MAIN_JS=NO
+DB_WRITE=NOT_EXECUTED
+DB_READ=NOT_EXECUTED
+API_SAVE=NOT_EXECUTED
+RLS_APPLY=NOT_EXECUTED
+DELETE=NOT_EXECUTED
+PYTHON=NOT_USED
+
+CLEAN_CORE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/assets/js/aicm-production-core.js
+BACKUP_CORE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/remove_last_clean_core_forbidden_marker_20260430_111700/aicm-production-core.before_anm_anp.js
+FORBIDDEN_BEFORE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/remove_last_clean_core_forbidden_marker_20260430_111700/100_forbidden_before.txt
+FORBIDDEN_AFTER=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/remove_last_clean_core_forbidden_marker_20260430_111700/110_forbidden_after.txt
+CORE_SCAN=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/remove_last_clean_core_forbidden_marker_20260430_111700/120_core_static_scan.txt
+NEXT_PLAN=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/remove_last_clean_core_forbidden_marker_20260430_111700/900_NEXT_PLAN.md
+RUN_DIR=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/remove_last_clean_core_forbidden_marker_20260430_111700
+
+BEFORE_FORBIDDEN_COUNT=1
+FORBIDDEN_COUNT=0
+EVENT_LISTENER_COUNT=4
+STORAGE_COUNT=3
+ROOT_REWRITE_COUNT=1
+
+INDEX_HASH_BEFORE=944ae703d0fc6ee105dbe64fb33a3660e6fa182190509b45f02c405711fee501
+INDEX_HASH_AFTER=944ae703d0fc6ee105dbe64fb33a3660e6fa182190509b45f02c405711fee501
+SERVER_HASH_BEFORE=69466459e52f89af471c52b6673d1da1b7379d52e5e98b2276ba1c2715f434dd
+SERVER_HASH_AFTER=69466459e52f89af471c52b6673d1da1b7379d52e5e98b2276ba1c2715f434dd
+OLD_JS_HASH_BEFORE=7d9c46ffc8b4d265c5423c8df05b1fb93cd41ad2eb34ddbf76fbab70d7bb496a
+OLD_JS_HASH_AFTER=7d9c46ffc8b4d265c5423c8df05b1fb93cd41ad2eb34ddbf76fbab70d7bb496a
+CORE_HASH_BEFORE=ce0f96d69664aec466b905e0d46521dc6ae6e17737141e9bec4770471c31bfcc
+CORE_HASH_AFTER=2cd195aaa300fe45602c94b99e0e42e884f94bbd77ef6b3fb890ff26bf4e3faa

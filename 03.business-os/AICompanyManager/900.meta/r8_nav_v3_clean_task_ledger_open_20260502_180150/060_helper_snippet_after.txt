@@ -1,0 +1,73 @@
+
+    return [
+      confirmCard,
+      pager,
+      '<div class="aicm-manager-major-list">',
+      cards,
+      '</div>',
+      pager
+    ].join("");
+  }
+  
+// AICM_R8_NAV_TASK_LEDGER_V3_CLEAN_HELPER_START
+  function aicmOpenTaskLedgerScreenR8V3Clean() {
+    state.screen = "task-ledger";
+    state.managerMajorDeleteConfirm = null;
+
+    if (typeof setMessage === "function") {
+      setMessage("ok", "部門別タスク台帳を表示します。");
+    }
+
+    render();
+
+    Promise.resolve()
+      .then(function () {
+        if (typeof aicmReloadTaskLedgerContext === "function") {
+          return aicmReloadTaskLedgerContext();
+        }
+        return null;
+      })
+      .then(function () {
+        state.screen = "task-ledger";
+        render();
+      })
+      .catch(function (error) {
+        state.screen = "task-ledger";
+
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "部門別タスク台帳の読込に失敗しました。");
+        }
+
+        render();
+      });
+  }
+// AICM_R8_NAV_TASK_LEDGER_V3_CLEAN_HELPER_END
+
+  async function aicmReloadTaskLedgerContext() {
+    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: reload
+    state.screen = "task-ledger";
+    state.errorMessage = "";
+
+    if (typeof loadContext === "function") {
+      await loadContext();
+      // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_RELOAD_CALL
+      if (typeof aicmFetchAndHydrateManagerMajorContextR8M === "function") {
+        await aicmFetchAndHydrateManagerMajorContextR8M();
+      }
+    }
+
+    state.screen = "task-ledger";
+
+    if (typeof render === "function") {
+      render();
+    }
+  }
+
+
+  function aicmHydrateManagerMajorContextArraysR8M(rawContext) {
+    // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_V1
+    var raw = rawContext && typeof rawContext === "object" ? rawContext : {};
+    var target = state && state.context && typeof state.context === "object" ? state.context : {};
+
+    if (state) {
+      state.context = target;

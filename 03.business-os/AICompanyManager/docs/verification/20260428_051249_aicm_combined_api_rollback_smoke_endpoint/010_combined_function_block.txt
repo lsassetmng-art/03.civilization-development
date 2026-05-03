@@ -1,0 +1,93 @@
+function combinedRollbackSmoke(body) {
+  const companyId = body.company_id || body.companyId || "";
+  const modelCode = body.aiworker_model_code || body.aiworkerModelCode || "HD-R3";
+  const targetLevel = body.target_level_code || body.targetLevelCode || "section";
+  const roleCode = body.role_code || body.roleCode || "Worker";
+  const nickname = body.internal_nickname || body.internalNickname || "Smoke Worker";
+  const updateNickname = body.update_internal_nickname || body.updateInternalNickname || nickname + " Updated";
+  const targetId = body.target_id || body.targetId || "";
+  const appCode = body.app_code || body.appCode || "AICompanyManager";
+  const quantity = Number(body.placement_quantity || body.placementQuantity || 1);
+  const metadata = body.metadata_jsonb || body.metadataJsonb || {};
+
+  return parseJsonFromPsql(runPsql(`
+BEGIN;
+
+CREATE TEMP TABLE tmp_aicm_combined_grant_result ON COMMIT DROP AS
+SELECT business.fn_company_robot_grant_entitlement(
+  ${uuidSql(companyId)},
+  ${sqlLit(modelCode)},
+  1,
+  'standard',
+  'company',
+  'unlimited_placement'
+) AS entitlement_id;
+
+CREATE TEMP TABLE tmp_aicm_combined_place_result ON COMMIT DROP AS
+SELECT business.fn_company_robot_place(
+  ${uuidSql(companyId)},
+  ${sqlLit(modelCode)},
+  ${sqlLit(targetLevel)},
+  ${sqlLit(roleCode)},
+  ${sqlLit(nickname)},
+  ${uuidSql(targetId)},
+  ${sqlLit(appCode)},
+  ${Number.isFinite(quantity) ? quantity : 1},
+  jsonb_build_object(
+    'source', 'combined_api_rollback_smoke_endpoint',
+    'smoke_mode', 'combined_grant_place_update_deactivate',
+    'model_code', ${sqlLit(modelCode)},
+    'role_code', ${sqlLit(roleCode)}
+  ) || ${jsonSql(metadata)}
+) AS placement_id
+FROM tmp_aicm_combined_grant_result;
+
+CREATE TEMP TABLE tmp_aicm_combined_update_result ON COMMIT DROP AS
+SELECT business.fn_company_robot_placement_update(
+  placement_id,
+  ${sqlLit(updateNickname)},
+  ${sqlLit(roleCode)},
+  ${sqlLit(targetLevel)},
+  ${uuidSql(targetId)},
+  jsonb_build_object(
+    'source', 'combined_api_rollback_smoke_endpoint',
+    'step', 'update',
+    'model_code', ${sqlLit(modelCode)},
+    'role_code', ${sqlLit(roleCode)}
+  ) || ${jsonSql(metadata)}
+) AS updated_placement_id
+FROM tmp_aicm_combined_place_result;
+
+CREATE TEMP TABLE tmp_aicm_combined_deactivate_result ON COMMIT DROP AS
+SELECT business.fn_company_robot_placement_deactivate(
+  placement_id,
+  'combined_api_rollback_smoke_deactivate',
+  jsonb_build_object(
+    'source', 'combined_api_rollback_smoke_endpoint',
+    'step', 'deactivate',
+    'model_code', ${sqlLit(modelCode)},
+    'role_code', ${sqlLit(roleCode)}
+  ) || ${jsonSql(metadata)}
+) AS deactivated_placement_id
+FROM tmp_aicm_combined_place_result;
+
+SELECT jsonb_build_object(
+  'ok', true,
+  'dry_run', true,
+  'rollback_smoke', true,
+  'smoke_mode', 'combined_grant_place_update_deactivate',
+  'aiworker_model_code', ${sqlLit(modelCode)},
+  'role_code', ${sqlLit(roleCode)},
+  'target_level_code', ${sqlLit(targetLevel)},
+  'company_robot_entitlement_id', (SELECT entitlement_id FROM tmp_aicm_combined_grant_result),
+  'company_robot_placement_id', (SELECT placement_id FROM tmp_aicm_combined_place_result),
+  'updated_company_robot_placement_id', (SELECT updated_placement_id FROM tmp_aicm_combined_update_result),
+  'deactivated_company_robot_placement_id', (SELECT deactivated_placement_id FROM tmp_aicm_combined_deactivate_result),
+  'display_label', ${sqlLit(updateNickname)} || '@' || ${sqlLit(roleCode)}
+);
+
+ROLLBACK;
+`));
+}
+
+async function handle(req, res) {

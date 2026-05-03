@@ -1,0 +1,42 @@
+# AICompanyManager Phase ANQ-ANT
+# Create clean server v2 API candidate
+
+generated_at: 2026-04-30 11:18:46 +0900
+
+PASS_COUNT=16
+WARN_COUNT=0
+FAIL_COUNT=0
+FINAL_STATUS=CLEAN_SERVER_V2_API_CANDIDATE_CREATED_REVIEW_REQUIRED
+
+SCOPE=CREATE_CLEAN_SERVER_CANDIDATE_ONLY
+MODIFY_EXISTING_INDEX=NO
+MODIFY_EXISTING_SERVER=NO
+MODIFY_OLD_MAIN_JS=NO
+MODIFY_CLEAN_CORE=NO
+DB_WRITE=NOT_EXECUTED
+DB_READ=NOT_EXECUTED
+API_EXECUTE=NOT_EXECUTED
+RLS_APPLY=NOT_EXECUTED
+DELETE=NOT_EXECUTED
+PYTHON=NOT_USED
+
+CLEAN_SERVER=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/server/aicm-clean-v2-api-server.candidate.mjs
+SERVER_SCAN=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/create_clean_server_v2_api_candidate_20260430_111845/100_clean_server_static_scan.txt
+ROUTE_CONTRACT=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/create_clean_server_v2_api_candidate_20260430_111845/200_CLEAN_SERVER_ROUTE_CONTRACT.md
+SWITCH_PLAN=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/create_clean_server_v2_api_candidate_20260430_111845/300_CLEAN_SERVER_SWITCH_PLAN.md
+NEXT_PLAN=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/create_clean_server_v2_api_candidate_20260430_111845/900_NEXT_PLAN.md
+RUN_DIR=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/create_clean_server_v2_api_candidate_20260430_111845
+
+FORBIDDEN_COUNT=0
+ROUTE_COUNT=6
+INSERT_COUNT=4
+UPDATE_DELETE_COUNT=0
+
+INDEX_HASH_BEFORE=944ae703d0fc6ee105dbe64fb33a3660e6fa182190509b45f02c405711fee501
+INDEX_HASH_AFTER=944ae703d0fc6ee105dbe64fb33a3660e6fa182190509b45f02c405711fee501
+CURRENT_SERVER_HASH_BEFORE=69466459e52f89af471c52b6673d1da1b7379d52e5e98b2276ba1c2715f434dd
+CURRENT_SERVER_HASH_AFTER=69466459e52f89af471c52b6673d1da1b7379d52e5e98b2276ba1c2715f434dd
+OLD_JS_HASH_BEFORE=7d9c46ffc8b4d265c5423c8df05b1fb93cd41ad2eb34ddbf76fbab70d7bb496a
+OLD_JS_HASH_AFTER=7d9c46ffc8b4d265c5423c8df05b1fb93cd41ad2eb34ddbf76fbab70d7bb496a
+CLEAN_CORE_HASH_BEFORE=2cd195aaa300fe45602c94b99e0e42e884f94bbd77ef6b3fb890ff26bf4e3faa
+CLEAN_CORE_HASH_AFTER=2cd195aaa300fe45602c94b99e0e42e884f94bbd77ef6b3fb890ff26bf4e3faa

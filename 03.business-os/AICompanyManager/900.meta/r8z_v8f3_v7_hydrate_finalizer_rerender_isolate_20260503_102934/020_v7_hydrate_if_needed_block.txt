@@ -1,0 +1,48 @@
+===== hydrateIfNeeded L9496-L9542 =====
+  9496: function hydrateIfNeeded(appState) {
+  9497:     appState = appState || {};
+  9498:     if (appState.aicmR8zV7Hydrating) return;
+  9499:     if (rows(appState).length > 0) return;
+  9500: 
+  9501:     var owner = ownerId(appState);
+  9502:     var company = companyId(appState);
+  9503: 
+  9504:     if (!owner || !company || typeof fetch !== "function") {
+  9505:       appState.aicmR8zV7HydrationError = "missing owner/company owner=" + owner + " company=" + company;
+  9506:       return;
+  9507:     }
+  9508: 
+  9509:     appState.aicmR8zV7Hydrating = true;
+  9510: 
+  9511:     var params = new URLSearchParams();
+  9512:     params.set("owner_civilization_id", owner);
+  9513:     params.set("aicm_user_company_id", company);
+  9514:     params.set("v", "r8z_v7_" + Date.now());
+  9515: 
+  9516:     fetch("/api/aicm/v2/context?" + params.toString(), { method: "GET" })
+  9517:       .then(function (res) {
+  9518:         return res.text().then(function (bodyText) {
+  9519:           var payload = {};
+  9520:           try {
+  9521:             payload = bodyText ? JSON.parse(bodyText) : {};
+  9522:           } catch (_error) {
+  9523:             payload = {};
+  9524:           }
+  9525: 
+  9526:           if (res.ok && payload && payload.result === "ok") {
+  9527:             normalize(appState, payload);
+  9528:           } else {
+  9529:             appState.aicmR8zV7HydrationError = payload.error_message || ("context status " + String(res.status));
+  9530:           }
+  9531:         });
+  9532:       })
+  9533:       .catch(function (error) {
+  9534:         appState.aicmR8zV7HydrationError = String(error && error.message ? error.message : error);
+  9535:       })
+  9536:       .finally(function () {
+  9537:         appState.aicmR8zV7Hydrating = false;
+  9538:         if (appState.screen === "review-list") rerender();
+  9539:       });
+  9540:   }
+  9541: 
+  9542:   

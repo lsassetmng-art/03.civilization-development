@@ -1,0 +1,2367 @@
+============================================================
+Worker runtime / workbench scan
+============================================================
+
+298-      owner_civilization_id: state.ownerCivilizationId,
+299-      aicm_user_company_id: state.selectedCompanyId,
+300-      department_name: payload.departmentName,
+301-      purpose: payload.purpose
+302-    }).then(function (json) {
+303-      if (json.department && json.department.aicm_user_company_department_id) {
+304-        state.selectedDepartmentId = json.department.aicm_user_company_department_id;
+305-        writeStorage(STORAGE.selectedDepartmentId, state.selectedDepartmentId);
+306-      }
+307-      state.noticeMessage = "部門を作成しました。";
+308-      return loadContext();
+309-    });
+310-  }
+311-
+312-  function createSection(payload) {
+313-    if (!state.selectedCompanyId || !hasCompany(state.selectedCompanyId)) {
+314-      throw new Error("先にv2のAI企業を作成・選択してください。");
+315-    }
+316-
+317-    if (!state.selectedDepartmentId || !hasDepartment(state.selectedDepartmentId)) {
+318-      throw new Error("先にv2の部門を作成・選択してください。");
+319-    }
+320-
+321-    return requestJson(API.createSection, {
+322-      owner_civilization_id: state.ownerCivilizationId,
+323-      aicm_user_company_id: state.selectedCompanyId,
+324-      aicm_user_company_department_id: state.selectedDepartmentId,
+325-      section_name: payload.sectionName,
+326-      purpose: payload.purpose
+327-    }).then(function (json) {
+328-      if (json.section && json.section.aicm_user_company_section_id) {
+329-        state.selectedSectionId = json.section.aicm_user_company_section_id;
+330-        writeStorage(STORAGE.selectedSectionId, state.selectedSectionId);
+331-      }
+332-      state.noticeMessage = "課を作成しました。";
+333-      return loadContext();
+334-    });
+335-  }
+336-
+337-  function createPlacement(payload) {
+338-    if (!state.selectedCompanyId || !hasCompany(state.selectedCompanyId)) {
+339-      throw new Error("先にv2のAI企業を作成・選択してください。");
+340-    }
+341-
+342-    return requestJson(API.createPlacement, {
+343-      owner_civilization_id: state.ownerCivilizationId,
+344-      aicm_user_company_id: state.selectedCompanyId,
+345-      aicm_user_company_department_id: payload.departmentId || "",
+346-      aicm_user_company_section_id: payload.sectionId || "",
+347-      target_level_code: payload.targetLevelCode,
+348-      target_id: payload.targetId,
+349-      role_code: payload.roleCode,
+350-      robot_pool_id: payload.robotPoolId,
+351-      aiworker_model_code: payload.aiworkerModelCode,
+352-      internal_nickname: payload.internalNickname
+353-    }).then(function () {
+354-      state.noticeMessage = "Worker配置を作成しました。";
+355-      return loadContext();
+356-    });
+357-  }
+358-
+359-  
+360-function setMessage(kind, message) {
+361-    if (kind === "ok") {
+362-      state.noticeMessage = String(message || "");
+363-      state.errorMessage = "";
+364-      return;
+365-    }
+366-
+367-    state.errorMessage = String(message || "");
+368-    state.noticeMessage = "";
+369-  }
+370-
+371-  function go(screen) {
+372-    state.screen = screen;
+373-    state.errorMessage = "";
+374-    render();
+375-  }
+376-
+377-  function pageTitle() {
+378-    if (state.screen === "company-new") return "AI企業新規追加";
+379-    if (state.screen === "department-new") return "部門新規追加";
+380-    if (state.screen === "section-new") return "課新規追加";
+381-    if (state.screen === "placement-new") return "Worker配置";
+382-    if (state.screen === "settings") return "AI企業設定";
+383-    return "AI企業ダッシュボード";
+384-  }
+385-
+386-  
+387-// AICM_WORKER_RUNTIME_UI_NAV_AXT_R1_V1
+388-function renderShell(content) {
+389-    return [
+390-      '<div class="aicm-core" data-core-mark="' + CORE_MARK + '">',
+391-      '  <header class="aicm-core-header">',
+392-      '    <h1>AI企業運営アプリ</h1>',
+393-      '  </header>',
+394-      '  <nav class="aicm-core-tabs" aria-label="AICompanyManager navigation">',
+395-      '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
+396-      '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳</button>',
+397-      '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
+398:      '  <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
+399-      '  </nav>',
+400-      renderMessages(),
+401-      '  <main class="aicm-core-main">',
+402-      content,
+403-      '  </main>',
+404-      '</div>'
+405-    ].join("");
+406-  }
+407-
+408-  function renderMessages() {
+409-    var parts = [];
+410-
+411-    if (state.loading) {
+412-      parts.push('<div class="aicm-core-message">読込中...</div>');
+413-    }
+414-
+415-    if (state.noticeMessage) {
+416-      parts.push('<div class="aicm-core-message aicm-core-message-ok">' + escapeHtml(state.noticeMessage) + '</div>');
+417-    }
+418-
+419-    if (state.errorMessage) {
+420-      parts.push('<div class="aicm-core-message aicm-core-message-error">' + escapeHtml(state.errorMessage) + '</div>');
+421-    }
+422-
+423-    return parts.join("");
+424-  }
+425-
+426-  function renderCompanySelect() {
+427-    if (state.context.companies.length === 0) {
+428-      return '<p class="aicm-core-empty">v2会社はまだありません。AI企業新規追加から作成してください。</p>';
+429-    }
+430-
+431-    return [
+432-      '<label>AI企業</label>',
+433-      '<select data-core-field="selectedCompanyId">',
+434-      state.context.companies.map(function (company) {
+435-        var selected = company.aicm_user_company_id === state.selectedCompanyId ? " selected" : "";
+436-        return '<option value="' + escapeHtml(company.aicm_user_company_id) + '"' + selected + '>' + escapeHtml(company.company_name) + '</option>';
+437-      }).join(""),
+438-      '</select>'
+439-    ].join("");
+440-  }
+441-
+442-  function renderDepartmentSelect() {
+443-    var departments = companyDepartments(state.selectedCompanyId);
+444-
+445-    if (departments.length === 0) {
+446-      return '<p class="aicm-core-empty">この会社のv2部門はまだありません。</p>';
+447-    }
+448-
+449-    return [
+450-      '<label>部門</label>',
+451-      '<select data-core-field="selectedDepartmentId">',
+452-      departments.map(function (department) {
+453-        var selected = department.aicm_user_company_department_id === state.selectedDepartmentId ? " selected" : "";
+454-        return '<option value="' + escapeHtml(department.aicm_user_company_department_id) + '"' + selected + '>' + escapeHtml(department.department_name) + '</option>';
+455-      }).join(""),
+456-      '</select>'
+457-    ].join("");
+458-  }
+459-
+460-  
+461-
+462-function renderDashboard() {
+463-    var company = selectedCompany();
+464-    var departments = company ? companyDepartments(company.aicm_user_company_id) : [];
+465-    var sections = departments.reduce(function (acc, department) {
+466-      return acc.concat(departmentSections(department.aicm_user_company_department_id));
+467-    }, []);
+468-    var placements = company ? companyPlacements(company.aicm_user_company_id) : [];
+469-
+470-    return renderShell([
+471-      '<section class="aicm-dashboard-grid aicm-dashboard-main-grid">',
+472-      '  <div class="aicm-core-card aicm-card-primary">',
+473-      '    <div class="aicm-card-title-row">',
+474-      '      <div>',
+475-      '        <p class="aicm-eyebrow">AI企業</p>',
+476-      '        <h2>AI企業選択</h2>',
+477-      '      </div>',
+478-      '      <button type="button" data-core-action="reload">AI企業を表示</button>',
+479-      '    </div>',
+480-      renderCompanySelect(),
+481-      company ? '<p class="aicm-selected-note">選択中: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+482-      '  </div>',
+483-
+484-      '  <div class="aicm-core-card">',
+485-      '    <p class="aicm-eyebrow">会社概要</p>',
+486-      '    <h2>会社概要</h2>',
+487-      company ? renderCompanyOverview(company, departments, sections, placements) : renderNoCompanyCard(),
+488-      '  </div>',
+489-      '</section>',
+490-
+491-      '<section class="aicm-core-card">',
+492-      '  <p class="aicm-eyebrow">部門 / 課</p>',
+493-      '  <h2>部門 / 課</h2>',
+494-      renderTree(departments),
+495-      '</section>'
+496-    ].join(""));
+497-  }
+498-
+--
+4456-
+4457-    if (sourceApp === "AICompanyManager" || sourceApp === "ai_company_manager") {
+4458-      return true;
+4459-    }
+4460-
+4461-    if (searchText.indexOf('"app_surface_code":"ai_company_manager"') >= 0) {
+4462-      return true;
+4463-    }
+4464-
+4465-    if (searchText.indexOf('"source_app_ref":"AICompanyManager"'.toLowerCase()) >= 0) {
+4466-      return true;
+4467-    }
+4468-
+4469-    return false;
+4470-  }
+4471-
+4472-function aicmRuntimeStatusFilterRowsForCurrentApp(rows) {
+4473-    rows = Array.isArray(rows) ? rows : [];
+4474-
+4475-    var filtered = rows.filter(function (row) {
+4476-      return aicmRuntimeStatusIsCurrentAppRow(row);
+4477-    });
+4478-
+4479-    return filtered;
+4480-  }
+4481-
+4482-
+4483-function aicmRuntimeStatusPanelRender() {
+4484-    var loading = !!state.runtimeStatusLoading;
+4485-    var error = state.runtimeStatusError || "";
+4486-    var rows = Array.isArray(state.runtimeStatusRows) ? state.runtimeStatusRows : [];
+4487-    var lastUpdated = state.runtimeStatusUpdatedAt || "";
+4488-
+4489-    return [
+4490-      '<section class="aicm-core-card aicm-runtime-status-panel">',
+4491-      '  <p class="aicm-eyebrow">AIWorkerOS 実行状況</p>',
+4492-      '  <h2>Runtime request / pipeline</h2>',
+4493-      '  <p class="aicm-selected-note">AIWorkerOSの app-read-payload / pipeline-board をAICM server経由で読みます。DB書込は行いません。</p>',
+4494-      error ? '  <p class="aicm-core-error">' + escapeHtml(error) + '</p>' : '',
+4495-      lastUpdated ? '  <p class="aicm-core-empty">最終更新: ' + escapeHtml(lastUpdated) + '</p>' : '',
+4496-      '  <div class="aicm-dashboard-action-row">',
+4497-      '    <button type="button" data-core-action="worker-runtime-status-refresh">' + (loading ? '更新中...' : '実行状況を更新') + '</button>',
+4498-      '  </div>',
+4499-      aicmRuntimeStatusRowsHtml(rows),
+4500-      '</section>'
+4501-    ].join("");
+4502-  }
+4503-
+4504-async function aicmRuntimeStatusRefresh() {
+4505-    state.runtimeStatusLoading = true;
+4506-    state.runtimeStatusError = "";
+4507-
+4508-    if (typeof render === "function") render();
+4509-
+4510-    try {
+4511-      var response = await fetch("/api/aicm/v2/worker-runtime/pipeline-board?app_surface_code=ai_company_manager&source_app_ref=AICompanyManager", { method: "GET" });
+4512-      var json = await response.json();
+4513-
+4514-      if (!response.ok || (json && json.result === "error")) {
+4515-        var message = (json && json.error_message) || "実行状況の取得に失敗しました。";
+4516-        throw new Error(message);
+4517-      }
+4518-
+4519-      var runtimeRows = aicmRuntimeStatusRowsFromPayload(json);
+4520-      state.runtimeStatusRawRows = runtimeRows;
+4521-      state.runtimeStatusRows = aicmRuntimeStatusFilterRowsForCurrentApp(runtimeRows);
+4522-      state.runtimeStatusRaw = json;
+4523-      state.runtimeStatusUpdatedAt = new Date().toLocaleString();
+4524-      state.runtimeStatusLoading = false;
+4525-      state.runtimeStatusError = "";
+4526-
+4527-      if (typeof render === "function") render();
+4528-    } catch (error) {
+4529-      state.runtimeStatusLoading = false;
+4530-      state.runtimeStatusError = error && error.message ? error.message : "実行状況の取得に失敗しました。";
+4531-
+4532-      if (typeof render === "function") render();
+4533-    }
+4534-  }
+4535-
+4536-
+4537-function renderWorkerRuntimeRequestBaseAxtR9R1() {
+4538-    var company = aicmWrtCurrentCompany();
+4539-    var workers = aicmWrtActiveWorkerPlacements();
+4540-    var last = state.workerRuntimeLastResult || null;
+4541-
+4542-    var lastHtml = "";
+4543-    if (last && last.runtime_request) {
+4544-      lastHtml = [
+4545-        '<section class="aicm-core-card">',
+4546-        '  <p class="aicm-eyebrow">直近の実行依頼</p>',
+4547-        '  <h2>request_id</h2>',
+4548-        '  <p class="aicm-selected-note">' + aicmWrtEscape(last.runtime_request.request_id || "未返却") + '</p>',
+4549-        '  <p>status: ' + aicmWrtEscape(last.runtime_request.request_status_code || "-") + '</p>',
+4550-        '</section>'
+4551-      ].join("");
+4552-    }
+4553-
+4554-    return renderShell([
+4555-      '<section class="aicm-core-card">',
+4556:      '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4557-      '  <h2>配置済みAI/Workerに作業を依頼</h2>',
+4558-      company
+4559-        ? '  <p class="aicm-selected-note">対象会社: <strong>' + aicmWrtEscape(company.company_name || "") + '</strong></p>'
+4560-        : '  <p class="aicm-core-empty">AI企業が選択されていません。</p>',
+4561-      workers.length
+4562-        ? '  <p class="aicm-selected-note">配置済みWorker: ' + String(workers.length) + '件</p>'
+4563-        : '  <p class="aicm-core-empty">この会社に配置済みAI/Workerがありません。先に課変更で従業員Workerを配置してください。</p>',
+4564-      '</section>',
+4565-      '<section class="aicm-core-card">',
+4566-      '  <label>実行AI/Worker<select id="aicm-worker-runtime-placement-id">' + aicmWrtWorkerOptions() + '</select></label>',
+4567-      '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
+4568-      '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
+4569-      '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
+4570-      '  <label>source_request_ref<input id="aicm-worker-runtime-source-ref" type="text" placeholder="空なら manual:<timestamp>"></label>',
+4571-      '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
+4572-      '</section>',
+4573-      '<section class="aicm-core-card aicm-operation-card">',
+4574-      '  <p class="aicm-eyebrow">操作</p>',
+4575-      '  <div class="aicm-dashboard-action-row">',
+4576-      '    <button type="button" data-core-action="worker-runtime-confirm">確認へ進む</button>',
+4577-      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+4578-      '  </div>',
+4579-      '</section>',
+4580-      lastHtml
+4581-    ].join(""));
+4582-  }
+4583-
+4584-function renderWorkerRuntimeRequest() {
+4585-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4586-    return renderWorkerRuntimeRequestBaseAxtR9R1() + aicmRuntimeStatusPanelRender();
+4587-  }
+4588-
+4589-function aicmWrtValue(id) {
+4590-    var el = document.getElementById(id);
+4591-    return el ? aicmWrtText(el.value) : "";
+4592-  }
+4593-
+4594-function buildWorkerRuntimePendingPayload() {
+4595-    var company = aicmWrtCurrentCompany();
+4596-    if (!company) throw new Error("AI企業を選択してください。");
+4597-
+4598-    var placementId = aicmWrtValue("aicm-worker-runtime-placement-id");
+4599-    if (!placementId) throw new Error("実行AI/AI/Workerを選択してください。");
+4600-
+4601-    var worker = aicmWrtPlacementById(placementId);
+4602-    if (!worker) throw new Error("選択したWorker配置が見つかりません。");
+4603-
+4604-    var title = aicmWrtValue("aicm-worker-runtime-title");
+4605-    if (!title) throw new Error("作業タイトルを入力してください。");
+4606-
+4607-    var instruction = aicmWrtValue("aicm-worker-runtime-instruction");
+4608-    if (!instruction) throw new Error("作業指示を入力してください。");
+4609-
+4610-    var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
+4611-    var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
+4612-
+4613-    return {
+4614-      endpoint: "/api/aicm/v2/worker-runtime/request",
+4615-      worker_label: aicmWrtWorkerLabel(worker),
+4616-      body: {
+4617-        owner_civilization_id: aicmWrtOwnerId(),
+4618-        aicm_user_company_id: aicmWrtText(company.aicm_user_company_id),
+4619-        aicm_user_company_department_id: aicmWrtText(worker.aicm_user_company_department_id),
+4620-        aicm_user_company_section_id: aicmWrtText(worker.aicm_user_company_section_id),
+4621-        aicm_user_company_worker_placement_id: placementId,
+4622-        model_code: aicmWrtText(worker.aiworker_model_code),
+4623-        robot_pool_id: aicmWrtText(worker.robot_pool_id),
+4624-        app_surface_code: "ai_company_manager",
+4625-        task_domain_code: aicmWrtValue("aicm-worker-runtime-task-domain") || "business_operation",
+4626-        task_title: title,
+4627-        task_instruction_ja: instruction,
+4628-        source_app_ref: "AICompanyManager",
+4629-        source_request_ref: sourceRef,
+4630-        requested_by_ref: "human",
+4631-        idempotency_key: idempotencyKey
+4632-      }
+4633-    };
+4634-  }
+4635-
+4636-function renderWorkerRuntimeConfirm() {
+4637-    var payload = state.pendingWorkerRuntimeRequest || null;
+4638-    if (!payload || !payload.body) {
+4639-      return renderShell([
+4640-        '<section class="aicm-core-card">',
+4641:        '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4642-        '  <h2>確認対象がありません</h2>',
+4643-        '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="worker-runtime-cancel">戻る</button></div>',
+4644-        '</section>'
+4645-      ].join(""));
+4646-    }
+4647-
+4648-    var body = payload.body;
+4649-    var rows = [
+4650-      ["実行AI/Worker", payload.worker_label],
+4651-      ["model_code", body.model_code],
+4652-      ["app_surface_code", body.app_surface_code],
+4653-      ["task_domain_code", body.task_domain_code],
+4654-      ["作業タイトル", body.task_title],
+4655-      ["作業指示", body.task_instruction_ja],
+4656-      ["source_request_ref", body.source_request_ref],
+4657-      ["idempotency_key", body.idempotency_key]
+4658-    ];
+4659-
+4660-    return renderShell([
+4661-      '<section class="aicm-core-card">',
+4662-      '  <p class="aicm-eyebrow">確認画面</p>',
+4663:      '  <h2>AI実行Workbenchを確定しますか？</h2>',
+4664-      '  <p class="aicm-selected-note">この操作はAIWorkerOS Runtime Executionへ実行依頼を作成します。</p>',
+4665-      '</section>',
+4666-      '<section class="aicm-core-card aicm-confirm-card">',
+4667-      rows.map(function (row) {
+4668-        return '<div class="aicm-confirm-row"><strong>' + aicmWrtEscape(row[0]) + '</strong><p>' + aicmWrtEscape(row[1]) + '</p></div>';
+4669-      }).join(""),
+4670-      '</section>',
+4671-      '<section class="aicm-core-card aicm-operation-card">',
+4672-      '  <p class="aicm-eyebrow">操作</p>',
+4673-      '  <div class="aicm-dashboard-action-row">',
+4674-      '    <button type="button" data-core-action="worker-runtime-execute">確定して実行</button>',
+4675-      '    <button type="button" data-core-action="worker-runtime-cancel">戻る</button>',
+4676-      '  </div>',
+4677-      '</section>'
+4678-    ].join(""));
+4679-  }
+4680-
+4681-async function aicmWrtPostJson(path, body) {
+4682-    var response = await fetch(path, {
+4683-      method: "POST",
+4684-      headers: {
+4685-        "Content-Type": "application/json"
+4686-      },
+4687-      body: JSON.stringify(body || {})
+4688-    });
+4689-
+4690-    var json = await response.json().catch(function () {
+4691-      return {};
+4692-    });
+4693-
+4694-    if (!response.ok || !json || json.result !== "ok") {
+4695:      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+4696-    }
+4697-
+4698-    return json;
+4699-  }
+4700-
+4701-async function executeWorkerRuntimeConfirmBaseAxtR9R1() {
+4702-    var payload = state.pendingWorkerRuntimeRequest || null;
+4703-    if (!payload || !payload.endpoint || !payload.body) {
+4704-      setMessage("error", "確認対象がありません。");
+4705-      return;
+4706-    }
+4707-
+4708-    try {
+4709-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4710-      state.pendingWorkerRuntimeRequest = null;
+4711-      state.workerRuntimeLastResult = result;
+4712-      state.screen = "worker-runtime-request";
+4713:      setMessage("ok", "AI実行Workbenchを作成しました。");
+4714-      if (typeof render === "function") render();
+4715-    } catch (error) {
+4716:      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+4717-      if (typeof render === "function") render();
+4718-    }
+4719-  }
+4720-
+4721-async function executeWorkerRuntimeConfirm() {
+4722-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4723-    var result = await executeWorkerRuntimeConfirmBaseAxtR9R1();
+4724-
+4725-    setTimeout(function () {
+4726-      if (typeof aicmRuntimeStatusRefresh === "function") {
+4727-        aicmRuntimeStatusRefresh();
+4728-      }
+4729-    }, 250);
+4730-
+4731-    return result;
+4732-  }
+4733-
+4734-function confirmWorkerRuntimeRequestFromForm() {
+4735-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4736-    try {
+4737-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4738-      state.screen = "worker-runtime-confirm";
+4739-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4740-      if (typeof render === "function") render();
+4741-    } catch (error) {
+4742-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4743-      if (typeof render === "function") render();
+4744-    }
+4745-  }
+4746-
+4747-function cancelWorkerRuntimeConfirm() {
+4748-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4749-    state.pendingWorkerRuntimeRequest = null;
+4750-    state.screen = "worker-runtime-request";
+4751-    if (typeof render === "function") render();
+4752-  }
+4753-
+4754-function render() {
+4755-    if (!root) return;
+4756-
+4757-    var html = "";
+4758-
+4759-    if (state.screen === "company-new") {
+4760-      html = renderCompanyNew();
+4761-    } else if (state.screen === "department-new") {
+4762-      html = renderDepartmentNew();
+4763-    } else if (state.screen === "section-new") {
+4764-      html = renderSectionNew();
+4765-    } else if (state.screen === "placement-new") {
+4766-      html = renderPlacementNew();
+4767-    } else if (state.screen === "worker-runtime-confirm") {
+4768-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4769-      html = renderWorkerRuntimeConfirm();
+4770-    } else if (state.screen === "worker-runtime-request") {
+4771-      html = renderWorkerRuntimeRequest();
+4772-    } else if (state.screen === "settings") {
+4773-      html = renderSettings();
+4774-    } else if (state.screen === "department-edit") {
+4775-      html = renderDepartmentEditPlaceholder();
+4776-    } else if (state.screen === "section-edit") {
+4777-      html = renderSectionEditPlaceholder();
+4778-    } else if (state.screen === "task-ledger") {
+4779-      html = renderTaskLedgerPlaceholder();
+4780-    } else if (state.screen === "review-list") {
+4781-      html = renderReviewListPlaceholder();
+4782-    } else {
+4783-      html = renderDashboard();
+4784-    }
+4785-
+4786-    
+4787-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+4788-    if (
+4789-      state &&
+4790-      (
+4791-        state.screen === "company-edit" ||
+4792-        state.screen === "company-change" ||
+4793-        state.screen === "company-update"
+4794-      )
+4795-    ) {
+4796-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4797-      html = renderCompanyEditPlaceholder();
+4798-    }
+4799-
+4800-
+4801-    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+4802-    if (state && state.screen === "company-edit") {
+4803-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4804-      html = renderCompanyEditPlaceholder();
+4805-    }
+4806-
+4807-    if (state && state.screen === "department-edit") {
+4808-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4809-      html = renderDepartmentEditPlaceholder();
+4810-    }
+4811-
+4812-    if (state && state.screen === "section-edit") {
+4813-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4814-      html = renderSectionEditPlaceholder();
+4815-    }
+4816-
+
+4437-      "app_surface_code",
+4438-      "surface_code"
+4439-    ]));
+4440-
+4441-    var sourceApp = aicmRuntimeStatusNormalizeText(aicmRuntimeStatusField(row, [
+4442-      "source_app_ref",
+4443-      "source_app_code",
+4444-      "app_code"
+4445-    ]));
+4446-
+4447-    var searchText = aicmRuntimeStatusRowSearchText(row);
+4448-
+4449-    if (aicmRuntimeStatusIsTestLikeRow(row)) {
+4450-      return false;
+4451-    }
+4452-
+4453-    if (appSurface === "ai_company_manager") {
+4454-      return true;
+4455-    }
+4456-
+4457-    if (sourceApp === "AICompanyManager" || sourceApp === "ai_company_manager") {
+4458-      return true;
+4459-    }
+4460-
+4461-    if (searchText.indexOf('"app_surface_code":"ai_company_manager"') >= 0) {
+4462-      return true;
+4463-    }
+4464-
+4465-    if (searchText.indexOf('"source_app_ref":"AICompanyManager"'.toLowerCase()) >= 0) {
+4466-      return true;
+4467-    }
+4468-
+4469-    return false;
+4470-  }
+4471-
+4472-function aicmRuntimeStatusFilterRowsForCurrentApp(rows) {
+4473-    rows = Array.isArray(rows) ? rows : [];
+4474-
+4475-    var filtered = rows.filter(function (row) {
+4476-      return aicmRuntimeStatusIsCurrentAppRow(row);
+4477-    });
+4478-
+4479-    return filtered;
+4480-  }
+4481-
+4482-
+4483-function aicmRuntimeStatusPanelRender() {
+4484-    var loading = !!state.runtimeStatusLoading;
+4485-    var error = state.runtimeStatusError || "";
+4486-    var rows = Array.isArray(state.runtimeStatusRows) ? state.runtimeStatusRows : [];
+4487-    var lastUpdated = state.runtimeStatusUpdatedAt || "";
+4488-
+4489-    return [
+4490-      '<section class="aicm-core-card aicm-runtime-status-panel">',
+4491-      '  <p class="aicm-eyebrow">AIWorkerOS 実行状況</p>',
+4492-      '  <h2>Runtime request / pipeline</h2>',
+4493-      '  <p class="aicm-selected-note">AIWorkerOSの app-read-payload / pipeline-board をAICM server経由で読みます。DB書込は行いません。</p>',
+4494-      error ? '  <p class="aicm-core-error">' + escapeHtml(error) + '</p>' : '',
+4495-      lastUpdated ? '  <p class="aicm-core-empty">最終更新: ' + escapeHtml(lastUpdated) + '</p>' : '',
+4496-      '  <div class="aicm-dashboard-action-row">',
+4497-      '    <button type="button" data-core-action="worker-runtime-status-refresh">' + (loading ? '更新中...' : '実行状況を更新') + '</button>',
+4498-      '  </div>',
+4499-      aicmRuntimeStatusRowsHtml(rows),
+4500-      '</section>'
+4501-    ].join("");
+4502-  }
+4503-
+4504-async function aicmRuntimeStatusRefresh() {
+4505-    state.runtimeStatusLoading = true;
+4506-    state.runtimeStatusError = "";
+4507-
+4508-    if (typeof render === "function") render();
+4509-
+4510-    try {
+4511-      var response = await fetch("/api/aicm/v2/worker-runtime/pipeline-board?app_surface_code=ai_company_manager&source_app_ref=AICompanyManager", { method: "GET" });
+4512-      var json = await response.json();
+4513-
+4514-      if (!response.ok || (json && json.result === "error")) {
+4515-        var message = (json && json.error_message) || "実行状況の取得に失敗しました。";
+4516-        throw new Error(message);
+4517-      }
+4518-
+4519-      var runtimeRows = aicmRuntimeStatusRowsFromPayload(json);
+4520-      state.runtimeStatusRawRows = runtimeRows;
+4521-      state.runtimeStatusRows = aicmRuntimeStatusFilterRowsForCurrentApp(runtimeRows);
+4522-      state.runtimeStatusRaw = json;
+4523-      state.runtimeStatusUpdatedAt = new Date().toLocaleString();
+4524-      state.runtimeStatusLoading = false;
+4525-      state.runtimeStatusError = "";
+4526-
+4527-      if (typeof render === "function") render();
+4528-    } catch (error) {
+4529-      state.runtimeStatusLoading = false;
+4530-      state.runtimeStatusError = error && error.message ? error.message : "実行状況の取得に失敗しました。";
+4531-
+4532-      if (typeof render === "function") render();
+4533-    }
+4534-  }
+4535-
+4536-
+4537:function renderWorkerRuntimeRequestBaseAxtR9R1() {
+4538-    var company = aicmWrtCurrentCompany();
+4539-    var workers = aicmWrtActiveWorkerPlacements();
+4540-    var last = state.workerRuntimeLastResult || null;
+4541-
+4542-    var lastHtml = "";
+4543-    if (last && last.runtime_request) {
+4544-      lastHtml = [
+4545-        '<section class="aicm-core-card">',
+4546-        '  <p class="aicm-eyebrow">直近の実行依頼</p>',
+4547-        '  <h2>request_id</h2>',
+4548-        '  <p class="aicm-selected-note">' + aicmWrtEscape(last.runtime_request.request_id || "未返却") + '</p>',
+4549-        '  <p>status: ' + aicmWrtEscape(last.runtime_request.request_status_code || "-") + '</p>',
+4550-        '</section>'
+4551-      ].join("");
+4552-    }
+4553-
+4554-    return renderShell([
+4555-      '<section class="aicm-core-card">',
+4556-      '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4557-      '  <h2>配置済みAI/Workerに作業を依頼</h2>',
+4558-      company
+4559-        ? '  <p class="aicm-selected-note">対象会社: <strong>' + aicmWrtEscape(company.company_name || "") + '</strong></p>'
+4560-        : '  <p class="aicm-core-empty">AI企業が選択されていません。</p>',
+4561-      workers.length
+4562-        ? '  <p class="aicm-selected-note">配置済みWorker: ' + String(workers.length) + '件</p>'
+4563-        : '  <p class="aicm-core-empty">この会社に配置済みAI/Workerがありません。先に課変更で従業員Workerを配置してください。</p>',
+4564-      '</section>',
+4565-      '<section class="aicm-core-card">',
+4566-      '  <label>実行AI/Worker<select id="aicm-worker-runtime-placement-id">' + aicmWrtWorkerOptions() + '</select></label>',
+4567-      '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
+4568-      '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
+4569-      '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
+4570-      '  <label>source_request_ref<input id="aicm-worker-runtime-source-ref" type="text" placeholder="空なら manual:<timestamp>"></label>',
+4571-      '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
+4572-      '</section>',
+4573-      '<section class="aicm-core-card aicm-operation-card">',
+4574-      '  <p class="aicm-eyebrow">操作</p>',
+4575-      '  <div class="aicm-dashboard-action-row">',
+4576-      '    <button type="button" data-core-action="worker-runtime-confirm">確認へ進む</button>',
+4577-      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+4578-      '  </div>',
+4579-      '</section>',
+4580-      lastHtml
+4581-    ].join(""));
+4582-  }
+4583-
+4584:function renderWorkerRuntimeRequest() {
+4585-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4586:    return renderWorkerRuntimeRequestBaseAxtR9R1() + aicmRuntimeStatusPanelRender();
+4587-  }
+4588-
+4589-function aicmWrtValue(id) {
+4590-    var el = document.getElementById(id);
+4591-    return el ? aicmWrtText(el.value) : "";
+4592-  }
+4593-
+4594-function buildWorkerRuntimePendingPayload() {
+4595-    var company = aicmWrtCurrentCompany();
+4596-    if (!company) throw new Error("AI企業を選択してください。");
+4597-
+4598-    var placementId = aicmWrtValue("aicm-worker-runtime-placement-id");
+4599-    if (!placementId) throw new Error("実行AI/AI/Workerを選択してください。");
+4600-
+4601-    var worker = aicmWrtPlacementById(placementId);
+4602-    if (!worker) throw new Error("選択したWorker配置が見つかりません。");
+4603-
+4604-    var title = aicmWrtValue("aicm-worker-runtime-title");
+4605-    if (!title) throw new Error("作業タイトルを入力してください。");
+4606-
+4607-    var instruction = aicmWrtValue("aicm-worker-runtime-instruction");
+4608-    if (!instruction) throw new Error("作業指示を入力してください。");
+4609-
+4610-    var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
+4611-    var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
+4612-
+4613-    return {
+4614-      endpoint: "/api/aicm/v2/worker-runtime/request",
+4615-      worker_label: aicmWrtWorkerLabel(worker),
+4616-      body: {
+4617-        owner_civilization_id: aicmWrtOwnerId(),
+4618-        aicm_user_company_id: aicmWrtText(company.aicm_user_company_id),
+4619-        aicm_user_company_department_id: aicmWrtText(worker.aicm_user_company_department_id),
+4620-        aicm_user_company_section_id: aicmWrtText(worker.aicm_user_company_section_id),
+4621-        aicm_user_company_worker_placement_id: placementId,
+4622-        model_code: aicmWrtText(worker.aiworker_model_code),
+4623-        robot_pool_id: aicmWrtText(worker.robot_pool_id),
+4624-        app_surface_code: "ai_company_manager",
+4625-        task_domain_code: aicmWrtValue("aicm-worker-runtime-task-domain") || "business_operation",
+4626-        task_title: title,
+4627-        task_instruction_ja: instruction,
+4628-        source_app_ref: "AICompanyManager",
+4629-        source_request_ref: sourceRef,
+4630-        requested_by_ref: "human",
+4631-        idempotency_key: idempotencyKey
+4632-      }
+4633-    };
+4634-  }
+4635-
+4636:function renderWorkerRuntimeConfirm() {
+4637-    var payload = state.pendingWorkerRuntimeRequest || null;
+4638-    if (!payload || !payload.body) {
+4639-      return renderShell([
+4640-        '<section class="aicm-core-card">',
+4641-        '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4642-        '  <h2>確認対象がありません</h2>',
+4643-        '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="worker-runtime-cancel">戻る</button></div>',
+4644-        '</section>'
+4645-      ].join(""));
+4646-    }
+4647-
+4648-    var body = payload.body;
+4649-    var rows = [
+4650-      ["実行AI/Worker", payload.worker_label],
+4651-      ["model_code", body.model_code],
+4652-      ["app_surface_code", body.app_surface_code],
+4653-      ["task_domain_code", body.task_domain_code],
+4654-      ["作業タイトル", body.task_title],
+4655-      ["作業指示", body.task_instruction_ja],
+4656-      ["source_request_ref", body.source_request_ref],
+4657-      ["idempotency_key", body.idempotency_key]
+4658-    ];
+4659-
+4660-    return renderShell([
+4661-      '<section class="aicm-core-card">',
+4662-      '  <p class="aicm-eyebrow">確認画面</p>',
+4663-      '  <h2>AI実行Workbenchを確定しますか？</h2>',
+4664-      '  <p class="aicm-selected-note">この操作はAIWorkerOS Runtime Executionへ実行依頼を作成します。</p>',
+4665-      '</section>',
+4666-      '<section class="aicm-core-card aicm-confirm-card">',
+4667-      rows.map(function (row) {
+4668-        return '<div class="aicm-confirm-row"><strong>' + aicmWrtEscape(row[0]) + '</strong><p>' + aicmWrtEscape(row[1]) + '</p></div>';
+4669-      }).join(""),
+4670-      '</section>',
+4671-      '<section class="aicm-core-card aicm-operation-card">',
+4672-      '  <p class="aicm-eyebrow">操作</p>',
+4673-      '  <div class="aicm-dashboard-action-row">',
+4674-      '    <button type="button" data-core-action="worker-runtime-execute">確定して実行</button>',
+4675-      '    <button type="button" data-core-action="worker-runtime-cancel">戻る</button>',
+4676-      '  </div>',
+4677-      '</section>'
+4678-    ].join(""));
+4679-  }
+4680-
+4681-async function aicmWrtPostJson(path, body) {
+4682-    var response = await fetch(path, {
+4683-      method: "POST",
+4684-      headers: {
+4685-        "Content-Type": "application/json"
+4686-      },
+4687-      body: JSON.stringify(body || {})
+4688-    });
+4689-
+4690-    var json = await response.json().catch(function () {
+4691-      return {};
+4692-    });
+4693-
+4694-    if (!response.ok || !json || json.result !== "ok") {
+4695-      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+4696-    }
+4697-
+4698-    return json;
+4699-  }
+4700-
+4701-async function executeWorkerRuntimeConfirmBaseAxtR9R1() {
+4702-    var payload = state.pendingWorkerRuntimeRequest || null;
+4703-    if (!payload || !payload.endpoint || !payload.body) {
+4704-      setMessage("error", "確認対象がありません。");
+4705-      return;
+4706-    }
+4707-
+4708-    try {
+4709-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4710-      state.pendingWorkerRuntimeRequest = null;
+4711-      state.workerRuntimeLastResult = result;
+4712-      state.screen = "worker-runtime-request";
+4713-      setMessage("ok", "AI実行Workbenchを作成しました。");
+4714-      if (typeof render === "function") render();
+4715-    } catch (error) {
+4716-      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+4717-      if (typeof render === "function") render();
+4718-    }
+4719-  }
+4720-
+4721-async function executeWorkerRuntimeConfirm() {
+4722-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4723-    var result = await executeWorkerRuntimeConfirmBaseAxtR9R1();
+4724-
+4725-    setTimeout(function () {
+4726-      if (typeof aicmRuntimeStatusRefresh === "function") {
+4727-        aicmRuntimeStatusRefresh();
+4728-      }
+4729-    }, 250);
+4730-
+4731-    return result;
+4732-  }
+4733-
+4734-function confirmWorkerRuntimeRequestFromForm() {
+4735-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4736-    try {
+4737-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4738-      state.screen = "worker-runtime-confirm";
+4739-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4740-      if (typeof render === "function") render();
+4741-    } catch (error) {
+4742-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4743-      if (typeof render === "function") render();
+4744-    }
+4745-  }
+4746-
+4747-function cancelWorkerRuntimeConfirm() {
+4748-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4749-    state.pendingWorkerRuntimeRequest = null;
+4750-    state.screen = "worker-runtime-request";
+4751-    if (typeof render === "function") render();
+4752-  }
+4753-
+4754-function render() {
+4755-    if (!root) return;
+4756-
+4757-    var html = "";
+4758-
+4759-    if (state.screen === "company-new") {
+4760-      html = renderCompanyNew();
+4761-    } else if (state.screen === "department-new") {
+4762-      html = renderDepartmentNew();
+4763-    } else if (state.screen === "section-new") {
+4764-      html = renderSectionNew();
+4765-    } else if (state.screen === "placement-new") {
+4766-      html = renderPlacementNew();
+4767-    } else if (state.screen === "worker-runtime-confirm") {
+4768-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4769:      html = renderWorkerRuntimeConfirm();
+4770-    } else if (state.screen === "worker-runtime-request") {
+4771:      html = renderWorkerRuntimeRequest();
+4772-    } else if (state.screen === "settings") {
+4773-      html = renderSettings();
+4774-    } else if (state.screen === "department-edit") {
+4775-      html = renderDepartmentEditPlaceholder();
+4776-    } else if (state.screen === "section-edit") {
+4777-      html = renderSectionEditPlaceholder();
+4778-    } else if (state.screen === "task-ledger") {
+4779-      html = renderTaskLedgerPlaceholder();
+4780-    } else if (state.screen === "review-list") {
+4781-      html = renderReviewListPlaceholder();
+4782-    } else {
+4783-      html = renderDashboard();
+4784-    }
+4785-
+4786-    
+4787-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+4788-    if (
+4789-      state &&
+4790-      (
+4791-        state.screen === "company-edit" ||
+4792-        state.screen === "company-change" ||
+4793-        state.screen === "company-update"
+4794-      )
+4795-    ) {
+4796-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4797-      html = renderCompanyEditPlaceholder();
+4798-    }
+4799-
+4800-
+4801-    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+4802-    if (state && state.screen === "company-edit") {
+4803-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4804-      html = renderCompanyEditPlaceholder();
+4805-    }
+4806-
+4807-    if (state && state.screen === "department-edit") {
+4808-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4809-      html = renderDepartmentEditPlaceholder();
+4810-    }
+4811-
+4812-    if (state && state.screen === "section-edit") {
+4813-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4814-      html = renderSectionEditPlaceholder();
+4815-    }
+4816-
+4817-
+4818-    // AICM_INLINE_ROLE_ADD_SCREEN_INJECTION_ATQ_ATT
+4819-    if (typeof aicmInjectInlineRoleSettingsForAddScreens === "function") {
+4820-      html = aicmInjectInlineRoleSettingsForAddScreens(html);
+4821-    }
+4822-
+4823-root.innerHTML = html;
+4824-  }
+4825-
+4826-  function fieldValue(form, name) {
+4827-    var field = form.elements[name];
+4828-    return field && typeof field.value === "string" ? field.value.trim() : "";
+4829-  }
+4830-
+4831-  function submitForm(form) {
+4832-    var formName = form.getAttribute("data-core-form") || "";
+4833-    state.errorMessage = "";
+4834-    state.noticeMessage = "";
+4835-
+4836-    var task;
+4837-
+4838-    if (formName === "company-create") {
+4839-      task = createCompany({
+4840-        companyName: fieldValue(form, "companyName"),
+4841-        businessDomain: fieldValue(form, "businessDomain")
+4842-      });
+4843-    } else if (formName === "department-create") {
+4844-      task = createDepartment({
+4845-        departmentName: fieldValue(form, "departmentName"),
+4846-        purpose: fieldValue(form, "purpose")
+4847-      });
+4848-    } else if (formName === "section-create") {
+4849-      task = createSection({
+4850-        sectionName: fieldValue(form, "sectionName"),
+4851-        purpose: fieldValue(form, "purpose")
+4852-      });
+4853-    } else if (formName === "placement-create") {
+4854-      var robotSelect = form.elements.robotPoolId;
+4855-      var selectedRobot = robotSelect && robotSelect.selectedOptions ? robotSelect.selectedOptions[0] : null;
+4856-      var targetLevelCode = fieldValue(form, "targetLevelCode");
+4857-      var sectionId = fieldValue(form, "sectionId");
+4858-      var targetId = state.selectedCompanyId;
+4859-
+4860-      if (targetLevelCode === "department") {
+4861-        targetId = state.selectedDepartmentId;
+4862-      }
+4863-
+4864-      if (targetLevelCode === "section") {
+4865-        targetId = sectionId;
+4866-      }
+4867-
+4868-      task = createPlacement({
+4869-        departmentId: state.selectedDepartmentId,
+4870-        sectionId: sectionId,
+4871-        targetLevelCode: targetLevelCode,
+
+4601-    var worker = aicmWrtPlacementById(placementId);
+4602-    if (!worker) throw new Error("選択したWorker配置が見つかりません。");
+4603-
+4604-    var title = aicmWrtValue("aicm-worker-runtime-title");
+4605-    if (!title) throw new Error("作業タイトルを入力してください。");
+4606-
+4607-    var instruction = aicmWrtValue("aicm-worker-runtime-instruction");
+4608-    if (!instruction) throw new Error("作業指示を入力してください。");
+4609-
+4610-    var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
+4611-    var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
+4612-
+4613-    return {
+4614-      endpoint: "/api/aicm/v2/worker-runtime/request",
+4615-      worker_label: aicmWrtWorkerLabel(worker),
+4616-      body: {
+4617-        owner_civilization_id: aicmWrtOwnerId(),
+4618-        aicm_user_company_id: aicmWrtText(company.aicm_user_company_id),
+4619-        aicm_user_company_department_id: aicmWrtText(worker.aicm_user_company_department_id),
+4620-        aicm_user_company_section_id: aicmWrtText(worker.aicm_user_company_section_id),
+4621-        aicm_user_company_worker_placement_id: placementId,
+4622-        model_code: aicmWrtText(worker.aiworker_model_code),
+4623-        robot_pool_id: aicmWrtText(worker.robot_pool_id),
+4624-        app_surface_code: "ai_company_manager",
+4625-        task_domain_code: aicmWrtValue("aicm-worker-runtime-task-domain") || "business_operation",
+4626-        task_title: title,
+4627-        task_instruction_ja: instruction,
+4628-        source_app_ref: "AICompanyManager",
+4629-        source_request_ref: sourceRef,
+4630-        requested_by_ref: "human",
+4631-        idempotency_key: idempotencyKey
+4632-      }
+4633-    };
+4634-  }
+4635-
+4636-function renderWorkerRuntimeConfirm() {
+4637-    var payload = state.pendingWorkerRuntimeRequest || null;
+4638-    if (!payload || !payload.body) {
+4639-      return renderShell([
+4640-        '<section class="aicm-core-card">',
+4641-        '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4642-        '  <h2>確認対象がありません</h2>',
+4643-        '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="worker-runtime-cancel">戻る</button></div>',
+4644-        '</section>'
+4645-      ].join(""));
+4646-    }
+4647-
+4648-    var body = payload.body;
+4649-    var rows = [
+4650-      ["実行AI/Worker", payload.worker_label],
+4651-      ["model_code", body.model_code],
+4652-      ["app_surface_code", body.app_surface_code],
+4653-      ["task_domain_code", body.task_domain_code],
+4654-      ["作業タイトル", body.task_title],
+4655-      ["作業指示", body.task_instruction_ja],
+4656-      ["source_request_ref", body.source_request_ref],
+4657-      ["idempotency_key", body.idempotency_key]
+4658-    ];
+4659-
+4660-    return renderShell([
+4661-      '<section class="aicm-core-card">',
+4662-      '  <p class="aicm-eyebrow">確認画面</p>',
+4663-      '  <h2>AI実行Workbenchを確定しますか？</h2>',
+4664-      '  <p class="aicm-selected-note">この操作はAIWorkerOS Runtime Executionへ実行依頼を作成します。</p>',
+4665-      '</section>',
+4666-      '<section class="aicm-core-card aicm-confirm-card">',
+4667-      rows.map(function (row) {
+4668-        return '<div class="aicm-confirm-row"><strong>' + aicmWrtEscape(row[0]) + '</strong><p>' + aicmWrtEscape(row[1]) + '</p></div>';
+4669-      }).join(""),
+4670-      '</section>',
+4671-      '<section class="aicm-core-card aicm-operation-card">',
+4672-      '  <p class="aicm-eyebrow">操作</p>',
+4673-      '  <div class="aicm-dashboard-action-row">',
+4674-      '    <button type="button" data-core-action="worker-runtime-execute">確定して実行</button>',
+4675-      '    <button type="button" data-core-action="worker-runtime-cancel">戻る</button>',
+4676-      '  </div>',
+4677-      '</section>'
+4678-    ].join(""));
+4679-  }
+4680-
+4681-async function aicmWrtPostJson(path, body) {
+4682-    var response = await fetch(path, {
+4683-      method: "POST",
+4684-      headers: {
+4685-        "Content-Type": "application/json"
+4686-      },
+4687-      body: JSON.stringify(body || {})
+4688-    });
+4689-
+4690-    var json = await response.json().catch(function () {
+4691-      return {};
+4692-    });
+4693-
+4694-    if (!response.ok || !json || json.result !== "ok") {
+4695-      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+4696-    }
+4697-
+4698-    return json;
+4699-  }
+4700-
+4701:async function executeWorkerRuntimeConfirmBaseAxtR9R1() {
+4702-    var payload = state.pendingWorkerRuntimeRequest || null;
+4703-    if (!payload || !payload.endpoint || !payload.body) {
+4704-      setMessage("error", "確認対象がありません。");
+4705-      return;
+4706-    }
+4707-
+4708-    try {
+4709-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4710-      state.pendingWorkerRuntimeRequest = null;
+4711-      state.workerRuntimeLastResult = result;
+4712-      state.screen = "worker-runtime-request";
+4713-      setMessage("ok", "AI実行Workbenchを作成しました。");
+4714-      if (typeof render === "function") render();
+4715-    } catch (error) {
+4716-      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+4717-      if (typeof render === "function") render();
+4718-    }
+4719-  }
+4720-
+4721:async function executeWorkerRuntimeConfirm() {
+4722-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4723:    var result = await executeWorkerRuntimeConfirmBaseAxtR9R1();
+4724-
+4725-    setTimeout(function () {
+4726-      if (typeof aicmRuntimeStatusRefresh === "function") {
+4727-        aicmRuntimeStatusRefresh();
+4728-      }
+4729-    }, 250);
+4730-
+4731-    return result;
+4732-  }
+4733-
+4734-function confirmWorkerRuntimeRequestFromForm() {
+4735-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4736-    try {
+4737-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4738-      state.screen = "worker-runtime-confirm";
+4739-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4740-      if (typeof render === "function") render();
+4741-    } catch (error) {
+4742-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4743-      if (typeof render === "function") render();
+4744-    }
+4745-  }
+4746-
+4747-function cancelWorkerRuntimeConfirm() {
+4748-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4749-    state.pendingWorkerRuntimeRequest = null;
+4750-    state.screen = "worker-runtime-request";
+4751-    if (typeof render === "function") render();
+4752-  }
+4753-
+4754-function render() {
+4755-    if (!root) return;
+4756-
+4757-    var html = "";
+4758-
+4759-    if (state.screen === "company-new") {
+4760-      html = renderCompanyNew();
+4761-    } else if (state.screen === "department-new") {
+4762-      html = renderDepartmentNew();
+4763-    } else if (state.screen === "section-new") {
+4764-      html = renderSectionNew();
+4765-    } else if (state.screen === "placement-new") {
+4766-      html = renderPlacementNew();
+4767-    } else if (state.screen === "worker-runtime-confirm") {
+4768-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4769-      html = renderWorkerRuntimeConfirm();
+4770-    } else if (state.screen === "worker-runtime-request") {
+4771-      html = renderWorkerRuntimeRequest();
+4772-    } else if (state.screen === "settings") {
+4773-      html = renderSettings();
+4774-    } else if (state.screen === "department-edit") {
+4775-      html = renderDepartmentEditPlaceholder();
+4776-    } else if (state.screen === "section-edit") {
+4777-      html = renderSectionEditPlaceholder();
+4778-    } else if (state.screen === "task-ledger") {
+4779-      html = renderTaskLedgerPlaceholder();
+4780-    } else if (state.screen === "review-list") {
+4781-      html = renderReviewListPlaceholder();
+4782-    } else {
+4783-      html = renderDashboard();
+4784-    }
+4785-
+4786-    
+4787-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+4788-    if (
+4789-      state &&
+4790-      (
+4791-        state.screen === "company-edit" ||
+4792-        state.screen === "company-change" ||
+4793-        state.screen === "company-update"
+4794-      )
+4795-    ) {
+4796-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4797-      html = renderCompanyEditPlaceholder();
+4798-    }
+4799-
+4800-
+4801-    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+4802-    if (state && state.screen === "company-edit") {
+4803-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4804-      html = renderCompanyEditPlaceholder();
+4805-    }
+4806-
+4807-    if (state && state.screen === "department-edit") {
+4808-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4809-      html = renderDepartmentEditPlaceholder();
+4810-    }
+4811-
+4812-    if (state && state.screen === "section-edit") {
+4813-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4814-      html = renderSectionEditPlaceholder();
+4815-    }
+4816-
+4817-
+4818-    // AICM_INLINE_ROLE_ADD_SCREEN_INJECTION_ATQ_ATT
+4819-    if (typeof aicmInjectInlineRoleSettingsForAddScreens === "function") {
+4820-      html = aicmInjectInlineRoleSettingsForAddScreens(html);
+4821-    }
+4822-
+4823-root.innerHTML = html;
+4824-  }
+4825-
+4826-  function fieldValue(form, name) {
+4827-    var field = form.elements[name];
+4828-    return field && typeof field.value === "string" ? field.value.trim() : "";
+4829-  }
+4830-
+4831-  function submitForm(form) {
+4832-    var formName = form.getAttribute("data-core-form") || "";
+4833-    state.errorMessage = "";
+4834-    state.noticeMessage = "";
+4835-
+4836-    var task;
+4837-
+4838-    if (formName === "company-create") {
+4839-      task = createCompany({
+4840-        companyName: fieldValue(form, "companyName"),
+4841-        businessDomain: fieldValue(form, "businessDomain")
+4842-      });
+4843-    } else if (formName === "department-create") {
+4844-      task = createDepartment({
+4845-        departmentName: fieldValue(form, "departmentName"),
+4846-        purpose: fieldValue(form, "purpose")
+4847-      });
+4848-    } else if (formName === "section-create") {
+4849-      task = createSection({
+4850-        sectionName: fieldValue(form, "sectionName"),
+4851-        purpose: fieldValue(form, "purpose")
+4852-      });
+4853-    } else if (formName === "placement-create") {
+4854-      var robotSelect = form.elements.robotPoolId;
+4855-      var selectedRobot = robotSelect && robotSelect.selectedOptions ? robotSelect.selectedOptions[0] : null;
+4856-      var targetLevelCode = fieldValue(form, "targetLevelCode");
+4857-      var sectionId = fieldValue(form, "sectionId");
+4858-      var targetId = state.selectedCompanyId;
+4859-
+4860-      if (targetLevelCode === "department") {
+4861-        targetId = state.selectedDepartmentId;
+4862-      }
+4863-
+4864-      if (targetLevelCode === "section") {
+4865-        targetId = sectionId;
+4866-      }
+4867-
+4868-      task = createPlacement({
+4869-        departmentId: state.selectedDepartmentId,
+4870-        sectionId: sectionId,
+4871-        targetLevelCode: targetLevelCode,
+4872-        targetId: targetId,
+4873-        roleCode: fieldValue(form, "roleCode"),
+4874-        robotPoolId: fieldValue(form, "robotPoolId"),
+4875-        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",
+4876-        internalNickname: fieldValue(form, "internalNickname")
+4877-      });
+4878-    } else {
+4879-      task = Promise.reject(new Error("未知のフォームです。"));
+4880-    }
+4881-
+4882-    state.loading = true;
+4883-    render();
+4884-
+4885-    task.catch(function (error) {
+4886-      state.loading = false;
+4887-      state.errorMessage = publicErrorMessage(error);
+4888-      render();
+4889-    });
+4890-  }
+4891-
+4892-  function handleRootClick(event) {
+4893-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+4894-  var aicmRawClickTarget = event.target;
+4895-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+4896-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+4897-    : aicmRawClickTarget;
+4898-
+4899-    var button = aicmActionTarget.closest("[data-core-action]");
+4900-    if (!button) return;
+4901-
+4902-    var action = button.getAttribute("data-core-action") || "";
+4903-
+4904-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4905-    if (action === "worker-runtime-status-refresh") {
+4906-      aicmRuntimeStatusRefresh();
+4907-      return;
+4908-    }
+4909-
+4910-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4911-    if (action === "worker-runtime-confirm") {
+4912-      confirmWorkerRuntimeRequestFromForm();
+4913-      return;
+4914-    }
+4915-
+4916-    if (action === "worker-runtime-execute") {
+4917:      executeWorkerRuntimeConfirm();
+4918-      return;
+4919-    }
+4920-
+4921-    if (action === "worker-runtime-cancel") {
+4922-      cancelWorkerRuntimeConfirm();
+4923-      return;
+4924-    }
+4925-
+4926-            if (action === "task-ledger-fill-csv-template") {
+4927-      fillTaskLedgerCsvTemplate();
+4928-      return;
+4929-    }
+4930-
+4931-        if (action === "task-ledger-csv-file-open") {
+4932-      openTaskLedgerCsvFilePicker();
+4933-      return;
+4934-    }
+4935-
+4936-    if (action === "task-ledger-chatgpt-prompt") {
+4937-      handleTaskLedgerChatGptPrompt();
+4938-      return;
+4939-    }
+4940-if (action === "task-ledger-csv-preview") {
+4941-      previewTaskLedgerCsv();
+4942-      return;
+4943-    }
+4944-
+4945-    if (action === "task-ledger-csv-import") {
+4946-      importTaskLedgerCsvToPmlwMajor();
+4947-      return;
+4948-    }
+4949-if (action === "task-ledger-create") {
+4950-      createTaskLedgerFromForm();
+4951-      return;
+4952-    }
+4953-if (action === "human-review-approve") {
+4954-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+4955-      return;
+4956-    }
+4957-
+4958-    if (action === "human-review-return") {
+4959-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+4960-      return;
+4961-    }
+4962-
+4963-    if (action === "department-update-select") {
+4964-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+4965-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+4966-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4967-      if (typeof render === "function") render();
+4968-      return;
+4969-    }
+4970-
+4971-    if (action === "department-update-clear") {
+4972-      state.editingDepartmentId = "";
+4973-      if (typeof render === "function") render();
+4974-      return;
+4975-    }
+4976-
+4977-    if (action === "section-update-select") {
+4978-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+4979-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+4980-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4981-      if (typeof render === "function") render();
+4982-      return;
+4983-    }
+4984-
+4985-    if (action === "section-update-clear") {
+4986-      state.editingSectionId = "";
+4987-      if (typeof render === "function") render();
+4988-      return;
+4989-    }
+4990-
+4991-    if (action === "company-update-save") {
+4992-      saveCompanyUpdateFromForm();
+4993-      return;
+4994-    }
+4995-
+4996-    if (action === "department-update-save") {
+4997-      saveDepartmentUpdateFromForm();
+4998-      return;
+4999-    }
+5000-
+5001-    if (action === "section-update-save") {
+5002-      saveSectionUpdateFromForm();
+5003-      return;
+5004-    }
+5005-
+5006-    if (action === "org-update-confirm-execute") {
+5007-      executeAicmOrgUpdateConfirm();
+5008-      return;
+5009-    }
+5010-
+5011-    if (action === "org-update-confirm-cancel") {
+5012-      cancelAicmOrgUpdateConfirm();
+5013-      return;
+5014-    }
+5015-
+5016-    if (action === "company-edit-open") {
+5017-      state.screen = "company-edit";
+
+4537-function renderWorkerRuntimeRequestBaseAxtR9R1() {
+4538-    var company = aicmWrtCurrentCompany();
+4539-    var workers = aicmWrtActiveWorkerPlacements();
+4540-    var last = state.workerRuntimeLastResult || null;
+4541-
+4542-    var lastHtml = "";
+4543-    if (last && last.runtime_request) {
+4544-      lastHtml = [
+4545-        '<section class="aicm-core-card">',
+4546-        '  <p class="aicm-eyebrow">直近の実行依頼</p>',
+4547-        '  <h2>request_id</h2>',
+4548-        '  <p class="aicm-selected-note">' + aicmWrtEscape(last.runtime_request.request_id || "未返却") + '</p>',
+4549-        '  <p>status: ' + aicmWrtEscape(last.runtime_request.request_status_code || "-") + '</p>',
+4550-        '</section>'
+4551-      ].join("");
+4552-    }
+4553-
+4554-    return renderShell([
+4555-      '<section class="aicm-core-card">',
+4556-      '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4557-      '  <h2>配置済みAI/Workerに作業を依頼</h2>',
+4558-      company
+4559-        ? '  <p class="aicm-selected-note">対象会社: <strong>' + aicmWrtEscape(company.company_name || "") + '</strong></p>'
+4560-        : '  <p class="aicm-core-empty">AI企業が選択されていません。</p>',
+4561-      workers.length
+4562-        ? '  <p class="aicm-selected-note">配置済みWorker: ' + String(workers.length) + '件</p>'
+4563-        : '  <p class="aicm-core-empty">この会社に配置済みAI/Workerがありません。先に課変更で従業員Workerを配置してください。</p>',
+4564-      '</section>',
+4565-      '<section class="aicm-core-card">',
+4566-      '  <label>実行AI/Worker<select id="aicm-worker-runtime-placement-id">' + aicmWrtWorkerOptions() + '</select></label>',
+4567-      '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
+4568-      '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
+4569-      '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
+4570-      '  <label>source_request_ref<input id="aicm-worker-runtime-source-ref" type="text" placeholder="空なら manual:<timestamp>"></label>',
+4571-      '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
+4572-      '</section>',
+4573-      '<section class="aicm-core-card aicm-operation-card">',
+4574-      '  <p class="aicm-eyebrow">操作</p>',
+4575-      '  <div class="aicm-dashboard-action-row">',
+4576-      '    <button type="button" data-core-action="worker-runtime-confirm">確認へ進む</button>',
+4577-      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+4578-      '  </div>',
+4579-      '</section>',
+4580-      lastHtml
+4581-    ].join(""));
+4582-  }
+4583-
+4584-function renderWorkerRuntimeRequest() {
+4585-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4586-    return renderWorkerRuntimeRequestBaseAxtR9R1() + aicmRuntimeStatusPanelRender();
+4587-  }
+4588-
+4589-function aicmWrtValue(id) {
+4590-    var el = document.getElementById(id);
+4591-    return el ? aicmWrtText(el.value) : "";
+4592-  }
+4593-
+4594-function buildWorkerRuntimePendingPayload() {
+4595-    var company = aicmWrtCurrentCompany();
+4596-    if (!company) throw new Error("AI企業を選択してください。");
+4597-
+4598-    var placementId = aicmWrtValue("aicm-worker-runtime-placement-id");
+4599-    if (!placementId) throw new Error("実行AI/AI/Workerを選択してください。");
+4600-
+4601-    var worker = aicmWrtPlacementById(placementId);
+4602-    if (!worker) throw new Error("選択したWorker配置が見つかりません。");
+4603-
+4604-    var title = aicmWrtValue("aicm-worker-runtime-title");
+4605-    if (!title) throw new Error("作業タイトルを入力してください。");
+4606-
+4607-    var instruction = aicmWrtValue("aicm-worker-runtime-instruction");
+4608-    if (!instruction) throw new Error("作業指示を入力してください。");
+4609-
+4610-    var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
+4611-    var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
+4612-
+4613-    return {
+4614-      endpoint: "/api/aicm/v2/worker-runtime/request",
+4615-      worker_label: aicmWrtWorkerLabel(worker),
+4616-      body: {
+4617-        owner_civilization_id: aicmWrtOwnerId(),
+4618-        aicm_user_company_id: aicmWrtText(company.aicm_user_company_id),
+4619-        aicm_user_company_department_id: aicmWrtText(worker.aicm_user_company_department_id),
+4620-        aicm_user_company_section_id: aicmWrtText(worker.aicm_user_company_section_id),
+4621-        aicm_user_company_worker_placement_id: placementId,
+4622-        model_code: aicmWrtText(worker.aiworker_model_code),
+4623-        robot_pool_id: aicmWrtText(worker.robot_pool_id),
+4624-        app_surface_code: "ai_company_manager",
+4625-        task_domain_code: aicmWrtValue("aicm-worker-runtime-task-domain") || "business_operation",
+4626-        task_title: title,
+4627-        task_instruction_ja: instruction,
+4628-        source_app_ref: "AICompanyManager",
+4629-        source_request_ref: sourceRef,
+4630-        requested_by_ref: "human",
+4631-        idempotency_key: idempotencyKey
+4632-      }
+4633-    };
+4634-  }
+4635-
+4636-function renderWorkerRuntimeConfirm() {
+4637:    var payload = state.pendingWorkerRuntimeRequest || null;
+4638-    if (!payload || !payload.body) {
+4639-      return renderShell([
+4640-        '<section class="aicm-core-card">',
+4641-        '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4642-        '  <h2>確認対象がありません</h2>',
+4643-        '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="worker-runtime-cancel">戻る</button></div>',
+4644-        '</section>'
+4645-      ].join(""));
+4646-    }
+4647-
+4648-    var body = payload.body;
+4649-    var rows = [
+4650-      ["実行AI/Worker", payload.worker_label],
+4651-      ["model_code", body.model_code],
+4652-      ["app_surface_code", body.app_surface_code],
+4653-      ["task_domain_code", body.task_domain_code],
+4654-      ["作業タイトル", body.task_title],
+4655-      ["作業指示", body.task_instruction_ja],
+4656-      ["source_request_ref", body.source_request_ref],
+4657-      ["idempotency_key", body.idempotency_key]
+4658-    ];
+4659-
+4660-    return renderShell([
+4661-      '<section class="aicm-core-card">',
+4662-      '  <p class="aicm-eyebrow">確認画面</p>',
+4663-      '  <h2>AI実行Workbenchを確定しますか？</h2>',
+4664-      '  <p class="aicm-selected-note">この操作はAIWorkerOS Runtime Executionへ実行依頼を作成します。</p>',
+4665-      '</section>',
+4666-      '<section class="aicm-core-card aicm-confirm-card">',
+4667-      rows.map(function (row) {
+4668-        return '<div class="aicm-confirm-row"><strong>' + aicmWrtEscape(row[0]) + '</strong><p>' + aicmWrtEscape(row[1]) + '</p></div>';
+4669-      }).join(""),
+4670-      '</section>',
+4671-      '<section class="aicm-core-card aicm-operation-card">',
+4672-      '  <p class="aicm-eyebrow">操作</p>',
+4673-      '  <div class="aicm-dashboard-action-row">',
+4674-      '    <button type="button" data-core-action="worker-runtime-execute">確定して実行</button>',
+4675-      '    <button type="button" data-core-action="worker-runtime-cancel">戻る</button>',
+4676-      '  </div>',
+4677-      '</section>'
+4678-    ].join(""));
+4679-  }
+4680-
+4681-async function aicmWrtPostJson(path, body) {
+4682-    var response = await fetch(path, {
+4683-      method: "POST",
+4684-      headers: {
+4685-        "Content-Type": "application/json"
+4686-      },
+4687-      body: JSON.stringify(body || {})
+4688-    });
+4689-
+4690-    var json = await response.json().catch(function () {
+4691-      return {};
+4692-    });
+4693-
+4694-    if (!response.ok || !json || json.result !== "ok") {
+4695-      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+4696-    }
+4697-
+4698-    return json;
+4699-  }
+4700-
+4701-async function executeWorkerRuntimeConfirmBaseAxtR9R1() {
+4702:    var payload = state.pendingWorkerRuntimeRequest || null;
+4703-    if (!payload || !payload.endpoint || !payload.body) {
+4704-      setMessage("error", "確認対象がありません。");
+4705-      return;
+4706-    }
+4707-
+4708-    try {
+4709-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4710:      state.pendingWorkerRuntimeRequest = null;
+4711-      state.workerRuntimeLastResult = result;
+4712-      state.screen = "worker-runtime-request";
+4713-      setMessage("ok", "AI実行Workbenchを作成しました。");
+4714-      if (typeof render === "function") render();
+4715-    } catch (error) {
+4716-      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+4717-      if (typeof render === "function") render();
+4718-    }
+4719-  }
+4720-
+4721-async function executeWorkerRuntimeConfirm() {
+4722-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4723-    var result = await executeWorkerRuntimeConfirmBaseAxtR9R1();
+4724-
+4725-    setTimeout(function () {
+4726-      if (typeof aicmRuntimeStatusRefresh === "function") {
+4727-        aicmRuntimeStatusRefresh();
+4728-      }
+4729-    }, 250);
+4730-
+4731-    return result;
+4732-  }
+4733-
+4734-function confirmWorkerRuntimeRequestFromForm() {
+4735-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4736-    try {
+4737:      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4738-      state.screen = "worker-runtime-confirm";
+4739-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4740-      if (typeof render === "function") render();
+4741-    } catch (error) {
+4742-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4743-      if (typeof render === "function") render();
+4744-    }
+4745-  }
+4746-
+4747-function cancelWorkerRuntimeConfirm() {
+4748-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4749:    state.pendingWorkerRuntimeRequest = null;
+4750-    state.screen = "worker-runtime-request";
+4751-    if (typeof render === "function") render();
+4752-  }
+4753-
+4754-function render() {
+4755-    if (!root) return;
+4756-
+4757-    var html = "";
+4758-
+4759-    if (state.screen === "company-new") {
+4760-      html = renderCompanyNew();
+4761-    } else if (state.screen === "department-new") {
+4762-      html = renderDepartmentNew();
+4763-    } else if (state.screen === "section-new") {
+4764-      html = renderSectionNew();
+4765-    } else if (state.screen === "placement-new") {
+4766-      html = renderPlacementNew();
+4767-    } else if (state.screen === "worker-runtime-confirm") {
+4768-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4769-      html = renderWorkerRuntimeConfirm();
+4770-    } else if (state.screen === "worker-runtime-request") {
+4771-      html = renderWorkerRuntimeRequest();
+4772-    } else if (state.screen === "settings") {
+4773-      html = renderSettings();
+4774-    } else if (state.screen === "department-edit") {
+4775-      html = renderDepartmentEditPlaceholder();
+4776-    } else if (state.screen === "section-edit") {
+4777-      html = renderSectionEditPlaceholder();
+4778-    } else if (state.screen === "task-ledger") {
+4779-      html = renderTaskLedgerPlaceholder();
+4780-    } else if (state.screen === "review-list") {
+4781-      html = renderReviewListPlaceholder();
+4782-    } else {
+4783-      html = renderDashboard();
+4784-    }
+4785-
+4786-    
+4787-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+4788-    if (
+4789-      state &&
+4790-      (
+4791-        state.screen === "company-edit" ||
+4792-        state.screen === "company-change" ||
+4793-        state.screen === "company-update"
+4794-      )
+4795-    ) {
+4796-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4797-      html = renderCompanyEditPlaceholder();
+4798-    }
+4799-
+4800-
+4801-    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+4802-    if (state && state.screen === "company-edit") {
+4803-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4804-      html = renderCompanyEditPlaceholder();
+4805-    }
+4806-
+4807-    if (state && state.screen === "department-edit") {
+4808-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4809-      html = renderDepartmentEditPlaceholder();
+4810-    }
+4811-
+4812-    if (state && state.screen === "section-edit") {
+4813-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4814-      html = renderSectionEditPlaceholder();
+4815-    }
+4816-
+4817-
+4818-    // AICM_INLINE_ROLE_ADD_SCREEN_INJECTION_ATQ_ATT
+4819-    if (typeof aicmInjectInlineRoleSettingsForAddScreens === "function") {
+4820-      html = aicmInjectInlineRoleSettingsForAddScreens(html);
+4821-    }
+4822-
+4823-root.innerHTML = html;
+4824-  }
+4825-
+4826-  function fieldValue(form, name) {
+4827-    var field = form.elements[name];
+4828-    return field && typeof field.value === "string" ? field.value.trim() : "";
+4829-  }
+4830-
+4831-  function submitForm(form) {
+4832-    var formName = form.getAttribute("data-core-form") || "";
+4833-    state.errorMessage = "";
+4834-    state.noticeMessage = "";
+4835-
+4836-    var task;
+4837-
+4838-    if (formName === "company-create") {
+4839-      task = createCompany({
+4840-        companyName: fieldValue(form, "companyName"),
+4841-        businessDomain: fieldValue(form, "businessDomain")
+4842-      });
+4843-    } else if (formName === "department-create") {
+4844-      task = createDepartment({
+4845-        departmentName: fieldValue(form, "departmentName"),
+4846-        purpose: fieldValue(form, "purpose")
+4847-      });
+4848-    } else if (formName === "section-create") {
+4849-      task = createSection({
+
+4514-      if (!response.ok || (json && json.result === "error")) {
+4515-        var message = (json && json.error_message) || "実行状況の取得に失敗しました。";
+4516-        throw new Error(message);
+4517-      }
+4518-
+4519-      var runtimeRows = aicmRuntimeStatusRowsFromPayload(json);
+4520-      state.runtimeStatusRawRows = runtimeRows;
+4521-      state.runtimeStatusRows = aicmRuntimeStatusFilterRowsForCurrentApp(runtimeRows);
+4522-      state.runtimeStatusRaw = json;
+4523-      state.runtimeStatusUpdatedAt = new Date().toLocaleString();
+4524-      state.runtimeStatusLoading = false;
+4525-      state.runtimeStatusError = "";
+4526-
+4527-      if (typeof render === "function") render();
+4528-    } catch (error) {
+4529-      state.runtimeStatusLoading = false;
+4530-      state.runtimeStatusError = error && error.message ? error.message : "実行状況の取得に失敗しました。";
+4531-
+4532-      if (typeof render === "function") render();
+4533-    }
+4534-  }
+4535-
+4536-
+4537-function renderWorkerRuntimeRequestBaseAxtR9R1() {
+4538-    var company = aicmWrtCurrentCompany();
+4539-    var workers = aicmWrtActiveWorkerPlacements();
+4540-    var last = state.workerRuntimeLastResult || null;
+4541-
+4542-    var lastHtml = "";
+4543-    if (last && last.runtime_request) {
+4544-      lastHtml = [
+4545-        '<section class="aicm-core-card">',
+4546-        '  <p class="aicm-eyebrow">直近の実行依頼</p>',
+4547-        '  <h2>request_id</h2>',
+4548-        '  <p class="aicm-selected-note">' + aicmWrtEscape(last.runtime_request.request_id || "未返却") + '</p>',
+4549-        '  <p>status: ' + aicmWrtEscape(last.runtime_request.request_status_code || "-") + '</p>',
+4550-        '</section>'
+4551-      ].join("");
+4552-    }
+4553-
+4554-    return renderShell([
+4555-      '<section class="aicm-core-card">',
+4556-      '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4557-      '  <h2>配置済みAI/Workerに作業を依頼</h2>',
+4558-      company
+4559-        ? '  <p class="aicm-selected-note">対象会社: <strong>' + aicmWrtEscape(company.company_name || "") + '</strong></p>'
+4560-        : '  <p class="aicm-core-empty">AI企業が選択されていません。</p>',
+4561-      workers.length
+4562-        ? '  <p class="aicm-selected-note">配置済みWorker: ' + String(workers.length) + '件</p>'
+4563-        : '  <p class="aicm-core-empty">この会社に配置済みAI/Workerがありません。先に課変更で従業員Workerを配置してください。</p>',
+4564-      '</section>',
+4565-      '<section class="aicm-core-card">',
+4566-      '  <label>実行AI/Worker<select id="aicm-worker-runtime-placement-id">' + aicmWrtWorkerOptions() + '</select></label>',
+4567-      '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
+4568-      '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
+4569-      '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
+4570-      '  <label>source_request_ref<input id="aicm-worker-runtime-source-ref" type="text" placeholder="空なら manual:<timestamp>"></label>',
+4571-      '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
+4572-      '</section>',
+4573-      '<section class="aicm-core-card aicm-operation-card">',
+4574-      '  <p class="aicm-eyebrow">操作</p>',
+4575-      '  <div class="aicm-dashboard-action-row">',
+4576-      '    <button type="button" data-core-action="worker-runtime-confirm">確認へ進む</button>',
+4577-      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+4578-      '  </div>',
+4579-      '</section>',
+4580-      lastHtml
+4581-    ].join(""));
+4582-  }
+4583-
+4584-function renderWorkerRuntimeRequest() {
+4585-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4586-    return renderWorkerRuntimeRequestBaseAxtR9R1() + aicmRuntimeStatusPanelRender();
+4587-  }
+4588-
+4589-function aicmWrtValue(id) {
+4590-    var el = document.getElementById(id);
+4591-    return el ? aicmWrtText(el.value) : "";
+4592-  }
+4593-
+4594-function buildWorkerRuntimePendingPayload() {
+4595-    var company = aicmWrtCurrentCompany();
+4596-    if (!company) throw new Error("AI企業を選択してください。");
+4597-
+4598-    var placementId = aicmWrtValue("aicm-worker-runtime-placement-id");
+4599-    if (!placementId) throw new Error("実行AI/AI/Workerを選択してください。");
+4600-
+4601-    var worker = aicmWrtPlacementById(placementId);
+4602-    if (!worker) throw new Error("選択したWorker配置が見つかりません。");
+4603-
+4604-    var title = aicmWrtValue("aicm-worker-runtime-title");
+4605-    if (!title) throw new Error("作業タイトルを入力してください。");
+4606-
+4607-    var instruction = aicmWrtValue("aicm-worker-runtime-instruction");
+4608-    if (!instruction) throw new Error("作業指示を入力してください。");
+4609-
+4610-    var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
+4611-    var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
+4612-
+4613-    return {
+4614:      endpoint: "/api/aicm/v2/worker-runtime/request",
+4615-      worker_label: aicmWrtWorkerLabel(worker),
+4616-      body: {
+4617-        owner_civilization_id: aicmWrtOwnerId(),
+4618-        aicm_user_company_id: aicmWrtText(company.aicm_user_company_id),
+4619-        aicm_user_company_department_id: aicmWrtText(worker.aicm_user_company_department_id),
+4620-        aicm_user_company_section_id: aicmWrtText(worker.aicm_user_company_section_id),
+4621-        aicm_user_company_worker_placement_id: placementId,
+4622-        model_code: aicmWrtText(worker.aiworker_model_code),
+4623-        robot_pool_id: aicmWrtText(worker.robot_pool_id),
+4624-        app_surface_code: "ai_company_manager",
+4625-        task_domain_code: aicmWrtValue("aicm-worker-runtime-task-domain") || "business_operation",
+4626-        task_title: title,
+4627-        task_instruction_ja: instruction,
+4628-        source_app_ref: "AICompanyManager",
+4629-        source_request_ref: sourceRef,
+4630-        requested_by_ref: "human",
+4631-        idempotency_key: idempotencyKey
+4632-      }
+4633-    };
+4634-  }
+4635-
+4636-function renderWorkerRuntimeConfirm() {
+4637-    var payload = state.pendingWorkerRuntimeRequest || null;
+4638-    if (!payload || !payload.body) {
+4639-      return renderShell([
+4640-        '<section class="aicm-core-card">',
+4641-        '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4642-        '  <h2>確認対象がありません</h2>',
+4643-        '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="worker-runtime-cancel">戻る</button></div>',
+4644-        '</section>'
+4645-      ].join(""));
+4646-    }
+4647-
+4648-    var body = payload.body;
+4649-    var rows = [
+4650-      ["実行AI/Worker", payload.worker_label],
+4651-      ["model_code", body.model_code],
+4652-      ["app_surface_code", body.app_surface_code],
+4653-      ["task_domain_code", body.task_domain_code],
+4654-      ["作業タイトル", body.task_title],
+4655-      ["作業指示", body.task_instruction_ja],
+4656-      ["source_request_ref", body.source_request_ref],
+4657-      ["idempotency_key", body.idempotency_key]
+4658-    ];
+4659-
+4660-    return renderShell([
+4661-      '<section class="aicm-core-card">',
+4662-      '  <p class="aicm-eyebrow">確認画面</p>',
+4663-      '  <h2>AI実行Workbenchを確定しますか？</h2>',
+4664-      '  <p class="aicm-selected-note">この操作はAIWorkerOS Runtime Executionへ実行依頼を作成します。</p>',
+4665-      '</section>',
+4666-      '<section class="aicm-core-card aicm-confirm-card">',
+4667-      rows.map(function (row) {
+4668-        return '<div class="aicm-confirm-row"><strong>' + aicmWrtEscape(row[0]) + '</strong><p>' + aicmWrtEscape(row[1]) + '</p></div>';
+4669-      }).join(""),
+4670-      '</section>',
+4671-      '<section class="aicm-core-card aicm-operation-card">',
+4672-      '  <p class="aicm-eyebrow">操作</p>',
+4673-      '  <div class="aicm-dashboard-action-row">',
+4674-      '    <button type="button" data-core-action="worker-runtime-execute">確定して実行</button>',
+4675-      '    <button type="button" data-core-action="worker-runtime-cancel">戻る</button>',
+4676-      '  </div>',
+4677-      '</section>'
+4678-    ].join(""));
+4679-  }
+4680-
+4681-async function aicmWrtPostJson(path, body) {
+4682-    var response = await fetch(path, {
+4683-      method: "POST",
+4684-      headers: {
+4685-        "Content-Type": "application/json"
+4686-      },
+4687-      body: JSON.stringify(body || {})
+4688-    });
+4689-
+4690-    var json = await response.json().catch(function () {
+4691-      return {};
+4692-    });
+4693-
+4694-    if (!response.ok || !json || json.result !== "ok") {
+4695-      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+4696-    }
+4697-
+4698-    return json;
+4699-  }
+4700-
+4701-async function executeWorkerRuntimeConfirmBaseAxtR9R1() {
+4702-    var payload = state.pendingWorkerRuntimeRequest || null;
+4703-    if (!payload || !payload.endpoint || !payload.body) {
+4704-      setMessage("error", "確認対象がありません。");
+4705-      return;
+4706-    }
+4707-
+4708-    try {
+4709-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4710-      state.pendingWorkerRuntimeRequest = null;
+4711-      state.workerRuntimeLastResult = result;
+4712-      state.screen = "worker-runtime-request";
+4713-      setMessage("ok", "AI実行Workbenchを作成しました。");
+4714-      if (typeof render === "function") render();
+
+4323-      if (value && typeof value === "object") {
+4324-        var keys = Object.keys(value);
+4325-
+4326-        for (var k = 0; k < keys.length; k += 1) {
+4327-          var found = firstUsefulArray(value[keys[k]]);
+4328-          if (found.length) return found;
+4329-        }
+4330-      }
+4331-
+4332-      return [];
+4333-    }
+4334-
+4335-    if (Array.isArray(payload)) return firstUsefulArray(payload);
+4336-    if (payload.payload) return firstUsefulArray(payload.payload);
+4337-
+4338-    return firstUsefulArray(payload);
+4339-  }
+4340-
+4341-function aicmRuntimeStatusShort(value, max) {
+4342-    var text = String(value === undefined || value === null ? "" : value);
+4343-    var limit = Number(max || 120);
+4344-
+4345-    return text.length > limit ? text.slice(0, limit) + "..." : text;
+4346-  }
+4347-
+4348-function aicmRuntimeStatusField(row, names) {
+4349-    row = row || {};
+4350-
+4351-    for (var i = 0; i < names.length; i += 1) {
+4352-      var value = row[names[i]];
+4353-
+4354-      if (value !== undefined && value !== null && String(value).length > 0) {
+4355-        return value;
+4356-      }
+4357-    }
+4358-
+4359-    return "";
+4360-  }
+4361-
+4362-function aicmRuntimeStatusRowsHtml(rows) {
+4363-    rows = Array.isArray(rows) ? rows.slice(0, 5) : [];
+4364-
+4365-    if (!rows.length) {
+4366-      return '<p class="aicm-core-empty">AICompanyManager由来の実行状況はまだありません。作成後に「実行状況を更新」を押してください。</p>';
+4367-    }
+4368-
+4369-    return rows.map(function (row) {
+4370-      var requestId = aicmRuntimeStatusField(row, ["request_id", "runtime_execution_request_id"]);
+4371-      var title = aicmRuntimeStatusField(row, ["task_title", "title"]);
+4372-      var model = aicmRuntimeStatusField(row, ["model_code", "aiworker_model_code", "model_no"]);
+4373-      var status = aicmRuntimeStatusField(row, ["request_status_code", "status_code"]);
+4374-      var outputStatus = aicmRuntimeStatusField(row, ["output_status_code"]);
+4375-      var deliveryStatus = aicmRuntimeStatusField(row, ["delivery_status_code"]);
+4376-      var reviewRequired = aicmRuntimeStatusField(row, ["review_required_flag"]);
+4377-      var humanGoRequired = aicmRuntimeStatusField(row, ["human_go_required_flag"]);
+4378-
+4379-      return [
+4380-        '<article class="aicm-core-card aicm-runtime-status-row">',
+4381-        '  <p class="aicm-eyebrow">Runtime request</p>',
+4382-        '  <h3>' + escapeHtml(aicmRuntimeStatusShort(title || requestId || "実行依頼", 80)) + '</h3>',
+4383-        '  <div class="aicm-confirm-list">',
+4384-        '    <div class="aicm-confirm-row"><strong>request_id</strong><p>' + escapeHtml(String(requestId || "-")) + '</p></div>',
+4385-        '    <div class="aicm-confirm-row"><strong>model_code</strong><p>' + escapeHtml(String(model || "-")) + '</p></div>',
+4386-        '    <div class="aicm-confirm-row"><strong>request_status</strong><p>' + escapeHtml(String(status || "-")) + '</p></div>',
+4387-        '    <div class="aicm-confirm-row"><strong>output_status</strong><p>' + escapeHtml(String(outputStatus || "-")) + '</p></div>',
+4388-        '    <div class="aicm-confirm-row"><strong>delivery_status</strong><p>' + escapeHtml(String(deliveryStatus || "-")) + '</p></div>',
+4389-        '    <div class="aicm-confirm-row"><strong>review / human GO</strong><p>' + escapeHtml("review=" + String(reviewRequired || "-") + " / human_go=" + String(humanGoRequired || "-")) + '</p></div>',
+4390-        '  </div>',
+4391-        '</article>'
+4392-      ].join("");
+4393-    }).join("");
+4394-  }
+4395-
+4396-
+4397-// AICM_RUNTIME_STATUS_PANEL_FILTER_AXT_R9_R2_V1
+4398-// Runtime Status Panel display filter.
+4399-// AIOperationDesk can reuse the same idea later by changing expected app surface/source rules.
+4400-function aicmRuntimeStatusNormalizeText(value) {
+4401-    return String(value === undefined || value === null ? "" : value).trim();
+4402-  }
+4403-
+4404-function aicmRuntimeStatusRowSearchText(row) {
+4405-    try {
+4406-      return JSON.stringify(row || {}).toLowerCase();
+4407-    } catch (error) {
+4408-      return "";
+4409-    }
+4410-  }
+4411-
+4412-function aicmRuntimeStatusIsTestLikeRow(row) {
+4413-    var title = aicmRuntimeStatusNormalizeText(aicmRuntimeStatusField(row, [
+4414-      "task_title",
+4415-      "title",
+4416-      "output_title_ja",
+4417-      "request_title"
+4418-    ]));
+4419-
+4420-    var code = aicmRuntimeStatusNormalizeText(aicmRuntimeStatusField(row, [
+4421-      "request_code",
+4422-      "source_request_ref",
+4423:      "idempotency_key"
+4424-    ]));
+4425-
+4426-    var text = (title + " " + code).toLowerCase();
+4427-
+4428-    return (
+4429-      text.indexOf("smoke") >= 0 ||
+4430-      text.indexOf("runtime execution http api fix") >= 0 ||
+4431-      text.indexOf("persistent smoke") >= 0
+4432-    );
+4433-  }
+4434-
+4435-function aicmRuntimeStatusIsCurrentAppRow(row) {
+4436-    var appSurface = aicmRuntimeStatusNormalizeText(aicmRuntimeStatusField(row, [
+4437-      "app_surface_code",
+4438-      "surface_code"
+4439-    ]));
+4440-
+4441-    var sourceApp = aicmRuntimeStatusNormalizeText(aicmRuntimeStatusField(row, [
+4442-      "source_app_ref",
+4443-      "source_app_code",
+4444-      "app_code"
+4445-    ]));
+4446-
+4447-    var searchText = aicmRuntimeStatusRowSearchText(row);
+4448-
+4449-    if (aicmRuntimeStatusIsTestLikeRow(row)) {
+4450-      return false;
+4451-    }
+4452-
+4453-    if (appSurface === "ai_company_manager") {
+4454-      return true;
+4455-    }
+4456-
+4457-    if (sourceApp === "AICompanyManager" || sourceApp === "ai_company_manager") {
+4458-      return true;
+4459-    }
+4460-
+4461-    if (searchText.indexOf('"app_surface_code":"ai_company_manager"') >= 0) {
+4462-      return true;
+4463-    }
+4464-
+4465-    if (searchText.indexOf('"source_app_ref":"AICompanyManager"'.toLowerCase()) >= 0) {
+4466-      return true;
+4467-    }
+4468-
+4469-    return false;
+4470-  }
+4471-
+4472-function aicmRuntimeStatusFilterRowsForCurrentApp(rows) {
+4473-    rows = Array.isArray(rows) ? rows : [];
+4474-
+4475-    var filtered = rows.filter(function (row) {
+4476-      return aicmRuntimeStatusIsCurrentAppRow(row);
+4477-    });
+4478-
+4479-    return filtered;
+4480-  }
+4481-
+4482-
+4483-function aicmRuntimeStatusPanelRender() {
+4484-    var loading = !!state.runtimeStatusLoading;
+4485-    var error = state.runtimeStatusError || "";
+4486-    var rows = Array.isArray(state.runtimeStatusRows) ? state.runtimeStatusRows : [];
+4487-    var lastUpdated = state.runtimeStatusUpdatedAt || "";
+4488-
+4489-    return [
+4490-      '<section class="aicm-core-card aicm-runtime-status-panel">',
+4491-      '  <p class="aicm-eyebrow">AIWorkerOS 実行状況</p>',
+4492-      '  <h2>Runtime request / pipeline</h2>',
+4493-      '  <p class="aicm-selected-note">AIWorkerOSの app-read-payload / pipeline-board をAICM server経由で読みます。DB書込は行いません。</p>',
+4494-      error ? '  <p class="aicm-core-error">' + escapeHtml(error) + '</p>' : '',
+4495-      lastUpdated ? '  <p class="aicm-core-empty">最終更新: ' + escapeHtml(lastUpdated) + '</p>' : '',
+4496-      '  <div class="aicm-dashboard-action-row">',
+4497-      '    <button type="button" data-core-action="worker-runtime-status-refresh">' + (loading ? '更新中...' : '実行状況を更新') + '</button>',
+4498-      '  </div>',
+4499-      aicmRuntimeStatusRowsHtml(rows),
+4500-      '</section>'
+4501-    ].join("");
+4502-  }
+4503-
+4504-async function aicmRuntimeStatusRefresh() {
+4505-    state.runtimeStatusLoading = true;
+4506-    state.runtimeStatusError = "";
+4507-
+4508-    if (typeof render === "function") render();
+4509-
+4510-    try {
+4511-      var response = await fetch("/api/aicm/v2/worker-runtime/pipeline-board?app_surface_code=ai_company_manager&source_app_ref=AICompanyManager", { method: "GET" });
+4512-      var json = await response.json();
+4513-
+4514-      if (!response.ok || (json && json.result === "error")) {
+4515-        var message = (json && json.error_message) || "実行状況の取得に失敗しました。";
+4516-        throw new Error(message);
+4517-      }
+4518-
+4519-      var runtimeRows = aicmRuntimeStatusRowsFromPayload(json);
+4520-      state.runtimeStatusRawRows = runtimeRows;
+4521-      state.runtimeStatusRows = aicmRuntimeStatusFilterRowsForCurrentApp(runtimeRows);
+4522-      state.runtimeStatusRaw = json;
+4523-      state.runtimeStatusUpdatedAt = new Date().toLocaleString();
+--
+4531-
+4532-      if (typeof render === "function") render();
+4533-    }
+4534-  }
+4535-
+4536-
+4537-function renderWorkerRuntimeRequestBaseAxtR9R1() {
+4538-    var company = aicmWrtCurrentCompany();
+4539-    var workers = aicmWrtActiveWorkerPlacements();
+4540-    var last = state.workerRuntimeLastResult || null;
+4541-
+4542-    var lastHtml = "";
+4543-    if (last && last.runtime_request) {
+4544-      lastHtml = [
+4545-        '<section class="aicm-core-card">',
+4546-        '  <p class="aicm-eyebrow">直近の実行依頼</p>',
+4547-        '  <h2>request_id</h2>',
+4548-        '  <p class="aicm-selected-note">' + aicmWrtEscape(last.runtime_request.request_id || "未返却") + '</p>',
+4549-        '  <p>status: ' + aicmWrtEscape(last.runtime_request.request_status_code || "-") + '</p>',
+4550-        '</section>'
+4551-      ].join("");
+4552-    }
+4553-
+4554-    return renderShell([
+4555-      '<section class="aicm-core-card">',
+4556-      '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4557-      '  <h2>配置済みAI/Workerに作業を依頼</h2>',
+4558-      company
+4559-        ? '  <p class="aicm-selected-note">対象会社: <strong>' + aicmWrtEscape(company.company_name || "") + '</strong></p>'
+4560-        : '  <p class="aicm-core-empty">AI企業が選択されていません。</p>',
+4561-      workers.length
+4562-        ? '  <p class="aicm-selected-note">配置済みWorker: ' + String(workers.length) + '件</p>'
+4563-        : '  <p class="aicm-core-empty">この会社に配置済みAI/Workerがありません。先に課変更で従業員Workerを配置してください。</p>',
+4564-      '</section>',
+4565-      '<section class="aicm-core-card">',
+4566-      '  <label>実行AI/Worker<select id="aicm-worker-runtime-placement-id">' + aicmWrtWorkerOptions() + '</select></label>',
+4567-      '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
+4568-      '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
+4569-      '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
+4570-      '  <label>source_request_ref<input id="aicm-worker-runtime-source-ref" type="text" placeholder="空なら manual:<timestamp>"></label>',
+4571-      '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
+4572-      '</section>',
+4573-      '<section class="aicm-core-card aicm-operation-card">',
+4574-      '  <p class="aicm-eyebrow">操作</p>',
+4575-      '  <div class="aicm-dashboard-action-row">',
+4576-      '    <button type="button" data-core-action="worker-runtime-confirm">確認へ進む</button>',
+4577-      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+4578-      '  </div>',
+4579-      '</section>',
+4580-      lastHtml
+4581-    ].join(""));
+4582-  }
+4583-
+4584-function renderWorkerRuntimeRequest() {
+4585-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4586-    return renderWorkerRuntimeRequestBaseAxtR9R1() + aicmRuntimeStatusPanelRender();
+4587-  }
+4588-
+4589-function aicmWrtValue(id) {
+4590-    var el = document.getElementById(id);
+4591-    return el ? aicmWrtText(el.value) : "";
+4592-  }
+4593-
+4594-function buildWorkerRuntimePendingPayload() {
+4595-    var company = aicmWrtCurrentCompany();
+4596-    if (!company) throw new Error("AI企業を選択してください。");
+4597-
+4598-    var placementId = aicmWrtValue("aicm-worker-runtime-placement-id");
+4599-    if (!placementId) throw new Error("実行AI/AI/Workerを選択してください。");
+4600-
+4601-    var worker = aicmWrtPlacementById(placementId);
+4602-    if (!worker) throw new Error("選択したWorker配置が見つかりません。");
+4603-
+4604-    var title = aicmWrtValue("aicm-worker-runtime-title");
+4605-    if (!title) throw new Error("作業タイトルを入力してください。");
+4606-
+4607-    var instruction = aicmWrtValue("aicm-worker-runtime-instruction");
+4608-    if (!instruction) throw new Error("作業指示を入力してください。");
+4609-
+4610-    var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
+4611-    var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
+4612-
+4613-    return {
+4614-      endpoint: "/api/aicm/v2/worker-runtime/request",
+4615-      worker_label: aicmWrtWorkerLabel(worker),
+4616-      body: {
+4617-        owner_civilization_id: aicmWrtOwnerId(),
+4618-        aicm_user_company_id: aicmWrtText(company.aicm_user_company_id),
+4619-        aicm_user_company_department_id: aicmWrtText(worker.aicm_user_company_department_id),
+4620-        aicm_user_company_section_id: aicmWrtText(worker.aicm_user_company_section_id),
+4621-        aicm_user_company_worker_placement_id: placementId,
+4622-        model_code: aicmWrtText(worker.aiworker_model_code),
+4623-        robot_pool_id: aicmWrtText(worker.robot_pool_id),
+4624-        app_surface_code: "ai_company_manager",
+4625-        task_domain_code: aicmWrtValue("aicm-worker-runtime-task-domain") || "business_operation",
+4626-        task_title: title,
+4627-        task_instruction_ja: instruction,
+4628-        source_app_ref: "AICompanyManager",
+4629-        source_request_ref: sourceRef,
+4630-        requested_by_ref: "human",
+4631:        idempotency_key: idempotencyKey
+4632-      }
+4633-    };
+4634-  }
+4635-
+4636-function renderWorkerRuntimeConfirm() {
+4637-    var payload = state.pendingWorkerRuntimeRequest || null;
+4638-    if (!payload || !payload.body) {
+4639-      return renderShell([
+4640-        '<section class="aicm-core-card">',
+4641-        '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4642-        '  <h2>確認対象がありません</h2>',
+4643-        '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="worker-runtime-cancel">戻る</button></div>',
+4644-        '</section>'
+4645-      ].join(""));
+4646-    }
+4647-
+4648-    var body = payload.body;
+4649-    var rows = [
+4650-      ["実行AI/Worker", payload.worker_label],
+4651-      ["model_code", body.model_code],
+4652-      ["app_surface_code", body.app_surface_code],
+4653-      ["task_domain_code", body.task_domain_code],
+4654-      ["作業タイトル", body.task_title],
+4655-      ["作業指示", body.task_instruction_ja],
+4656-      ["source_request_ref", body.source_request_ref],
+4657:      ["idempotency_key", body.idempotency_key]
+4658-    ];
+4659-
+4660-    return renderShell([
+4661-      '<section class="aicm-core-card">',
+4662-      '  <p class="aicm-eyebrow">確認画面</p>',
+4663-      '  <h2>AI実行Workbenchを確定しますか？</h2>',
+4664-      '  <p class="aicm-selected-note">この操作はAIWorkerOS Runtime Executionへ実行依頼を作成します。</p>',
+4665-      '</section>',
+4666-      '<section class="aicm-core-card aicm-confirm-card">',
+4667-      rows.map(function (row) {
+4668-        return '<div class="aicm-confirm-row"><strong>' + aicmWrtEscape(row[0]) + '</strong><p>' + aicmWrtEscape(row[1]) + '</p></div>';
+4669-      }).join(""),
+4670-      '</section>',
+4671-      '<section class="aicm-core-card aicm-operation-card">',
+4672-      '  <p class="aicm-eyebrow">操作</p>',
+4673-      '  <div class="aicm-dashboard-action-row">',
+4674-      '    <button type="button" data-core-action="worker-runtime-execute">確定して実行</button>',
+4675-      '    <button type="button" data-core-action="worker-runtime-cancel">戻る</button>',
+4676-      '  </div>',
+4677-      '</section>'
+4678-    ].join(""));
+4679-  }
+4680-
+4681-async function aicmWrtPostJson(path, body) {
+4682-    var response = await fetch(path, {
+4683-      method: "POST",
+4684-      headers: {
+4685-        "Content-Type": "application/json"
+4686-      },
+4687-      body: JSON.stringify(body || {})
+4688-    });
+4689-
+4690-    var json = await response.json().catch(function () {
+4691-      return {};
+4692-    });
+4693-
+4694-    if (!response.ok || !json || json.result !== "ok") {
+4695-      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+4696-    }
+4697-
+4698-    return json;
+4699-  }
+4700-
+4701-async function executeWorkerRuntimeConfirmBaseAxtR9R1() {
+4702-    var payload = state.pendingWorkerRuntimeRequest || null;
+4703-    if (!payload || !payload.endpoint || !payload.body) {
+4704-      setMessage("error", "確認対象がありません。");
+4705-      return;
+4706-    }
+4707-
+4708-    try {
+4709-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4710-      state.pendingWorkerRuntimeRequest = null;
+4711-      state.workerRuntimeLastResult = result;
+4712-      state.screen = "worker-runtime-request";
+4713-      setMessage("ok", "AI実行Workbenchを作成しました。");
+4714-      if (typeof render === "function") render();
+4715-    } catch (error) {
+4716-      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+4717-      if (typeof render === "function") render();
+4718-    }
+4719-  }
+4720-
+4721-async function executeWorkerRuntimeConfirm() {
+4722-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+4723-    var result = await executeWorkerRuntimeConfirmBaseAxtR9R1();
+4724-
+4725-    setTimeout(function () {
+4726-      if (typeof aicmRuntimeStatusRefresh === "function") {
+4727-        aicmRuntimeStatusRefresh();
+4728-      }
+4729-    }, 250);
+4730-
+4731-    return result;
+4732-  }
+4733-
+4734-function confirmWorkerRuntimeRequestFromForm() {
+4735-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4736-    try {
+4737-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4738-      state.screen = "worker-runtime-confirm";
+4739-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4740-      if (typeof render === "function") render();
+4741-    } catch (error) {
+4742-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4743-      if (typeof render === "function") render();
+4744-    }
+4745-  }
+4746-
+4747-function cancelWorkerRuntimeConfirm() {
+4748-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4749-    state.pendingWorkerRuntimeRequest = null;
+4750-    state.screen = "worker-runtime-request";
+4751-    if (typeof render === "function") render();
+4752-  }
+4753-
+4754-function render() {
+4755-    if (!root) return;
+4756-
+4757-    var html = "";

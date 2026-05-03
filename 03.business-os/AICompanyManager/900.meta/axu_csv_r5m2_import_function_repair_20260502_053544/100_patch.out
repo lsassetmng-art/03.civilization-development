@@ -1,0 +1,77 @@
+Could not parse INSERT target/columns from importManagerMajorItemsCsv. Stop without patch.
+function importManagerMajorItemsCsv(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+  const rows = aicmPmlwCsvRows(body);
+
+  if (rows.length === 0) {
+    return { result: "ok", api_identifier: SERVER_MARK, inserted_count: 0, manager_major_items: [] };
+  }
+
+  const values = rows.map((row, index) => [
+    "(",
+    index,
+    ", " + sqlLiteral(owner) + "::uuid",
+    ", " + sqlLiteral(companyId) + "::uuid",
+    ", " + sqlLiteral(row.department_name),
+    ", " + sqlLiteral(row.section_name),
+    ", " + sqlLiteral(row.major_item_name),
+    ", " + sqlLiteral(row.major_item_description),
+    ", " + sqlLiteral(row.assigned_leader_label),
+    ", " + sqlLiteral(row.priority_code),
+    ", " + aicmPmlwOptionalDateSql(row.due_date),
+    ", " + sqlLiteral(row.note),
+    ")"
+  ].join("")).join(",\n    ");
+
+  const sql = [
+    "WITH input_rows(row_order, owner_civilization_id, aicm_user_company_id, department_name, section_name, major_item_name, major_item_description, assigned_leader_label, priority_code, due_date, note) AS (",
+    "  VALUES",
+    "    " + values,
+    "), resolved AS (",
+    "  SELECT i.*, (",
+    "    SELECT d.aicm_user_company_department_id",
+    "    FROM business.aicm_user_company_department d",
+    "    WHERE d.owner_civilization_id = i.owner_civilization_id",
+    "      AND d.aicm_user_company_id = i.aicm_user_company_id",
+    "      AND d.department_status = 'active'",
+    "      AND (i.department_name = '' OR d.department_name = i.department_name)",
+    "    ORDER BY CASE WHEN d.department_name = i.department_name THEN 0 ELSE 1 END, d.display_order, d.created_at",
+    "    LIMIT 1",
+    "  ) AS department_id",
+    "  FROM input_rows i",
+    "), resolved_section AS (",
+    "  SELECT r.*, (",
+    "    SELECT s.aicm_user_company_section_id",
+    "    FROM business.aicm_user_company_section s",
+    "    WHERE s.owner_civilization_id = r.owner_civilization_id",
+    "      AND s.aicm_user_company_id = r.aicm_user_company_id",
+    "      AND s.section_status = 'active'",
+    "      AND (r.department_id IS NULL OR s.aicm_user_company_department_id = r.department_id)",
+    "      AND (r.section_name = '' OR s.section_name = r.section_name)",
+    "    ORDER BY CASE WHEN s.section_name = r.section_name THEN 0 ELSE 1 END, s.display_order, s.created_at",
+    "    LIMIT 1",
+    "  ) AS section_id",
+    "  FROM resolved r",
+    "), inserted AS (",
+    "  INSERT INTO business.aicm_manager_major_work_item (",
+    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+    "    major_item_name, major_item_description, source_route_code, assigned_leader_label,",
+    "    decomposition_status_code, handoff_status_code, priority_code, due_date, note, display_order",
+    "  )",
+    "  SELECT owner_civilization_id, aicm_user_company_id, department_id, section_id,",
+    "         major_item_name, major_item_description, 'csv_import', assigned_leader_label,",
+    "         'not_started', 'draft', priority_code, due_date, note, 100 + row_order",
+    "  FROM resolved_section",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', 'ok',",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'inserted_count', (SELECT count(*) FROM inserted),",
+    "  'manager_major_items', COALESCE((SELECT jsonb_agg(to_jsonb(inserted) ORDER BY display_order, created_at) FROM inserted), '[]'::jsonb)",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}

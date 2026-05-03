@@ -1,0 +1,521 @@
+---- current refs ----
+4408:    function isPendingMajor(row) {
+4449:      return isPendingMajor(row);
+4959:      return isPendingMajor(row);
+
+---- current nearby ----
+4378-      }
+4379-    }
+4380-
+4381-    function asArray(value) {
+4382-      return Array.isArray(value) ? value : [];
+4383-    }
+4384-
+4385-    function rowCompanyId(row) {
+4386-      return String(
+4387-        row && (
+4388-          row.aicm_user_company_id ||
+4389-          row.company_id ||
+4390-          row.user_company_id ||
+4391-          row.companyId ||
+4392-          ""
+4393-        ) || ""
+4394-      );
+4395-    }
+4396-
+4397-    function statusText(row, keys) {
+4398-      for (var i = 0; i < keys.length; i += 1) {
+4399-        var key = keys[i];
+4400-        if (row && row[key] != null && String(row[key]) !== "") {
+4401-          return String(row[key]).toLowerCase();
+4402-        }
+4403-      }
+4404-
+4405-      return "";
+4406-    }
+4407-
+4408:    function isPendingMajor(row) {
+4409-      var handoff = statusText(row, ["handoff_status_code", "handoff_status", "leader_handoff_status_code"]);
+4410-      var decomposition = statusText(row, ["decomposition_status_code", "work_status_code", "status_code"]);
+4411-
+4412-      var closed = {
+4413-        sent: true,
+4414-        handed_off: true,
+4415-        leader_handoff_done: true,
+4416-        submitted: true,
+4417-        delivered: true,
+4418-        done: true,
+4419-        completed: true,
+4420-        complete: true,
+4421-        cancelled: true,
+4422-        canceled: true,
+4423-        archived: true
+4424-      };
+4425-
+4426-      if (closed[handoff]) return false;
+4427-      if (closed[decomposition]) return false;
+4428-
+4429-      return true;
+4430-    }
+4431-
+4432-    function rowOrder(row) {
+4433-      var n = Number(row && (row.display_order || row.sort_order || row.row_order || 0));
+4434-      return Number.isFinite(n) ? n : 0;
+4435-    }
+4436-
+4437-    var rows = []
+4438-      .concat(asArray(ctx.pmlw_major_items))
+4439-      .concat(asArray(ctx.manager_major_items))
+4440-      .concat(asArray(ctx.major_items));
+4441-
+4442-    rows = rows.filter(function (row) {
+4443-      if (!row) return false;
+4444-
+4445-      var cid = rowCompanyId(row);
+4446-
+4447-      if (selectedId && cid && cid !== selectedId) return false;
+4448-
+4449:      return isPendingMajor(row);
+4450-    });
+4451-
+4452-    rows.sort(function (a, b) {
+4453-      var ao = rowOrder(a);
+4454-      var bo = rowOrder(b);
+4455-
+4456-      if (ao !== bo) return ao - bo;
+4457-
+4458-      var an = String((a && (a.major_item_name || a.title || a.task_name || a.deliverable_name)) || "");
+4459-      var bn = String((b && (b.major_item_name || b.title || b.task_name || b.deliverable_name)) || "");
+4460-
+4461-      return an.localeCompare(bn, "ja");
+4462-    });
+4463-
+4464-    return rows;
+4465-  }
+4466-
+4467-
+4468-
+4469-
+4470-
+4471-// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_START
+4472-  function aicmIsPendingManagerMajorRowR8V6(row) {
+4473-    if (!row || typeof row !== "object") return false;
+4474-
+4475-    var handoff = String(row.handoff_status_code || "").toLowerCase();
+4476-    var decomposition = String(row.decomposition_status_code || "").toLowerCase();
+4477-    var deleted = String(row.deleted_flag || row.is_deleted || "").toLowerCase();
+4478-    var archived = String(row.archived_flag || row.is_archived || "").toLowerCase();
+4479-
+--
+4926-        body: JSON.stringify({
+4927-          aicm_manager_major_work_item_id: payload.majorId
+4928-        })
+4929-      });
+4930-
+4931-      var json = null;
+4932-      try {
+4933-        json = await response.json();
+4934-      } catch (_) {
+4935-        json = null;
+4936-      }
+4937-
+4938-      if (!response.ok || (json && json.result && json.result !== "ok")) {
+4939-        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+4940-      }
+4941-
+4942-      state.managerMajorDeleteConfirm = null;
+4943-      setMessage("ok", "大項目を削除済みにしました。");
+4944-      await aicmReloadTaskLedgerContext();
+4945-      state.screen = "task-ledger";
+4946-      render();
+4947-    } catch (error) {
+4948-      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+4949-      render();
+4950-    }
+4951-  }
+4952-// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+4953-
+4954-
+4955-  
+4956:function aicmRenderManagerMajorRows(rows) {
+4957-    var sourceRows = Array.isArray(rows) ? rows : [];
+4958-    var pendingRows = sourceRows.filter(function (row) {
+4959:      return isPendingMajor(row);
+4960-    });
+4961-
+4962-    var confirmCard = aicmRenderMajorItemDeleteConfirmCardR8P();
+4963-
+4964-    if (!pendingRows.length) {
+4965-      return [
+4966-        confirmCard,
+4967-        '<div class="aicm-core-empty">',
+4968-        '  <strong>登録済み大項目はまだありません</strong>',
+4969-        '  <p>CSV取り込み後、未実行/未引き継ぎのManager大項目だけが表示されます。</p>',
+4970-        '</div>'
+4971-      ].join("");
+4972-    }
+4973-
+4974-    var pageSize = aicmMajorItemPageSizeR8O();
+4975-    var totalRows = pendingRows.length;
+4976-    var totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+4977-    var page = aicmMajorItemCurrentPageR8O(totalRows);
+4978-    var start = (page - 1) * pageSize;
+4979-    var pageRows = pendingRows.slice(start, start + pageSize);
+4980-
+4981-    var pager = [
+4982-      '<div class="aicm-dashboard-action-row">',
+4983-      '  <button type="button" data-core-action="pmlw-major-page-prev"' + (page <= 1 ? ' disabled' : '') + '>前ページ</button>',
+4984-      '  <span class="aicm-selected-note">ページ ' + escapeHtml(String(page)) + ' / ' + escapeHtml(String(totalPages)) + '　表示 ' + escapeHtml(String(start + 1)) + '-' + escapeHtml(String(start + pageRows.length)) + ' / ' + escapeHtml(String(totalRows)) + '件</span>',
+4985-      '  <button type="button" data-core-action="pmlw-major-page-next"' + (page >= totalPages ? ' disabled' : '') + '>次ページ</button>',
+4986-      '</div>'
+4987-    ].join("");
+4988-
+4989-    var cards = pageRows.map(function (row, index) {
+--
+4999-        '  <dl class="aicm-core-detail-list">',
+5000-        '    <dt>課長/Leader</dt><dd>' + escapeHtml(summary.leader) + '</dd>',
+5001-        '    <dt>優先度</dt><dd>' + escapeHtml(summary.priority) + '</dd>',
+5002-        '    <dt>期限</dt><dd>' + escapeHtml(summary.due) + '</dd>',
+5003-        '    <dt>状態</dt><dd>' + escapeHtml(summary.status) + '</dd>',
+5004-        '  </dl>',
+5005-        '  <div class="aicm-dashboard-action-row">',
+5006-        '    <button type="button" data-core-action="pmlw-major-leader-handoff" data-major-id="' + escapeHtml(majorId) + '">課長へ送る</button>',
+5007-        '    <button type="button" data-core-action="pmlw-major-delete-open" data-major-id="' + escapeHtml(majorId) + '">削除</button>',
+5008-        '  </div>',
+5009-        '</article>'
+5010-      ].join("");
+5011-    }).join("");
+5012-
+5013-    return [
+5014-      confirmCard,
+5015-      pager,
+5016-      '<div class="aicm-manager-major-list">',
+5017-      cards,
+5018-      '</div>',
+5019-      pager
+5020-    ].join("");
+5021-  }
+5022-
+5023-    function aicmRenderTaskLedgerSafeR8V4(sourceLabel) {
+5024-    state.screen = "task-ledger";
+5025-
+5026-    try {
+5027-      if (!root) return;
+5028-
+5029:      var html = renderTaskLedgerPlaceholder();
+5030-      root.innerHTML = html;
+5031-
+5032-      return true;
+5033-    } catch (error) {
+5034-      var message = error && error.message ? error.message : String(error || "unknown error");
+5035-      var stack = error && error.stack ? String(error.stack) : "";
+5036-
+5037-      if (typeof console !== "undefined" && console && console.error) {
+5038-        console.error("AICM task-ledger render failed", {
+5039-          sourceLabel: sourceLabel || "",
+5040-          message: message,
+5041-          stack: stack
+5042-        });
+5043-      }
+5044-
+5045-      if (root) {
+5046-        root.innerHTML = renderShell([
+5047-          '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
+5048-          '  <p class="aicm-eyebrow">TASK LEDGER RENDER ERROR</p>',
+5049-          '  <h2>部門別タスク台帳の描画でエラーが発生しました</h2>',
+5050-          '  <p class="aicm-selected-note">クリック処理と画面遷移は動いています。以下はブラウザ側の描画エラーです。</p>',
+5051-          '  <dl class="aicm-core-detail-list">',
+5052-          '    <dt>source</dt><dd>' + escapeHtml(sourceLabel || "") + '</dd>',
+5053-          '    <dt>message</dt><dd>' + escapeHtml(message) + '</dd>',
+5054-          '  </dl>',
+5055-          stack ? '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(stack) + '</pre>' : '',
+5056-          '  <div class="aicm-dashboard-action-row">',
+5057-          '    <button type="button" data-core-action="task-ledger-refresh">再読み込み</button>',
+5058-          '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
+5059-          '  </div>',
+--
+5922-
+5923-    var json = null;
+5924-    try {
+5925-      json = await response.json();
+5926-    } catch (_) {
+5927-      json = null;
+5928-    }
+5929-
+5930-    if (!response.ok || (json && json.result && json.result !== "ok")) {
+5931-      throw new Error(json && (json.error_message || json.message || json.error) ? (json.error_message || json.message || json.error) : "Worker自動実行に失敗しました。");
+5932-    }
+5933-
+5934-    return json || {};
+5935-  }
+5936-
+5937-  function aicmWorkerAutoExecutionMessageR8ZI(result) {
+5938-    var executed = result && typeof result.executed_count !== "undefined" ? Number(result.executed_count || 0) : 0;
+5939-    var failed = result && typeof result.failed_count !== "undefined" ? Number(result.failed_count || 0) : 0;
+5940-
+5941-    if (failed > 0) {
+5942-      return "Leader自動分解後、Worker自動実行で一部エラーがありました。成功 " + String(executed) + "件 / 失敗 " + String(failed) + "件。";
+5943-    }
+5944-
+5945-    return "Leader自動分解後、Worker自動実行requestを " + String(executed) + "件作成しました。";
+5946-  }
+5947-// AICM_R8Z_I_WORKER_AUTO_EXECUTION_CORE_END
+5948-
+5949-// AICM_R8Z_B_LEADER_AUTO_DECOMPOSITION_CORE_END
+5950-
+5951-
+5952:function renderTaskLedgerPlaceholder() {
+5953-    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: screen
+5954-    var company = typeof selectedCompany === "function" ? selectedCompany() : null;
+5955-    var companyId = company && company.aicm_user_company_id ? company.aicm_user_company_id : "";
+5956-    var rows = aicmGetManagerMajorRowsForSelectedCompany(companyId);
+5957-    
+5958-
+5959-    // AICM_R8V_REMOVE_LEADER_INBOX_UI_START
+5960-  // Leader受信箱 routine section removed.
+5961-  // Manager大項目サマリの Leader受信済み 件数/詳細を正面表示として使う。
+5962-// AICM_R8V_REMOVE_LEADER_INBOX_UI_END
+5963-return renderShell([
+5964-      '<section class="aicm-core-card">',
+5965-      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+5966-      '  <h2>部門別タスク台帳</h2>',
+5967-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+5968-      '  <p class="aicm-selected-note">未実行のManager大項目だけをDB/contextから表示します。CSV取り込みは部長/Manager分解済み大項目の新規追加です。</p>',
+5969-'  <div class="aicm-dashboard-action-row">',
+5970-      '    <button type="button" data-core-action="task-ledger-refresh">登録済み大項目をリロード</button>',
+5971-      '  </div>',
+5972-      '</section>',
+5973-      aicmRenderManagerMajorSummarySectionR8U(),
+5974-      aicmRenderLeaderAutoFlowStatusR8W(),
+5975-      renderCsvImportCard(company),
+5976-      '<section class="aicm-core-card">',
+5977-      '  <p class="aicm-eyebrow">Manager大項目</p>',
+5978-      '  <h2>登録済み大項目</h2>',
+5979:      aicmRenderManagerMajorRows(rows),
+5980-      '</section>'
+5981-    ].join(""));
+5982-  }
+5983-// AICM_R8Z_C_OUTPUT_VISIBILITY_PANEL_START
+5984-  function aicmR8ZCText(value) {
+5985-    if (value === null || typeof value === "undefined") return "";
+5986-    return String(value).trim();
+5987-  }
+5988-
+5989-  function aicmR8ZCHtml(value) {
+5990-    if (typeof escapeHtml === "function") return escapeHtml(aicmR8ZCText(value));
+5991-    return aicmR8ZCText(value)
+5992-      .replace(/&/g, "&amp;")
+5993-      .replace(/</g, "&lt;")
+5994-      .replace(/>/g, "&gt;")
+5995-      .replace(/"/g, "&quot;")
+5996-      .replace(/'/g, "&#39;");
+5997-  }
+5998-
+5999-  function aicmR8ZCContextArray(names) {
+6000-    var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+6001-
+6002-    for (var i = 0; i < names.length; i += 1) {
+6003-      var key = names[i];
+6004-
+6005-      if (Array.isArray(ctx[key])) return ctx[key];
+6006-      if (Array.isArray(state && state[key])) return state[key];
+6007-    }
+6008-
+6009-    return [];
+--
+6163-
+6164-  function aicmInjectPmlwAutoOutputsPanelR8ZC(html) {
+6165-    var panel = aicmRenderPmlwAutoOutputsPanelR8ZC();
+6166-    var source = String(html || "");
+6167-
+6168-    // AICM_R8Z_C2_OUTPUT_PANEL_POSITION_V1
+6169-    // Prefer showing this directly after Manager大項目サマリ and before CSV/import/list sections.
+6170-    var anchors = [
+6171-      '<section class="aicm-core-card aicm-csv-panel">',
+6172-      '<section class="aicm-core-card"><p class="aicm-eyebrow">Manager大項目</p>',
+6173-      '<section class="aicm-core-card">\n  <p class="aicm-eyebrow">Manager大項目</p>',
+6174-      '<p class="aicm-eyebrow">CSV取り込み</p>'
+6175-    ];
+6176-
+6177-    for (var i = 0; i < anchors.length; i += 1) {
+6178-      var anchor = anchors[i];
+6179-      var index = source.indexOf(anchor);
+6180-
+6181-      if (index >= 0) {
+6182-        return source.slice(0, index) + panel + source.slice(index);
+6183-      }
+6184-    }
+6185-
+6186-    if (source.indexOf('</main>') >= 0) {
+6187-      return source.replace('</main>', panel + '</main>');
+6188-    }
+6189-
+6190-    return source + panel;
+6191-  }
+6192-
+6193:  var aicmRenderTaskLedgerPlaceholderBeforeR8ZC = renderTaskLedgerPlaceholder;
+6194-
+6195:  renderTaskLedgerPlaceholder = function renderTaskLedgerPlaceholder() {
+6196-    return aicmInjectPmlwAutoOutputsPanelR8ZC(
+6197-      aicmRenderTaskLedgerPlaceholderBeforeR8ZC()
+6198-    );
+6199-  };
+6200-// AICM_R8Z_C_OUTPUT_VISIBILITY_PANEL_END
+6201-
+6202-
+6203-// AICM_R8Z_N_WORKER_RUNTIME_STATUS_PANEL_START
+6204-  function aicmR8ZNText(value) {
+6205-    if (value === null || typeof value === "undefined") return "";
+6206-    return String(value).trim();
+6207-  }
+6208-
+6209-  function aicmR8ZNHtml(value) {
+6210-    var text = aicmR8ZNText(value);
+6211-    if (typeof escapeHtml === "function") return escapeHtml(text);
+6212-    return text
+6213-      .replace(/&/g, "&amp;")
+6214-      .replace(/</g, "&lt;")
+6215-      .replace(/>/g, "&gt;")
+6216-      .replace(/"/g, "&quot;")
+6217-      .replace(/'/g, "&#039;");
+6218-  }
+6219-
+6220-  function aicmR8ZNMetadata(row) {
+6221-    var meta = row && (row.metadata_jsonb || row.metadata || row.meta) || {};
+6222-    if (typeof meta === "string") {
+6223-      try {
+6224-        meta = JSON.parse(meta);
+6225-      } catch (_) {
+--
+6413-      '</section>'
+6414-    ].join("");
+6415-  }
+6416-
+6417-  (function aicmInstallR8ZNWorkerRuntimeStatusPanel() {
+6418-    try {
+6419-      if (typeof aicmRenderR8ZCOutputVisibilityPanel === "function" && !aicmRenderR8ZCOutputVisibilityPanel.__r8znWrapped) {
+6420-        var originalR8ZCOutputPanel = aicmRenderR8ZCOutputVisibilityPanel;
+6421-        var wrappedR8ZCOutputPanel = function () {
+6422-          var baseHtml = "";
+6423-          try {
+6424-            baseHtml = originalR8ZCOutputPanel.apply(this, arguments) || "";
+6425-          } catch (error) {
+6426-            baseHtml = [
+6427-              '<section class="aicm-core-card">',
+6428-              '  <p class="aicm-eyebrow">Leader以降の出力</p>',
+6429-              '  <p class="aicm-core-message aicm-core-message-error">Leader以降の出力パネル描画に失敗しました。</p>',
+6430-              '</section>'
+6431-            ].join("");
+6432-          }
+6433-
+6434-          return String(baseHtml || "") + aicmRenderR8ZNWorkerRuntimeStatusPanel();
+6435-        };
+6436-
+6437-        wrappedR8ZCOutputPanel.__r8znWrapped = true;
+6438-        wrappedR8ZCOutputPanel.__r8znOriginal = originalR8ZCOutputPanel;
+6439-        aicmRenderR8ZCOutputVisibilityPanel = wrappedR8ZCOutputPanel;
+6440-        return;
+6441-      }
+6442-
+6443:      if (typeof renderTaskLedgerPlaceholder === "function" && !renderTaskLedgerPlaceholder.__r8znWrapped) {
+6444:        var originalTaskLedgerPlaceholder = renderTaskLedgerPlaceholder;
+6445:        var wrappedTaskLedgerPlaceholder = function () {
+6446-          var base = originalTaskLedgerPlaceholder.apply(this, arguments);
+6447-          return String(base || "") + aicmRenderR8ZNWorkerRuntimeStatusPanel();
+6448-        };
+6449-
+6450:        wrappedTaskLedgerPlaceholder.__r8znWrapped = true;
+6451:        wrappedTaskLedgerPlaceholder.__r8znOriginal = originalTaskLedgerPlaceholder;
+6452:        renderTaskLedgerPlaceholder = wrappedTaskLedgerPlaceholder;
+6453-      }
+6454-    } catch (error) {
+6455-      if (typeof console !== "undefined" && console.warn) {
+6456-        console.warn("AICM R8Z-N worker runtime status panel install skipped", error);
+6457-      }
+6458-    }
+6459-  })();
+6460-// AICM_R8Z_N_WORKER_RUNTIME_STATUS_PANEL_END
+6461-
+6462-
+6463-
+6464-  
+6465-// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+6466-// Human review queue UI.
+6467-// Human review only shows delivery summaries / exception summaries.
+6468-// AI review remains internal; the UI displays ai_review_result_text summary only.
+6469-
+6470-function aicmHumanReviewOwnerId() {
+6471-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+6472-    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+6473-    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+6474-    return "00000000-0000-4000-8000-000000000001";
+6475-  }
+6476-
+6477-  function aicmHumanReviewRows() {
+6478-    var ctx = state.context || state || {};
+6479-    var rows = ctx.review_wait_items || state.review_wait_items || [];
+6480-    return Array.isArray(rows) ? rows : [];
+6481-  }
+6482-
+--
+7575-    ].join("");
+7576-  }
+7577-
+7578-function render() {
+7579-    if (!root) return;
+7580-
+7581-    var html = "";
+7582-
+7583-    if (state.screen === "company-new") {
+7584-      html = renderCompanyNew();
+7585-    } else if (state.screen === "department-new") {
+7586-      html = renderDepartmentNew();
+7587-    } else if (state.screen === "section-new") {
+7588-      html = renderSectionNew();
+7589-    } else if (state.screen === "placement-new") {
+7590-      html = renderPlacementNew();
+7591-    } else if (state.screen === "worker-runtime-confirm") {
+7592-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+7593-      html = renderWorkerRuntimeConfirm();
+7594-    } else if (state.screen === "worker-runtime-request") {
+7595-      html = renderWorkerRuntimeRequest();
+7596-    } else if (state.screen === "settings") {
+7597-      html = renderSettings();
+7598-    } else if (state.screen === "department-edit") {
+7599-      html = renderDepartmentEditPlaceholder();
+7600-    } else if (state.screen === "section-edit") {
+7601-      html = renderSectionEditPlaceholder();
+7602-    } else if (state.screen === "ai-business-start") {
+7603-      html = renderAicmBusinessStartScreen();
+7604-    } else if (state.screen === "task-ledger") {
+7605:      html = renderTaskLedgerPlaceholder();
+7606-    } else if (state.screen === "review-list") {
+7607-      html = (typeof window !== "undefined" && typeof window.aicmR8zV7RenderReviewList === "function" ? window.aicmR8zV7RenderReviewList(state) : renderReviewListPlaceholder()); // AICM_R8Z_V7_ROUTE_BRIDGE_CALL
+7608-    } else {
+7609-      html = renderDashboard();
+7610-    }
+7611-
+7612-    
+7613-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+7614-    if (
+7615-      state &&
+7616-      (
+7617-        state.screen === "company-edit" ||
+7618-        state.screen === "company-change" ||
+7619-        state.screen === "company-update"
+7620-      )
+7621-    ) {
+7622-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+7623-      html = renderCompanyEditPlaceholder();
+7624-    }
+7625-
+7626-
+7627-    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+7628-    if (state && state.screen === "company-edit") {
+7629-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+7630-      html = renderCompanyEditPlaceholder();
+7631-    }
+7632-
+7633-    if (state && state.screen === "department-edit") {
+7634-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+7635-      html = renderDepartmentEditPlaceholder();

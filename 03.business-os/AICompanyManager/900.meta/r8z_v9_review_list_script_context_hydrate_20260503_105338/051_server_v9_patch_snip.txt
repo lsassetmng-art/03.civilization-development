@@ -1,0 +1,70 @@
+2136-
+2137-
+2138-    if (route === "/api/aicm/v2/company/update" && req.method === "POST") {
+2139-      const body = await readBody(req);
+2140-      sendJson(res, 200, updateCompany(body));
+2141-      return true;
+2142-    }
+2143-
+2144-    if (route === "/api/aicm/v2/department/update" && req.method === "POST") {
+2145-      const body = await readBody(req);
+2146-      sendJson(res, 200, updateDepartment(body));
+2147-      return true;
+2148-    }
+2149-
+2150-    // AICM_ORGANIZATION_UPDATE_DELEGATES_TO_SECTION_UPDATE
+2151-    // UI label "組織変更" is connected to the current section/k課 update responsibility.
+2152-    // Keep this as an explicit compatibility route so future split can be handled here.
+2153-    if (route === "/api/aicm/v2/organization/update" && req.method === "POST") {
+2154-      const body = await readBody(req);
+2155-      sendJson(res, 200, updateSection(body));
+2156-      return true;
+2157-    }
+2158-
+2159-    if (route === "/api/aicm/v2/section/update" && req.method === "POST") {
+2160-      const body = await readBody(req);
+2161-      sendJson(res, 200, updateSection(body));
+2162-      return true;
+2163-    }
+2164-
+2165-
+2166:    // AICM_R8Z_V9_CONTEXT_SCRIPT_ROUTE: review-list script transport for local browser hydration
+2167:    if (route === "/api/aicm/v2/context-script" && req.method === "GET") {
+2168-      const owner = url.searchParams.get("owner_civilization_id") || "";
+2169-      const callbackRaw = url.searchParams.get("callback") || "__aicmR8zV9ReviewContextCallback";
+2170-      const callback = /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/.test(callbackRaw)
+2171-        ? callbackRaw
+2172-        : "__aicmR8zV9ReviewContextCallback";
+2173-      const payload = getContext(owner);
+2174-      const js = [
+2175:        "/* AICM_R8Z_V9_CONTEXT_SCRIPT_ROUTE */",
+2176-        "try {",
+2177-        callback + "(" + JSON.stringify(payload) + ");",
+2178-        "} catch (error) {",
+2179-        "  try { window.__aicmR8zV9ReviewContextError = String(error && error.message ? error.message : error); } catch (_) {}",
+2180-        "}"
+2181-      ].join("\n");
+2182-
+2183-      res.writeHead(200, {
+2184-        "content-type": "application/javascript; charset=utf-8",
+2185-        "access-control-allow-origin": "*",
+2186-        "cache-control": "no-store"
+2187-      });
+2188-      res.end(js);
+2189-      return true;
+2190-    }
+2191-
+2192-if (route === "/api/aicm/v2/context" && req.method === "GET") {
+2193-      sendJson(res, 200, getContext(url.searchParams.get("owner_civilization_id") || ""));
+2194-      return true;
+2195-    }
+2196-
+2197-    if (route === "/api/aicm/v2/company/create" && req.method === "POST") {
+2198-      sendJson(res, 200, createCompany(await readBody(req)));
+2199-      return true;
+2200-    }
+2201-
+2202-    if (route === "/api/aicm/v2/department/create" && req.method === "POST") {
+2203-      const payload = createDepartment(await readBody(req));
+2204-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+2205-      return true;

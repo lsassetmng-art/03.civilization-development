@@ -1,0 +1,171 @@
+============================================================
+Organization update connection scan
+============================================================
+
+---- server organization/update ----
+1141-      const body = await readBody(req);
+1142-      sendJson(res, 200, updateDepartment(body));
+1143-      return true;
+1144-    }
+1145-
+1146-    // AICM_ORGANIZATION_UPDATE_DELEGATES_TO_SECTION_UPDATE
+1147-    // UI label "組織変更" is connected to the current section/k課 update responsibility.
+1148-    // Keep this as an explicit compatibility route so future split can be handled here.
+1149:    if (route === "/api/aicm/v2/organization/update" && req.method === "POST") {
+1150-      const body = await readBody(req);
+1151-      sendJson(res, 200, updateSection(body));
+1152-      return true;
+1153-    }
+1154-
+1155-    if (route === "/api/aicm/v2/section/update" && req.method === "POST") {
+1156-      const body = await readBody(req);
+1157-      sendJson(res, 200, updateSection(body));
+
+---- server section/update ----
+1147-    // UI label "組織変更" is connected to the current section/k課 update responsibility.
+1148-    // Keep this as an explicit compatibility route so future split can be handled here.
+1149-    if (route === "/api/aicm/v2/organization/update" && req.method === "POST") {
+1150-      const body = await readBody(req);
+1151-      sendJson(res, 200, updateSection(body));
+1152-      return true;
+1153-    }
+1154-
+1155:    if (route === "/api/aicm/v2/section/update" && req.method === "POST") {
+1156-      const body = await readBody(req);
+1157-      sendJson(res, 200, updateSection(body));
+1158-      return true;
+1159-    }
+1160-
+1161-if (route === "/api/aicm/v2/context" && req.method === "GET") {
+1162-      sendJson(res, 200, getContext(url.searchParams.get("owner_civilization_id") || ""));
+1163-      return true;
+
+---- clean core endpoint refs ----
+931:      endpoint: "/api/aicm/v2/company/update",
+966:      endpoint: "/api/aicm/v2/department/update",
+1003:      endpoint: "/api/aicm/v2/section/update",
+
+---- clean core organization related refs ----
+30:    selectedSectionId: "AICM_V2_SELECTED_SECTION_ID",
+40:    createSection: "/api/aicm/v2/section/create",
+55:    selectedSectionId: readStorage(STORAGE.selectedSectionId) || "",
+59:      sections: [],
+141:      sections: Array.isArray(json.sections) ? json.sections : [],
+160:  function getSection(sectionId) {
+161:    return state.context.sections.find(function (section) {
+162:      return section.aicm_user_company_section_id === sectionId;
+172:  function departmentSections(departmentId) {
+173:    return state.context.sections.filter(function (section) {
+174:      return section.aicm_user_company_department_id === departmentId;
+192:  function selectedSection() {
+193:    return getSection(state.selectedSectionId);
+217:      state.selectedSectionId = "";
+220:      writeStorage(STORAGE.selectedSectionId, "");
+229:      var sections = departmentSections(departmentId);
+230:      if (!getSection(state.selectedSectionId)) {
+231:        state.selectedSectionId = sections[0] ? sections[0].aicm_user_company_section_id : "";
+232:        writeStorage(STORAGE.selectedSectionId, state.selectedSectionId);
+236:      state.selectedSectionId = "";
+238:      writeStorage(STORAGE.selectedSectionId, "");
+312:  function createSection(payload) {
+321:    return requestJson(API.createSection, {
+325:      section_name: payload.sectionName,
+328:      if (json.section && json.section.aicm_user_company_section_id) {
+329:        state.selectedSectionId = json.section.aicm_user_company_section_id;
+330:        writeStorage(STORAGE.selectedSectionId, state.selectedSectionId);
+332:      state.noticeMessage = "課を作成しました。";
+346:      aicm_user_company_section_id: payload.sectionId || "",
+380:    if (state.screen === "section-new") return "課新規追加";
+463:    var sections = departments.reduce(function (acc, department) {
+464:      return acc.concat(departmentSections(department.aicm_user_company_department_id));
+469:      '<section class="aicm-dashboard-grid aicm-dashboard-main-grid">',
+485:      company ? renderCompanyOverview(company, departments, sections, placements) : renderNoCompanyCard(),
+487:      '</section>',
+489:      '<section class="aicm-core-card">',
+490:      '  <p class="aicm-eyebrow">部門 / 課</p>',
+491:      '  <h2>部門 / 課</h2>',
+493:      '</section>'
+511:// Company / Department / Section update UI.
+537:  function aicmOrgSections() {
+539:    var rows = ctx.sections || state.sections || [];
+564:  function aicmOrgSectionById(id) {
+565:    return aicmOrgSections().find(function (row) {
+566:      return row.aicm_user_company_section_id === id;
+576:  function aicmOrgSectionsForCompany(companyId) {
+577:    return aicmOrgSections().filter(function (row) {
+582:  function aicmOrgSectionsForDepartment(departmentId) {
+583:    return aicmOrgSections().filter(function (row) {
+648:        '<section class="aicm-core-card">',
+652:        '</section>'
+657:      '<section class="aicm-core-card">',
+669:      '</section>'
+675:      return '<section class="aicm-core-card"><p class="aicm-eyebrow">部門変更</p><h2>AI企業を選択してください</h2></section>';
+680:        '<section class="aicm-core-card">',
+684:        '</section>'
+689:      '<section class="aicm-core-card">',
+704:      '</section>'
+710:      '<section class="aicm-core-card">',
+725:      '</section>'
+729:  function renderSectionUpdatePicker(company, rows) {
+731:      return '<section class="aicm-core-card"><p class="aicm-eyebrow">課変更</p><h2>AI企業を選択してください</h2></section>';
+736:        '<section class="aicm-core-card">',
+737:        '  <p class="aicm-eyebrow">課変更</p>',
+738:        '  <h2>変更できる課がありません</h2>',
+739:        '  <p class="aicm-core-empty">先に課新規追加で課を作成してください。</p>',
+740:        '</section>'
+745:      '<section class="aicm-core-card">',
+746:      '  <p class="aicm-eyebrow">課変更</p>',
+747:      '  <h2>変更する課を選択</h2>',
+754:          '    <strong>' + escapeHtml(row.section_name || '課') + '</strong>',
+757:          '  <button type="button" data-core-action="section-update-select" data-section-id="' + escapeHtml(row.aicm_user_company_section_id || '') + '">変更</button>',
+761:      '</section>'
+765:  function renderSectionUpdateForm(section) {
+767:      '<section class="aicm-core-card">',
+768:      '  <p class="aicm-eyebrow">課変更</p>',
+769:      '  <h2>課情報を変更</h2>',
+770:      '  <input type="hidden" id="aicm-section-edit-id" value="' + escapeHtml(section.aicm_user_company_section_id || '') + '">',
+771:      '  <label>課名<input id="aicm-section-edit-name" type="text" value="' + escapeHtml(section.section_name || '') + '"></label>',
+772:      '  <label>目的<textarea id="aicm-section-edit-purpose" rows="4">' + escapeHtml(section.purpose || '') + '</textarea></label>',
+773:      '  <label>状態<select id="aicm-section-edit-status">',
+774:      '    <option value="active"' + ((section.section_status || 'active') === 'active' ? ' selected' : '') + '>active</option>',
+775:      '    <option value="inactive"' + ((section.section_status || '') === 'inactive' ? ' selected' : '') + '>inactive</option>',
+776:      '    <option value="archived"' + ((section.section_status || '') === 'archived' ? ' selected' : '') + '>archived</option>',
+779:      '    <button type="button" data-core-action="section-update-save">変更を保存</button>',
+780:      '    <button type="button" data-core-action="section-update-clear">一覧へ戻る</button>',
+782:      '</section>'
+798:  function renderAicmSectionUpdateScreen() {
+800:    var selectedId = state.editingSectionId || "";
+801:    var selected = selectedId ? aicmOrgSectionById(selectedId) : null;
+802:    var rows = company ? aicmOrgSectionsForCompany(company.aicm_user_company_id) : [];
+803:    return renderShell(selected ? renderSectionUpdateForm(selected) : renderSectionUpdatePicker(company, rows));
+812:    if (kind === "section") return "課変更";
+822:        key !== "aicm_user_company_section_id";
+842:      '<section class="aicm-core-card">',
+846:      '</section>',
+848:      '<section class="aicm-core-card aicm-operation-card">',
+854:      '</section>'
+883:      if (payload.kind === "section") state.editingSectionId = "";
+973:function saveSectionUpdateFromForm() {
+974:    var sectionId = aicmAvdTextById("aicm-section-edit-id");
+975:    var companyId = aicmAvdTextById("aicm-section-edit-company-id");
+976:    var departmentId = aicmAvdTextById("aicm-section-edit-department-id");
+978:    if (!sectionId || !companyId || !departmentId) {
+979:      setMessage("error", "変更対象の課が見つかりません。");
+987:      aicm_user_company_section_id: sectionId,
+988:      section_name: aicmAvdTextById("aicm-section-edit-name"),
+989:      purpose: aicmAvdTextById("aicm-section-edit-purpose"),
+990:      section_status: aicmAvdTextById("aicm-section-edit-status") || "active"
+994:      ["操作", "課変更"],
+995:      ["課名", body.section_name],
+997:      ["状態", body.section_status]
+998:    ].concat(aicmAvdRoleSummaryRows("section"));
+1001:      kind: "section-update",
+1002:      title: "課変更",
+1003:      endpoint: "/api/aicm/v2/section/update",
+1100:        Array.isArray(c.sections)
+1109:          Array.isArray(c.context.sections)
+1187:function aicmSectionsForCompanySafe(companyId) {
+1190:    if (typeof aicmOrgSectionsForCompany === "function") {
+
+---- handleApi remaining sendJson + bare return ----
+remaining_count=0

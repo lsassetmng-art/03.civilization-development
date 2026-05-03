@@ -1,0 +1,119 @@
+============================================================
+Event listener context
+============================================================
+3737-        robotPoolId: fieldValue(form, "robotPoolId"),
+3738-        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",
+3739-        internalNickname: fieldValue(form, "internalNickname")
+3740-      });
+3741-    } else {
+3742-      task = Promise.reject(new Error("未知のフォームです。"));
+3743-    }
+3744-
+3745-    state.loading = true;
+3746-    render();
+3747-
+3748-    task.catch(function (error) {
+3749-      state.loading = false;
+3750-      state.errorMessage = publicErrorMessage(error);
+3751-      render();
+3752-    });
+3753-  }
+3754-
+3755:  function handleRootClick(event) {
+3756-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+3757-  var aicmRawClickTarget = event.target;
+3758-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+3759-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+3760-    : aicmRawClickTarget;
+3761-
+3762-    var button = aicmActionTarget.closest("[data-core-action]");
+3763-    if (!button) return;
+3764-
+3765-    var action = button.getAttribute("data-core-action") || "";
+3766-
+3767-            if (action === "task-ledger-fill-csv-template") {
+3768-      fillTaskLedgerCsvTemplate();
+3769-      return;
+3770-    }
+3771-
+3772-        if (action === "task-ledger-csv-file-open") {
+3773-      openTaskLedgerCsvFilePicker();
+--
+3927-  }
+3928-
+3929-  function handleRootChange(event) {
+3930-    var field = event.target;
+3931-    var fieldName = field.getAttribute("data-core-field") || "";
+3932-
+3933-    if (fieldName === "selectedCompanyId") {
+3934-      setSelectedCompany(field.value);
+3935-      render();
+3936-      return;
+3937-    }
+3938-
+3939-    if (fieldName === "selectedDepartmentId") {
+3940-      setSelectedDepartment(field.value);
+3941-      render();
+3942-    }
+3943-  }
+3944-
+3945:  function handleRootSubmit(event) {
+3946-    var form = event.target.closest("form[data-core-form]");
+3947-    if (!form) return;
+3948-
+3949-    event.preventDefault();
+3950-    submitForm(form);
+3951-  }
+3952-
+3953-  
+3954-
+3955-function injectMinimalCss() {
+3956-    if (document.getElementById("aicm-production-core-css")) return;
+3957-
+3958-    var style = document.createElement("style");
+3959-    style.id = "aicm-production-core-css";
+3960-    style.textContent = [
+3961-      ".aicm-core{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:980px;margin:0 auto;padding:20px;color:#172033;background:#f6f7fb;min-height:100vh}",
+3962-      ".aicm-core-header{padding:10px 0 18px}",
+3963-      ".aicm-core-header h1{font-size:32px;margin:0;letter-spacing:-.04em}",
+--
+4066-      ".aicm-company-overview-stat strong{display:block;margin-top:4px;font-size:20px}",
+4067-      "@media(min-width:820px){.aicm-dashboard-main-grid{grid-template-columns:minmax(0,1fr) minmax(320px,.75fr)}}",
+4068-      "@media(max-width:720px){.aicm-core{padding:18px}.aicm-core-header h1{font-size:30px}.aicm-card-title-row{flex-direction:column}.aicm-core-tabs button{flex:1 1 auto}}"
+4069-    ].join("\n");
+4070-    document.head.appendChild(style);
+4071-  }
+4072-
+4073-  function boot() {
+4074-    root = document.getElementById("aicm-root");
+4075-
+4076-    if (!root) {
+4077-      root = document.createElement("div");
+4078-      root.id = "aicm-root";
+4079-      document.body.appendChild(root);
+4080-    }
+4081-
+4082-    injectMinimalCss();
+4083-
+4084:      root.addEventListener("change", function (event) {
+4085-    var target = event.target;
+4086-    if (target && target.getAttribute && target.getAttribute("data-core-file") === "task-ledger-csv") {
+4087-      readTaskLedgerCsvFile(target.files && target.files[0]);
+4088-    }
+4089-  });
+4090:root.addEventListener("click", handleRootClick);
+4091:    root.addEventListener("change", handleRootChange);
+4092:    root.addEventListener("submit", handleRootSubmit);
+4093-
+4094-    writeStorage(STORAGE.ownerCivilizationId, state.ownerCivilizationId);
+4095-
+4096-    render();
+4097-    loadContext();
+4098-  }
+4099-
+4100-  if (document.readyState === "loading") {
+4101:    document.addEventListener("DOMContentLoaded", boot, { once: true });
+4102-  } else {
+4103-    boot();
+4104-  }
+4105-})();

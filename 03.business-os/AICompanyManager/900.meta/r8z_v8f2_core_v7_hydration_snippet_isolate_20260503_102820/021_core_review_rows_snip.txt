@@ -1,0 +1,300 @@
+  6459:   })();
+  6460: // AICM_R8Z_N_WORKER_RUNTIME_STATUS_PANEL_END
+  6461: 
+  6462: 
+  6463: 
+  6464:   
+  6465: // AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+  6466: // Human review queue UI.
+  6467: // Human review only shows delivery summaries / exception summaries.
+  6468: // AI review remains internal; the UI displays ai_review_result_text summary only.
+  6469: 
+  6470: function aicmHumanReviewOwnerId() {
+  6471:     if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+  6472:     if (state && state.owner_civilization_id) return state.owner_civilization_id;
+  6473:     if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+  6474:     return "00000000-0000-4000-8000-000000000001";
+  6475:   }
+  6476: 
+  6477:   function aicmHumanReviewRows() {
+  6478:     var ctx = state.context || state || {};
+  6479:     var rows = ctx.review_wait_items || state.review_wait_items || [];
+  6480:     return Array.isArray(rows) ? rows : [];
+  6481:   }
+  6482: 
+  6483:   function aicmHumanReviewRowsForCompany(companyId) {
+  6484:     return aicmHumanReviewRows().filter(function (row) {
+  6485:       return !companyId || row.aicm_user_company_id === companyId;
+  6486:     });
+  6487:   }
+  6488: 
+  6489:   async function aicmHumanReviewPostJson(path, body) {
+  6490:     var response = await fetch(path, {
+  6491:       method: "POST",
+  6492:       headers: { "Content-Type": "application/json" },
+  6493:       body: JSON.stringify(body || {})
+  6494:     });
+  6495: 
+  6496:     var text = await response.text();
+  6497:     var json = {};
+  6498: 
+  6499:     try {
+  6500:       json = text ? JSON.parse(text) : {};
+  6501:     } catch (_) {
+  6502:       json = { result: "error", message: text || "Invalid server response" };
+  6503:     }
+  6504: 
+  6505:     if (!response.ok || (json.result && json.result !== "ok")) {
+  6506:       throw new Error(json.message || json.error || ("API failed: " + path));
+  6507:     }
+  6508: 
+  6509:     return json;
+  6510:   }
+  6511: 
+  6512:   async function aicmHumanReviewReload() {
+  6513:     if (typeof aicmPmlwReloadContext === "function") {
+  6514:       await aicmReloadTaskLedgerContext();
+  6515:       return;
+  6516:     }
+  6517: 
+  6518:     if (typeof loadContext === "function") {
+  6519:       await loadContext();
+  6520:       return;
+  6521:     }
+
+  6643:         '  </section>',
+  6644:         '  <div class="aicm-dashboard-action-row">',
+  6645:         '    <button type="button" data-core-action="human-review-approve" data-review-id="' + escapeHtml(id) + '">承認</button>',
+  6646:         '    <button type="button" data-core-action="human-review-return" data-review-id="' + escapeHtml(id) + '">差し戻し</button>',
+  6647:         '  </div>',
+  6648:         '</article>'
+  6649:       ].join("");
+  6650:     }).join("");
+  6651:   }
+  6652: 
+  6653: 
+  6654:   
+  6655: function renderReviewListPlaceholder() {
+  6656: 
+  6657:   // AICM_R8Z_V4B_REVIEW_LIST_STABLE_RENDERER_START
+  6658:   var ctx = state && state.context ? state.context : {};
+  6659:   var rows = [];
+  6660: 
+  6661:   if (ctx && Array.isArray(ctx.review_wait_items)) {
+  6662:     rows = ctx.review_wait_items;
+  6663:   } else if (state && Array.isArray(state.review_wait_items)) {
+  6664:     rows = state.review_wait_items;
+  6665:   } else if (ctx && Array.isArray(ctx.human_review_items)) {
+  6666:     rows = ctx.human_review_items;
+  6667:   }
+  6668: 
+  6669:   function r8zV4bText(value, fallback) {
+  6670:     if (value === null || typeof value === "undefined") return fallback || "";
+  6671:     var text = String(value);
+  6672:     return text.length ? text : (fallback || "");
+  6673:   }
+  6674: 
+  6675:   function r8zV4bEsc(value) {
+  6676:     if (typeof escapeHtml === "function") return escapeHtml(r8zV4bText(value));
+  6677:     return r8zV4bText(value)
+  6678:       .replace(/&/g, "&amp;")
+  6679:       .replace(/</g, "&lt;")
+  6680:       .replace(/>/g, "&gt;")
+  6681:       .replace(/"/g, "&quot;")
+  6682:       .replace(/'/g, "&#039;");
+  6683:   }
+  6684: 
+  6685:   function r8zV4bCompanyName() {
+  6686:     if (state && state.selectedCompanyName) return state.selectedCompanyName;
+  6687:     if (ctx && Array.isArray(ctx.companies)) {
+  6688:       for (var i = 0; i < ctx.companies.length; i += 1) {
+  6689:         var c = ctx.companies[i] || {};
+  6690:         var id = r8zV4bText(c.aicm_user_company_id || c.company_id || c.id);
+  6691:         if (id && id === r8zV4bText(state && state.selectedCompanyId)) {
+  6692:           return r8zV4bText(c.company_name || c.name || c.display_name, "選択中の会社");
+  6693:         }
+  6694:       }
+  6695:       if (ctx.companies[0]) return r8zV4bText(ctx.companies[0].company_name || ctx.companies[0].name, "選択中の会社");
+  6696:     }
+  6697:     return "選択中の会社";
+  6698:   }
+  6699: 
+  6700:   function r8zV4bSummary(row) {
+  6701:     return r8zV4bText(
+  6702:       row.delivery_summary_text ||
+
+  9112:     return fallback || "";
+  9113:   }
+  9114: 
+  9115:   function r8zV5dState() {
+  9116:     if (!window.state || typeof window.state !== "object") {
+  9117:       window.state = {};
+  9118:     }
+  9119:     return window.state;
+  9120:   }
+  9121: 
+  9122:   function r8zV5dContext() {
+  9123:     var state = r8zV5dState();
+  9124:     if (!state.context || typeof state.context !== "object") {
+  9125:       state.context = {};
+  9126:     }
+  9127:     return state.context;
+  9128:   }
+  9129: 
+  9130:   function r8zV5dNormalizeContext(ctx) {
+  9131:     var state = r8zV5dState();
+  9132: 
+  9133:     if (!ctx || typeof ctx !== "object") {
+  9134:       ctx = {};
+  9135:     }
+  9136: 
+  9137:     var rows = [];
+  9138:     if (Array.isArray(ctx.review_wait_items)) rows = ctx.review_wait_items;
+  9139:     else if (Array.isArray(ctx.reviewWaitItems)) rows = ctx.reviewWaitItems;
+  9140:     else if (Array.isArray(ctx.human_review_wait_items)) rows = ctx.human_review_wait_items;
+  9141:     else if (Array.isArray(ctx.humanReviewWaitItems)) rows = ctx.humanReviewWaitItems;
+  9142:     else if (Array.isArray(state.review_wait_items)) rows = state.review_wait_items;
+  9143: 
+  9144:     ctx.review_wait_items = rows;
+  9145:     state.context = ctx;
+  9146:     state.review_wait_items = rows;
+  9147: 
+  9148:     if (ctx.owner_civilization_id) state.owner_civilization_id = ctx.owner_civilization_id;
+  9149:     if (ctx.aicm_user_company_id) state.selectedCompanyId = ctx.aicm_user_company_id;
+  9150: 
+  9151:     return ctx;
+  9152:   }
+  9153: 
+  9154:   function r8zV5dReviewRows() {
+  9155:     var state = r8zV5dState();
+  9156:     var ctx = r8zV5dNormalizeContext(r8zV5dContext());
+  9157: 
+  9158:     var candidates = [
+  9159:       ctx.review_wait_items,
+  9160:       state.review_wait_items,
+  9161:       ctx.reviewWaitItems,
+  9162:       ctx.human_review_wait_items,
+  9163:       ctx.humanReviewWaitItems
+  9164:     ];
+  9165: 
+  9166:     for (var i = 0; i < candidates.length; i += 1) {
+  9167:       if (Array.isArray(candidates[i])) {
+  9168:         return candidates[i].filter(function (row) {
+  9169:           return row && typeof row === "object";
+  9170:         });
+  9171:       }
+  9172:     }
+  9173: 
+  9174:     return [];
+  9175:   }
+  9176: 
+  9177:   function r8zV5dOwnerId() {
+  9178:     var state = r8zV5dState();
+  9179:     var ctx = r8zV5dContext();
+  9180:     return r8zV5dText(
+  9181:       state.owner_civilization_id ||
+  9182:       state.ownerCivilizationId ||
+  9183:       ctx.owner_civilization_id ||
+  9184:       ctx.ownerCivilizationId ||
+  9185:       "00000000-0000-4000-8000-000000000001"
+  9186:     );
+  9187:   }
+  9188: 
+  9189:   function r8zV5dCompanyId() {
+  9190:     var state = r8zV5dState();
+  9191:     var ctx = r8zV5dContext();
+  9192:     return r8zV5dText(
+  9193:       state.selectedCompanyId ||
+  9194:       state.aicm_user_company_id ||
+  9195:       ctx.aicm_user_company_id ||
+  9196:       ctx.selectedCompanyId ||
+  9197:       ctx.company_id
+  9198:     );
+  9199:   }
+  9200: 
+
+  9401: 
+  9402:   function first(row, keys, fallback) {
+  9403:     row = row || {};
+  9404:     for (var i = 0; i < keys.length; i += 1) {
+  9405:       var key = keys[i];
+  9406:       if (Object.prototype.hasOwnProperty.call(row, key)) {
+  9407:         var value = t(row[key]);
+  9408:         if (value) return value;
+  9409:       }
+  9410:     }
+  9411:     return fallback || "";
+  9412:   }
+  9413: 
+  9414:   function normalize(appState, ctx) {
+  9415:     appState = appState || {};
+  9416:     if (!ctx || typeof ctx !== "object") ctx = {};
+  9417: 
+  9418:     var rows = [];
+  9419:     if (Array.isArray(ctx.review_wait_items)) rows = ctx.review_wait_items;
+  9420:     else if (Array.isArray(ctx.reviewWaitItems)) rows = ctx.reviewWaitItems;
+  9421:     else if (Array.isArray(ctx.human_review_wait_items)) rows = ctx.human_review_wait_items;
+  9422:     else if (Array.isArray(ctx.humanReviewWaitItems)) rows = ctx.humanReviewWaitItems;
+  9423:     else if (Array.isArray(appState.review_wait_items)) rows = appState.review_wait_items;
+  9424: 
+  9425:     ctx.review_wait_items = rows;
+  9426:     appState.context = ctx;
+  9427:     appState.review_wait_items = rows;
+  9428: 
+  9429:     if (ctx.owner_civilization_id) appState.owner_civilization_id = ctx.owner_civilization_id;
+  9430:     if (ctx.aicm_user_company_id) appState.selectedCompanyId = ctx.aicm_user_company_id;
+  9431: 
+  9432:     return ctx;
+  9433:   }
+  9434: 
+  9435:   function ctx(appState) {
+  9436:     appState = appState || {};
+  9437:     return normalize(appState, appState.context && typeof appState.context === "object" ? appState.context : {});
+  9438:   }
+  9439: 
+  9440:   function rows(appState) {
+  9441:     appState = appState || {};
+  9442:     var c = ctx(appState);
+  9443:     var candidates = [
+  9444:       c.review_wait_items,
+  9445:       appState.review_wait_items,
+  9446:       c.reviewWaitItems,
+  9447:       c.human_review_wait_items,
+  9448:       c.humanReviewWaitItems
+  9449:     ];
+  9450: 
+  9451:     for (var i = 0; i < candidates.length; i += 1) {
+  9452:       if (Array.isArray(candidates[i])) {
+  9453:         return candidates[i].filter(function (row) {
+  9454:           return row && typeof row === "object";
+  9455:         });
+  9456:       }
+  9457:     }
+  9458:     return [];
+  9459:   }
+  9460: 
+  9461:   function ownerId(appState) {
+  9462:     appState = appState || {};
+  9463:     var c = appState.context || {};
+  9464:     return t(appState.owner_civilization_id || appState.ownerCivilizationId || c.owner_civilization_id || c.ownerCivilizationId || "00000000-0000-4000-8000-000000000001");
+  9465:   }
+  9466: 
+  9467:   function companyId(appState) {
+  9468:     appState = appState || {};
+  9469:     var c = appState.context || {};
+  9470:     return t(appState.selectedCompanyId || appState.aicm_user_company_id || appState.companyId || c.aicm_user_company_id || c.selectedCompanyId || c.company_id);
+  9471:   }
+  9472: 
+  9473:   function companyName(appState) {
+  9474:     appState = appState || {};
+  9475:     var c = appState.context || {};
+  9476:     var cid = companyId(appState);
+  9477: 
+  9478:     var direct = t(appState.selectedCompanyName || c.selectedCompanyName || c.company_name || c.aicm_user_company_name);
+  9479:     if (direct) return direct;
+  9480: 
+  9481:     var companies = Array.isArray(c.companies) ? c.companies : [];
+  9482:     for (var i = 0; i < companies.length; i += 1) {
+  9483:       var row = companies[i] || {};
+  9484:       var id = t(row.aicm_user_company_id || row.company_id || row.id);
+  9485:       if (cid && id === cid) return t(row.company_name || row.name || row.display_name) || "選択中";

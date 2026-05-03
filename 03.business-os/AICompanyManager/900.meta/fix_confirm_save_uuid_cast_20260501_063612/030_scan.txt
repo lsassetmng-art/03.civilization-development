@@ -1,0 +1,209 @@
+============================================================
+AXM scan
+============================================================
+
+---- server syncRoleSettings UUID cast ----
+1173-    String(index),
+1174-    ", " + sqlLiteral(row.target_level_code),
+1175-    ", " + sqlLiteral(row.target_id) + "::uuid",
+1176-    ", " + sqlLiteral(row.role_code),
+1177-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_department_id),
+1178-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_section_id),
+1179-    ")"
+1180-  ].join("")).join(",\n    ");
+1181-
+1182-  const insertValues = insertRows.length ? insertRows.map((row, index) => [
+1183-    "(",
+1184-    String(index),
+1185-    ", " + sqlLiteral(row.target_level_code),
+1186-    ", " + sqlLiteral(row.target_id) + "::uuid",
+1187-    ", " + sqlLiteral(row.role_code),
+1188-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_department_id),
+1189-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_section_id),
+1190-    ", " + aicmRoleSyncOptionalUuidSql(row.robot_pool_id),
+1191-    ", " + sqlLiteral(row.aiworker_model_code),
+1192-    ", " + sqlLiteral(row.internal_nickname),
+1193-    ")"
+1194-  ].join("")).join(",\n    ") : "";
+1195-
+1196-  const insertCte = insertRows.length ? [
+1197-    "), insert_rows(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id, robot_pool_id, aiworker_model_code, internal_nickname) AS (",
+1198-    "  VALUES",
+1199-    "    " + insertValues,
+1200-    "), inserted AS (",
+1201-    "  INSERT INTO business.aicm_user_company_worker_placement (",
+1202-    "    owner_civilization_id, aicm_user_company_id,",
+1203-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1204-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1205-    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1206-    "  )",
+1207-    "  SELECT",
+1208:    "  -- AICM_ROLE_SYNC_UUID_CAST_AXM_V1",
+1209-    "    " + sqlLiteral(owner) + "::uuid,",
+1210-    "    c.aicm_user_company_id,",
+1211-    "    i.aicm_user_company_department_id::uuid,",
+1212-    "    i.aicm_user_company_section_id::uuid,",
+1213-    "    i.target_level_code,",
+1214-    "    i.target_id,",
+1215-    "    'AICompanyManager',",
+1216-    "    i.role_code,",
+1217-    "    i.robot_pool_id::uuid,",
+1218-    "    i.aiworker_model_code,",
+1219-    "    i.internal_nickname,",
+1220-    "    1,",
+1221-    "    'unlimited_system_use',",
+1222-    "    'active'",
+1223-    "  FROM insert_rows i",
+1224-    "  CROSS JOIN company_ok c",
+1225-    "  RETURNING *"
+1226-  ].join("\n") : [
+1227-    "), inserted AS (",
+1228-    "  SELECT *",
+1229-    "  FROM business.aicm_user_company_worker_placement",
+1230-    "  WHERE false"
+1231-  ].join("\n");
+1232-
+1233-  const sql = [
+1234-    "WITH company_ok AS (",
+1235-    "  SELECT aicm_user_company_id",
+1236-    "  FROM business.aicm_user_company",
+1237-    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1238-    "    AND aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1239-    "    AND company_status = 'active'",
+1240-    "  LIMIT 1",
+1241-    "), target_keys(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id) AS (",
+1242-    "  VALUES",
+1243-    "    " + targetValues,
+
+---- server placement sync route ----
+1373-      return true;
+1374-    }
+1375-
+1376-    if (route === "/api/aicm/v2/section/create" && req.method === "POST") {
+1377-      const payload = createSection(await readBody(req));
+1378-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1379-      return true;
+1380-    }
+1381-
+1382-    
+1383-    if (route === "/api/aicm/v2/task-ledger/create" && req.method === "POST") {
+1384-      const payload = createTaskLedger(await readBody(req));
+1385-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1386-      return true;
+1387-    }
+1388-
+1389:    if (route === "/api/aicm/v2/placement/sync-role-settings" && req.method === "POST") {
+1390-      const payload = syncRoleSettings(await readBody(req));
+1391-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1392-      return true;
+1393-    }
+1394-
+1395-if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
+1396-      const payload = createPlacement(await readBody(req));
+1397-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1398-      return true;
+1399-    }
+1400-
+1401-    if (route.startsWith("/api/aicm/v2/")) {
+1402-      sendJson(res, 404, {
+1403-        result: "error",
+1404-        api_identifier: SERVER_MARK,
+1405-        error_message: "unknown v2 endpoint"
+
+---- core confirm error render ----
+867-    root.innerHTML = renderAicmOrgUpdateConfirmation(payload || {});
+868-  }
+869-
+870-  async function executeAicmOrgUpdateConfirm() {
+871-    var payload = state.pendingOrgUpdate || null;
+872-
+873-    if (!payload || !payload.endpoint || !payload.body) {
+874-      setMessage("error", "確認対象がありません。");
+875-      return;
+876-    }
+877-
+878-    try {
+879-      await aicmOrgPostJson(payload.endpoint, payload.body);
+880-            // AICM_AXC_EXECUTE_ROLE_PLACEMENT_SYNC_AFTER_MAIN_UPDATE
+881-      await aicmAxcSyncRolePlacementsForPayload(payload);
+882-state.pendingOrgUpdate = null;
+883-
+884-      if (payload.kind === "department") state.editingDepartmentId = "";
+885-      if (payload.kind === "section") state.editingSectionId = "";
+886-
+887-      setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
+888-      await aicmOrgReloadContext();
+889-    } catch (error) {
+890-      setMessage("error", error && error.message ? error.message : "保存に失敗しました。");
+891:      // AICM_CONFIRM_SAVE_ERROR_RENDER_AXM_V1
+892-      if (typeof render === "function") render();
+893-    }
+894-  }
+895-
+896-  function cancelAicmOrgUpdateConfirm() {
+897-    var payload = state.pendingOrgUpdate || {};
+898-    state.pendingOrgUpdate = null;
+899-
+900-    if (payload.returnScreen) {
+901-      state.screen = payload.returnScreen;
+902-    }
+903-
+904-    if (typeof render === "function") render();
+905-  }
+906-
+907-
+908-  
+909-
+910-// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+911-// Role settings are saved through a dedicated placement sync endpoint after the main entity update succeeds.
+912-// Main company/department/section fields remain separate from robot placement truth.
+913-function aicmAxcUuidLike(value) {
+914-  return /^[0-9a-fA-F-]{36}$/.test(String(value || "").trim());
+915-}
+
+---- core aicmOrgPostJson error extraction ----
+593-  function aicmOrgSetScreen(screen) {
+594-    state.screen = screen;
+595-    if (typeof render === "function") render();
+596-  }
+597-
+598-  async function aicmOrgPostJson(path, body) {
+599-    var response = await fetch(path, {
+600-      method: "POST",
+601-      headers: { "Content-Type": "application/json" },
+602-      body: JSON.stringify(body || {})
+603-    });
+604-
+605-    var text = await response.text();
+606-    var json = {};
+607-
+608-    try {
+609-      json = text ? JSON.parse(text) : {};
+610-    } catch (_) {
+611-      json = { result: "error", message: text || "Invalid server response" };
+612-    }
+613-
+614-    if (!response.ok || (json.result && json.result !== "ok")) {
+615:      throw new Error(json.error_message || json.message || json.error || ("API failed: " + path));
+616-    }
+617-
+618-    return json;
+619-  }
+620-
+621-  async function aicmOrgReloadContext() {
+622-    if (typeof aicmPmlwReloadContext === "function") {
+623-      await aicmPmlwReloadContext();
+624-      return;
+625-    }
+626-
+627-    if (typeof aicmHumanReviewReload === "function") {
+628-      await aicmHumanReviewReload();
+629-      return;
+630-    }
+631-
+632-    if (typeof loadContext === "function") {
+633-      await loadContext();
+634-      return;
+635-    }
+636-
+637-    var owner = encodeURIComponent(aicmOrgOwnerId());

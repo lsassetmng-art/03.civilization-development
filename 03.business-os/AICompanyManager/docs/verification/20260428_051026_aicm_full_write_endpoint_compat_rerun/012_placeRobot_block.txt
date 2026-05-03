@@ -1,0 +1,60 @@
+function placeRobot(body, dryRun) {
+  const companyId = body.company_id || body.companyId || "";
+  const modelCode = body.aiworker_model_code || body.aiworkerModelCode || "HD-R3";
+  const targetLevel = body.target_level_code || body.targetLevelCode || "section";
+  const roleCode = body.role_code || body.roleCode || "Worker";
+  const nickname = body.internal_nickname || body.internalNickname || "Smoke Worker";
+  const targetId = body.target_id || body.targetId || "";
+  const appCode = body.app_code || body.appCode || "AICompanyManager";
+  const quantity = Number(body.placement_quantity || body.placementQuantity || 1);
+  const metadata = body.metadata_jsonb || body.metadataJsonb || {};
+
+  return parseJsonFromPsql(runPsql(`
+BEGIN;
+
+CREATE TEMP TABLE tmp_aicm_grant_result ON COMMIT DROP AS
+SELECT business.fn_company_robot_grant_entitlement(
+  ${uuidSql(companyId)},
+  ${sqlLit(modelCode)},
+  1,
+  'standard',
+  'company',
+  'unlimited_placement'
+) AS entitlement_id;
+
+CREATE TEMP TABLE tmp_aicm_place_result ON COMMIT DROP AS
+SELECT business.fn_company_robot_place(
+  ${uuidSql(companyId)},
+  ${sqlLit(modelCode)},
+  ${sqlLit(targetLevel)},
+  ${sqlLit(roleCode)},
+  ${sqlLit(nickname)},
+  ${uuidSql(targetId)},
+  ${sqlLit(appCode)},
+  ${Number.isFinite(quantity) ? quantity : 1},
+  jsonb_build_object(
+    'source', 'api_v3_place_endpoint_repair_v3',
+    'repair_mode', 'active_js_template_interpolation',
+    'model_code', ${sqlLit(modelCode)},
+    'role_code', ${sqlLit(roleCode)}
+  ) || ${jsonSql(metadata)}
+) AS placement_id
+FROM tmp_aicm_grant_result;
+
+SELECT jsonb_build_object(
+  'ok', true,
+  'dry_run', ${boolSql(dryRun)},
+  'repair_mode', 'active_js_template_interpolation',
+  'aiworker_model_code', ${sqlLit(modelCode)},
+  'role_code', ${sqlLit(roleCode)},
+  'target_level_code', ${sqlLit(targetLevel)},
+  'company_robot_entitlement_id', (SELECT entitlement_id FROM tmp_aicm_grant_result),
+  'company_robot_placement_id', (SELECT placement_id FROM tmp_aicm_place_result),
+  'display_label', ${sqlLit(nickname)} || '@' || ${sqlLit(roleCode)}
+);
+
+${dryRun ? "ROLLBACK;" : "COMMIT;"}
+`));
+}
+
+function updatePlacement(body, dryRun) {

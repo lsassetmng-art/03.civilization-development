@@ -1,0 +1,41 @@
+# AICompanyManager Phase ANU-ANX
+# Prepare controlled production switch plan
+
+generated_at: 2026-04-30 11:22:09 +0900
+
+PASS_COUNT=14
+WARN_COUNT=1
+FAIL_COUNT=0
+FINAL_STATUS=CONTROLLED_PRODUCTION_SWITCH_PLAN_READY_REVIEW_REQUIRED
+
+SCOPE=SWITCH_PLAN_ONLY
+MODIFY_EXISTING_INDEX=NO
+MODIFY_EXISTING_SERVER=NO
+MODIFY_OLD_MAIN_JS=NO
+MODIFY_CLEAN_CORE=NO
+MODIFY_CLEAN_SERVER=NO
+DB_WRITE=NOT_EXECUTED
+DB_READ=NOT_EXECUTED
+API_EXECUTE=NOT_EXECUTED
+RLS_APPLY=NOT_EXECUTED
+DELETE=NOT_EXECUTED
+PYTHON=NOT_USED
+
+CURRENT_SCRIPT_STACK=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/prepare_controlled_production_switch_20260430_112208/100_CURRENT_INDEX_SCRIPT_STACK.txt
+CURRENT_HASHES=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/prepare_controlled_production_switch_20260430_112208/110_CURRENT_FILE_HASHES.txt
+PROPOSED_INDEX=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/prepare_controlled_production_switch_20260430_112208/200_PROPOSED_INDEX_CLEAN_PRODUCTION.html
+SWITCH_DRAFT=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/prepare_controlled_production_switch_20260430_112208/300_SWITCH_TO_CLEAN_PRODUCTION_DRAFT.sh
+ROLLBACK_DRAFT=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/prepare_controlled_production_switch_20260430_112208/310_ROLLBACK_FROM_CLEAN_PRODUCTION_DRAFT.sh
+STOP_LOADING_PLAN=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/prepare_controlled_production_switch_20260430_112208/400_STOP_LOADING_OLD_SCRIPT_STACK_PLAN.md
+VERIFY_PLAN=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/prepare_controlled_production_switch_20260430_112208/500_POST_SWITCH_VERIFY_PLAN.md
+NEXT_PLAN=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/prepare_controlled_production_switch_20260430_112208/900_NEXT_PLAN.md
+RUN_DIR=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/prepare_controlled_production_switch_20260430_112208
+
+SCRIPT_COUNT=36
+PROPOSED_SCRIPT_COUNT=1
+
+INDEX_HASH=944ae703d0fc6ee105dbe64fb33a3660e6fa182190509b45f02c405711fee501
+CURRENT_SERVER_HASH=69466459e52f89af471c52b6673d1da1b7379d52e5e98b2276ba1c2715f434dd
+OLD_JS_HASH=7d9c46ffc8b4d265c5423c8df05b1fb93cd41ad2eb34ddbf76fbab70d7bb496a
+CLEAN_CORE_HASH=2cd195aaa300fe45602c94b99e0e42e884f94bbd77ef6b3fb890ff26bf4e3faa
+CLEAN_SERVER_HASH=b68d62cb140e09addeca66f68914ebf7a07309c1db019901cda8be934970b077

@@ -1,0 +1,430 @@
+============================================================
+fixed branch scan
+============================================================
+5770-      return;
+5771-    }
+5772-
+5773-    if (action === "section-worker-update-open") {
+5774-      var actionTarget = aicmActionTargetSafe(event, button);
+5775-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : (state.editingSectionId || "");
+5776-      state.workerPlacementSectionId = state.editingSectionId || "";
+5777-      state.screen = "worker-placement";
+5778-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5779-      if (typeof render === "function") render();
+5780-      return;
+5781-    }
+5782-
+5783-        // AICM_REMOVE_STALE_ROLE_SETTING_OPEN_AUC_AUF_V1: stale role setting open action removed
+5784-
+5785-    
+5786-
+5787-    if (action === "inline-worker-slot-add") {
+5788-      // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
+5789-      aicmAxoCaptureCurrentEditFormDraft();
+5790-      if (!state.inlineWorkerSlotCount) state.inlineWorkerSlotCount = 3;
+5791-      state.inlineWorkerSlotCount = Math.min(20, Number(state.inlineWorkerSlotCount || 3) + 1);
+5792-      if (typeof render === "function") render();
+5793-      return;
+5794-    }
+5795-
+5796-    if (action === "task-ledger-csv-file-open") {
+5797-      aicmCsvOpenFileInput();
+5798-      return;
+5799-    }
+5800:    // AICM_AXU_CSV_R3_FIX1_LITERAL_NEWLINE_REPAIR_V1
+5801-    if (action === "task-ledger-csv-import") {
+5802-      aicmCsvImportLoadedReadBeforeImport();
+5803-      return;
+5804-    }
+5805-    if (action === "go") {
+5806-      // AICM_CLEAR_TRANSIENT_ON_GO_ASS_ASV
+5807-      if (typeof aicmClearTransientMessage === "function") {
+5808-        var nextScreenForMessageClear = "";
+5809-        try {
+5810-          nextScreenForMessageClear = button && button.getAttribute ? String(button.getAttribute("data-screen") || "") : "";
+5811-        } catch (_) {
+5812-          nextScreenForMessageClear = "";
+5813-        }
+5814-
+5815-        if (
+5816-          nextScreenForMessageClear === "company-edit" ||
+5817-          nextScreenForMessageClear === "company-change" ||
+5818-          nextScreenForMessageClear === "company-update" ||
+5819-          nextScreenForMessageClear === "department-edit" ||
+5820-          nextScreenForMessageClear === "section-edit"
+5821-        ) {
+5822-          aicmClearTransientMessage();
+5823-        }
+5824-      }
+5825-
+5826-      go(button.getAttribute("data-screen") || "dashboard");
+5827-      return;
+5828-    }
+5829-
+5830-    if (action === "reload") {
+
+3481-    var company = selectedCompany();
+3482-
+3483-    if (!company) {
+3484-      setMessage("error", "AI企業を選択してください。");
+3485-      return;
+3486-    }
+3487-
+3488-    var text = String(state.csvImportText || "").trim();
+3489-
+3490-    if (!text) {
+3491-      setMessage("error", "CSVファイルを読み込んでください。");
+3492-      return;
+3493-    }
+3494-
+3495-    try {
+3496-      var rows = parseAicmCsv(text);
+3497-
+3498-      if (!rows.length) {
+3499-        setMessage("error", "取り込めるCSV行がありません。");
+3500-        return;
+3501-      }
+3502-
+3503-      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+3504-        owner_civilization_id: aicmPmlwOwnerId(),
+3505-        aicm_user_company_id: company.aicm_user_company_id,
+3506-        rows: rows
+3507-      });
+3508-
+3509-      var count = result.inserted_count || 0;
+3510-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+3511-      setMessage("ok", state.csvImportLastResult);
+3512-
+3513-      await aicmPmlwReloadContext();
+3514-    } catch (error) {
+3515-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3516-    }
+3517-  }
+3518-
+3519-
+3520-  function renderCsvImportCard(company) {
+3521-    var fileName = state.csvImportFileName || "未選択";
+3522-    var lastResult = state.csvImportLastResult || "";
+3523-
+3524-    return [
+3525-      '<section class="aicm-core-card aicm-csv-panel">',
+3526-      '  <p class="aicm-eyebrow">CSV取り込み</p>',
+3527-      '  <h2>ChatGPTでCSV作成・取り込み</h2>',
+3528-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3529-      '  <div class="aicm-csv-flow">',
+3530-      '    <div class="aicm-csv-flow-step aicm-csv-flow-main">',
+3531-      '      <div><strong>ChatGPT用プロンプト</strong><p>部長/Managerが分解した大項目CSVをChatGPTで作成します。</p></div>',
+3532-      '      <button type="button" data-core-action="task-ledger-chatgpt-prompt">ChatGPT用プロンプト</button>',
+3533-      '    </div>',
+3534-      '    <div class="aicm-csv-flow-step">',
+3535-      '      <div><strong>CSVファイル読込</strong><p>作成したCSVファイルを選択します。</p></div>',
+3536-      '      <button type="button" data-core-action="task-ledger-csv-file-open">CSVファイル読込</button>',
+3537-      '    </div>',
+3538-      '    <div class="aicm-csv-file-name">ファイル名: <strong>' + escapeHtml(fileName) + '</strong></div>',
+3539-      '    <div class="aicm-csv-flow-step">',
+3540-      '      <div><strong>CSV取り込み実行</strong><p>部長/Manager分解済みの大項目CSVを部門別タスク台帳へ登録します。</p></div>',
+3541:      '      <button type="button" data-core-action="task-ledger-csv-import">CSV取り込み実行</button>',
+3542-      '    </div>',
+3543-      '  </div>',
+3544-      '  <input id="aicm-ledger-csv-file" class="aicm-csv-native-file" type="file" accept=".csv,text/csv" data-core-file="task-ledger-csv">',
+3545-      lastResult ? '<p class="aicm-selected-note">' + escapeHtml(lastResult) + '</p>' : '',
+3546-      '</section>'
+3547-    ].join("");
+3548-  }
+3549-
+3550-  
+3551-function renderCsvPreviewTable(preview) {
+3552-    return "";
+3553-  }
+3554-
+3555-  
+3556-function renderCsvTemplatePanel() {
+3557-    return "";
+3558-  }
+3559-
+3560-
+3561-function downloadTextFile(filename, text, mimeType) {
+3562-    var blob = new Blob([String(text || "")], { type: mimeType || "text/plain;charset=utf-8" });
+3563-    var url = URL.createObjectURL(blob);
+3564-    var a = document.createElement("a");
+3565-    a.href = url;
+3566-    a.download = filename;
+3567-    document.body.appendChild(a);
+3568-    a.click();
+3569-    a.remove();
+3570-    setTimeout(function () {
+3571-      URL.revokeObjectURL(url);
+3572-    }, 1000);
+3573-  }
+3574-
+3575-  async function readTaskLedgerCsvFile(file) {
+3576-    if (!file) return;
+3577-
+3578-    try {
+3579-      var text = await file.text();
+3580-      state.csvImportText = text;
+3581-      state.csvImportFileName = file.name || "selected.csv";
+3582-      state.csvImportPreview = [];
+3583-      state.csvImportLastResult = "";
+3584-      setMessage("ok", "CSVファイルを読み込みました: " + state.csvImportFileName);
+3585-    } catch (error) {
+3586-      state.csvImportText = "";
+3587-      state.csvImportFileName = "";
+3588-      state.csvImportPreview = [];
+3589-      state.csvImportLastResult = "";
+3590-      setMessage("error", "CSVファイル読込に失敗しました。");
+3591-    }
+3592-
+3593-    render();
+3594-  }
+3595-
+3596-  function openTaskLedgerCsvFilePicker() {
+3597-    var input = document.getElementById("aicm-ledger-csv-file");
+3598-    if (input) input.click();
+3599-  }
+3600-
+3601-  async function openTaskLedgerChatGptPrompt() {
+--
+5620-        if (aicmScreenOnlyName) {
+5621-          state.screen = aicmScreenOnlyName;
+5622-          if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5623-          if (typeof render === "function") render();
+5624-          return;
+5625-        }
+5626-      }
+5627-
+5628-      return;
+5629-    }
+5630-
+5631-    var action = button.getAttribute("data-core-action") || "";
+5632-
+5633-    // AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+5634-    if (action === "pmlw-major-leader-handoff") {
+5635-      aicmAxuR1OpenLeaderHandoffConfirm(button);
+5636-      return;
+5637-    }
+5638-
+5639-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+5640-    if (action === "worker-runtime-status-refresh") {
+5641-      aicmRuntimeStatusRefresh();
+5642-      return;
+5643-    }
+5644-
+5645-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+5646-    if (action === "worker-runtime-confirm") {
+5647-      confirmWorkerRuntimeRequestFromForm();
+5648-      return;
+5649-    }
+5650-
+5651-    if (action === "worker-runtime-execute") {
+5652-      executeWorkerRuntimeConfirm();
+5653-      return;
+5654-    }
+5655-
+5656-    if (action === "worker-runtime-cancel") {
+5657-      cancelWorkerRuntimeConfirm();
+5658-      return;
+5659-    }
+5660-
+5661-            if (action === "task-ledger-fill-csv-template") {
+5662-      fillTaskLedgerCsvTemplate();
+5663-      return;
+5664-    }
+5665-
+5666-        if (action === "task-ledger-csv-file-open") {
+5667-      openTaskLedgerCsvFilePicker();
+5668-      return;
+5669-    }
+5670-
+5671-    if (action === "task-ledger-chatgpt-prompt") {
+5672-      handleTaskLedgerChatGptPrompt();
+5673-      return;
+5674-    }
+5675-if (action === "task-ledger-csv-preview") {
+5676-      previewTaskLedgerCsv();
+5677-      return;
+5678-    }
+5679-
+5680:    if (action === "task-ledger-csv-import") {
+5681-      importTaskLedgerCsvToPmlwMajor();
+5682-      return;
+5683-    }
+5684-if (action === "task-ledger-create") {
+5685-      createTaskLedgerFromForm();
+5686-      return;
+5687-    }
+5688-if (action === "human-review-approve") {
+5689-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5690-      return;
+5691-    }
+5692-
+5693-    if (action === "human-review-return") {
+5694-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5695-      return;
+5696-    }
+5697-
+5698-    if (action === "department-update-select") {
+5699-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5700-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+5701-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5702-      if (typeof render === "function") render();
+5703-      return;
+5704-    }
+5705-
+5706-    if (action === "department-update-clear") {
+5707-      state.editingDepartmentId = "";
+5708-      if (typeof render === "function") render();
+5709-      return;
+5710-    }
+5711-
+5712-    if (action === "section-update-select") {
+5713-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5714-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+5715-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5716-      if (typeof render === "function") render();
+5717-      return;
+5718-    }
+5719-
+5720-    if (action === "section-update-clear") {
+5721-      state.editingSectionId = "";
+5722-      if (typeof render === "function") render();
+5723-      return;
+5724-    }
+5725-
+5726-    if (action === "company-update-save") {
+5727-      saveCompanyUpdateFromForm();
+5728-      return;
+5729-    }
+5730-
+5731-    if (action === "department-update-save") {
+5732-      saveDepartmentUpdateFromForm();
+5733-      return;
+5734-    }
+5735-
+5736-    if (action === "section-update-save") {
+5737-      saveSectionUpdateFromForm();
+5738-      return;
+5739-    }
+5740-
+5741-    if (action === "org-update-confirm-execute") {
+5742-      executeAicmOrgUpdateConfirm();
+5743-      return;
+5744-    }
+5745-
+5746-    if (action === "org-update-confirm-cancel") {
+5747-      cancelAicmOrgUpdateConfirm();
+5748-      return;
+5749-    }
+5750-
+5751-    if (action === "company-edit-open") {
+5752-      state.screen = "company-edit";
+5753-      if (typeof render === "function") render();
+5754-      return;
+5755-    }
+5756-
+5757-    if (action === "department-edit-pick") {
+5758-      var actionTarget = aicmActionTargetSafe(event, button);
+5759-      state.editingDepartmentId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-department-id") || "") : "";
+5760-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5761-      if (typeof render === "function") render();
+5762-      return;
+5763-    }
+5764-
+5765-    if (action === "section-edit-pick") {
+5766-      var actionTarget = aicmActionTargetSafe(event, button);
+5767-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : "";
+5768-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5769-      if (typeof render === "function") render();
+5770-      return;
+5771-    }
+5772-
+5773-    if (action === "section-worker-update-open") {
+5774-      var actionTarget = aicmActionTargetSafe(event, button);
+5775-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : (state.editingSectionId || "");
+5776-      state.workerPlacementSectionId = state.editingSectionId || "";
+5777-      state.screen = "worker-placement";
+5778-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5779-      if (typeof render === "function") render();
+5780-      return;
+5781-    }
+5782-
+5783-        // AICM_REMOVE_STALE_ROLE_SETTING_OPEN_AUC_AUF_V1: stale role setting open action removed
+5784-
+5785-    
+5786-
+5787-    if (action === "inline-worker-slot-add") {
+5788-      // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
+5789-      aicmAxoCaptureCurrentEditFormDraft();
+5790-      if (!state.inlineWorkerSlotCount) state.inlineWorkerSlotCount = 3;
+5791-      state.inlineWorkerSlotCount = Math.min(20, Number(state.inlineWorkerSlotCount || 3) + 1);
+5792-      if (typeof render === "function") render();
+5793-      return;
+5794-    }
+5795-
+5796-    if (action === "task-ledger-csv-file-open") {
+5797-      aicmCsvOpenFileInput();
+5798-      return;
+5799-    }
+5800-    // AICM_AXU_CSV_R3_FIX1_LITERAL_NEWLINE_REPAIR_V1
+5801:    if (action === "task-ledger-csv-import") {
+5802-      aicmCsvImportLoadedReadBeforeImport();
+5803-      return;
+5804-    }
+5805-    if (action === "go") {
+5806-      // AICM_CLEAR_TRANSIENT_ON_GO_ASS_ASV
+5807-      if (typeof aicmClearTransientMessage === "function") {
+5808-        var nextScreenForMessageClear = "";
+5809-        try {
+5810-          nextScreenForMessageClear = button && button.getAttribute ? String(button.getAttribute("data-screen") || "") : "";
+5811-        } catch (_) {
+5812-          nextScreenForMessageClear = "";
+5813-        }
+5814-
+5815-        if (
+5816-          nextScreenForMessageClear === "company-edit" ||
+5817-          nextScreenForMessageClear === "company-change" ||
+5818-          nextScreenForMessageClear === "company-update" ||
+5819-          nextScreenForMessageClear === "department-edit" ||
+5820-          nextScreenForMessageClear === "section-edit"
+5821-        ) {
+5822-          aicmClearTransientMessage();
+5823-        }
+5824-      }
+5825-
+5826-      go(button.getAttribute("data-screen") || "dashboard");
+5827-      return;
+5828-    }
+5829-
+5830-    if (action === "reload") {
+5831-      loadContext();
+5832-      return;
+5833-    }
+5834-  }
+5835-
+5836-  function handleRootChange(event) {
+5837-    var field = event.target;
+5838-    var fileKind = field.getAttribute("data-core-file") || "";
+5839-    if (fileKind === "task-ledger-csv") {
+5840-      aicmCsvReadSelectedFile(field);
+5841-      return;
+5842-    }
+5843-
+5844-    var fieldName = field.getAttribute("data-core-field") || "";
+5845-
+5846-    if (fieldName === "selectedCompanyId") {
+5847-      setSelectedCompany(field.value);
+5848-      render();
+5849-      return;
+5850-    }
+5851-
+5852-    if (fieldName === "selectedDepartmentId") {
+5853-      setSelectedDepartment(field.value);
+5854-      render();
+5855-    }
+5856-  }
+5857-
+5858-  function handleRootSubmit(event) {
+5859-    var form = event.target.closest("form[data-core-form]");
+5860-    if (!form) return;
+5861-
+

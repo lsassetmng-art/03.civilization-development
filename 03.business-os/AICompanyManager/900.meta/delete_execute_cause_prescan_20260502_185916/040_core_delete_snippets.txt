@@ -1,0 +1,678 @@
+
+===== CORE SNIPPET: function aicmRenderMajorItemDeleteConfirmCardR8P @ 4413 =====
+  }
+
+  function aicmMajorItemSummaryR8O(row) {
+    var title = row && (row.major_item_name || row.deliverable_name || row.task_name) || "Manager大項目";
+    var description = row && (row.major_item_description || row.task_description || row.note) || "";
+    var leader = row && (row.assigned_leader_label || row.leader_label || row.responsible_robot_label) || "未設定";
+    var due = row && row.due_date ? String(row.due_date) : "未設定";
+    var priority = aicmMajorItemPriorityLabelR8O(row && row.priority_code);
+    var status = aicmMajorItemStatusLabelR8O(row);
+
+    return {
+      title: String(title),
+      description: String(description),
+      leader: String(leader),
+      due: String(due),
+      priority: String(priority),
+      status: String(status)
+    };
+  }
+
+  function aicmRenderMajorItemDeleteConfirmCardR8P() {
+    var payload = state.managerMajorDeleteConfirm || null;
+    if (!payload) return "";
+
+    return [
+      '<section id="aicm-manager-major-delete-confirm" class="aicm-core-card" style="border:2px solid #f97316;">',
+      '  <p class="aicm-eyebrow">削除確認</p>',
+      '  <h2>登録済み大項目を削除しますか？</h2>',
+      '  <p class="aicm-selected-note">この操作は確認後にDBへ保存されます。物理DELETEではなく、既存APIで削除済み扱いにします。</p>',
+      '  <dl class="aicm-core-detail-list">',
+      '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
+      '    <dt>課長/Leader</dt><dd>' + escapeHtml(payload.leader || "未設定") + '</dd>',
+      '    <dt>状態</dt><dd>' + escapeHtml(payload.status || "") + '</dd>',
+      '    <dt>期限</dt><dd>' + escapeHtml(payload.due || "未設定") + '</dd>',
+      '  </dl>',
+      payload.description ? '<p class="aicm-selected-note">' + escapeHtml(payload.description) + '</p>' : '',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="pmlw-major-delete-execute">削除を確定</button>',
+      '    <button type="button" data-core-action="pmlw-major-delete-cancel">キャンセル</button>',
+      '  </div>',
+      '</section>'
+    ].join("");
+  }
+  function aicmOpenMajorItemDeleteConfirmR8P(button) {
+    try {
+      var majorId = button && button.getAttribute ? button.getAttribute("data-major-id") : "";
+      if (!majorId) throw new Error("Manager大項目IDを特定できません。");
+
+      var row = aicmAxuR1FindMajorById(majorId);
+      if (!row) throw new Error("Manager大項目を特定できません。");
+
+      var summary = aicmMajorItemSummaryR8O(row);
+
+      state.managerMajorDeleteConfirm = {
+        majorId: majorId,
+        title: summary.title,
+        description: summary.description,
+        leader: summary.leader,
+        due: summary.due,
+        priority: summary.priority,
+        status: summary.status
+      };
+
+      state.screen = "task-ledger";
+      setMessage("ok", "削除確認を表示しました。内容を確認してから確定してください。");
+      render();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "削除確認を表示できません。");
+      render();
+    }
+  }
+
+  function aicmCancelMajorItemDeleteConfirmR8P() {
+    state.managerMajorDeleteConfirm = null;
+    setMessage("ok", "削除をキャンセルしました。");
+    state.screen = "task-ledger";
+    render();
+  }
+
+  async function aicmExecuteMajorItemDeleteConfirmR8P() {
+    var payload = state.managerMajorDeleteConfirm || null;
+    if (!payload || !payload.majorId) {
+      setMessage("error", "削除確認対象がありません。");
+      render();
+      return;
+    }
+
+    try {
+      var response = await fetch("/api/aicm/v2/manager-major/archive", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          aicm_manager_major_work_item_id: payload.majorId
+        })
+      });
+
+      var json = null;
+      try {
+        json = await response.json();
+      } catch (_) {
+        json = null;
+      }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+      }
+
+      state.managerMajorDeleteConfirm = null;
+      setMessage("ok", "大項目を削除済みにしました。");
+
+===== CORE SNIPPET: function aicmOpenMajorItemDeleteConfirmR8P @ 4436 =====
+
+    return [
+      '<section id="aicm-manager-major-delete-confirm" class="aicm-core-card" style="border:2px solid #f97316;">',
+      '  <p class="aicm-eyebrow">削除確認</p>',
+      '  <h2>登録済み大項目を削除しますか？</h2>',
+      '  <p class="aicm-selected-note">この操作は確認後にDBへ保存されます。物理DELETEではなく、既存APIで削除済み扱いにします。</p>',
+      '  <dl class="aicm-core-detail-list">',
+      '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
+      '    <dt>課長/Leader</dt><dd>' + escapeHtml(payload.leader || "未設定") + '</dd>',
+      '    <dt>状態</dt><dd>' + escapeHtml(payload.status || "") + '</dd>',
+      '    <dt>期限</dt><dd>' + escapeHtml(payload.due || "未設定") + '</dd>',
+      '  </dl>',
+      payload.description ? '<p class="aicm-selected-note">' + escapeHtml(payload.description) + '</p>' : '',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="pmlw-major-delete-execute">削除を確定</button>',
+      '    <button type="button" data-core-action="pmlw-major-delete-cancel">キャンセル</button>',
+      '  </div>',
+      '</section>'
+    ].join("");
+  }
+  function aicmOpenMajorItemDeleteConfirmR8P(button) {
+    try {
+      var majorId = button && button.getAttribute ? button.getAttribute("data-major-id") : "";
+      if (!majorId) throw new Error("Manager大項目IDを特定できません。");
+
+      var row = aicmAxuR1FindMajorById(majorId);
+      if (!row) throw new Error("Manager大項目を特定できません。");
+
+      var summary = aicmMajorItemSummaryR8O(row);
+
+      state.managerMajorDeleteConfirm = {
+        majorId: majorId,
+        title: summary.title,
+        description: summary.description,
+        leader: summary.leader,
+        due: summary.due,
+        priority: summary.priority,
+        status: summary.status
+      };
+
+      state.screen = "task-ledger";
+      setMessage("ok", "削除確認を表示しました。内容を確認してから確定してください。");
+      render();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "削除確認を表示できません。");
+      render();
+    }
+  }
+
+  function aicmCancelMajorItemDeleteConfirmR8P() {
+    state.managerMajorDeleteConfirm = null;
+    setMessage("ok", "削除をキャンセルしました。");
+    state.screen = "task-ledger";
+    render();
+  }
+
+  async function aicmExecuteMajorItemDeleteConfirmR8P() {
+    var payload = state.managerMajorDeleteConfirm || null;
+    if (!payload || !payload.majorId) {
+      setMessage("error", "削除確認対象がありません。");
+      render();
+      return;
+    }
+
+    try {
+      var response = await fetch("/api/aicm/v2/manager-major/archive", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          aicm_manager_major_work_item_id: payload.majorId
+        })
+      });
+
+      var json = null;
+      try {
+        json = await response.json();
+      } catch (_) {
+        json = null;
+      }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+      }
+
+      state.managerMajorDeleteConfirm = null;
+      setMessage("ok", "大項目を削除済みにしました。");
+      await aicmReloadTaskLedgerContext();
+      state.screen = "task-ledger";
+      render();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+      render();
+    }
+  }
+// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+
+
+// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_START
+  function aicmIsPendingManagerMajorRowR8V6(row) {
+    if (!row || typeof row !== "object") return false;
+
+    var handoff = String(row.handoff_status_code || "").toLowerCase();
+    var decomposition = String(row.decomposition_status_code || "").toLowerCase();
+    var deleted = String(row.deleted_flag || row.is_deleted || "").toLowerCase();
+    var archived = String(row.archived_flag || row.is_archived || "").toLowerCase();
+
+    if (deleted === "true" || deleted === "1") return false;
+    if (archived === "true" || archived === "1") return false;
+
+
+===== CORE SNIPPET: function aicmCancelMajorItemDeleteConfirmR8P @ 4465 =====
+
+      state.managerMajorDeleteConfirm = {
+        majorId: majorId,
+        title: summary.title,
+        description: summary.description,
+        leader: summary.leader,
+        due: summary.due,
+        priority: summary.priority,
+        status: summary.status
+      };
+
+      state.screen = "task-ledger";
+      setMessage("ok", "削除確認を表示しました。内容を確認してから確定してください。");
+      render();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "削除確認を表示できません。");
+      render();
+    }
+  }
+
+  function aicmCancelMajorItemDeleteConfirmR8P() {
+    state.managerMajorDeleteConfirm = null;
+    setMessage("ok", "削除をキャンセルしました。");
+    state.screen = "task-ledger";
+    render();
+  }
+
+  async function aicmExecuteMajorItemDeleteConfirmR8P() {
+    var payload = state.managerMajorDeleteConfirm || null;
+    if (!payload || !payload.majorId) {
+      setMessage("error", "削除確認対象がありません。");
+      render();
+      return;
+    }
+
+    try {
+      var response = await fetch("/api/aicm/v2/manager-major/archive", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          aicm_manager_major_work_item_id: payload.majorId
+        })
+      });
+
+      var json = null;
+      try {
+        json = await response.json();
+      } catch (_) {
+        json = null;
+      }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+      }
+
+      state.managerMajorDeleteConfirm = null;
+      setMessage("ok", "大項目を削除済みにしました。");
+      await aicmReloadTaskLedgerContext();
+      state.screen = "task-ledger";
+      render();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+      render();
+    }
+  }
+// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+
+
+// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_START
+  function aicmIsPendingManagerMajorRowR8V6(row) {
+    if (!row || typeof row !== "object") return false;
+
+    var handoff = String(row.handoff_status_code || "").toLowerCase();
+    var decomposition = String(row.decomposition_status_code || "").toLowerCase();
+    var deleted = String(row.deleted_flag || row.is_deleted || "").toLowerCase();
+    var archived = String(row.archived_flag || row.is_archived || "").toLowerCase();
+
+    if (deleted === "true" || deleted === "1") return false;
+    if (archived === "true" || archived === "1") return false;
+
+    if (
+      handoff === "archived" ||
+      handoff === "deleted" ||
+      handoff === "cancelled" ||
+      handoff === "canceled" ||
+      handoff === "sent" ||
+      handoff === "handed_off" ||
+      handoff === "completed" ||
+      handoff === "done"
+    ) {
+      return false;
+    }
+
+    if (
+      decomposition === "completed" ||
+      decomposition === "complete" ||
+      decomposition === "done"
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_END
+
+
+  function aicmRenderManagerMajorRows(rows) {
+    var sourceRows = Array.isArray(rows) ? rows : [];
+    var pendingRows = sourceRows.filter(function (row) {
+
+===== CORE SNIPPET: async function aicmExecuteMajorItemDeleteConfirmR8P @ 4472 =====
+        priority: summary.priority,
+        status: summary.status
+      };
+
+      state.screen = "task-ledger";
+      setMessage("ok", "削除確認を表示しました。内容を確認してから確定してください。");
+      render();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "削除確認を表示できません。");
+      render();
+    }
+  }
+
+  function aicmCancelMajorItemDeleteConfirmR8P() {
+    state.managerMajorDeleteConfirm = null;
+    setMessage("ok", "削除をキャンセルしました。");
+    state.screen = "task-ledger";
+    render();
+  }
+
+  async function aicmExecuteMajorItemDeleteConfirmR8P() {
+    var payload = state.managerMajorDeleteConfirm || null;
+    if (!payload || !payload.majorId) {
+      setMessage("error", "削除確認対象がありません。");
+      render();
+      return;
+    }
+
+    try {
+      var response = await fetch("/api/aicm/v2/manager-major/archive", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          aicm_manager_major_work_item_id: payload.majorId
+        })
+      });
+
+      var json = null;
+      try {
+        json = await response.json();
+      } catch (_) {
+        json = null;
+      }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+      }
+
+      state.managerMajorDeleteConfirm = null;
+      setMessage("ok", "大項目を削除済みにしました。");
+      await aicmReloadTaskLedgerContext();
+      state.screen = "task-ledger";
+      render();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+      render();
+    }
+  }
+// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+
+
+// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_START
+  function aicmIsPendingManagerMajorRowR8V6(row) {
+    if (!row || typeof row !== "object") return false;
+
+    var handoff = String(row.handoff_status_code || "").toLowerCase();
+    var decomposition = String(row.decomposition_status_code || "").toLowerCase();
+    var deleted = String(row.deleted_flag || row.is_deleted || "").toLowerCase();
+    var archived = String(row.archived_flag || row.is_archived || "").toLowerCase();
+
+    if (deleted === "true" || deleted === "1") return false;
+    if (archived === "true" || archived === "1") return false;
+
+    if (
+      handoff === "archived" ||
+      handoff === "deleted" ||
+      handoff === "cancelled" ||
+      handoff === "canceled" ||
+      handoff === "sent" ||
+      handoff === "handed_off" ||
+      handoff === "completed" ||
+      handoff === "done"
+    ) {
+      return false;
+    }
+
+    if (
+      decomposition === "completed" ||
+      decomposition === "complete" ||
+      decomposition === "done"
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_END
+
+
+  function aicmRenderManagerMajorRows(rows) {
+    var sourceRows = Array.isArray(rows) ? rows : [];
+    var pendingRows = sourceRows.filter(function (row) {
+      return aicmIsPendingManagerMajorRowR8V6(row);
+    });
+
+    var confirmCard = aicmRenderMajorItemDeleteConfirmCardR8P();
+
+    if (!pendingRows.length) {
+      return [
+
+===== CORE SNIPPET: function aicmExecuteMajorDeleteConfirmFromActionR8V7C2 @ 6750 =====
+
+    if (typeof aicmScrollMajorDeleteConfirmIntoViewR8V7D2 === "function") {
+      setTimeout(aicmScrollMajorDeleteConfirmIntoViewR8V7D2, 50);
+    }
+  }
+  function aicmCancelMajorDeleteConfirmFromActionR8V7C2() {
+    if (typeof aicmCancelMajorItemDeleteConfirmR8P === "function") {
+      aicmCancelMajorItemDeleteConfirmR8P();
+      return;
+    }
+
+    if (state) {
+      state.managerMajorDeleteConfirm = null;
+      state.screen = "task-ledger";
+    }
+
+    setMessage("ok", "削除をキャンセルしました。");
+    render();
+  }
+
+  function aicmExecuteMajorDeleteConfirmFromActionR8V7C2() {
+    if (typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") {
+      aicmExecuteMajorItemDeleteConfirmR8P();
+      return;
+    }
+
+    setMessage("error", "削除確定処理が見つかりません。");
+    render();
+  }
+
+  function aicmMoveMajorItemPageFromActionR8V7C2(delta) {
+    if (typeof aicmMajorItemSetPageR8O === "function") {
+      aicmMajorItemSetPageR8O(delta);
+      return;
+    }
+
+    var current = Number(state.managerMajorPage || 1);
+    if (!Number.isFinite(current) || current < 1) current = 1;
+    state.managerMajorPage = Math.max(1, current + Number(delta || 0));
+    render();
+  }
+// AICM_R8_V7_CLEAN2_DELETE_ACTION_HELPER_HELPER_END
+
+function handleRootChange(event) {
+    var field = event.target;
+    var fileKind = field.getAttribute("data-core-file") || "";
+    if (fileKind === "task-ledger-csv") {
+      aicmCsvReadSelectedFile(field);
+      return;
+    }
+
+    var fieldName = field.getAttribute("data-core-field") || "";
+
+    if (fieldName === "selectedCompanyId") {
+      setSelectedCompany(field.value);
+      render();
+      return;
+    }
+
+    if (fieldName === "selectedDepartmentId") {
+      setSelectedDepartment(field.value);
+      render();
+    }
+  }
+
+  function handleRootSubmit(event) {
+    var form = event.target.closest("form[data-core-form]");
+    if (!form) return;
+
+    event.preventDefault();
+    submitForm(form);
+  }
+
+  
+
+function injectMinimalCss() {
+    if (document.getElementById("aicm-production-core-css")) return;
+
+    var style = document.createElement("style");
+    style.id = "aicm-production-core-css";
+    style.textContent = [
+      ".aicm-core{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:980px;margin:0 auto;padding:20px;color:#172033;background:#f6f7fb;min-height:100vh}",
+      ".aicm-core-header{padding:10px 0 18px}",
+      ".aicm-core-header h1{font-size:32px;margin:0;letter-spacing:-.04em}",
+      ".aicm-core-tabs{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px}",
+      ".aicm-core button{border:1px solid #d8dee9;background:#eef2ff;border-radius:14px;padding:11px 15px;font-weight:800;color:#1f2a44;box-shadow:0 4px 10px rgba(31,42,68,.06)}",
+      ".aicm-core-main{display:grid;gap:16px}",
+      ".aicm-core-card{background:#fff;border:1px solid #e6eaf2;border-radius:22px;padding:20px;box-shadow:0 10px 24px rgba(15,23,42,.06)}",
+      ".aicm-core-card h2{font-size:26px;margin:0 0 14px;letter-spacing:-.03em}",
+      ".aicm-core label{display:block;font-weight:800;margin:12px 0 6px;color:#25324a}",
+      ".aicm-core input,.aicm-core select,.aicm-core textarea{width:100%;box-sizing:border-box;border:1px solid #cfd6e4;border-radius:14px;padding:12px;font-size:16px;background:#fff}",
+      ".aicm-core-message{border-radius:14px;padding:12px 14px;margin:12px 0;background:#f3f4f6}",
+      ".aicm-core-message-ok{background:#ecfdf5;color:#047857}",
+      ".aicm-core-message-error{background:#fef2f2;color:#b91c1c}",
+      ".aicm-core-empty{color:#6b7280;margin:8px 0}",
+      ".aicm-dashboard-grid{display:grid;gap:16px}",
+      ".aicm-dashboard-main-grid{grid-template-columns:minmax(0,1fr)}",
+      ".aicm-card-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}",
+      ".aicm-eyebrow{margin:0 0 6px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}",
+      ".aicm-selected-note{background:#f8fafc;border:1px solid #edf2f7;border-radius:14px;padding:10px 12px;margin:12px 0 0}",
+      ".aicm-overview-block{display:grid;gap:14px}",
+      ".aicm-overview-main strong{display:block;font-size:22px;letter-spacing:-.03em}",
+      ".aicm-overview-main span{color:#5f6c80}",
+      ".aicm-overview-list{display:grid;gap:10px;margin:0}",
+      ".aicm-overview-list div{background:#f8fafc;border:1px solid #edf2f7;border-radius:14px;padding:10px 12px}",
+      ".aicm-overview-list dt{font-size:12px;color:#64748b;font-weight:900}",
+      ".aicm-overview-list dd{margin:4px 0 0;word-break:break-all}",
+      ".aicm-empty-state{border:1px dashed #cbd5e1;background:#f8fafc;border-radius:18px;padding:18px}",
+      ".aicm-empty-state strong{display:block;font-size:18px;margin-bottom:6px}",
+      ".aicm-org-tree{display:grid;gap:12px}",
+      ".aicm-org-node{border:1px solid #edf2f7;background:#fbfdff;border-radius:18px;padding:14px}",
+
+===== CORE SNIPPET: if (action === "pmlw-major-delete-execute") @ 6663 =====
+    if (action === "pmlw-major-page-prev") {
+      aicmMoveMajorItemPageFromActionR8V7C2(-1);
+      return;
+    }
+
+    if (action === "pmlw-major-page-next") {
+      aicmMoveMajorItemPageFromActionR8V7C2(1);
+      return;
+    }
+
+    if (action === "pmlw-major-delete-open") {
+      aicmOpenMajorDeleteConfirmFromActionR8V7C2(event, button);
+      return;
+    }
+
+    if (action === "pmlw-major-delete-cancel") {
+      aicmCancelMajorDeleteConfirmFromActionR8V7C2();
+      return;
+    }
+
+    if (action === "pmlw-major-delete-execute") {
+      aicmExecuteMajorDeleteConfirmFromActionR8V7C2();
+      return;
+    }
+// AICM_R8_V7_CLEAN2_DELETE_ACTION_HELPER_ACTION_HANDLER_END
+
+    if (action === "task-ledger-refresh") {
+      aicmReloadTaskLedgerContext();
+      return;
+    }
+
+    if (action === "reload") {
+      loadContext();
+      return;
+    }
+  }
+
+  
+// AICM_R8_V7_CLEAN2_DELETE_ACTION_HELPER_HELPER_START
+  // AICM_R8_V7D2_DELETE_CONFIRM_VISIBLE_START
+  function aicmScrollMajorDeleteConfirmIntoViewR8V7D2() {
+    try {
+      var card = document.getElementById("aicm-manager-major-delete-confirm");
+      if (card && card.scrollIntoView) {
+        card.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } catch (_) {
+    }
+  }
+// AICM_R8_V7D2_DELETE_CONFIRM_VISIBLE_END
+
+  function aicmResolveMajorDeleteActionTargetR8V7C2(ev, btn) {
+    if (typeof aicmActionTargetSafe === "function") {
+      var safeTarget = aicmActionTargetSafe(ev, btn);
+      if (safeTarget && safeTarget.getAttribute) return safeTarget;
+    }
+
+    if (btn && btn.getAttribute) return btn;
+
+    if (ev && ev.target) {
+      if (ev.target.closest) {
+        var closest = ev.target.closest("[data-core-action]");
+        if (closest && closest.getAttribute) return closest;
+      }
+
+      if (ev.target.getAttribute) return ev.target;
+    }
+
+    return null;
+  }
+
+  function aicmOpenMajorDeleteConfirmFromActionR8V7C2(ev, btn) {
+    var deleteTarget = aicmResolveMajorDeleteActionTargetR8V7C2(ev, btn);
+
+    if (!deleteTarget || !deleteTarget.getAttribute) {
+      setMessage("error", "削除対象のボタンを特定できません。");
+      render();
+      return;
+    }
+
+    if (typeof aicmOpenMajorItemDeleteConfirmR8P !== "function") {
+      setMessage("error", "削除確認処理が見つかりません。");
+      render();
+      return;
+    }
+
+    aicmOpenMajorItemDeleteConfirmR8P(deleteTarget);
+
+    if (typeof aicmScrollMajorDeleteConfirmIntoViewR8V7D2 === "function") {
+      setTimeout(aicmScrollMajorDeleteConfirmIntoViewR8V7D2, 50);
+    }
+  }
+  function aicmCancelMajorDeleteConfirmFromActionR8V7C2() {
+    if (typeof aicmCancelMajorItemDeleteConfirmR8P === "function") {
+      aicmCancelMajorItemDeleteConfirmR8P();
+      return;
+    }
+
+    if (state) {
+      state.managerMajorDeleteConfirm = null;
+      state.screen = "task-ledger";
+    }
+
+    setMessage("ok", "削除をキャンセルしました。");
+    render();
+  }
+
+  function aicmExecuteMajorDeleteConfirmFromActionR8V7C2() {
+    if (typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") {
+      aicmExecuteMajorItemDeleteConfirmR8P();
+      return;

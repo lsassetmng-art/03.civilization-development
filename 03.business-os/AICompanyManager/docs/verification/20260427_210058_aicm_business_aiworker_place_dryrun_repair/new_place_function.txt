@@ -1,0 +1,53 @@
+function placeRobot(payload, dryRun) {
+  const dryRunEnsureEntitlementSql = dryRun ? `
+SELECT business.fn_company_robot_grant_entitlement(
+  :'company_id'::uuid,
+  :'aiworker_model_code',
+  1,
+  'standard',
+  'company',
+  'unlimited_placement'
+);
+` : "";
+
+  const result = runPsql(`
+BEGIN;
+
+${dryRunEnsureEntitlementSql}
+
+SELECT jsonb_build_object(
+  'ok', true,
+  'dry_run', :'dry_run',
+  'company_robot_placement_id',
+  business.fn_company_robot_place(
+    :'company_id'::uuid,
+    :'aiworker_model_code',
+    :'target_level_code',
+    :'role_code',
+    :'internal_nickname',
+    NULLIF(:'target_id', '')::uuid,
+    :'app_code',
+    :'placement_quantity'::integer,
+    :'metadata_jsonb'::jsonb
+  ),
+  'display_label',
+  :'internal_nickname' || '@' || :'role_code'
+);
+
+${dryRun ? "ROLLBACK;" : "COMMIT;"}
+`, {
+    dry_run: dryRun ? "true" : "false",
+    company_id: payload.company_id,
+    aiworker_model_code: payload.aiworker_model_code,
+    target_level_code: payload.target_level_code,
+    role_code: payload.role_code,
+    internal_nickname: payload.internal_nickname,
+    target_id: payload.target_id || "",
+    app_code: payload.app_code,
+    placement_quantity: payload.placement_quantity,
+    metadata_jsonb: payload.metadata_jsonb
+  });
+
+  return parseJsonFromPsql(result);
+}
+

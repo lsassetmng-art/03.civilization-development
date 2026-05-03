@@ -1,0 +1,959 @@
+============================================================
+PMLW / manager major / workflow tree scan
+============================================================
+3628-    var el = document.getElementById("aicm-ledger-csv-text");
+3629-    if (el) {
+3630-      el.value = taskLedgerCsvTemplateText();
+3631-      setMessage("ok", "CSV入力例を確認しました。");
+3632-    }
+3633-    render();
+3634-  }
+3635-
+3636-
+3637-async function importTaskLedgerCsv() {
+3638-    var preview = [];
+3639-
+3640-    try {
+3641-      preview = buildTaskLedgerCsvPreview();
+3642-    } catch (error) {
+3643-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3644-      render();
+3645-      return;
+3646-    }
+3647-
+3648-    var invalidRows = preview.filter(function (row) { return !row.valid; });
+3649-    if (invalidRows.length) {
+3650-      var message = invalidRows.slice(0, 3).map(function (row) {
+3651-        return "行" + row.row_number + ": " + row.errors.join(" / ");
+3652-      }).join(" / ");
+3653-
+3654-      setMessage("error", "CSV取り込み前チェックでエラーがあります。 " + message);
+3655-      render();
+3656-      return;
+3657-    }
+3658-
+3659-    var success = 0;
+3660-    var failed = 0;
+3661-    var messages = [];
+3662-
+3663-    for (var i = 0; i < preview.length; i++) {
+3664-      var row = preview[i];
+3665-
+3666-      try {
+3667-        var response = await fetch("/api/aicm/v2/task-ledger/create", {
+3668-          method: "POST",
+3669-          headers: { "content-type": "application/json" },
+3670-          body: JSON.stringify(row.payload)
+3671-        });
+3672-
+3673-        var json = await response.json();
+3674-
+3675-        if (!response.ok || !json || json.result !== "ok") {
+3676-          throw new Error((json && json.error_message) || "取り込み失敗");
+3677-        }
+3678-
+3679-        success++;
+3680-      } catch (error) {
+3681-        failed++;
+3682-        messages.push("行" + row.row_number + ": " + (error && error.message ? error.message : "取り込み失敗"));
+3683-      }
+3684-    }
+3685-
+3686-    if (typeof loadContext === "function") {
+3687-      await loadContext();
+3688-    }
+3689-
+3690-    if (failed > 0) {
+3691-      state.csvImportLastResult = "CSV取り込み: 成功 " + success + "件 / 失敗 " + failed + "件";
+3692-      setMessage("error", state.csvImportLastResult + "。 " + messages.slice(0, 3).join(" / "));
+3693-    } else {
+3694-      state.csvImportLastResult = "CSV取り込み完了: " + success + "件";
+3695-      state.csvImportText = "";
+3696-      state.csvImportFileName = "";
+3697-      setMessage("ok", state.csvImportLastResult);
+3698-    }
+3699-
+3700-    state.csvImportPreview = [];
+3701-    state.screen = "task-ledger";
+3702-    render();
+3703-  }
+3704-
+3705-
+3706-  
+3707-
+3708:function pmlwMajorRowsForCompany(companyId) {
+3709:    return (state.context.pmlw_major_items || []).filter(function (row) {
+3710-      return String(row.aicm_user_company_id || "") === String(companyId || "");
+3711-    });
+3712-  }
+3713-
+3714:  function pmlwValue(value, fallback) {
+3715-    var text = String(value || "").trim();
+3716-    return text || fallback || "-";
+3717-  }
+3718-
+3719:  function pmlwStatusLabel(value) {
+3720-    var map = {
+3721-      not_started: "未着手",
+3722-      assigned_to_leader: "Leader割当済",
+3723-      leader_decomposing: "Leader分解中",
+3724-      decomposed: "分解済",
+3725-      returned: "差戻し",
+3726-      archived: "削除済",
+3727-      draft: "下書き",
+3728-      ready_handoff: "引渡し準備",
+3729-      handed_off: "引渡し済",
+3730-      accepted: "受領済",
+3731-      completed: "完了",
+3732-      low: "低",
+3733-      normal: "通常",
+3734-      high: "高",
+3735-      urgent: "緊急"
+3736-    };
+3737-
+3738:    return map[value] || pmlwValue(value, "-");
+3739-  }
+3740-
+3741-  function renderPmlwMajorRows(rows) {
+3742-    if (!rows.length) {
+3743-      return [
+3744-        '<div class="aicm-empty-state">',
+3745-        '  <strong>Manager大項目はまだありません</strong>',
+3746-        '  <p>President方針またはユーザー依頼からManagerが大項目を作ると、ここに表示されます。</p>',
+3747-        '</div>'
+3748-      ].join("");
+3749-    }
+3750-
+3751-    return [
+3752-      '<div class="aicm-table-wrap">',
+3753-      '  <table class="aicm-core-table">',
+3754-      '    <thead>',
+3755-      '      <tr>',
+3756-      '        <th>方針元</th>',
+3757-      '        <th>大項目</th>',
+3758-      '        <th>部門</th>',
+3759-      '        <th>課</th>',
+3760-      '        <th>Leader</th>',
+3761-      '        <th>分解状態</th>',
+3762-      '        <th>引渡し</th>',
+3763-      '        <th>優先度</th>',
+3764-      '        <th>期限</th>',
+3765-      '      </tr>',
+3766-      '    </thead>',
+3767-      '    <tbody>',
+3768-      rows.map(function (row) {
+3769-        return [
+3770-          '      <tr>',
+3771:          '        <td>' + escapeHtml(pmlwValue(row.policy_title, row.source_route_code || "-")) + '</td>',
+3772:          '        <td><strong>' + escapeHtml(pmlwValue(row.major_item_name, "-")) + '</strong><small>' + escapeHtml(pmlwValue(row.major_item_description, "")) + '</small></td>',
+3773:          '        <td>' + escapeHtml(pmlwValue(row.department_name, "未割当")) + '</td>',
+3774:          '        <td>' + escapeHtml(pmlwValue(row.section_name, "未割当")) + '</td>',
+3775:          '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+3776:          '        <td>' + escapeHtml(pmlwStatusLabel(row.decomposition_status_code)) + '</td>',
+3777:          '        <td>' + escapeHtml(pmlwStatusLabel(row.handoff_status_code)) + '</td>',
+3778:          '        <td>' + escapeHtml(pmlwStatusLabel(row.priority_code)) + '</td>',
+3779:          '        <td>' + escapeHtml(pmlwValue(row.due_date, "-")) + '</td>',
+3780-          '      </tr>'
+3781-        ].join("");
+3782-      }).join(""),
+3783-      '    </tbody>',
+3784-      '  </table>',
+3785-      '</div>'
+3786-    ].join("");
+3787-  }
+3788-
+3789-
+3790-  
+3791-
+3792-function renderTaskLedgerPlaceholder() {
+3793-    var company = selectedCompany();
+3794:    var rows = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+3795-
+3796-    return renderShell([
+3797-      '<section class="aicm-core-card">',
+3798-      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+3799-      '  <h2>部門別タスク台帳</h2>',
+3800-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3801-      '  <p class="aicm-selected-note">President方針やユーザー依頼を、Managerが大項目として整理し、部門・課・Leaderへ引き渡すための台帳です。</p>',
+3802-      '</section>',
+3803-      renderCsvImportCard(company),
+3804-      '<section class="aicm-core-card">',
+3805-      '  <p class="aicm-eyebrow">Manager大項目</p>',
+3806-      '  <h2>登録済み大項目</h2>',
+3807-      renderPmlwMajorRows(rows),
+3808-      '</section>'
+3809-    ].join(""));
+3810-  }
+3811-
+3812-  
+3813-// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+3814-// Human review queue UI.
+3815-// Human review only shows delivery summaries / exception summaries.
+3816-// AI review remains internal; the UI displays ai_review_result_text summary only.
+3817-
+3818-function aicmHumanReviewOwnerId() {
+3819-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+3820-    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+3821-    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+3822-    return "00000000-0000-4000-8000-000000000001";
+3823-  }
+3824-
+3825-  function aicmHumanReviewRows() {
+3826-    var ctx = state.context || state || {};
+3827-    var rows = ctx.review_wait_items || state.review_wait_items || [];
+3828-    return Array.isArray(rows) ? rows : [];
+3829-  }
+3830-
+3831-  function aicmHumanReviewRowsForCompany(companyId) {
+3832-    return aicmHumanReviewRows().filter(function (row) {
+3833-      return !companyId || row.aicm_user_company_id === companyId;
+3834-    });
+3835-  }
+3836-
+3837-  async function aicmHumanReviewPostJson(path, body) {
+3838-    var response = await fetch(path, {
+3839-      method: "POST",
+3840-      headers: { "Content-Type": "application/json" },
+3841-      body: JSON.stringify(body || {})
+3842-    });
+3843-
+3844-    var text = await response.text();
+3845-    var json = {};
+3846-
+3847-    try {
+3848-      json = text ? JSON.parse(text) : {};
+3849-    } catch (_) {
+3850-      json = { result: "error", message: text || "Invalid server response" };
+3851-    }
+3852-
+3853-    if (!response.ok || (json.result && json.result !== "ok")) {
+3854-      throw new Error(json.message || json.error || ("API failed: " + path));
+3855-    }
+3856-
+3857-    return json;
+3858-  }
+3859-
+3860-  async function aicmHumanReviewReload() {
+3861-    if (typeof aicmPmlwReloadContext === "function") {
+3862-      await aicmPmlwReloadContext();
+3863-      return;
+3864-    }
+3865-
+3866-    if (typeof loadContext === "function") {
+3867-      await loadContext();
+3868-      return;
+3869-    }
+3870-
+3871-    var owner = encodeURIComponent(aicmHumanReviewOwnerId());
+3872-    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+3873-    var json = await response.json();
+3874-
+
+3419-      if (inQuotes && ch === '"' && next === '"') {
+3420-        cell += '"';
+3421-        i += 1;
+3422-        continue;
+3423-      }
+3424-
+3425-      if (ch === '"') {
+3426-        inQuotes = !inQuotes;
+3427-        continue;
+3428-      }
+3429-
+3430-      if (!inQuotes && ch === ",") {
+3431-        row.push(cell);
+3432-        cell = "";
+3433-        continue;
+3434-      }
+3435-
+3436-      if (!inQuotes && (ch === "\n" || ch === "\r")) {
+3437-        if (ch === "\r" && next === "\n") i += 1;
+3438-        row.push(cell);
+3439-        cell = "";
+3440-
+3441-        if (row.some(function (v) { return String(v || "").trim() !== ""; })) {
+3442-          rows.push(row);
+3443-        }
+3444-
+3445-        row = [];
+3446-        continue;
+3447-      }
+3448-
+3449-      cell += ch;
+3450-    }
+3451-
+3452-    row.push(cell);
+3453-    if (row.some(function (v) { return String(v || "").trim() !== ""; })) {
+3454-      rows.push(row);
+3455-    }
+3456-
+3457-    if (rows.length < 2) return [];
+3458-
+3459-    var headers = rows[0].map(function (v) {
+3460-      return String(v || "").trim();
+3461-    });
+3462-
+3463-    return rows.slice(1).map(function (values) {
+3464-      var obj = {};
+3465-      headers.forEach(function (header, index) {
+3466-        obj[header] = String(values[index] || "").trim();
+3467-      });
+3468-      return obj;
+3469-    }).filter(function (obj) {
+3470-      return Object.keys(obj).some(function (key) {
+3471-        return String(obj[key] || "").trim() !== "";
+3472-      });
+3473-    });
+3474-  }
+3475-
+3476-  async function importTaskLedgerCsvToPmlwMajor() {
+3477-    var company = selectedCompany();
+3478-
+3479-    if (!company) {
+3480-      setMessage("error", "AI企業を選択してください。");
+3481-      return;
+3482-    }
+3483-
+3484-    var text = String(state.csvImportText || "").trim();
+3485-
+3486-    if (!text) {
+3487-      setMessage("error", "CSVファイルを読み込んでください。");
+3488-      return;
+3489-    }
+3490-
+3491-    try {
+3492-      var rows = parseAicmCsv(text);
+3493-
+3494-      if (!rows.length) {
+3495-        setMessage("error", "取り込めるCSV行がありません。");
+3496-        return;
+3497-      }
+3498-
+3499:      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+3500-        owner_civilization_id: aicmPmlwOwnerId(),
+3501-        aicm_user_company_id: company.aicm_user_company_id,
+3502-        rows: rows
+3503-      });
+3504-
+3505-      var count = result.inserted_count || 0;
+3506-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+3507-      setMessage("ok", state.csvImportLastResult);
+3508-
+3509-      await aicmPmlwReloadContext();
+3510-    } catch (error) {
+3511-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3512-    }
+3513-  }
+3514-
+3515-
+3516-  function renderCsvImportCard(company) {
+3517-    var fileName = state.csvImportFileName || "未選択";
+3518-    var lastResult = state.csvImportLastResult || "";
+3519-
+3520-    return [
+3521-      '<section class="aicm-core-card aicm-csv-panel">',
+3522-      '  <p class="aicm-eyebrow">CSV取り込み</p>',
+3523-      '  <h2>ChatGPTでCSV作成・取り込み</h2>',
+3524-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3525-      '  <div class="aicm-csv-flow">',
+3526-      '    <div class="aicm-csv-flow-step aicm-csv-flow-main">',
+3527-      '      <div><strong>ChatGPT用プロンプト</strong><p>部門別タスク台帳の大項目CSVをChatGPTで作成します。</p></div>',
+3528-      '      <button type="button" data-core-action="task-ledger-chatgpt-prompt">ChatGPT用プロンプト</button>',
+3529-      '    </div>',
+3530-      '    <div class="aicm-csv-flow-step">',
+3531-      '      <div><strong>CSVファイル読込</strong><p>作成したCSVファイルを選択します。</p></div>',
+3532-      '      <button type="button" data-core-action="task-ledger-csv-file-open">CSVファイル読込</button>',
+3533-      '    </div>',
+3534-      '    <div class="aicm-csv-file-name">ファイル名: <strong>' + escapeHtml(fileName) + '</strong></div>',
+3535-      '    <div class="aicm-csv-flow-step">',
+3536-      '      <div><strong>CSV取り込み実行</strong><p>読み込んだCSVを部門別タスク台帳へ登録します。</p></div>',
+3537-      '      <button type="button" data-core-action="task-ledger-csv-import">CSV取り込み実行</button>',
+3538-      '    </div>',
+3539-      '  </div>',
+3540-      '  <input id="aicm-ledger-csv-file" class="aicm-hidden-file" type="file" accept=".csv,text/csv" data-core-file="task-ledger-csv">',
+3541-      lastResult ? '<p class="aicm-selected-note">' + escapeHtml(lastResult) + '</p>' : '',
+3542-      '</section>'
+3543-    ].join("");
+3544-  }
+3545-
+3546-  
+3547-function renderCsvPreviewTable(preview) {
+3548-    return "";
+3549-  }
+3550-
+3551-  
+3552-function renderCsvTemplatePanel() {
+3553-    return "";
+3554-  }
+3555-
+3556-
+3557-function downloadTextFile(filename, text, mimeType) {
+3558-    var blob = new Blob([String(text || "")], { type: mimeType || "text/plain;charset=utf-8" });
+3559-    var url = URL.createObjectURL(blob);
+3560-    var a = document.createElement("a");
+3561-    a.href = url;
+3562-    a.download = filename;
+3563-    document.body.appendChild(a);
+3564-    a.click();
+3565-    a.remove();
+3566-    setTimeout(function () {
+3567-      URL.revokeObjectURL(url);
+3568-    }, 1000);
+3569-  }
+3570-
+3571-  async function readTaskLedgerCsvFile(file) {
+3572-    if (!file) return;
+3573-
+3574-    try {
+3575-      var text = await file.text();
+3576-      state.csvImportText = text;
+3577-      state.csvImportFileName = file.name || "selected.csv";
+3578-      state.csvImportPreview = [];
+3579-      state.csvImportLastResult = "";
+
+3286-          aicm_user_company_section_id: section ? section.aicm_user_company_section_id : "",
+3287-          deliverable_name: row.deliverable_name || "",
+3288-          task_name: row.task_name || "",
+3289-          work_type_code: row.work_type_code || "design",
+3290-          responsible_role_code: row.responsible_role_code || "Manager",
+3291-          task_status_code: row.task_status_code || "todo",
+3292-          priority_code: row.priority_code || "normal",
+3293-          due_date: row.due_date || "",
+3294-          reference_files_text: row.reference_files_text || "",
+3295-          supplemental_materials_text: row.supplemental_materials_text || "",
+3296-          applicable_rules_text: row.applicable_rules_text || "",
+3297-          note: row.note || "",
+3298-          handoff_link: row.handoff_link || ""
+3299-        }
+3300-      };
+3301-    });
+3302-  }
+3303-
+3304-  
+3305-
+3306-
+3307-
+3308-// AICM_PMLW_CSV_CONNECT_ARB_ARE_V1
+3309-// PMLW CSV/UI connector. Uses existing clean core state and selectedCompany().
+3310-function aicmPmlwOwnerId() {
+3311-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+3312-    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+3313-    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+3314-    return "00000000-0000-4000-8000-000000000001";
+3315-  }
+3316-
+3317-  async function aicmPmlwPostJson(path, body) {
+3318-    var response = await fetch(path, {
+3319-      method: "POST",
+3320-      headers: { "Content-Type": "application/json" },
+3321-      body: JSON.stringify(body || {})
+3322-    });
+3323-
+3324-    var text = await response.text();
+3325-    var json = {};
+3326-
+3327-    try {
+3328-      json = text ? JSON.parse(text) : {};
+3329-    } catch (_) {
+3330-      json = { result: "error", message: text || "Invalid server response" };
+3331-    }
+3332-
+3333-    if (!response.ok || (json.result && json.result !== "ok")) {
+3334-      throw new Error(json.message || json.error || ("API failed: " + path));
+3335-    }
+3336-
+3337-    return json;
+3338-  }
+3339-
+3340-  async function aicmPmlwReloadContext() {
+3341-    if (typeof loadContext === "function") {
+3342-      await loadContext();
+3343-      return;
+3344-    }
+3345-
+3346-    if (typeof refreshContext === "function") {
+3347-      await refreshContext();
+3348-      return;
+3349-    }
+3350-
+3351-    var owner = encodeURIComponent(aicmPmlwOwnerId());
+3352-    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+3353-    var json = await response.json();
+3354-
+3355-    if (json && json.result === "ok") {
+3356-      state.context = json;
+3357-    }
+3358-
+3359-    if (typeof render === "function") {
+3360-      render();
+3361-    }
+3362-  }
+3363-
+3364-  function aicmPmlwCsvPromptText() {
+3365-    return [
+3366:      "以下のCSVカラムで、AICompanyManagerの部門別タスク台帳に取り込むManager大項目行を作成してください。",
+3367-      "出力はCSVのみ。説明文やMarkdownコードブロックは不要です。",
+3368-      "",
+3369-      "CSVカラム:",
+3370-      "department_name,section_name,major_item_name,major_item_description,assigned_leader_label,priority_code,due_date,note",
+3371-      "",
+3372-      "ルール:",
+3373-      "- department_name は既存部門名に合わせる",
+3374-      "- section_name は既存課名に合わせる",
+3375-      "- major_item_name はManagerがLeaderへ渡す大項目名",
+3376-      "- major_item_description は大項目の説明",
+3377-      "- assigned_leader_label は未定なら空欄",
+3378-      "- priority_code は low / normal / high / urgent のいずれか",
+3379-      "- due_date は YYYY-MM-DD。未定なら空欄",
+3380-      "- note は短い補足だけ",
+3381-      "",
+3382-      "例:",
+3383-      "department_name,section_name,major_item_name,major_item_description,assigned_leader_label,priority_code,due_date,note",
+3384-      "開発部,UI課,銀行業務UI整理,銀行業務に必要なUI領域を大項目として整理する,,normal,,"
+3385-    ].join("\n");
+3386-  }
+3387-
+3388-  async function handleTaskLedgerChatGptPrompt() {
+3389-    var text = aicmPmlwCsvPromptText();
+3390-
+3391-    try {
+3392-      if (navigator.clipboard && navigator.clipboard.writeText) {
+3393-        await navigator.clipboard.writeText(text);
+3394-        setMessage("ok", "ChatGPT用プロンプトをコピーしました。");
+3395-        return;
+3396-      }
+3397-    } catch (_) {}
+3398-
+3399-    if (typeof downloadTextFile === "function") {
+3400-      downloadTextFile("aicm_manager_major_csv_prompt.txt", text, "text/plain;charset=utf-8");
+3401-      setMessage("ok", "ChatGPT用プロンプトファイルを作成しました。");
+3402-      return;
+3403-    }
+3404-
+3405-    setMessage("error", "プロンプトのコピーに失敗しました。");
+3406-  }
+3407-
+3408-  function parseAicmCsv(text) {
+3409-    var rows = [];
+3410-    var row = [];
+3411-    var cell = "";
+3412-    var inQuotes = false;
+3413-    var value = String(text || "");
+3414-
+3415-    for (var i = 0; i < value.length; i += 1) {
+3416-      var ch = value[i];
+3417-      var next = value[i + 1];
+3418-
+3419-      if (inQuotes && ch === '"' && next === '"') {
+3420-        cell += '"';
+3421-        i += 1;
+3422-        continue;
+3423-      }
+3424-
+3425-      if (ch === '"') {
+3426-        inQuotes = !inQuotes;
+3427-        continue;
+3428-      }
+3429-
+3430-      if (!inQuotes && ch === ",") {
+3431-        row.push(cell);
+3432-        cell = "";
+3433-        continue;
+3434-      }
+3435-
+3436-      if (!inQuotes && (ch === "\n" || ch === "\r")) {
+3437-        if (ch === "\r" && next === "\n") i += 1;
+3438-        row.push(cell);
+3439-        cell = "";
+3440-
+3441-        if (row.some(function (v) { return String(v || "").trim() !== ""; })) {
+3442-          rows.push(row);
+3443-        }
+3444-
+3445-        row = [];
+3446-        continue;
+--
+3665-
+3666-      try {
+3667-        var response = await fetch("/api/aicm/v2/task-ledger/create", {
+3668-          method: "POST",
+3669-          headers: { "content-type": "application/json" },
+3670-          body: JSON.stringify(row.payload)
+3671-        });
+3672-
+3673-        var json = await response.json();
+3674-
+3675-        if (!response.ok || !json || json.result !== "ok") {
+3676-          throw new Error((json && json.error_message) || "取り込み失敗");
+3677-        }
+3678-
+3679-        success++;
+3680-      } catch (error) {
+3681-        failed++;
+3682-        messages.push("行" + row.row_number + ": " + (error && error.message ? error.message : "取り込み失敗"));
+3683-      }
+3684-    }
+3685-
+3686-    if (typeof loadContext === "function") {
+3687-      await loadContext();
+3688-    }
+3689-
+3690-    if (failed > 0) {
+3691-      state.csvImportLastResult = "CSV取り込み: 成功 " + success + "件 / 失敗 " + failed + "件";
+3692-      setMessage("error", state.csvImportLastResult + "。 " + messages.slice(0, 3).join(" / "));
+3693-    } else {
+3694-      state.csvImportLastResult = "CSV取り込み完了: " + success + "件";
+3695-      state.csvImportText = "";
+3696-      state.csvImportFileName = "";
+3697-      setMessage("ok", state.csvImportLastResult);
+3698-    }
+3699-
+3700-    state.csvImportPreview = [];
+3701-    state.screen = "task-ledger";
+3702-    render();
+3703-  }
+3704-
+3705-
+3706-  
+3707-
+3708-function pmlwMajorRowsForCompany(companyId) {
+3709-    return (state.context.pmlw_major_items || []).filter(function (row) {
+3710-      return String(row.aicm_user_company_id || "") === String(companyId || "");
+3711-    });
+3712-  }
+3713-
+3714-  function pmlwValue(value, fallback) {
+3715-    var text = String(value || "").trim();
+3716-    return text || fallback || "-";
+3717-  }
+3718-
+3719-  function pmlwStatusLabel(value) {
+3720-    var map = {
+3721-      not_started: "未着手",
+3722-      assigned_to_leader: "Leader割当済",
+3723-      leader_decomposing: "Leader分解中",
+3724-      decomposed: "分解済",
+3725-      returned: "差戻し",
+3726-      archived: "削除済",
+3727-      draft: "下書き",
+3728-      ready_handoff: "引渡し準備",
+3729-      handed_off: "引渡し済",
+3730-      accepted: "受領済",
+3731-      completed: "完了",
+3732-      low: "低",
+3733-      normal: "通常",
+3734-      high: "高",
+3735-      urgent: "緊急"
+3736-    };
+3737-
+3738-    return map[value] || pmlwValue(value, "-");
+3739-  }
+3740-
+3741-  function renderPmlwMajorRows(rows) {
+3742-    if (!rows.length) {
+3743-      return [
+3744-        '<div class="aicm-empty-state">',
+3745:        '  <strong>Manager大項目はまだありません</strong>',
+3746-        '  <p>President方針またはユーザー依頼からManagerが大項目を作ると、ここに表示されます。</p>',
+3747-        '</div>'
+3748-      ].join("");
+3749-    }
+3750-
+3751-    return [
+3752-      '<div class="aicm-table-wrap">',
+3753-      '  <table class="aicm-core-table">',
+3754-      '    <thead>',
+3755-      '      <tr>',
+3756-      '        <th>方針元</th>',
+3757-      '        <th>大項目</th>',
+3758-      '        <th>部門</th>',
+3759-      '        <th>課</th>',
+3760-      '        <th>Leader</th>',
+3761-      '        <th>分解状態</th>',
+3762-      '        <th>引渡し</th>',
+3763-      '        <th>優先度</th>',
+3764-      '        <th>期限</th>',
+3765-      '      </tr>',
+3766-      '    </thead>',
+3767-      '    <tbody>',
+3768-      rows.map(function (row) {
+3769-        return [
+3770-          '      <tr>',
+3771-          '        <td>' + escapeHtml(pmlwValue(row.policy_title, row.source_route_code || "-")) + '</td>',
+3772-          '        <td><strong>' + escapeHtml(pmlwValue(row.major_item_name, "-")) + '</strong><small>' + escapeHtml(pmlwValue(row.major_item_description, "")) + '</small></td>',
+3773-          '        <td>' + escapeHtml(pmlwValue(row.department_name, "未割当")) + '</td>',
+3774-          '        <td>' + escapeHtml(pmlwValue(row.section_name, "未割当")) + '</td>',
+3775-          '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+3776-          '        <td>' + escapeHtml(pmlwStatusLabel(row.decomposition_status_code)) + '</td>',
+3777-          '        <td>' + escapeHtml(pmlwStatusLabel(row.handoff_status_code)) + '</td>',
+3778-          '        <td>' + escapeHtml(pmlwStatusLabel(row.priority_code)) + '</td>',
+3779-          '        <td>' + escapeHtml(pmlwValue(row.due_date, "-")) + '</td>',
+3780-          '      </tr>'
+3781-        ].join("");
+3782-      }).join(""),
+3783-      '    </tbody>',
+3784-      '  </table>',
+3785-      '</div>'
+3786-    ].join("");
+3787-  }
+3788-
+3789-
+3790-  
+3791-
+3792-function renderTaskLedgerPlaceholder() {
+3793-    var company = selectedCompany();
+3794-    var rows = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+3795-
+3796-    return renderShell([
+3797-      '<section class="aicm-core-card">',
+3798-      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+3799-      '  <h2>部門別タスク台帳</h2>',
+3800-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+3801-      '  <p class="aicm-selected-note">President方針やユーザー依頼を、Managerが大項目として整理し、部門・課・Leaderへ引き渡すための台帳です。</p>',
+3802-      '</section>',
+3803-      renderCsvImportCard(company),
+3804-      '<section class="aicm-core-card">',
+3805:      '  <p class="aicm-eyebrow">Manager大項目</p>',
+3806-      '  <h2>登録済み大項目</h2>',
+3807-      renderPmlwMajorRows(rows),
+3808-      '</section>'
+3809-    ].join(""));
+3810-  }
+3811-
+3812-  
+3813-// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+3814-// Human review queue UI.
+3815-// Human review only shows delivery summaries / exception summaries.
+3816-// AI review remains internal; the UI displays ai_review_result_text summary only.
+3817-
+3818-function aicmHumanReviewOwnerId() {
+3819-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+3820-    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+3821-    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+3822-    return "00000000-0000-4000-8000-000000000001";
+3823-  }
+3824-
+3825-  function aicmHumanReviewRows() {
+3826-    var ctx = state.context || state || {};
+3827-    var rows = ctx.review_wait_items || state.review_wait_items || [];
+3828-    return Array.isArray(rows) ? rows : [];
+3829-  }
+3830-
+3831-  function aicmHumanReviewRowsForCompany(companyId) {
+3832-    return aicmHumanReviewRows().filter(function (row) {
+3833-      return !companyId || row.aicm_user_company_id === companyId;
+3834-    });
+3835-  }
+3836-
+3837-  async function aicmHumanReviewPostJson(path, body) {
+3838-    var response = await fetch(path, {
+3839-      method: "POST",
+3840-      headers: { "Content-Type": "application/json" },
+3841-      body: JSON.stringify(body || {})
+3842-    });
+3843-
+3844-    var text = await response.text();
+3845-    var json = {};
+3846-
+3847-    try {
+3848-      json = text ? JSON.parse(text) : {};
+3849-    } catch (_) {
+3850-      json = { result: "error", message: text || "Invalid server response" };
+3851-    }
+3852-
+3853-    if (!response.ok || (json.result && json.result !== "ok")) {
+3854-      throw new Error(json.message || json.error || ("API failed: " + path));
+3855-    }
+3856-
+3857-    return json;
+3858-  }
+3859-
+3860-  async function aicmHumanReviewReload() {
+3861-    if (typeof aicmPmlwReloadContext === "function") {
+3862-      await aicmPmlwReloadContext();
+3863-      return;
+3864-    }
+3865-
+3866-    if (typeof loadContext === "function") {
+3867-      await loadContext();
+3868-      return;
+3869-    }
+3870-
+3871-    var owner = encodeURIComponent(aicmHumanReviewOwnerId());
+3872-    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+3873-    var json = await response.json();
+3874-
+3875-    if (json && json.result === "ok") state.context = json;
+3876-    if (typeof render === "function") render();
+3877-  }
+3878-
+3879-  async function approveHumanReviewFromAction(el) {
+3880-    var reviewId = el && el.getAttribute ? el.getAttribute("data-review-id") : "";
+3881-
+3882-    if (!reviewId) {
+3883-      setMessage("error", "レビュー項目を特定できません。");
+3884-      return;
+3885-    }
+
+3629-    if (el) {
+3630-      el.value = taskLedgerCsvTemplateText();
+3631-      setMessage("ok", "CSV入力例を確認しました。");
+3632-    }
+3633-    render();
+3634-  }
+3635-
+3636-
+3637-async function importTaskLedgerCsv() {
+3638-    var preview = [];
+3639-
+3640-    try {
+3641-      preview = buildTaskLedgerCsvPreview();
+3642-    } catch (error) {
+3643-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+3644-      render();
+3645-      return;
+3646-    }
+3647-
+3648-    var invalidRows = preview.filter(function (row) { return !row.valid; });
+3649-    if (invalidRows.length) {
+3650-      var message = invalidRows.slice(0, 3).map(function (row) {
+3651-        return "行" + row.row_number + ": " + row.errors.join(" / ");
+3652-      }).join(" / ");
+3653-
+3654-      setMessage("error", "CSV取り込み前チェックでエラーがあります。 " + message);
+3655-      render();
+3656-      return;
+3657-    }
+3658-
+3659-    var success = 0;
+3660-    var failed = 0;
+3661-    var messages = [];
+3662-
+3663-    for (var i = 0; i < preview.length; i++) {
+3664-      var row = preview[i];
+3665-
+3666-      try {
+3667-        var response = await fetch("/api/aicm/v2/task-ledger/create", {
+3668-          method: "POST",
+3669-          headers: { "content-type": "application/json" },
+3670-          body: JSON.stringify(row.payload)
+3671-        });
+3672-
+3673-        var json = await response.json();
+3674-
+3675-        if (!response.ok || !json || json.result !== "ok") {
+3676-          throw new Error((json && json.error_message) || "取り込み失敗");
+3677-        }
+3678-
+3679-        success++;
+3680-      } catch (error) {
+3681-        failed++;
+3682-        messages.push("行" + row.row_number + ": " + (error && error.message ? error.message : "取り込み失敗"));
+3683-      }
+3684-    }
+3685-
+3686-    if (typeof loadContext === "function") {
+3687-      await loadContext();
+3688-    }
+3689-
+3690-    if (failed > 0) {
+3691-      state.csvImportLastResult = "CSV取り込み: 成功 " + success + "件 / 失敗 " + failed + "件";
+3692-      setMessage("error", state.csvImportLastResult + "。 " + messages.slice(0, 3).join(" / "));
+3693-    } else {
+3694-      state.csvImportLastResult = "CSV取り込み完了: " + success + "件";
+3695-      state.csvImportText = "";
+3696-      state.csvImportFileName = "";
+3697-      setMessage("ok", state.csvImportLastResult);
+3698-    }
+3699-
+3700-    state.csvImportPreview = [];
+3701-    state.screen = "task-ledger";
+3702-    render();
+3703-  }
+3704-
+3705-
+3706-  
+3707-
+3708-function pmlwMajorRowsForCompany(companyId) {
+3709:    return (state.context.pmlw_major_items || []).filter(function (row) {
+3710-      return String(row.aicm_user_company_id || "") === String(companyId || "");
+3711-    });
+3712-  }
+3713-
+3714-  function pmlwValue(value, fallback) {
+3715-    var text = String(value || "").trim();
+3716-    return text || fallback || "-";
+3717-  }
+3718-
+3719-  function pmlwStatusLabel(value) {
+3720-    var map = {
+3721-      not_started: "未着手",
+3722-      assigned_to_leader: "Leader割当済",
+3723-      leader_decomposing: "Leader分解中",
+3724-      decomposed: "分解済",
+3725-      returned: "差戻し",
+3726-      archived: "削除済",
+3727-      draft: "下書き",
+3728-      ready_handoff: "引渡し準備",
+3729-      handed_off: "引渡し済",
+3730-      accepted: "受領済",
+3731-      completed: "完了",
+3732-      low: "低",
+3733-      normal: "通常",
+3734-      high: "高",
+3735-      urgent: "緊急"
+3736-    };
+3737-
+3738-    return map[value] || pmlwValue(value, "-");
+3739-  }
+3740-
+3741-  function renderPmlwMajorRows(rows) {
+3742-    if (!rows.length) {
+3743-      return [
+3744-        '<div class="aicm-empty-state">',
+3745-        '  <strong>Manager大項目はまだありません</strong>',
+3746-        '  <p>President方針またはユーザー依頼からManagerが大項目を作ると、ここに表示されます。</p>',
+3747-        '</div>'
+3748-      ].join("");
+3749-    }
+3750-
+3751-    return [
+3752-      '<div class="aicm-table-wrap">',
+3753-      '  <table class="aicm-core-table">',
+3754-      '    <thead>',
+3755-      '      <tr>',
+3756-      '        <th>方針元</th>',
+3757-      '        <th>大項目</th>',
+3758-      '        <th>部門</th>',
+3759-      '        <th>課</th>',
+3760-      '        <th>Leader</th>',
+3761-      '        <th>分解状態</th>',
+3762-      '        <th>引渡し</th>',
+3763-      '        <th>優先度</th>',
+3764-      '        <th>期限</th>',
+3765-      '      </tr>',
+3766-      '    </thead>',
+3767-      '    <tbody>',
+3768-      rows.map(function (row) {
+3769-        return [
+3770-          '      <tr>',
+3771-          '        <td>' + escapeHtml(pmlwValue(row.policy_title, row.source_route_code || "-")) + '</td>',
+3772-          '        <td><strong>' + escapeHtml(pmlwValue(row.major_item_name, "-")) + '</strong><small>' + escapeHtml(pmlwValue(row.major_item_description, "")) + '</small></td>',
+3773-          '        <td>' + escapeHtml(pmlwValue(row.department_name, "未割当")) + '</td>',
+3774-          '        <td>' + escapeHtml(pmlwValue(row.section_name, "未割当")) + '</td>',
+3775-          '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+3776-          '        <td>' + escapeHtml(pmlwStatusLabel(row.decomposition_status_code)) + '</td>',
+3777-          '        <td>' + escapeHtml(pmlwStatusLabel(row.handoff_status_code)) + '</td>',
+3778-          '        <td>' + escapeHtml(pmlwStatusLabel(row.priority_code)) + '</td>',
+3779-          '        <td>' + escapeHtml(pmlwValue(row.due_date, "-")) + '</td>',
+3780-          '      </tr>'
+3781-        ].join("");
+3782-      }).join(""),
+3783-      '    </tbody>',
+3784-      '  </table>',
+3785-      '</div>'
+3786-    ].join("");
+3787-  }
+3788-
+3789-
+

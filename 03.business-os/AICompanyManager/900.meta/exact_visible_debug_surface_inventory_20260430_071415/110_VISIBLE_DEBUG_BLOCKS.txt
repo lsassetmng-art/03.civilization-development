@@ -1,0 +1,1855 @@
+============================================================
+VISIBLE DEBUG SURFACE BLOCKS
+============================================================
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=buildPayload
+RANGE=1219-1296
+LABEL_HITS=110
+DOM_HITS=180
+PRODUCTION_HITS=440
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=1236,1237,1238,1264,1267,1275,1281,1283,1285,1287
+------------------------------------------------------------
+ 1219:   function buildPayload(target, card) {
+ 1220:     var select = byId(target.selectId);
+ 1221:     var resolvedRobot = resolveRobotForPayload(target, card, select);
+ 1222:     var selectedRobot = resolvedRobot.robot;
+ 1223:     var optionText = resolvedRobot.option_text;
+ 1224:     var robotResolveSource = resolvedRobot.source;
+ 1225:     var finalRobotResolution = aicmNormalizeRobotForFinalPayload(target, card, select, selectedRobot, optionText, robotResolveSource);
+ 1226:     selectedRobot = finalRobotResolution.robot;
+ 1227:     optionText = finalRobotResolution.option_text;
+ 1228:     robotResolveSource = finalRobotResolution.source;
+ 1229:     var nickname = firstValue(target.nicknameIds);
+ 1230:     var canonical = canonicalizeTarget(target, card);
+ 1231:     var companyCanonical = canonicalCompany();
+ 1232: 
+ 1233:     if (!nickname && selectedRobot) nickname = displayName(selectedRobot, optionText);
+ 1234: 
+ 1235:     var payload = {
+ 1236:       source: "AICompanyManager UI preview",
+ 1237:       operation: "company_robot_placement.preview_only",
+ 1238:       save_status: "PREVIEW_VALIDATION_PENDING",
+ 1239:       api_write: false,
+ 1240:       db_write: false,
+ 1241:       company_id_input: companyCanonical.company_id_input,
+ 1242:       company_id: companyCanonical.company_id,
+ 1243:       company_id_source: companyCanonical.company_id_source,
+ 1244:       company_id_canonicalization_status: companyCanonical.company_id_canonicalization_status,
+ 1245:       company_display_hint: companyCanonical.company_display_hint || "",
+ 1246:       matched_company_name: companyCanonical.matched_company_name || "",
+ 1247:       target_scope: target.scope,
+ 1248:       target_id_input: canonical.target_id_input,
+ 1249:       target_id: canonical.target_id,
+ 1250:       target_id_source: canonical.target_id_source,
+ 1251:       target_id_canonicalization_status: canonical.target_id_canonicalization_status,
+ 1252:       target_display_hint: canonical.target_display_hint,
+ 1253:       matched_db_name: canonical.matched_db_name || "",
+ 1254:       save_blocked: !!(companyCanonical.company_save_blocked || canonical.save_blocked),
+ 1255:       placement_role_code: target.role,
+ 1256:       robot_pool_id: selectedRobot ? robotId(selectedRobot, select ? select.value : "") : "",
+ 1257:       model_code: selectedRobot ? detectModelCode(selectedRobot, optionText) : "",
+ 1258:       robot_display_name: selectedRobot ? displayName(selectedRobot, optionText) : "",
+ 1259:       internal_nickname: nickname || "",
+ 1260:       assignment_policy: "unlimited_system_use",
+ 1261:       quantity_consumption: false,
+ 1262:       selected_option_text: optionText || "",
+ 1263:       robot_resolve_source: robotResolveSource || "",
+ 1264:       preview_warning: companyCanonical.company_save_blocked ? "company_id_local_only_save_blocked" : (canonical.save_blocked ? "target_id_local_only_save_blocked" : "")
+ 1265:     };
+ 1266: 
+ 1267:     var validation = validatePayloadForPreview(payload);
+ 1268: 
+ 1269:     payload.validation_errors = validation.validation_errors;
+ 1270:     payload.validation_warnings = validation.validation_warnings;
+ 1271:     payload.robot_selection_status = validation.robot_selection_status;
+ 1272:     payload.company_mapping_warning = validation.company_mapping_warning;
+ 1273:     payload.strict_validation_status = validation.strict_validation_status;
+ 1274:     payload.save_blocked = !!(payload.save_blocked || validation.strict_save_blocked);
+ 1275:     payload.save_status = payload.save_blocked ? "PREVIEW_ONLY_SAVE_BLOCKED_VALIDATION" : "PREVIEW_ONLY_CANONICAL_OK";
+ 1276: 
+ 1277:     if (
+ 1278:       validation.validation_errors.indexOf("robot_not_selected") >= 0 ||
+ 1279:       validation.validation_errors.indexOf("robot_pool_id_required") >= 0
+ 1280:     ) {
+ 1281:       payload.preview_warning = "robot_not_selected_save_blocked";
+ 1282:     } else if (validation.validation_errors.indexOf("robot_pool_id_not_canonical_uuid") >= 0) {
+ 1283:       payload.preview_warning = "robot_pool_id_not_canonical_uuid_save_blocked";
+ 1284:     } else if (validation.validation_errors.indexOf("robot_selection_not_businessos_db") >= 0) {
+ 1285:       payload.preview_warning = "robot_selection_not_businessos_db_save_blocked";
+ 1286:     } else if (payload.company_mapping_warning) {
+ 1287:       payload.preview_warning = payload.company_mapping_warning;
+ 1288:     }
+ 1289: 
+ 1290:     return payload;
+ 1291:   }
+ 1292: 
+ 1293:   function row(label, value) {
+ 1294:     return '<div class="aicm-preview-key">' + esc(label) + '</div><div class="aicm-preview-value">' + esc(value || "-") + '</div>';
+ 1295:   }
+ 1296: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=injectStyle
+RANGE=292-315
+LABEL_HITS=143
+DOM_HITS=55
+PRODUCTION_HITS=66
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=297,298,299,300,301,302,303,304,305,306,307
+------------------------------------------------------------
+  292:   function injectStyle() {
+  293:     if (document.getElementById(STYLE_ID)) return;
+  294:     var style = document.createElement("style");
+  295:     style.id = STYLE_ID;
+  296:     style.textContent = [
+  297:       ".aicm-payload-preview{border:1px solid #d6e4ff;border-radius:12px;background:#f8fbff;padding:12px;margin-top:12px;}",
+  298:       ".aicm-payload-preview h3{font-size:15px;margin:0 0 8px;}",
+  299:       ".aicm-preview-grid{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;font-size:13px;line-height:1.45;margin-top:8px;}",
+  300:       ".aicm-preview-key{color:#667085;font-weight:700;}",
+  301:       ".aicm-preview-value{color:#101828;word-break:break-word;}",
+  302:       ".aicm-preview-badge{display:inline-block;padding:3px 7px;border-radius:999px;background:#e8fff2;color:#087443;font-weight:700;font-size:11px;margin:2px;}",
+  303:       ".aicm-preview-warn{background:#fff7e8;color:#9a5b00;}",
+  304:       ".aicm-preview-danger{background:#ffecec;color:#b42318;}",
+  305:       ".aicm-payload-preview details{margin-top:8px;}",
+  306:       ".aicm-payload-preview summary{cursor:pointer;color:#175cd3;font-weight:700;font-size:13px;}",
+  307:       ".aicm-payload-preview pre{white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:10px;font-size:12px;line-height:1.45;max-height:240px;overflow:auto;}"
+  308:     ].join("\n");
+  309:     document.head.appendChild(style);
+  310:   }
+  311: 
+  312:   function removeExistingPreviewNodes(root) {
+  313:     Array.prototype.slice.call((root || document).querySelectorAll("[data-aicm-placement-payload-preview]")).forEach(function (node) {
+  314:       if (node.parentNode) node.parentNode.removeChild(node);
+  315:     });
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=renderPreview
+RANGE=1297-1340
+LABEL_HITS=110
+DOM_HITS=80
+PRODUCTION_HITS=190
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=1297,1303,1306,1309,1311,1312,1313,1314,1315,1326
+------------------------------------------------------------
+ 1297:   function renderPreview(target) {
+ 1298:     var card = cardForTarget(target);
+ 1299:     var payload, existing, html, statusClass, detailsWasOpen;
+ 1300: 
+ 1301:     if (!card) return;
+ 1302: 
+ 1303:     existing = card.querySelector("[data-aicm-placement-payload-preview='" + target.role + "']");
+ 1304:     payload = buildPayload(target, card);
+ 1305:     detailsWasOpen = !!(existing && existing.querySelector("details") && existing.querySelector("details").open);
+ 1306:     statusClass = payload.save_blocked ? " aicm-preview-danger" : "";
+ 1307: 
+ 1308:     html = [
+ 1309:       '<div class="aicm-payload-preview" data-aicm-placement-payload-preview="' + esc(target.role) + '">',
+ 1310:       '<h3>' + esc(target.cardTitle) + '</h3>',
+ 1311:       '<span class="aicm-preview-badge">preview only</span>',
+ 1312:       '<span class="aicm-preview-badge">DB保存なし</span>',
+ 1313:       '<span class="aicm-preview-badge">数量消費なし</span>',
+ 1314:       '<span class="aicm-preview-badge' + statusClass + '">' + esc(payload.target_id_canonicalization_status) + '</span>',
+ 1315:       '<div class="aicm-preview-grid">',
+ 1316:       row("role", payload.placement_role_code),
+ 1317:       row("robot", payload.robot_display_name + (payload.model_code ? " / " + payload.model_code : "")),
+ 1318:       row("nickname", payload.internal_nickname),
+ 1319:       row("company", payload.company_id || payload.company_id_source),
+ 1320:       row("scope", payload.target_scope),
+ 1321:       row("target", payload.target_id || payload.target_id_source),
+ 1322:       row("company status", payload.company_id_canonicalization_status),
+ 1323:       row("target status", payload.target_id_canonicalization_status),
+ 1324:       row("robot status", payload.robot_selection_status),
+ 1325:       row("validation", payload.strict_validation_status),
+ 1326:       row("warning", payload.preview_warning || payload.company_mapping_warning || "-"),
+ 1327:       row("status", payload.save_status),
+ 1328:       '</div>',
+ 1329:       '<details data-aicm-json-details="' + esc(target.role) + '"' + (detailsWasOpen ? ' open' : '') + '><summary>詳細JSONを表示</summary><pre>' + esc(JSON.stringify(payload, null, 2)) + '</pre></details>',
+ 1330:       '</div>'
+ 1331:     ].join("");
+ 1332: 
+ 1333:     if (existing) existing.outerHTML = html;
+ 1334:     else card.insertAdjacentHTML("beforeend", html);
+ 1335:   }
+ 1336: 
+ 1337:   function renderAll() {
+ 1338:     try {
+ 1339:       injectStyle();
+ 1340:       TARGETS.forEach(renderPreview);
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-businessos-db-company-binding.js
+INDEX_LINE=43
+BLOCK=render
+RANGE=136-218
+LABEL_HITS=25
+DOM_HITS=105
+PRODUCTION_HITS=55
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=162,170,171,172,174
+------------------------------------------------------------
+  136:   function render() {
+  137:     var existing;
+  138:     var insertPoint;
+  139:     var selected;
+  140:     var options;
+  141:     var html;
+  142:     var select;
+  143: 
+  144:     if (RENDERING) return;
+  145:     RENDERING = true;
+  146: 
+  147:     try {
+  148:       if (!isSettingsScreen()) {
+  149:         removeCardWhenWrongScreen();
+  150:         return;
+  151:       }
+  152: 
+  153:       if (!FETCHED) return;
+  154: 
+  155:       existing = document.getElementById(CARD_ID);
+  156:       insertPoint = findInsertPoint();
+  157: 
+  158:       if (!insertPoint && !existing) return;
+  159: 
+  160:       selected = selectedId(COMPANIES);
+  161: 
+  162:       options = ['<option value="">BusinessOS DB会社を選択</option>'].concat(COMPANIES.map(function (company) {
+  163:         var id = companyId(company);
+  164:         var name = companyName(company) || id;
+  165:         return '<option value="' + esc(id) + '"' + (id === selected ? " selected" : "") + '>' + esc(name + " / " + id) + '</option>';
+  166:       })).join("");
+  167: 
+  168:       html = [
+  169:         '<div class="aicm-card" id="' + CARD_ID + '" data-aicm-screen-scope="settings">',
+  170:         '<h2>BusinessOS DB会社バインド</h2>',
+  171:         '<p class="aicm-muted">永続保存前に、local UI会社ではなく BusinessOS DB の会社UUIDを明示選択します。</p>',
+  172:         '<div class="aicm-field"><label>BusinessOS DB会社</label><select id="' + SELECT_ID + '">' + options + '</select></div>',
+  173:         '<p class="aicm-muted">local UI会社: ' + esc(localUiCompanyText() || "未取得") + '</p>',
+  174:         '<p class="aicm-muted">DB会社候補: ' + esc(String(COMPANIES.length)) + '件 / DB保存なし / AI企業設定画面のみ表示</p>',
+  175:         '</div>'
+  176:       ].join("");
+  177: 
+  178:       if (existing) {
+  179:         existing.outerHTML = html;
+  180:       } else if (insertPoint) {
+  181:         insertPoint.insertAdjacentHTML("beforebegin", html);
+  182:       }
+  183: 
+  184:       select = document.getElementById(SELECT_ID);
+  185: 
+  186:       if (select) {
+  187:         select.onchange = function () {
+  188:           storeCompanyId(select.value || "");
+  189:           window.setTimeout(function () { dispatchChange(select); }, 50);
+  190:         };
+  191: 
+  192:         if (select.value) {
+  193:           storeCompanyId(select.value);
+  194:           select.setAttribute("data-aicm-db-company-binding-active", "true");
+  195:           window.setTimeout(function () { dispatchChange(select); }, 120);
+  196:         }
+  197:       }
+  198: 
+  199:       window.AICM_BUSINESSOS_DB_COMPANY_BINDING_STATUS = {
+  200:         ok: true,
+  201:         mode: "screen_scoped_persistent_v3",
+  202:         visible: !!document.getElementById(CARD_ID),
+  203:         screen_scope: "settings_only",
+  204:         company_count: COMPANIES.length,
+  205:         selected_company_id: select ? select.value : "",
+  206:         local_storage_company_id: storedCompanyId(),
+  207:         db_write: false,
+  208:         api_write: false
+  209:       };
+  210:     } finally {
+  211:       RENDERING = false;
+  212:     }
+  213:   }
+  214: 
+  215:   function fetchCompanies() {
+  216:     return fetch(API_URL, { cache: "no-store" })
+  217:       .then(function (res) {
+  218:         return res.json();
+
+------------------------------------------------------------
+SCRIPT=assets/js/phase-de-dh-workflow-final-local-ui.js
+INDEX_LINE=15
+BLOCK=importCsv
+RANGE=4538-4652
+LABEL_HITS=85
+DOM_HITS=5
+PRODUCTION_HITS=70
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=4571,4574,4575,4577,4582
+------------------------------------------------------------
+ 4538:   function importCsv() {
+ 4539:     var repository = createRepository();
+ 4540:     var companyId = getCurrentCompanyId();
+ 4541:     var departmentId = getCurrentDepartmentId();
+ 4542:     var previewRaw = sessionStorage.getItem(PREVIEW_KEY);
+ 4543:     var preview;
+ 4544:     var validRows;
+ 4545:     var chain;
+ 4546:     var imported = [];
+ 4547: 
+ 4548:     if (!repository) {
+ 4549:       return Promise.resolve({
+ 4550:         ok: false,
+ 4551:         error_code: "CSV_WIRING_NOT_READY",
+ 4552:         error_message: "CSV wiring is not ready.",
+ 4553:         details: {},
+ 4554:         request_id: "csv_wiring_not_ready"
+ 4555:       });
+ 4556:     }
+ 4557: 
+ 4558:     if (!companyId || !departmentId) {
+ 4559:       return Promise.resolve({
+ 4560:         ok: false,
+ 4561:         error_code: "CSV_IMPORT_REQUIRES_COMPANY_AND_DEPARTMENT",
+ 4562:         error_message: "CSV import requires company_id and department_id.",
+ 4563:         details: {
+ 4564:           company_id: companyId,
+ 4565:           department_id: departmentId
+ 4566:         },
+ 4567:         request_id: "csv_import_guard"
+ 4568:       });
+ 4569:     }
+ 4570: 
+ 4571:     if (!previewRaw) {
+ 4572:       return Promise.resolve({
+ 4573:         ok: false,
+ 4574:         error_code: "CSV_PREVIEW_REQUIRED",
+ 4575:         error_message: "CSV preview is required before import.",
+ 4576:         details: {},
+ 4577:         request_id: "csv_preview_required"
+ 4578:       });
+ 4579:     }
+ 4580: 
+ 4581:     try {
+ 4582:       preview = JSON.parse(previewRaw);
+ 4583:     } catch (error) {
+ 4584:       return Promise.resolve({
+ 4585:         ok: false,
+ 4586:         error_code: "CSV_PREVIEW_PARSE_FAILED",
+ 4587:         error_message: "CSV preview result could not be parsed.",
+ 4588:         details: {},
+ 4589:         request_id: "csv_preview_parse_failed"
+ 4590:       });
+ 4591:     }
+ 4592: 
+ 4593:     if (!preview.ok) {
+ 4594:       return Promise.resolve({
+ 4595:         ok: false,
+ 4596:         error_code: "CSV_PREVIEW_INVALID",
+ 4597:         error_message: "CSV preview is invalid.",
+ 4598:         details: preview,
+ 4599:         request_id: "csv_preview_invalid"
+ 4600:       });
+ 4601:     }
+ 4602: 
+ 4603:     validRows = (preview.rows || []).filter(function (row) {
+ 4604:       return row.validation_status === "valid";
+ 4605:     });
+ 4606: 
+ 4607:     chain = Promise.resolve();
+ 4608: 
+ 4609:     validRows.forEach(function (row) {
+ 4610:       chain = chain.then(function () {
+ 4611:         return repository.saveLedgerRow({
+ 4612:           company_id: companyId,
+ 4613:           department_id: departmentId,
+ 4614:           ledger_row: {
+ 4615:             ledger_row_id: null,
+ 4616:             deliverable_name: row.parsed_row.deliverable_name,
+ 4617:             task_name: row.parsed_row.task_name,
+ 4618:             work_type: row.parsed_row.work_type,
+ 4619:             task_status: row.parsed_row.status,
+ 4620:             priority: row.parsed_row.priority,
+ 4621:             due_date: row.parsed_row.due_date,
+ 4622:             reference_files: row.parsed_row.reference_files,
+ 4623:             supplemental_materials: row.parsed_row.supplemental_materials,
+ 4624:             note: row.parsed_row.note,
+ 4625:             source_type: "csv"
+ 4626:           }
+ 4627:         }).then(function (result) {
+ 4628:           imported.push(result);
+ 4629:         });
+ 4630:       });
+ 4631:     });
+ 4632: 
+ 4633:     return chain.then(function () {
+ 4634:       var result = {
+ 4635:         ok: true,
+ 4636:         imported_count: imported.length,
+ 4637:         invalid_count: (preview.rows || []).length - validRows.length,
+ 4638:         imported: imported
+ 4639:       };
+ 4640: 
+ 4641:       sessionStorage.setItem(IMPORT_RESULT_KEY, JSON.stringify(result));
+ 4642:       setCurrentCompany(companyId);
+ 4643:       setPendingDepartment(departmentId);
+ 4644: 
+ 4645:       return result;
+ 4646:     });
+ 4647:   }
+ 4648: 
+ 4649:   function isCsvAction(action) {
+ 4650:     return !!CSV_ACTIONS[action];
+ 4651:   }
+ 4652: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/phase-de-dh-workflow-final-local-ui.js
+INDEX_LINE=15
+BLOCK=renderTaskLedger
+RANGE=1625-1676
+LABEL_HITS=4
+DOM_HITS=66
+PRODUCTION_HITS=10
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=1660,1662
+------------------------------------------------------------
+ 1625:   function renderTaskLedger(company) {
+ 1626:     var dept = currentDepartment(company);
+ 1627: 
+ 1628:     if (!dept) {
+ 1629:       return shell('<section class="aicm-grid"><div class="aicm-card"><h2>部門別タスク台帳</h2><p class="aicm-muted">台帳を使うには部門が必要です。</p><button class="primary" data-screen="department-add">新規追加へ</button></div></section>');
+ 1630:     }
+ 1631: 
+ 1632:     return shell([
+ 1633:       '<section class="aicm-grid" data-screen-scope="task-ledger">',
+ 1634:       '<div class="aicm-card"><h2>部門選択</h2>',
+ 1635:       '<div class="aicm-field"><label>部門</label><select id="department-select">' + departmentOptions(company) + '</select></div>',
+ 1636:       '<button data-action="switch-department">部門を表示</button>',
+ 1637:       '</div>',
+ 1638:       '<div class="aicm-card"><h2>台帳 追加</h2>',
+ 1639:       field("成果物名", "add-deliverable", "窓口業務システム"),
+ 1640:       field("タスク名", "add-task", "窓口業務システム設計"),
+ 1641:       selectField("仕事種別", "add-work-type", ["設計", "実装", "デザイン", "修正", "調査", "レビュー", "資料作成", "納品準備", "引き継ぎ"], "設計"),
+ 1642:       selectField("状態", "add-status", ["未着手", "進行中", "レビュー中", "完了", "保留"], "未着手"),
+ 1643:       selectField("優先度", "add-priority", ["高", "中", "低"], "中"),
+ 1644:       field("期限", "add-due-date", ""),
+ 1645:       field("参照ファイル", "add-reference", ""),
+ 1646:       field("補足資料", "add-supplemental", ""),
+ 1647:       textArea("補足メモ", "add-note", ""),
+ 1648:       '<button class="primary" data-action="add-ledger-row">台帳行を追加</button>',
+ 1649:       '</div>',
+ 1650:       '<div class="aicm-card"><h2>台帳 変更・削除</h2>',
+ 1651:       '<div class="aicm-field"><label>台帳行</label><select id="edit-ledger-select">' + ledgerOptions(dept) + '</select></div>',
+ 1652:       '<button data-action="load-ledger-edit">読み込み</button>',
+ 1653:       '<div id="ledger-edit-form">' + renderLedgerEditForm(dept) + '</div>',
+ 1654:       '</div>',
+ 1655:       '<div class="aicm-card aicm-wide"><h2>台帳一覧</h2>',
+ 1656:       renderLedgerTable(dept),
+ 1657:       '</div>',
+ 1658:       '<div class="aicm-card"><h2>CSV操作</h2>',
+ 1659:       '<div class="aicm-field"><label>CSVファイル</label><input id="csv-file" type="file" accept=".csv,text/csv"></div>',
+ 1660:       '<button class="primary" data-action="preview-csv">プレビュー</button> ',
+ 1661:       '<button class="primary" data-action="import-csv">取り込み</button>',
+ 1662:       '<div id="csv-preview"><p class="aicm-muted">未プレビュー</p></div>',
+ 1663:       '</div>',
+ 1664:       '<div class="aicm-card"><h2>作成テンプレ</h2>',
+ 1665:       '<button class="primary" data-action="copy-csv-prompt">CSV作成プロンプトをコピー</button>',
+ 1666:       '<p id="copy-result" class="aicm-muted"></p>',
+ 1667:       '<textarea class="aicm-output" readonly>' + esc(csvPrompt) + '</textarea>',
+ 1668:       '</div>',
+ 1669:       '</section>'
+ 1670:     ].join(""));
+ 1671:   }
+ 1672: 
+ 1673:   function ledgerOptions(dept) {
+ 1674:     if (!dept || !dept.task_ledger.length) return '<option value="">台帳行なし</option>';
+ 1675:     return dept.task_ledger.map(function (r) {
+ 1676:       return '<option value="' + esc(r.id) + '"' + (r.id === app.editLedgerId ? " selected" : "") + '>' + esc(r.deliverable_name + " / " + r.task_name) + '</option>';
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-worker-change-businessos-db-candidate-normalizer.js
+INDEX_LINE=45
+BLOCK=normalizeOne
+RANGE=110-165
+LABEL_HITS=9
+DOM_HITS=54
+PRODUCTION_HITS=18
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=135,142,157
+------------------------------------------------------------
+  110:   function normalizeOne(select, candidates) {
+  111:     var current = String(select.value || "");
+  112:     var signature = candidates.map(function (x) { return x.value + ":" + x.text; }).join("|");
+  113:     var changed = false;
+  114:     var i;
+  115:     var option;
+  116:     var foundCurrent = false;
+  117: 
+  118:     if (!isWorkerChangeSelect(select)) return false;
+  119:     if (!candidates.length) return false;
+  120: 
+  121:     if (
+  122:       select.getAttribute("data-aicm-worker-change-force-db-clone") === signature &&
+  123:       !hasLegacyOptions(select)
+  124:     ) {
+  125:       return false;
+  126:     }
+  127: 
+  128:     while (select.firstChild) {
+  129:       select.removeChild(select.firstChild);
+  130:       changed = true;
+  131:     }
+  132: 
+  133:     option = document.createElement("option");
+  134:     option.value = "";
+  135:     option.textContent = "BusinessOS DB候補を選択";
+  136:     select.appendChild(option);
+  137: 
+  138:     for (i = 0; i < candidates.length; i += 1) {
+  139:       option = document.createElement("option");
+  140:       option.value = candidates[i].value;
+  141:       option.textContent = candidates[i].text;
+  142:       option.setAttribute("data-source", "BusinessOS DB");
+  143:       option.setAttribute("data-role", "Worker");
+  144:       option.setAttribute("data-aicm-worker-change-option", "1");
+  145: 
+  146:       if (current && current === candidates[i].value) {
+  147:         option.selected = true;
+  148:         foundCurrent = true;
+  149:       }
+  150: 
+  151:       select.appendChild(option);
+  152:     }
+  153: 
+  154:     if (!foundCurrent) select.value = "";
+  155: 
+  156:     select.setAttribute("data-aicm-worker-change-force-db-clone", signature);
+  157:     select.setAttribute("data-aicm-worker-change-normalized", "BusinessOS DB only");
+  158: 
+  159:     return true;
+  160:   }
+  161: 
+  162:   function normalizeAll() {
+  163:     var candidates = collectDbWorkerOptions();
+  164:     var selects = Array.prototype.slice.call(document.querySelectorAll("select"));
+  165:     var changed = 0;
+
+------------------------------------------------------------
+SCRIPT=assets/js/phase-de-dh-workflow-final-local-ui.js
+INDEX_LINE=15
+BLOCK=previewCsv
+RANGE=2288-2311
+LABEL_HITS=16
+DOM_HITS=24
+PRODUCTION_HITS=0
+RISK=debug_only_candidate
+ACTION=move_to_debug_only_or_disable_block
+HIT_LINES=2288,2290,2293,2300
+------------------------------------------------------------
+ 2288:   function previewCsv() {
+ 2289:     var input = document.getElementById("csv-file");
+ 2290:     var preview = document.getElementById("csv-preview");
+ 2291: 
+ 2292:     if (!input.files || !input.files[0]) {
+ 2293:       preview.innerHTML = '<p style="color:#9f1239;">CSVファイルが未選択です。</p>';
+ 2294:       return;
+ 2295:     }
+ 2296: 
+ 2297:     var reader = new FileReader();
+ 2298:     reader.onload = function () {
+ 2299:       CSV_ROWS = parseCsv(String(reader.result || ""));
+ 2300:       preview.innerHTML = CSV_ROWS.map(function (r) {
+ 2301:         var errors = validCsvRow(r);
+ 2302:         return '<div class="aicm-row"><strong>' + esc(r.deliverable_name || "(成果物名なし)") + '</strong><p class="aicm-muted">' + esc(r.task_name || "") + '</p>' + (errors.length ? '<p style="color:#9f1239;">ERROR: ' + esc(errors.join(" / ")) + '</p>' : '<p class="aicm-row ok">OK</p>') + '</div>';
+ 2303:       }).join("");
+ 2304:     };
+ 2305:     reader.readAsText(input.files[0]);
+ 2306:   }
+ 2307: 
+ 2308:   function validCsvRow(r) {
+ 2309:     var errors = [];
+ 2310:     if (!String(r.deliverable_name || "").trim()) errors.push("deliverable_name required");
+ 2311:     if (!String(r.task_name || "").trim()) errors.push("task_name required");
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=UNKNOWN_BLOCK
+RANGE=1-31
+LABEL_HITS=20
+DOM_HITS=16
+PRODUCTION_HITS=24
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=3,4,5,8
+------------------------------------------------------------
+    1: /* AICM_PAYLOAD_PREVIEW_STRICT_VALIDATION_V6 */
+    2: /* AICM_FINAL_PAYLOAD_ROLE_MODEL_NORMALIZER_V13 */
+    3: /* AICM_FINAL_PREVIEW_READINESS_ALIGNMENT_V8 */
+    4: /* AICM_PREVIEW_EXISTING_ASSIGNMENT_RESOLVER_V9 */
+    5: /* AICM_PREVIEW_ROLE_CANONICAL_ROBOT_RESOLVER_V10 */
+    6: /* AICM_STRICT_ROLE_COMPATIBLE_ROBOT_RESOLVER_V11 */
+    7: /* AICM_ROLE_ELIGIBILITY_SEGMENT_STRICT_RESOLVER_V12 */
+    8: /* AICM_BUSINESSOS_DB_COMPANY_BINDING_PREVIEW_V7 */
+    9: 
+   10: /* AICM_MANAGER_PAYLOAD_ROBOT_ROLE_GUARD_V12 */
+   11: function aicmV12NormalizeRoleCode(input) {
+   12:   var s = String(input || "").trim().toLowerCase();
+   13:   s = s.replace(/[＿_\s\-]+/g, "_");
+   14:   s = s.replace(/配置/g, "");
+   15:   s = s.replace(/役割/g, "");
+   16:   s = s.replace(/ロール/g, "");
+   17:   if (s === "president" || s === "hd_r5p" || s === "社長" || s === "プレジデント") return "president";
+   18:   if (s === "manager" || s === "hd_r5" || s === "マネージャー" || s === "manager_role") return "manager";
+   19:   if (s === "leader" || s === "hd_r4" || s === "リーダー" || s === "leader_role") return "leader";
+   20:   if (s === "worker" || s === "hd_r3" || s === "ワーカー" || s === "worker_role") return "worker";
+   21:   if (s.indexOf("president") >= 0 || s.indexOf("プレジデント") >= 0) return "president";
+   22:   if (s.indexOf("manager") >= 0 || s.indexOf("マネージャー") >= 0) return "manager";
+   23:   if (s.indexOf("leader") >= 0 || s.indexOf("リーダー") >= 0) return "leader";
+   24:   if (s.indexOf("worker") >= 0 || s.indexOf("ワーカー") >= 0) return "worker";
+   25:   return s;
+   26: }
+   27: 
+   28: function aicmV12NormalizeText(input) {
+   29:   return String(input || "")
+   30:     .replace(/[－ー–—]/g, "-")
+   31:     .replace(/[：]/g, ":")
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-businessos-db-robot-pool-wire.js
+INDEX_LINE=40
+BLOCK=populateSelect
+RANGE=193-263
+LABEL_HITS=1
+DOM_HITS=29
+PRODUCTION_HITS=17
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=246
+------------------------------------------------------------
+  193:   function populateSelect(select, role, screenLabel) {
+  194:     if (!select) return;
+  195:     if (isSelectBusy(select)) return;
+  196: 
+  197:     var current = select.value || "";
+  198:     var previousText = "";
+  199:     if (select.selectedIndex >= 0 && select.options[select.selectedIndex]) {
+  200:       previousText = select.options[select.selectedIndex].textContent || "";
+  201:     }
+  202: 
+  203:     var candidates = STATE.robots.filter(function (robot) {
+  204:       return robotMatchesScreenRole(robot, role);
+  205:     });
+  206: 
+  207:     candidates.sort(function (a, b) {
+  208:       return optionLabel(a, role, screenLabel).localeCompare(optionLabel(b, role, screenLabel), "ja");
+  209:     });
+  210: 
+  211:     select.setAttribute("data-aicm-businessos-db-backed", STATE.api_ok ? "true" : "false");
+  212:     select.setAttribute("data-aicm-role-filter", role);
+  213:     select.setAttribute("data-aicm-businessos-db-candidate-count", String(candidates.length));
+  214:     select.setAttribute("data-aicm-role-filter-mode", "canonical_model_role_exact_v4_label_cleanup");
+  215: 
+  216:     if (!STATE.api_ok) return;
+  217: 
+  218:     if (!candidates.length) {
+  219:       select.setAttribute("data-aicm-db-empty-exact", "true");
+  220: 
+  221:       var localExists = Array.prototype.slice.call(select.options).some(function (opt) {
+  222:         return opt.value === current;
+  223:       });
+  224: 
+  225:       if (!localExists && current) {
+  226:         var keep = document.createElement("option");
+  227:         keep.value = current;
+  228:         keep.textContent = previousText || current + " / local保持";
+  229:         keep.selected = true;
+  230:         select.appendChild(keep);
+  231:       }
+  232: 
+  233:       return;
+  234:     }
+  235: 
+  236:     var signature = role + "::label-v4::" + candidates.map(function (r) { return robotId(r); }).join("|");
+  237: 
+  238:     if (select.getAttribute("data-aicm-db-signature") === signature) {
+  239:       return;
+  240:     }
+  241: 
+  242:     select.innerHTML = "";
+  243: 
+  244:     var empty = document.createElement("option");
+  245:     empty.value = "";
+  246:     empty.textContent = "BusinessOS DB候補を選択";
+  247:     select.appendChild(empty);
+  248: 
+  249:     candidates.forEach(function (robot) {
+  250:       var opt = document.createElement("option");
+  251:       opt.value = robotId(robot);
+  252:       opt.textContent = optionLabel(robot, role, screenLabel);
+  253:       if (current && current === opt.value) opt.selected = true;
+  254:       select.appendChild(opt);
+  255:     });
+  256: 
+  257:     select.setAttribute("data-aicm-db-signature", signature);
+  258:   }
+  259: 
+  260:   function populateAllSelects() {
+  261:     SELECT_TARGETS.forEach(function (target) {
+  262:       populateSelect(document.getElementById(target.id), target.role, target.label);
+  263:     });
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-business-aiworker-bridge.js
+INDEX_LINE=18
+BLOCK=buildPanelHtml
+RANGE=202-283
+LABEL_HITS=1
+DOM_HITS=26
+PRODUCTION_HITS=25
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=232
+------------------------------------------------------------
+  202:   function buildPanelHtml(state) {
+  203:     var roleOptionsHtml = ROLE_OPTIONS.map(function (role) {
+  204:       var selected = role.roleCode === state.roleCode ? " selected" : "";
+  205:       return '<option value="' + escapeHtml(role.roleCode) + '"' + selected + '>' + escapeHtml(role.label) + '</option>';
+  206:     }).join("");
+  207: 
+  208:     var filteredOptions = filterOptionsByRole(state.options, state.roleCode);
+  209:     var robotOptionsHtml = filteredOptions.map(function (option) {
+  210:       var value = toOptionValue(option);
+  211:       var selected = value === state.aiworkerModelCode ? " selected" : "";
+  212:       return '<option value="' + escapeHtml(value) + '"' + selected + '>' + escapeHtml(toOptionLabel(option)) + '</option>';
+  213:     }).join("");
+  214: 
+  215:     if (!robotOptionsHtml) {
+  216:       robotOptionsHtml = '<option value="">選択可能なロボットがありません</option>';
+  217:     } else {
+  218:       robotOptionsHtml = '<option value="">ロボットを選択</option>' + robotOptionsHtml;
+  219:     }
+  220: 
+  221:     var draftText = state.lastDraft
+  222:       ? JSON.stringify(state.lastDraft, null, 2)
+  223:       : "まだpayloadは作成されていません。";
+  224: 
+  225:     return [
+  226:       '<section id="aicm-business-aiworker-bridge-panel" style="border:1px solid #d0d7de;border-radius:12px;padding:16px;margin:16px 0;background:#fff;">',
+  227:       '<h2 style="margin:0 0 8px;font-size:18px;">BusinessOS AIWorker ロボット設定</h2>',
+  228:       '<p style="margin:0 0 12px;color:#57606a;font-size:13px;">Business側ロボットプールから、AICompanyManager用の配置payloadを作成します。DB保存は次工程です。</p>',
+  229: 
+  230:       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">',
+  231: 
+  232:       '<label style="display:block;font-size:13px;">会社ID',
+  233:       '<input data-aicm-aiworker-field="companyId" value="' + escapeHtml(state.companyId) + '" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  234:       '</label>',
+  235: 
+  236:       '<label style="display:block;font-size:13px;">対象階層',
+  237:       '<select data-aicm-aiworker-field="targetLevelCode" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  238:       '<option value="company"' + (state.targetLevelCode === "company" ? " selected" : "") + '>company / 会社</option>',
+  239:       '<option value="department"' + (state.targetLevelCode === "department" ? " selected" : "") + '>department / 部門</option>',
+  240:       '<option value="section"' + (state.targetLevelCode === "section" ? " selected" : "") + '>section / 課</option>',
+  241:       '<option value="organization"' + (state.targetLevelCode === "organization" ? " selected" : "") + '>organization / 内部互換</option>',
+  242:       '</select>',
+  243:       '</label>',
+  244: 
+  245:       '<label style="display:block;font-size:13px;">対象ID',
+  246:       '<input data-aicm-aiworker-field="targetId" value="' + escapeHtml(state.targetId) + '" placeholder="会社直下なら空で可" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  247:       '</label>',
+  248: 
+  249:       '<label style="display:block;font-size:13px;">役割',
+  250:       '<select data-aicm-aiworker-field="roleCode" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  251:       roleOptionsHtml,
+  252:       '</select>',
+  253:       '</label>',
+  254: 
+  255:       '<label style="display:block;font-size:13px;">社内通称',
+  256:       '<input data-aicm-aiworker-field="internalNickname" value="' + escapeHtml(state.internalNickname) + '" placeholder="例: 佐藤" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  257:       '</label>',
+  258: 
+  259:       '<label style="display:block;font-size:13px;">ロボット',
+  260:       '<select data-aicm-aiworker-field="aiworkerModelCode" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  261:       robotOptionsHtml,
+  262:       '</select>',
+  263:       '</label>',
+  264: 
+  265:       '</div>',
+  266: 
+  267:       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">',
+  268:       '<button type="button" data-aicm-aiworker-action="build-draft" style="padding:8px 12px;border-radius:10px;border:1px solid #0969da;background:#0969da;color:#fff;">配置payload作成</button>',
+  269:       '<button type="button" data-aicm-aiworker-action="reset" style="padding:8px 12px;border-radius:10px;border:1px solid #d0d7de;background:#f6f8fa;">リセット</button>',
+  270:       '</div>',
+  271: 
+  272:       '<pre data-aicm-aiworker-output="draft" style="white-space:pre-wrap;word-break:break-word;background:#f6f8fa;border-radius:10px;padding:12px;margin-top:12px;max-height:360px;overflow:auto;font-size:12px;">',
+  273:       escapeHtml(draftText),
+  274:       '</pre>',
+  275: 
+  276:       '</section>'
+  277:     ].join("");
+  278:   }
+  279: 
+  280:   function readStateFromPanel(panel, state) {
+  281:     var next = Object.assign({}, state);
+  282:     var fields = panel.querySelectorAll("[data-aicm-aiworker-field]");
+  283: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=validatePayloadForPreview
+RANGE=714-776
+LABEL_HITS=6
+DOM_HITS=20
+PRODUCTION_HITS=56
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=754,768
+------------------------------------------------------------
+  714:   function validatePayloadForPreview(payload) {
+  715:     var errors = [];
+  716:     var warnings = [];
+  717: 
+  718:     if (!isUuid(payload.company_id)) {
+  719:       errors.push("company_id_not_canonical_uuid");
+  720:     }
+  721: 
+  722:     if (payload.company_id_source === "single_db_company_fallback") {
+  723:       warnings.push("company_id_single_db_fallback_confirm_before_save");
+  724:     }
+  725: 
+  726:     if (payload.company_id_canonicalization_status && payload.company_id_canonicalization_status.indexOf("OK_") !== 0) {
+  727:       errors.push("company_id_canonicalization_not_ok");
+  728:     }
+  729: 
+  730:     if (payload.target_id_canonicalization_status && payload.target_id_canonicalization_status.indexOf("OK_") !== 0) {
+  731:       errors.push("target_id_canonicalization_not_ok");
+  732:     }
+  733: 
+  734:     if (payload.target_scope !== "company" && !isUuid(payload.target_id)) {
+  735:       errors.push("target_id_not_canonical_uuid");
+  736:     }
+  737: 
+  738:     if (!payload.robot_pool_id) {
+  739:       errors.push("robot_pool_id_required");
+  740:     } else if (!isUuid(payload.robot_pool_id)) {
+  741:       errors.push("robot_pool_id_not_canonical_uuid");
+  742:     }
+  743: 
+  744:     if (!payload.model_code) {
+  745:       errors.push("model_code_required");
+  746:     }
+  747: 
+  748:     if (!payload.robot_display_name) {
+  749:       errors.push("robot_display_name_required");
+  750:     }
+  751: 
+  752:     if (isPlaceholderOption(payload.selected_option_text)) {
+  753:       errors.push("robot_not_selected");
+  754:     } else if (String(payload.selected_option_text || "").indexOf("BusinessOS DB") < 0 && String(payload.robot_resolve_source || "") !== "existing_assignment_visible") {
+  755:       errors.push("robot_selection_not_businessos_db");
+  756:     }
+  757: 
+  758:     return {
+  759:       validation_errors: errors,
+  760:       validation_warnings: warnings,
+  761:       robot_selection_status: (
+  762:         errors.indexOf("robot_not_selected") >= 0 ||
+  763:         errors.indexOf("robot_pool_id_required") >= 0 ||
+  764:         errors.indexOf("robot_pool_id_not_canonical_uuid") >= 0 ||
+  765:         errors.indexOf("robot_selection_not_businessos_db") >= 0
+  766:       ) ? "BLOCKED_ROBOT_NOT_SELECTED" : "OK_ROBOT_SELECTED",
+  767:       company_mapping_warning: warnings.indexOf("company_id_single_db_fallback_confirm_before_save") >= 0 ? "CONFIRM_SINGLE_DB_COMPANY_FALLBACK" : "",
+  768:       strict_validation_status: errors.length ? "BLOCKED_PREVIEW_VALIDATION_ERRORS" : "OK_STRICT_PREVIEW_VALIDATION",
+  769:       strict_save_blocked: errors.length > 0
+  770:     };
+  771:   }
+  772: 
+  773: 
+  774:   function existingAssignmentRegionText(target, card) {
+  775:     var texts = [];
+  776:     var body = "";
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-business-aiworker-placement-client.js
+INDEX_LINE=22
+BLOCK=buildPanelHtml
+RANGE=169-203
+LABEL_HITS=1
+DOM_HITS=15
+PRODUCTION_HITS=14
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=179
+------------------------------------------------------------
+  169:   function buildPanelHtml(state) {
+  170:     var companyId = text(state && state.companyId) || DEFAULT_COMPANY_ID;
+  171:     var statusCode = text(state && state.statusCode) || "active";
+  172:     var output = state && state.output ? state.output : "未読み込み";
+  173: 
+  174:     return [
+  175:       '<section id="aicm-business-aiworker-placement-panel" style="border:1px solid #d0d7de;border-radius:12px;padding:16px;margin:16px 0;background:#fff;">',
+  176:       '<h2 style="margin:0 0 8px;font-size:18px;">保存済みロボット配置</h2>',
+  177:       '<p style="margin:0 0 12px;color:#57606a;font-size:13px;">BusinessOS _aiworker から AICompanyManager 用配置を一覧表示します。</p>',
+  178:       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">',
+  179:       '<label style="display:block;font-size:13px;">会社ID',
+  180:       '<input data-aicm-aiworker-placement-field="companyId" value="' + escapeHtml(companyId) + '" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  181:       '</label>',
+  182:       '<label style="display:block;font-size:13px;">状態',
+  183:       '<select data-aicm-aiworker-placement-field="statusCode" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  184:       '<option value="active"' + (statusCode === "active" ? " selected" : "") + '>active</option>',
+  185:       '<option value="inactive"' + (statusCode === "inactive" ? " selected" : "") + '>inactive</option>',
+  186:       '<option value=""' + (statusCode === "" ? " selected" : "") + '>all</option>',
+  187:       '</select>',
+  188:       '</label>',
+  189:       '</div>',
+  190:       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">',
+  191:       '<button type="button" data-aicm-aiworker-placement-action="load" style="padding:8px 12px;border-radius:10px;border:1px solid #0969da;background:#0969da;color:#fff;">一覧読み込み</button>',
+  192:       '</div>',
+  193:       '<div data-aicm-aiworker-placement-output="list" style="margin-top:12px;">',
+  194:       typeof output === "string" ? '<pre style="white-space:pre-wrap;background:#f6f8fa;border-radius:10px;padding:12px;">' + escapeHtml(output) + '</pre>' : renderPlacementListHtml(output),
+  195:       '</div>',
+  196:       '</section>'
+  197:     ].join("");
+  198:   }
+  199: 
+  200:   function ensureMount() {
+  201:     if (!root || !root.document) return null;
+  202: 
+  203:     var existing = root.document.getElementById("aicm-business-aiworker-placement-root");
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-worker-change-businessos-db-candidate-normalizer.js
+INDEX_LINE=45
+BLOCK=normalizeAll
+RANGE=162-192
+LABEL_HITS=1
+DOM_HITS=9
+PRODUCTION_HITS=0
+RISK=debug_only_candidate
+ACTION=move_to_debug_only_or_disable_block
+HIT_LINES=184
+------------------------------------------------------------
+  162:   function normalizeAll() {
+  163:     var candidates = collectDbWorkerOptions();
+  164:     var selects = Array.prototype.slice.call(document.querySelectorAll("select"));
+  165:     var changed = 0;
+  166:     var targetCount = 0;
+  167:     var legacyRemaining = 0;
+  168:     var i;
+  169: 
+  170:     for (i = 0; i < selects.length; i += 1) {
+  171:       if (!isWorkerChangeSelect(selects[i])) continue;
+  172:       targetCount += 1;
+  173:       if (normalizeOne(selects[i], candidates)) changed += 1;
+  174:       if (hasLegacyOptions(selects[i])) legacyRemaining += 1;
+  175:     }
+  176: 
+  177:     window.AICM_WORKER_CHANGE_BUSINESSOS_DB_CANDIDATE_NORMALIZER_STATUS = {
+  178:       marker: MARKER,
+  179:       result: legacyRemaining === 0 && targetCount > 0 && candidates.length > 0 ? "OK" : "CHECK",
+  180:       candidate_count: candidates.length,
+  181:       target_select_count: targetCount,
+  182:       changed: changed,
+  183:       legacy_remaining_select_count: legacyRemaining,
+  184:       policy: "Worker change selects clone BusinessOS DB Worker options",
+  185:       local_worker_alpha_beta: "excluded"
+  186:     };
+  187:   }
+  188: 
+  189:   function normalizeEventTarget(event) {
+  190:     var select = event && event.target && event.target.closest ? event.target.closest("select") : null;
+  191:     var candidates;
+  192: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-business-aiworker-screen-filter.js
+INDEX_LINE=26
+BLOCK=buildPanelHtml
+RANGE=201-228
+LABEL_HITS=1
+DOM_HITS=8
+PRODUCTION_HITS=3
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=211
+------------------------------------------------------------
+  201:   function buildPanelHtml(state) {
+  202:     var companyId = text(state && state.companyId) || DEFAULT_COMPANY_ID;
+  203:     var targetId = text(state && state.targetId) || "";
+  204:     var cards = SCREEN_ROUTES.map(buildRouteCardHtml).join("");
+  205: 
+  206:     return [
+  207:       '<section id="aicm-business-aiworker-screen-filter-panel" style="border:1px solid #d0d7de;border-radius:12px;padding:16px;margin:16px 0;background:#f6f8fa;">',
+  208:       '<h2 style="margin:0 0 8px;font-size:18px;">画面別ロボット配置フィルタ</h2>',
+  209:       '<p style="margin:0 0 12px;color:#57606a;font-size:13px;">AI企業設定・部門詳細・課詳細・Worker配置ごとに、保存済みロボット配置を絞り込みます。</p>',
+  210:       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px;">',
+  211:       '<label style="display:block;font-size:13px;">会社ID',
+  212:       '<input data-aicm-screen-filter-field="companyId" value="' + escapeHtml(companyId) + '" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  213:       '</label>',
+  214:       '<label style="display:block;font-size:13px;">対象ID',
+  215:       '<input data-aicm-screen-filter-field="targetId" value="' + escapeHtml(targetId) + '" placeholder="画面対象ID。空ならtarget_id無指定" style="width:100%;box-sizing:border-box;padding:8px;margin-top:4px;">',
+  216:       '</label>',
+  217:       '</div>',
+  218:       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">',
+  219:       cards,
+  220:       '</div>',
+  221:       '</section>'
+  222:     ].join("");
+  223:   }
+  224: 
+  225:   function ensureMount() {
+  226:     if (!root || !root.document) return null;
+  227: 
+  228:     var existing = root.document.getElementById("aicm-business-aiworker-screen-filter-root");
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-legacy-local-robot-selection-guard.js
+INDEX_LINE=44
+BLOCK=isValidBusinessOsSelection
+RANGE=50-68
+LABEL_HITS=1
+DOM_HITS=8
+PRODUCTION_HITS=3
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=57
+------------------------------------------------------------
+   50:   function isValidBusinessOsSelection(select, target) {
+   51:     var text = selectedText(select);
+   52:     var option;
+   53: 
+   54:     if (!select) return false;
+   55:     if (isPlaceholderText(text)) return false;
+   56:     if (!isUuid(select.value)) return false;
+   57:     if (text.indexOf("BusinessOS DB") < 0) return false;
+   58: 
+   59:     option = select.options && select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+   60:     if (!optionMatchesRole(option, target)) return false;
+   61: 
+   62:     return true;
+   63:   }
+   64: 
+   65:   function isInvalidLegacySelection(select, target) {
+   66:     var text = selectedText(select);
+   67: 
+   68:     if (!select) return false;
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-company-legacy-dom-compatibility.js
+INDEX_LINE=12
+BLOCK=ensureRoot
+RANGE=88-111
+LABEL_HITS=1
+DOM_HITS=7
+PRODUCTION_HITS=0
+RISK=debug_only_candidate
+ACTION=move_to_debug_only_or_disable_block
+HIT_LINES=99
+------------------------------------------------------------
+   88:   function ensureRoot() {
+   89:     ensureStyle();
+   90: 
+   91:     var root = document.getElementById("aicm-legacy-company-compat-root");
+   92:     if (!root) {
+   93:       root = el("div", {
+   94:         id: "aicm-legacy-company-compat-root",
+   95:         className: "aicm-legacy-company-compat-root",
+   96:         "data-aicm-compat": "legacy-company-dom",
+   97:         "aria-hidden": "true"
+   98:       });
+   99:       root.appendChild(el("h2", {}, "BusinessOS DB会社バインド 互換DOM"));
+  100:       root.appendChild(el("p", {}, "旧会社選択欄 互換保持"));
+  101:       document.body.appendChild(root);
+  102:       log("compat-root-created", {});
+  103:     }
+  104: 
+  105:     return root;
+  106:   }
+  107: 
+  108:   function optionExists(select, value) {
+  109:     var opts = Array.prototype.slice.call(select.options || []);
+  110:     return opts.some(function (o) { return s(o.value) === s(value); });
+  111:   }
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-businessos-db-robot-pool-wire.js
+INDEX_LINE=40
+BLOCK=updateStatusLines
+RANGE=272-301
+LABEL_HITS=1
+DOM_HITS=7
+PRODUCTION_HITS=6
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=286
+------------------------------------------------------------
+  272:   function updateStatusLines() {
+  273:     Array.prototype.slice.call(document.querySelectorAll("[data-aicm-db-robot-pool-status]")).forEach(function (node) {
+  274:       if (node.parentNode) node.parentNode.removeChild(node);
+  275:     });
+  276: 
+  277:     ["AI企業設定", "部門詳細", "課詳細"].forEach(function (title) {
+  278:       Array.prototype.slice.call(document.querySelectorAll(".aicm-card")).forEach(function (card) {
+  279:         var text = textOf(card);
+  280:         if (text.indexOf(title) < 0) return;
+  281:         if (card.querySelector("[data-aicm-db-robot-pool-status]")) return;
+  282: 
+  283:         var p = document.createElement("p");
+  284:         p.className = "aicm-muted";
+  285:         p.setAttribute("data-aicm-db-robot-pool-status", "true");
+  286:         p.textContent = "BusinessOS DB robot_pool: " +
+  287:           (STATE.api_ok ? "接続OK" : "未接続") +
+  288:           " / President=" + roleCount("President") +
+  289:           " / Manager=" + roleCount("Manager") +
+  290:           " / Leader=" + roleCount("Leader") +
+  291:           " / Worker=" + roleCount("Worker") +
+  292:           " / label cleanup / exact filter / 数量消費なし";
+  293:         card.appendChild(p);
+  294:       });
+  295:     });
+  296:   }
+  297: 
+  298:   function applyUi() {
+  299:     try {
+  300:       var now = Date.now();
+  301:       if (now - STATE.last_apply_at < 250) return;
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=removeExistingPreviewNodes
+RANGE=312-321
+LABEL_HITS=6
+DOM_HITS=2
+PRODUCTION_HITS=2
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=312,313
+------------------------------------------------------------
+  312:   function removeExistingPreviewNodes(root) {
+  313:     Array.prototype.slice.call((root || document).querySelectorAll("[data-aicm-placement-payload-preview]")).forEach(function (node) {
+  314:       if (node.parentNode) node.parentNode.removeChild(node);
+  315:     });
+  316:   }
+  317: 
+  318:   function textOf(el) {
+  319:     if (!el) return "";
+  320:     var clone = el.cloneNode(true);
+  321:     removeExistingPreviewNodes(clone);
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=renderAll
+RANGE=1337-1365
+LABEL_HITS=8
+DOM_HITS=0
+PRODUCTION_HITS=24
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=1340,1341
+------------------------------------------------------------
+ 1337:   function renderAll() {
+ 1338:     try {
+ 1339:       injectStyle();
+ 1340:       TARGETS.forEach(renderPreview);
+ 1341:       window.AICM_COMPACT_PAYLOAD_PREVIEW_STATUS = {
+ 1342:         ok: true,
+ 1343:         mode: "compact_payload_preview_repair_v3",
+ 1344:         robot_api_ok: STATE.robot_api_ok,
+ 1345:         structure_api_ok: STATE.structure_api_ok,
+ 1346:         robot_count: STATE.robots.length,
+ 1347:         company_count: STATE.companies.length,
+ 1348:         department_count: STATE.departments.length,
+ 1349:         organization_count: STATE.organizations.length,
+ 1350:         db_write: false,
+ 1351:         api_write: false,
+ 1352:         quantity_consumption: false
+ 1353:       };
+ 1354:     } catch (error) {
+ 1355:       window.AICM_COMPACT_PAYLOAD_PREVIEW_STATUS = {
+ 1356:         ok: false,
+ 1357:         error: error && error.message ? error.message : String(error)
+ 1358:       };
+ 1359:     }
+ 1360:   }
+ 1361: 
+ 1362:   function fetchJson(url) {
+ 1363:     return fetch(url, { cache: "no-store" }).then(function (res) {
+ 1364:       return res.json().then(function (body) {
+ 1365:         return { ok: res.ok, status: res.status, body: body };
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-existing-robot-assignment-select-sync.js
+INDEX_LINE=42
+BLOCK=removePreviewNodes
+RANGE=32-41
+LABEL_HITS=6
+DOM_HITS=2
+PRODUCTION_HITS=2
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=32,33
+------------------------------------------------------------
+   32:   function removePreviewNodes(root) {
+   33:     Array.prototype.slice.call((root || document).querySelectorAll("[data-aicm-placement-payload-preview]")).forEach(function (node) {
+   34:       if (node.parentNode) node.parentNode.removeChild(node);
+   35:     });
+   36:   }
+   37: 
+   38:   function textOf(el) {
+   39:     if (!el) return "";
+   40:     var clone = el.cloneNode(true);
+   41:     removePreviewNodes(clone);
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-existing-robot-assignment-select-sync.js
+INDEX_LINE=42
+BLOCK=isPlaceholder
+RANGE=45-61
+LABEL_HITS=1
+DOM_HITS=7
+PRODUCTION_HITS=2
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=55
+------------------------------------------------------------
+   45:   function isPlaceholder(select) {
+   46:     var text = "";
+   47:     if (!select) return true;
+   48:     if (select.selectedIndex >= 0 && select.options && select.options[select.selectedIndex]) {
+   49:       text = select.options[select.selectedIndex].textContent || "";
+   50:     }
+   51: 
+   52:     return !select.value ||
+   53:       text.indexOf("選択してください") >= 0 ||
+   54:       text.indexOf("候補を選択") >= 0 ||
+   55:       text.indexOf("BusinessOS DB候補を選択") >= 0;
+   56:   }
+   57: 
+   58:   function optionExists(select, value) {
+   59:     var i;
+   60:     if (!select || !value) return false;
+   61: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/phase-de-dh-workflow-final-local-ui.js
+INDEX_LINE=15
+BLOCK=buildCsvPreviewPayload
+RANGE=2712-2724
+LABEL_HITS=1
+DOM_HITS=4
+PRODUCTION_HITS=6
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=2712
+------------------------------------------------------------
+ 2712:   function buildCsvPreviewPayload(companyId, departmentId, csvText, fileName) {
+ 2713:     return {
+ 2714:       company_id: companyId || val("company-select"),
+ 2715:       department_id: departmentId || val("department-select"),
+ 2716:       original_file_name: fileName || "",
+ 2717:       csv_text: csvText || ""
+ 2718:     };
+ 2719:   }
+ 2720: 
+ 2721:   function buildCsvImportPayload(companyId, departmentId, batchId) {
+ 2722:     return {
+ 2723:       company_id: companyId || val("company-select"),
+ 2724:       department_id: departmentId || val("department-select"),
+
+------------------------------------------------------------
+SCRIPT=assets/js/phase-de-dh-workflow-final-local-ui.js
+INDEX_LINE=15
+BLOCK=createActionRouter
+RANGE=2836-2886
+LABEL_HITS=1
+DOM_HITS=4
+PRODUCTION_HITS=12
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=2857
+------------------------------------------------------------
+ 2836:   function createActionRouter(handlers) {
+ 2837:     var h = handlers || {};
+ 2838: 
+ 2839:     var routes = {
+ 2840:       "add-company": function () { return h.company.createCompany(); },
+ 2841:       "save-company": function () { return h.company.saveCompany(); },
+ 2842:       "delete-company": function () { return h.company.deleteCompany(); },
+ 2843:       "add-common-rules": function () { return h.company.saveCompanyRules(); },
+ 2844: 
+ 2845:       "add-department": function () { return h.department.createDepartment(); },
+ 2846:       "save-department": function () { return h.department.saveDepartment(); },
+ 2847:       "delete-department": function () { return h.department.deleteDepartment(); },
+ 2848: 
+ 2849:       "add-organization": function () { return h.organization.createOrganization(); },
+ 2850:       "save-organization": function () { return h.organization.saveOrganization(); },
+ 2851:       "delete-organization": function () { return h.organization.deleteOrganization(); },
+ 2852: 
+ 2853:       "add-ledger-row": function () { return h.ledger.saveLedgerRow(); },
+ 2854:       "save-ledger-row": function () { return h.ledger.saveLedgerRow(); },
+ 2855:       "delete-ledger-row": function () { return h.ledger.deleteLedgerRow(); },
+ 2856: 
+ 2857:       "preview-csv": function () { return h.csv.previewCsv(); },
+ 2858:       "import-csv": function () { return h.csv.importCsv(); },
+ 2859: 
+ 2860:       "approve-review": function (button) { return h.review.approveReview(button && button.getAttribute ? button.getAttribute("data-review-id") : ""); },
+ 2861:       "reject-review": function (button) { return h.review.rejectReview(button && button.getAttribute ? button.getAttribute("data-review-id") : ""); }
+ 2862:     };
+ 2863: 
+ 2864:     return {
+ 2865:       route: function route(action, button) {
+ 2866:         if (!routes[action]) {
+ 2867:           return Promise.resolve({
+ 2868:             ok: false,
+ 2869:             error_code: "ACTION_ROUTE_NOT_FOUND",
+ 2870:             error_message: "Action route not found: " + action,
+ 2871:             details: { action: action },
+ 2872:             request_id: "route_" + Date.now().toString(36)
+ 2873:           });
+ 2874:         }
+ 2875:         return routes[action](button || null);
+ 2876:       },
+ 2877:       hasRoute: function hasRoute(action) {
+ 2878:         return !!routes[action];
+ 2879:       }
+ 2880:     };
+ 2881:   }
+ 2882: 
+ 2883:   global.AICM = global.AICM || {};
+ 2884:   global.AICM.createActionRouter = createActionRouter;
+ 2885: })(window);
+ 2886: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-existing-robot-assignment-select-sync.js
+INDEX_LINE=42
+BLOCK=textOf
+RANGE=38-48
+LABEL_HITS=1
+DOM_HITS=4
+PRODUCTION_HITS=1
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=41
+------------------------------------------------------------
+   38:   function textOf(el) {
+   39:     if (!el) return "";
+   40:     var clone = el.cloneNode(true);
+   41:     removePreviewNodes(clone);
+   42:     return (clone.textContent || "").replace(/\s+/g, " ").trim();
+   43:   }
+   44: 
+   45:   function isPlaceholder(select) {
+   46:     var text = "";
+   47:     if (!select) return true;
+   48:     if (select.selectedIndex >= 0 && select.options && select.options[select.selectedIndex]) {
+
+------------------------------------------------------------
+SCRIPT=assets/js/phase-de-dh-workflow-final-local-ui.js
+INDEX_LINE=15
+BLOCK=AicmApiRepositoryStub
+RANGE=729-736
+LABEL_HITS=0
+DOM_HITS=4
+PRODUCTION_HITS=6
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=746
+------------------------------------------------------------
+  729:   function AicmApiRepositoryStub(apiClient) {
+  730:     this.apiClient = apiClient || null;
+  731:   }
+  732: 
+  733:   AicmApiRepositoryStub.prototype.loadBootstrap = function (input) { return disabled("loadBootstrap", "GET /api/aicm/bootstrap", input); };
+  734:   AicmApiRepositoryStub.prototype.createCompany = function (input) { return disabled("createCompany", "POST /api/aicm/company/create", input); };
+  735:   AicmApiRepositoryStub.prototype.saveCompany = function (input) { return disabled("saveCompany", "POST /api/aicm/company/save", input); };
+  736:   AicmApiRepositoryStub.prototype.deleteCompany = function (input) { return disabled("deleteCompany", "POST /api/aicm/company/delete", input); };
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-business-aiworker-duplicate-guard.js
+INDEX_LINE=30
+BLOCK=buildSmokeDraft
+RANGE=289-307
+LABEL_HITS=2
+DOM_HITS=2
+PRODUCTION_HITS=8
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=289,323
+------------------------------------------------------------
+  289:   function buildSmokeDraft(roleCode) {
+  290:     return {
+  291:       ok: true,
+  292:       displayLabel: "社長AI@" + (roleCode || "President"),
+  293:       placementPayload: {
+  294:         company_id: "00000000-0000-4000-8000-000000000001",
+  295:         role_code: roleCode || "President",
+  296:         target_level_code: roleCode === "Worker" ? "section" : "company",
+  297:         target_id: "",
+  298:         app_code: "AICompanyManager",
+  299:         internal_nickname: roleCode === "Worker" ? "ワーカーAI" : "社長AI"
+  300:       }
+  301:     };
+  302:   }
+  303: 
+  304:   if (root && root.document) {
+  305:     if (document.readyState === "loading") {
+  306:       document.addEventListener("DOMContentLoaded", init);
+  307:     } else {
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=selectedRobotIsCanonicalBusinessOs
+RANGE=939-954
+LABEL_HITS=1
+DOM_HITS=3
+PRODUCTION_HITS=3
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=945
+------------------------------------------------------------
+  939:   function selectedRobotIsCanonicalBusinessOs(row, select, optionText, target) {
+  940:     var rid = row ? robotId(row, select ? select.value : "") : "";
+  941:     var text = String(optionText || "");
+  942: 
+  943:     if (!row) return false;
+  944:     if (!isUuid(rid)) return false;
+  945:     if (text.indexOf("BusinessOS DB") < 0) return false;
+  946:     if (!businessOsTextSupportsTargetRole(text, target)) return false;
+  947: 
+  948:     return true;
+  949:   }
+  950: 
+  951:   function buildRobotFromOption(option) {
+  952:     var text = option ? option.textContent || "" : "";
+  953:     var value = option ? option.value || "" : "";
+  954:     var match;
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-legacy-local-robot-selection-guard.js
+INDEX_LINE=44
+BLOCK=optionMatchesRole
+RANGE=75-103
+LABEL_HITS=1
+DOM_HITS=3
+PRODUCTION_HITS=0
+RISK=debug_only_candidate
+ACTION=move_to_debug_only_or_disable_block
+HIT_LINES=82
+------------------------------------------------------------
+   75:   function optionMatchesRole(option, target) {
+   76:     var text = option ? option.textContent || "" : "";
+   77:     var rolePart = "";
+   78:     var idx;
+   79:     var i;
+   80: 
+   81:     if (!option || !isUuid(option.value)) return false;
+   82:     if (text.indexOf("BusinessOS DB") < 0) return false;
+   83: 
+   84:     idx = text.indexOf("対応:");
+   85:     if (idx < 0) return false;
+   86: 
+   87:     rolePart = text.slice(idx)
+   88:       .replace(/AICompanyManager/g, "AICM")
+   89:       .replace(/[^A-Za-z0-9_]+/g, " ");
+   90: 
+   91:     rolePart = " " + rolePart.trim() + " ";
+   92: 
+   93:     for (i = 0; i < target.roleWords.length; i += 1) {
+   94:       if (rolePart.indexOf(" " + target.roleWords[i] + " ") >= 0) return true;
+   95:     }
+   96: 
+   97:     return false;
+   98:   }
+   99: 
+  100:   function firstBusinessOsOption(select, target) {
+  101:     var i;
+  102:     if (!select || !select.options) return null;
+  103: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-businessos-db-robot-pool-wire.js
+INDEX_LINE=40
+BLOCK=optionLabel
+RANGE=172-192
+LABEL_HITS=1
+DOM_HITS=2
+PRODUCTION_HITS=4
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=184
+------------------------------------------------------------
+  172:   function optionLabel(robot, screenRole, screenLabel) {
+  173:     var name = displayName(robot);
+  174:     var model = detectModelCode(robot);
+  175:     var roles = canonicalRolesForRobot(robot);
+  176:     var base = screenLabel + ": " + name;
+  177: 
+  178:     if (model) base += " / " + model;
+  179: 
+  180:     if (roles.length) {
+  181:       base += " / 対応: " + roleJoin(roles);
+  182:     }
+  183: 
+  184:     base += " / BusinessOS DB";
+  185: 
+  186:     return base;
+  187:   }
+  188: 
+  189:   function isSelectBusy(select) {
+  190:     return document.activeElement === select;
+  191:   }
+  192: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=businessOsRobotOptionText
+RANGE=922-942
+LABEL_HITS=1
+DOM_HITS=2
+PRODUCTION_HITS=4
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=936
+------------------------------------------------------------
+  922:   function businessOsRobotOptionText(target, row) {
+  923:     var roleText = "";
+  924:     var text = robotRowText(row);
+  925:     var words = roleWordsForTarget(target);
+  926:     var i;
+  927: 
+  928:     for (i = 0; i < words.length; i += 1) {
+  929:       if (roleTokenMatch(text, words[i])) {
+  930:         roleText = roleText ? roleText + "・" + words[i] : words[i];
+  931:       }
+  932:     }
+  933: 
+  934:     if (!roleText) roleText = target.role;
+  935: 
+  936:     return target.role + "配置: " + displayName(row, "") + " / " + detectModelCode(row, "") + " / 対応: " + roleText + " / BusinessOS DB";
+  937:   }
+  938: 
+  939:   function selectedRobotIsCanonicalBusinessOs(row, select, optionText, target) {
+  940:     var rid = row ? robotId(row, select ? select.value : "") : "";
+  941:     var text = String(optionText || "");
+  942: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=row
+RANGE=1293-1300
+LABEL_HITS=2
+DOM_HITS=1
+PRODUCTION_HITS=1
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=1294
+------------------------------------------------------------
+ 1293:   function row(label, value) {
+ 1294:     return '<div class="aicm-preview-key">' + esc(label) + '</div><div class="aicm-preview-value">' + esc(value || "-") + '</div>';
+ 1295:   }
+ 1296: 
+ 1297:   function renderPreview(target) {
+ 1298:     var card = cardForTarget(target);
+ 1299:     var payload, existing, html, statusClass, detailsWasOpen;
+ 1300: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-legacy-local-robot-selection-guard.js
+INDEX_LINE=44
+BLOCK=isPlaceholderText
+RANGE=42-53
+LABEL_HITS=1
+DOM_HITS=2
+PRODUCTION_HITS=1
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=47
+------------------------------------------------------------
+   42:   function isPlaceholderText(text) {
+   43:     var t = String(text || "");
+   44:     return !t ||
+   45:       t.indexOf("選択してください") >= 0 ||
+   46:       t.indexOf("候補を選択") >= 0 ||
+   47:       t.indexOf("BusinessOS DB候補を選択") >= 0;
+   48:   }
+   49: 
+   50:   function isValidBusinessOsSelection(select, target) {
+   51:     var text = selectedText(select);
+   52:     var option;
+   53: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-worker-change-businessos-db-candidate-normalizer.js
+INDEX_LINE=45
+BLOCK=isBusinessOsWorkerOption
+RANGE=21-37
+LABEL_HITS=1
+DOM_HITS=2
+PRODUCTION_HITS=0
+RISK=debug_only_candidate
+ACTION=move_to_debug_only_or_disable_block
+HIT_LINES=26
+------------------------------------------------------------
+   21:   function isBusinessOsWorkerOption(option) {
+   22:     var text = optionText(option);
+   23:     var value = String(option && option.value ? option.value : "");
+   24: 
+   25:     if (!isUuid(value)) return false;
+   26:     if (text.indexOf("BusinessOS DB") < 0) return false;
+   27:     if (text.indexOf("Worker配置") >= 0) return true;
+   28:     if (text.indexOf("対応:") >= 0 && text.indexOf("Worker") >= 0) return true;
+   29:     if (WORKER_MODEL_RE.test(text)) return true;
+   30: 
+   31:     return false;
+   32:   }
+   33: 
+   34:   function hasLegacyOptions(select) {
+   35:     var i;
+   36: 
+   37:     if (!select || !select.options) return false;
+
+------------------------------------------------------------
+SCRIPT=assets/js/phase-de-dh-workflow-final-local-ui.js
+INDEX_LINE=15
+BLOCK=readCsvTextFromDom
+RANGE=4369-4394
+LABEL_HITS=1
+DOM_HITS=1
+PRODUCTION_HITS=1
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=4376
+------------------------------------------------------------
+ 4369:   function readCsvTextFromDom() {
+ 4370:     var ids = [
+ 4371:       "csv-text",
+ 4372:       "csv-input",
+ 4373:       "csv-import-text",
+ 4374:       "task-ledger-csv",
+ 4375:       "ledger-csv-text",
+ 4376:       "csv-preview-text"
+ 4377:     ];
+ 4378:     var i;
+ 4379:     var el;
+ 4380: 
+ 4381:     for (i = 0; i < ids.length; i += 1) {
+ 4382:       el = byId(ids[i]);
+ 4383:       if (el && typeof el.value === "string" && el.value.trim().length > 0) {
+ 4384:         return el.value;
+ 4385:       }
+ 4386:     }
+ 4387: 
+ 4388:     return "";
+ 4389:   }
+ 4390: 
+ 4391:   function parseCsvLine(line) {
+ 4392:     var cells = [];
+ 4393:     var current = "";
+ 4394:     var inQuotes = false;
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-business-aiworker-save-client.js
+INDEX_LINE=20
+BLOCK=buildSmokeDraft
+RANGE=301-332
+LABEL_HITS=2
+DOM_HITS=0
+PRODUCTION_HITS=8
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=350
+------------------------------------------------------------
+  301:   function buildSmokeDraft() {
+  302:     return {
+  303:       ok: true,
+  304:       displayLabel: "社長AI@President",
+  305:       grantPayload: {
+  306:         company_id: "00000000-0000-4000-8000-000000000001",
+  307:         aiworker_model_code: "HD-R5",
+  308:         quantity: 1,
+  309:         business_offer_code: "standard",
+  310:         entitlement_scope_code: "company",
+  311:         assignment_mode_code: "unlimited_placement"
+  312:       },
+  313:       placementPayload: {
+  314:         company_id: "00000000-0000-4000-8000-000000000001",
+  315:         aiworker_model_code: "HD-R5",
+  316:         target_level_code: "company",
+  317:         target_id: "",
+  318:         app_code: "AICompanyManager",
+  319:         role_code: "President",
+  320:         internal_nickname: "社長AI",
+  321:         placement_quantity: 1,
+  322:         metadata_jsonb: {
+  323:           source: "node_smoke"
+  324:         }
+  325:       }
+  326:     };
+  327:   }
+  328: 
+  329:   if (root && root.document) {
+  330:     if (document.readyState === "loading") {
+  331:       document.addEventListener("DOMContentLoaded", bindPanelSave);
+  332:     } else {
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=textOf
+RANGE=318-328
+LABEL_HITS=1
+DOM_HITS=1
+PRODUCTION_HITS=0
+RISK=debug_only_candidate
+ACTION=move_to_debug_only_or_disable_block
+HIT_LINES=321
+------------------------------------------------------------
+  318:   function textOf(el) {
+  319:     if (!el) return "";
+  320:     var clone = el.cloneNode(true);
+  321:     removeExistingPreviewNodes(clone);
+  322:     return (clone.textContent || "").replace(/\s+/g, " ").trim();
+  323:   }
+  324: 
+  325:   function normalize(value) {
+  326:     return String(value == null ? "" : value).toLowerCase().replace(/[\s　／/・|:：,，。\.\-＿_]+/g, "");
+  327:   }
+  328: 
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-robot-placement-payload-preview.js
+INDEX_LINE=41
+BLOCK=aicmFindRoleCompatibleStateRobot
+RANGE=1160-1189
+LABEL_HITS=1
+DOM_HITS=1
+PRODUCTION_HITS=10
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=1178
+------------------------------------------------------------
+ 1160:   function aicmFindRoleCompatibleStateRobot(target) {
+ 1161:     var i;
+ 1162:     var row;
+ 1163:     var rid;
+ 1164:     var model;
+ 1165: 
+ 1166:     if (!STATE || !STATE.robots || !STATE.robots.length) return null;
+ 1167: 
+ 1168:     for (i = 0; i < STATE.robots.length; i += 1) {
+ 1169:       row = STATE.robots[i];
+ 1170:       rid = robotId(row, "");
+ 1171:       model = detectModelCode(row, "");
+ 1172: 
+ 1173:       if (!isUuid(rid)) continue;
+ 1174:       if (!aicmModelAllowedForRole(target.role, model)) continue;
+ 1175: 
+ 1176:       return {
+ 1177:         robot: row,
+ 1178:         option_text: target.role + "配置: " + displayName(row, "") + " / " + model + " / BusinessOS DB",
+ 1179:         source: "final_payload_role_model_state"
+ 1180:       };
+ 1181:     }
+ 1182: 
+ 1183:     return null;
+ 1184:   }
+ 1185: 
+ 1186:   function aicmNormalizeRobotForFinalPayload(target, card, select, resolvedRobot, optionText, robotResolveSource) {
+ 1187:     var currentModel = resolvedRobot ? detectModelCode(resolvedRobot, optionText || "") : "";
+ 1188:     var currentRobotId = resolvedRobot ? robotId(resolvedRobot, "") : "";
+ 1189:     var optionMatch;
+
+------------------------------------------------------------
+SCRIPT=assets/js/aicm-business-aiworker-save-reload-bridge.js
+INDEX_LINE=28
+BLOCK=buildSmokeSaveSuccessPayload
+RANGE=386-405
+LABEL_HITS=1
+DOM_HITS=0
+PRODUCTION_HITS=6
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=424
+------------------------------------------------------------
+  386:   function buildSmokeSaveSuccessPayload() {
+  387:     return {
+  388:       ok: true,
+  389:       displayLabel: "社長AI@President",
+  390:       grantResult: {
+  391:         ok: true,
+  392:         company_robot_entitlement_id: "00000000-0000-4000-8000-000000000701"
+  393:       },
+  394:       placementResult: {
+  395:         ok: true,
+  396:         company_robot_placement_id: "00000000-0000-4000-8000-000000000702",
+  397:         display_label: "社長AI@President"
+  398:       }
+  399:     };
+  400:   }
+  401: 
+  402:   if (root && root.document) {
+  403:     if (document.readyState === "loading") {
+  404:       document.addEventListener("DOMContentLoaded", init);
+  405:     } else {
+
+------------------------------------------------------------
+SCRIPT=assets/js/phase-de-dh-workflow-final-local-ui.js
+INDEX_LINE=15
+BLOCK=AicmLocalRepository
+RANGE=370-379
+LABEL_HITS=0
+DOM_HITS=0
+PRODUCTION_HITS=8
+RISK=coupled_do_not_disable_whole_file
+ACTION=split_or_gate_this_visible_debug_block_only
+HIT_LINES=635,640
+------------------------------------------------------------
+  370:   function AicmLocalRepository(options) {
+  371:     this.options = options || {};
+  372:     this.storageKey = this.options.storageKey || DEFAULT_STORAGE_KEY;
+  373:     this.adapter = global.AICM && global.AICM.AicmStateAdapter;
+  374:   }
+  375: 
+  376:   AicmLocalRepository.prototype.loadState = function loadState() {
+  377:     try {
+  378:       var raw = localStorage.getItem(this.storageKey);
+  379:       var state = raw ? JSON.parse(raw) : defaultState();
+
+------------------------------------------------------------
+SCRIPT=assets/js/phase-de-dh-workflow-final-local-ui.js
+INDEX_LINE=15
+BLOCK=AicmActionAdapter
+RANGE=2373-2380
+LABEL_HITS=0
+DOM_HITS=0
+PRODUCTION_HITS=0
+RISK=debug_only_candidate
+ACTION=move_to_debug_only_or_disable_block
+HIT_LINES=2456,2458
+------------------------------------------------------------
+ 2373:   function AicmActionAdapter(repository) {
+ 2374:     this.repository = repository || null;
+ 2375:   }
+ 2376: 
+ 2377:   AicmActionAdapter.prototype.requireRepository = function requireRepository() {
+ 2378:     if (!this.repository) {
+ 2379:       return null;
+ 2380:     }

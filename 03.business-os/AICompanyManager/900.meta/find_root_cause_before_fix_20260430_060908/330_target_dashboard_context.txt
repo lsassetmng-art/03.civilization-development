@@ -1,0 +1,130 @@
+============================================================
+CONTEXT pattern=function renderDashboard[[:space:]]*\(
+============================================================
+FOUND_LINE=1352
+        '<div class="aicm-field"><label>Workerロボット変更</label><select id="worker-assignment-' + esc(domId) + '-robot">' + aicmBusinessRobotOptions(data, item.robot_id ? [item.robot_id] : [], "worker") + '</select></div>',
+        field("社内通称", "worker-assignment-" + domId + "-nickname", item.nickname || ""),
+        '<button class="primary" data-action="update-section-worker-assignment-v2" data-assignment-id="' + esc(item.assignment_id) + '">この配置を変更</button>',
+        '<p class="aicm-muted">Business側ロボットプール: ' + esc(item.robot_id || "") + ' / 無制限割当</p>',
+        '</div>'
+      ].join("");
+    }).join("");
+  }
+
+  function aicmSectionWorkerUi(data, org) {
+    return [
+      '<div class="aicm-card"><h2>Workerロボット配置</h2>',
+      '<p class="aicm-muted">コンボボックスでWorkerロボットを選択し、社内通称を入力して追加します。複数配置できます。配置済みWorkerも変更できます。</p>',
+      '<div class="aicm-field"><label>追加するWorkerロボット</label><select id="section-worker-robot-select">' + aicmBusinessRobotOptions(data, [], "worker") + '</select></div>',
+      field("社内通称", "section-worker-nickname", ""),
+      '<button class="primary" data-action="add-section-worker-assignment-v2">Workerを追加</button>',
+      '<div class="aicm-card"><h3>配置済みWorker</h3>' + aicmWorkerAssignmentRows(data, org) + '</div>',
+      '</div>'
+    ].join("");
+  }
+
+  function aicmHiddenRobotIdsSelect(data, org) {
+    var ids = org && Array.isArray(org.robot_ids) ? org.robot_ids : [];
+    return '<div style="display:none"><select id="edit-org-robots" multiple>' +
+      aicmBusinessRobotOptions(data, ids, "worker") +
+      '</select></div>';
+  }
+  /* AICM_DIRECT_SOURCE_REPAIR_HELPERS_END */
+
+
+
+
+
+
+
+  function renderDashboard(data, company) {
+    var totalTasks = 0;
+    var totalReview = 0;
+    var totalDone = 0;
+    var orgRows = allOrganizations(company);
+
+    aicmEnsureBusinessRobots(data);
+
+    if (company) {
+      company.departments.forEach(function (d) {
+        totalTasks += d.task_ledger.length;
+        totalReview += d.review_items.length;
+        d.task_ledger.forEach(function (r) {
+          if (r.status === "完了") totalDone += 1;
+        });
+      });
+    }
+
+    return shell([
+      '<section class="aicm-grid" data-screen-scope="dashboard">',
+      '<div class="aicm-card"><h2>AI企業選択</h2>',
+      '<div class="aicm-field"><label>AI企業</label><select id="company-select">' + companyOptions(data) + '</select></div>',
+      '<button class="primary" data-action="switch-company">AI企業を表示</button>',
+      '</div>',
+      '<div class="aicm-card"><h2>会社概要</h2>',
+      company ? '<p><strong>' + esc(company.name) + '</strong></p><p class="aicm-muted">' + esc(company.business_domain) + '</p><p>会社共通ルール: ' + company.company_common_rules.length + '件</p>' : '<p class="aicm-muted">会社なし</p>',
+      '<div class="aicm-card-footer">',
+      '<button class="primary" data-screen="settings">AI企業設定</button>',
+      '<button class="primary" data-screen="company-add">AI企業新規追加</button>',
+      '</div>',
+      '</div>',
+      '<div class="aicm-card"><h2>全体状況</h2>',
+      '<p>部門数: ' + (company ? company.departments.length : 0) + '</p>',
+      '<p>課数: ' + orgRows.length + '</p>',
+      '<p>台帳行: ' + totalTasks + '</p>',
+      '<p>完了: ' + totalDone + '</p>',
+      '<p>レビュー・承認待ち: ' + totalReview + '</p>',
+      '</div>',
+      '<div class="aicm-card"><h2>部門一覧</h2>',
+      company && company.departments.length ? company.departments.map(function (d) {
+        return '<div class="aicm-row"><strong>' + esc(d.name) + '</strong><p class="aicm-muted">' + esc(d.purpose) + '</p><p>課: ' + d.organizations.length + ' / 台帳: ' + d.task_ledger.length + '</p></div>';
+      }).join("") : '<p class="aicm-muted">部門なし。新規追加から作成してください。</p>',
+      '<div class="aicm-card-footer"><button class="primary" data-screen="department-detail">部門詳細</button><button class="primary" data-screen="department-add">新規追加</button></div>',
+      '</div>',
+      '<div class="aicm-card"><h2>課一覧</h2>',
+      orgRows.length ? orgRows.map(function (r) {
+        return '<div class="aicm-row"><strong>' + esc(r.org.name) + '</strong><p class="aicm-muted">' + esc(r.dept.name + " / " + r.org.purpose) + '</p><p>Leader: ' + esc(aicmRoleLabel(data, r.org.leader_robot_id, r.org.leader_robot_nickname, "Leader")) + '</p><p>Worker: ' + esc(aicmWorkerAssignmentLabels(data, r.org).join(" / ")) + '</p></div>';
+      }).join("") : '<p class="aicm-muted">課なし。先に部門を作成し、その後に課を追加してください。</p>',
+      '<div class="aicm-card-footer"><button class="primary" data-screen="organization-detail">課詳細</button><button class="primary" data-screen="organization-add">新規追加</button></div>',
+      '</div>',
+      '</section>'
+    ].join(""));
+  }
+
+
+  function renderCompanyAdd() {
+    return shell([
+      '<section class="aicm-grid" data-screen-scope="company-add">',
+      '<div class="aicm-card aicm-wide"><h2>AI企業新規追加</h2><p class="aicm-muted">AI企業設定とは分けた新規追加専用画面です。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
+      '<div class="aicm-card">',
+      field("会社名", "new-company-name", "新規AI企業"),
+      field("事業領域", "new-company-domain", "業務支援"),
+      '<button class="primary" data-action="add-company">AI企業を追加</button>',
+      '</div>',
+      '</section>'
+    ].join(""));
+  }
+
+  function renderSettings(data, company) {
+    var editing = app.editCompanyId ? findCompany(data, app.editCompanyId) : company;
+
+    aicmEnsureBusinessRobots(data);
+
+    return shell([
+      '<section class="aicm-grid" data-screen-scope="settings">',
+      '<div class="aicm-card aicm-wide"><h2>AI企業設定</h2><p class="aicm-muted">会社変更・削除・会社共通ルール管理、Presidentロボット設定、会社事業方針指示を行います。</p><button data-screen="dashboard">AI企業ダッシュボードへ戻る</button></div>',
+      '<div class="aicm-card"><h2>会社 変更・削除</h2>',
+      '<div class="aicm-field"><label>変更対象</label><select id="edit-company-select">' + companyOptions(data) + '</select></div>',
+      '<button data-action="load-company-edit">読み込み</button>',
+      field("会社名", "edit-company-name", editing ? editing.name : ""),
+      field("事業領域", "edit-company-domain", editing ? editing.business_domain : ""),
+      '<button class="primary" data-action="save-company">会社を変更</button> ',
+      '<button class="danger" data-action="delete-company">会社を削除</button>',
+      '</div>',
+      '<div class="aicm-card"><h2>Presidentロボット</h2>',
+      '<p class="aicm-muted">会社単位のPresidentはAI企業設定で設定します。Business側ロボットプールから選択します。AICompanyManagerはシステム用のため数量消費せず無制限割当です。</p>',
+      '<div class="aicm-field"><label>Presidentロボット</label><select id="company-president-robot">' + aicmBusinessRobotOptions(data, editing && editing.president_robot_id ? [editing.president_robot_id] : [], "president") + '</select></div>',
+      field("社内通称", "company-president-nickname", editing ? editing.president_robot_nickname : ""),
+      '<button class="primary" data-action="save-company-president-v2">Presidentを設定</button>',
+      aicmPresidentRobotSummary(data, editing),
+      '</div>',

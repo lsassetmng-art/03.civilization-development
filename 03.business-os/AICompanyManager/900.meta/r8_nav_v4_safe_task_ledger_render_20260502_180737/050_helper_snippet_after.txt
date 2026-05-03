@@ -1,0 +1,123 @@
+      confirmCard,
+      pager,
+      '<div class="aicm-manager-major-list">',
+      cards,
+      '</div>',
+      pager
+    ].join("");
+  }
+  
+// AICM_R8_NAV_TASK_LEDGER_V3_CLEAN_HELPER_START
+  
+// AICM_R8_NAV_TASK_LEDGER_SAFE_RENDER_V4_START
+  function aicmRenderTaskLedgerSafeR8V4(sourceLabel) {
+    state.screen = "task-ledger";
+
+    try {
+      if (!root) return;
+
+      var html = renderTaskLedgerPlaceholder();
+      root.innerHTML = html;
+
+      return true;
+    } catch (error) {
+      var message = error && error.message ? error.message : String(error || "unknown error");
+      var stack = error && error.stack ? String(error.stack) : "";
+
+      if (typeof console !== "undefined" && console && console.error) {
+        console.error("AICM task-ledger render failed", {
+          sourceLabel: sourceLabel || "",
+          message: message,
+          stack: stack
+        });
+      }
+
+      if (root) {
+        root.innerHTML = renderShell([
+          '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
+          '  <p class="aicm-eyebrow">TASK LEDGER RENDER ERROR</p>',
+          '  <h2>部門別タスク台帳の描画でエラーが発生しました</h2>',
+          '  <p class="aicm-selected-note">クリック処理と画面遷移は動いています。以下はブラウザ側の描画エラーです。</p>',
+          '  <dl class="aicm-core-detail-list">',
+          '    <dt>source</dt><dd>' + escapeHtml(sourceLabel || "") + '</dd>',
+          '    <dt>message</dt><dd>' + escapeHtml(message) + '</dd>',
+          '  </dl>',
+          stack ? '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(stack) + '</pre>' : '',
+          '  <div class="aicm-dashboard-action-row">',
+          '    <button type="button" data-core-action="task-ledger-refresh">再読み込み</button>',
+          '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
+          '  </div>',
+          '</section>'
+        ].join(""));
+      }
+
+      return false;
+    }
+  }
+// AICM_R8_NAV_TASK_LEDGER_SAFE_RENDER_V4_END
+
+  function aicmOpenTaskLedgerScreenR8V3Clean() {
+    state.screen = "task-ledger";
+    state.managerMajorDeleteConfirm = null;
+
+    if (typeof setMessage === "function") {
+      setMessage("ok", "部門別タスク台帳を表示します。");
+    }
+
+    aicmRenderTaskLedgerSafeR8V4("open:initial");
+
+    Promise.resolve()
+      .then(function () {
+        if (typeof aicmReloadTaskLedgerContext === "function") {
+          return aicmReloadTaskLedgerContext();
+        }
+        return null;
+      })
+      .then(function () {
+        state.screen = "task-ledger";
+        render();
+      })
+      .catch(function (error) {
+        state.screen = "task-ledger";
+
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "部門別タスク台帳の読込に失敗しました。");
+        }
+
+        aicmRenderTaskLedgerSafeR8V4("open:error");
+      });
+  }
+// AICM_R8_NAV_TASK_LEDGER_V3_CLEAN_HELPER_END
+
+  async function aicmReloadTaskLedgerContext() {
+    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: reload
+    state.screen = "task-ledger";
+    state.errorMessage = "";
+
+    if (typeof loadContext === "function") {
+      await loadContext();
+      // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_RELOAD_CALL
+      if (typeof aicmFetchAndHydrateManagerMajorContextR8M === "function") {
+        await aicmFetchAndHydrateManagerMajorContextR8M();
+      }
+    }
+
+    state.screen = "task-ledger";
+
+    if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+      aicmRenderTaskLedgerSafeR8V4("reload:complete");
+    } else if (typeof render === "function") {
+      render();
+    }
+  }
+
+
+  function aicmHydrateManagerMajorContextArraysR8M(rawContext) {
+    // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_V1
+    var raw = rawContext && typeof rawContext === "object" ? rawContext : {};
+    var target = state && state.context && typeof state.context === "object" ? state.context : {};
+
+    if (state) {
+      state.context = target;
+    }
+

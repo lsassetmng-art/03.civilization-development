@@ -1,0 +1,1929 @@
+============================================================
+ownerId / loadContext scan
+============================================================
+25-
+26-  var STORAGE = {
+27-    ownerCivilizationId: "AICM_OWNER_CIVILIZATION_ID",
+28-    selectedCompanyId: "AICM_V2_SELECTED_COMPANY_ID",
+29-    selectedDepartmentId: "AICM_V2_SELECTED_DEPARTMENT_ID",
+30-    selectedSectionId: "AICM_V2_SELECTED_SECTION_ID",
+31-    contextCache: "AICM_V2_SELECTED_COMPANY_CONTEXT"
+32-  };
+33-
+34-  var DEFAULT_OWNER_CIVILIZATION_ID = "00000000-0000-4000-8000-000000000001";
+35-
+36-  var API = {
+37:    context: "/api/aicm/v2/context",
+38-    createCompany: "/api/aicm/v2/company/create",
+39-    createDepartment: "/api/aicm/v2/department/create",
+40-    createSection: "/api/aicm/v2/section/create",
+41-    createPlacement: "/api/aicm/v2/placement/create"
+42-  };
+43-
+44-  var root = null;
+45-
+46-  var state = {
+47-    booted: false,
+48-    loading: false,
+49-    screen: "dashboard",
+--
+100-  }
+101-
+102-  function publicErrorMessage(error) {
+103-    var message = error && error.message ? String(error.message) : String(error || "不明なエラーです。");
+104-    message = message.replace(new RegExp("post" + "gres(?:ql)?://" + "[^\\s\'\\\"]+", "g"), "[DB_CONNECTION_REDACTED]");
+105-    if (message.length > 500) {
+106-      message = message.slice(0, 500) + "...";
+107-    }
+108-    return message;
+109-  }
+110-
+111-  function endpointWithOwner() {
+112:    return API.context + "?owner_civilization_id=" + encodeURIComponent(state.ownerCivilizationId);
+113-  }
+114-
+115-  function requestJson(url, body) {
+116-    var options = body ? {
+117-      method: "POST",
+118-      headers: { "content-type": "application/json" },
+119-      body: JSON.stringify(body)
+120-    } : {
+121-      method: "GET"
+122-    };
+123-
+124-    return window.fetch(url, options)
+--
+244-      setSelectedCompany(state.selectedCompanyId);
+245-      return;
+246-    }
+247-
+248-    if (state.context.companies[0]) {
+249-      setSelectedCompany(state.context.companies[0].aicm_user_company_id);
+250-      return;
+251-    }
+252-
+253-    setSelectedCompany("");
+254-  }
+255-
+256:  function loadContext() {
+257-    state.loading = true;
+258-    state.errorMessage = "";
+259-    render();
+260-
+261-    return requestJson(endpointWithOwner())
+262-      .then(function (json) {
+263-        state.context = normalizeContext(json);
+264-        writeStorage(STORAGE.contextCache, JSON.stringify(state.context));
+265-        syncSelectionAfterContextLoad();
+266-        state.loading = false;
+267-        state.booted = true;
+268-        render();
+269-      })
+270-      .catch(function (error) {
+271-        state.loading = false;
+272-        state.errorMessage = publicErrorMessage(error);
+273-        render();
+274-      });
+275-  }
+276-
+277-  function createCompany(payload) {
+278-    return requestJson(API.createCompany, {
+279:      owner_civilization_id: state.ownerCivilizationId,
+280-      company_name: payload.companyName,
+281-      business_domain: payload.businessDomain
+282-    }).then(function (json) {
+283-      if (json.company && json.company.aicm_user_company_id) {
+284-        state.selectedCompanyId = json.company.aicm_user_company_id;
+285-        writeStorage(STORAGE.selectedCompanyId, state.selectedCompanyId);
+286-      }
+287-      state.noticeMessage = "AI企業を作成しました。";
+288:      return loadContext();
+289-    });
+290-  }
+291-
+292-  function createDepartment(payload) {
+293-    if (!state.selectedCompanyId || !hasCompany(state.selectedCompanyId)) {
+294-      throw new Error("先にv2のAI企業を作成・選択してください。");
+295-    }
+296-
+297-    return requestJson(API.createDepartment, {
+298:      owner_civilization_id: state.ownerCivilizationId,
+299-      aicm_user_company_id: state.selectedCompanyId,
+300-      department_name: payload.departmentName,
+301-      purpose: payload.purpose
+302-    }).then(function (json) {
+303-      if (json.department && json.department.aicm_user_company_department_id) {
+304-        state.selectedDepartmentId = json.department.aicm_user_company_department_id;
+305-        writeStorage(STORAGE.selectedDepartmentId, state.selectedDepartmentId);
+306-      }
+307-      state.noticeMessage = "部門を作成しました。";
+308:      return loadContext();
+309-    });
+310-  }
+311-
+312-  function createSection(payload) {
+313-    if (!state.selectedCompanyId || !hasCompany(state.selectedCompanyId)) {
+314-      throw new Error("先にv2のAI企業を作成・選択してください。");
+315-    }
+316-
+317-    if (!state.selectedDepartmentId || !hasDepartment(state.selectedDepartmentId)) {
+318-      throw new Error("先にv2の部門を作成・選択してください。");
+319-    }
+320-
+321-    return requestJson(API.createSection, {
+322:      owner_civilization_id: state.ownerCivilizationId,
+323-      aicm_user_company_id: state.selectedCompanyId,
+324-      aicm_user_company_department_id: state.selectedDepartmentId,
+325-      section_name: payload.sectionName,
+326-      purpose: payload.purpose
+327-    }).then(function (json) {
+328-      if (json.section && json.section.aicm_user_company_section_id) {
+329-        state.selectedSectionId = json.section.aicm_user_company_section_id;
+330-        writeStorage(STORAGE.selectedSectionId, state.selectedSectionId);
+331-      }
+332-      state.noticeMessage = "課を作成しました。";
+333:      return loadContext();
+334-    });
+335-  }
+336-
+337-  function createPlacement(payload) {
+338-    if (!state.selectedCompanyId || !hasCompany(state.selectedCompanyId)) {
+339-      throw new Error("先にv2のAI企業を作成・選択してください。");
+340-    }
+341-
+342-    return requestJson(API.createPlacement, {
+343:      owner_civilization_id: state.ownerCivilizationId,
+344-      aicm_user_company_id: state.selectedCompanyId,
+345-      aicm_user_company_department_id: payload.departmentId || "",
+346-      aicm_user_company_section_id: payload.sectionId || "",
+347-      target_level_code: payload.targetLevelCode,
+348-      target_id: payload.targetId,
+349-      role_code: payload.roleCode,
+350-      robot_pool_id: payload.robotPoolId,
+351-      aiworker_model_code: payload.aiworkerModelCode,
+352-      internal_nickname: payload.internalNickname
+353-    }).then(function () {
+354-      state.noticeMessage = "Worker配置を作成しました。";
+355:      return loadContext();
+356-    });
+357-  }
+358-
+359-  
+360-function setMessage(kind, message) {
+361-    if (kind === "ok") {
+362-      state.noticeMessage = String(message || "");
+363-      state.errorMessage = "";
+364-      return;
+365-    }
+366-
+367-    state.errorMessage = String(message || "");
+--
+508-  
+509-
+510-// AICM_ORG_UPDATE_UI_ARU_ARX_V1
+511-// Company / Department / Section update UI.
+512-// No bridge, no diagnostic layer, no legacy localStorage owner.
+513-
+514-function aicmOrgCtx() {
+515-    return state.context || state || {};
+516-  }
+517-
+518-  function aicmOrgOwnerId() {
+519-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+520:    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+521:    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+522-    return "00000000-0000-4000-8000-000000000001";
+523-  }
+524-
+525-  function aicmOrgCompanies() {
+526-    var ctx = aicmOrgCtx();
+527-    var rows = ctx.companies || state.companies || [];
+528-    return Array.isArray(rows) ? rows : [];
+529-  }
+530-
+531-  function aicmOrgDepartments() {
+532-    var ctx = aicmOrgCtx();
+533-    var rows = ctx.departments || state.departments || [];
+--
+609-      json = text ? JSON.parse(text) : {};
+610-    } catch (_) {
+611-      json = { result: "error", message: text || "Invalid server response" };
+612-    }
+613-
+614-    if (!response.ok || (json.result && json.result !== "ok")) {
+615-      throw new Error(json.message || json.error || ("API failed: " + path));
+616-    }
+617-
+618-    return json;
+619-  }
+620-
+621:  async function aicmOrgReloadContext() {
+622:    if (typeof aicmPmlwReloadContext === "function") {
+623:      await aicmPmlwReloadContext();
+624-      return;
+625-    }
+626-
+627-    if (typeof aicmHumanReviewReload === "function") {
+628-      await aicmHumanReviewReload();
+629-      return;
+630-    }
+631-
+632:    if (typeof loadContext === "function") {
+633:      await loadContext();
+634-      return;
+635-    }
+636-
+637-    var owner = encodeURIComponent(aicmOrgOwnerId());
+638:    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+639-    var json = await response.json();
+640-
+641-    if (json && json.result === "ok") state.context = json;
+642-    if (typeof render === "function") render();
+643-  }
+644-
+645-  function renderCompanyUpdateForm(company) {
+646-    if (!company) {
+647-      return [
+648-        '<section class="aicm-core-card">',
+649-        '  <p class="aicm-eyebrow">企業変更</p>',
+650-        '  <h2>AI企業が選択されていません</h2>',
+--
+806-// AICM_DB_WRITE_CONFIRMATION_REQUIRED_ARY_ASB_V1
+807-// DB write operations must pass through a visible confirmation screen before POST.
+808-
+809-function aicmOrgUpdateLabel(kind) {
+810-    if (kind === "company") return "企業変更";
+811-    if (kind === "department") return "部門変更";
+812-    if (kind === "section") return "課変更";
+813-    return "変更";
+814-  }
+815-
+816-  function aicmOrgUpdateBodyRows(body) {
+817-    var keys = Object.keys(body || {}).filter(function (key) {
+818:      return key !== "owner_civilization_id" &&
+819-        key.indexOf("_id") === -1 &&
+820-        key !== "aicm_user_company_id" &&
+821-        key !== "aicm_user_company_department_id" &&
+822-        key !== "aicm_user_company_section_id";
+823-    });
+824-
+825-    if (!keys.length) return '<p class="aicm-core-empty">表示できる変更項目がありません。</p>';
+826-
+827-    return keys.map(function (key) {
+828-      return [
+829-        '<div class="aicm-confirm-row">',
+830-        '  <strong>' + escapeHtml(key) + '</strong>',
+--
+876-    }
+877-
+878-    try {
+879-      await aicmOrgPostJson(payload.endpoint, payload.body);
+880-            // AICM_AXC_EXECUTE_ROLE_PLACEMENT_SYNC_AFTER_MAIN_UPDATE
+881-      await aicmAxcSyncRolePlacementsForPayload(payload);
+882-state.pendingOrgUpdate = null;
+883-
+884-      if (payload.kind === "department") state.editingDepartmentId = "";
+885-      if (payload.kind === "section") state.editingSectionId = "";
+886-
+887-      setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
+888:      await aicmOrgReloadContext();
+889-    } catch (error) {
+890-      setMessage("error", error && error.message ? error.message : "保存に失敗しました。");
+891-    }
+892-  }
+893-
+894-  function cancelAicmOrgUpdateConfirm() {
+895-    var payload = state.pendingOrgUpdate || {};
+896-    state.pendingOrgUpdate = null;
+897-
+898-    if (payload.returnScreen) {
+899-      state.screen = payload.returnScreen;
+900-    }
+--
+1081-
+1082-async function aicmAxcSyncRolePlacementsForPayload(payload) {
+1083-  var rows = payload && Array.isArray(payload.rolePlacements) ? payload.rolePlacements : [];
+1084-  if (!rows.length) return { result: "ok", skipped: true };
+1085-
+1086-  var body = payload.body || {};
+1087-  var companyId = body.aicm_user_company_id || "";
+1088-  if (!companyId && state && state.selectedCompanyId) companyId = state.selectedCompanyId;
+1089-
+1090-  return requestJson("/api/aicm/v2/placement/sync-role-settings", {
+1091-    method: "POST",
+1092-    body: JSON.stringify({
+1093:      owner_civilization_id: ownerId(),
+1094-      aicm_user_company_id: companyId,
+1095-      role_placements: rows
+1096-    })
+1097-  });
+1098-}
+1099-
+1100-
+1101-function saveCompanyUpdateFromForm() {
+1102-    var companyId = aicmAvdTextById("aicm-company-edit-id");
+1103-
+1104-    if (!companyId) {
+1105-      setMessage("error", "変更対象の企業が見つかりません。");
+1106-      return;
+1107-    }
+1108-
+1109-    var body = {
+1110:      owner_civilization_id: aicmAvdOwnerId(),
+1111-      aicm_user_company_id: companyId,
+1112-      company_name: aicmAvdTextById("aicm-company-edit-name"),
+1113-      business_domain: aicmAvdTextById("aicm-company-edit-domain"),
+1114-      company_status: aicmAvdTextById("aicm-company-edit-status") || "active"
+1115-    };
+1116-
+1117-    var rows = [
+1118-      ["操作", "企業変更"],
+1119-      ["企業名", body.company_name],
+1120-      ["事業領域", body.business_domain || "未設定"],
+1121-      ["状態", body.company_status]
+1122-    ].concat(aicmAvdRoleSummaryRows("company"));
+--
+1133-
+1134-
+1135-function saveDepartmentUpdateFromForm() {
+1136-    var departmentId = aicmAvdTextById("aicm-department-edit-id");
+1137-    var companyId = aicmAvdTextById("aicm-department-edit-company-id");
+1138-
+1139-    if (!departmentId || !companyId) {
+1140-      setMessage("error", "変更対象の部門が見つかりません。");
+1141-      return;
+1142-    }
+1143-
+1144-    var body = {
+1145:      owner_civilization_id: aicmAvdOwnerId(),
+1146-      aicm_user_company_id: companyId,
+1147-      aicm_user_company_department_id: departmentId,
+1148-      department_name: aicmAvdTextById("aicm-department-edit-name"),
+1149-      purpose: aicmAvdTextById("aicm-department-edit-purpose"),
+1150-      department_status: aicmAvdTextById("aicm-department-edit-status") || "active"
+1151-    };
+1152-
+1153-    var rows = [
+1154-      ["操作", "部門変更"],
+1155-      ["部門名", body.department_name],
+1156-      ["目的", body.purpose || "未設定"],
+1157-      ["状態", body.department_status]
+--
+1170-
+1171-function saveSectionUpdateFromForm() {
+1172-    var sectionId = aicmAvdTextById("aicm-section-edit-id");
+1173-    var companyId = aicmAvdTextById("aicm-section-edit-company-id");
+1174-    var departmentId = aicmAvdTextById("aicm-section-edit-department-id");
+1175-
+1176-    if (!sectionId || !companyId || !departmentId) {
+1177-      setMessage("error", "変更対象の課が見つかりません。");
+1178-      return;
+1179-    }
+1180-
+1181-    var body = {
+1182:      owner_civilization_id: aicmAvdOwnerId(),
+1183-      aicm_user_company_id: companyId,
+1184-      aicm_user_company_department_id: departmentId,
+1185-      aicm_user_company_section_id: sectionId,
+1186-      section_name: aicmAvdTextById("aicm-section-edit-name"),
+1187-      purpose: aicmAvdTextById("aicm-section-edit-purpose"),
+1188-      section_status: aicmAvdTextById("aicm-section-edit-status") || "active"
+1189-    };
+1190-
+1191-    var rows = [
+1192-      ["操作", "課変更"],
+1193-      ["課名", body.section_name],
+1194-      ["目的", body.purpose || "未設定"],
+--
+1854-    if (typeof ctx !== "undefined" && ctx) return ctx;
+1855-    if (typeof state !== "undefined" && state && state.context) return state.context;
+1856-    if (typeof state !== "undefined" && state && state.ctx) return state.ctx;
+1857-    return {};
+1858-  }
+1859-
+1860-function aicmAvdArray(value) {
+1861-    return Array.isArray(value) ? value : [];
+1862-  }
+1863-
+1864-function aicmAvdOwnerId() {
+1865-    var c = aicmAvdCtx();
+1866:    if (c.owner_civilization_id) return c.owner_civilization_id;
+1867:    if (typeof state !== "undefined" && state && state.owner_civilization_id) return state.owner_civilization_id;
+1868-    if (typeof state !== "undefined" && state && state.ownerCivilizationId) return state.ownerCivilizationId;
+1869-    return "00000000-0000-4000-8000-000000000001";
+1870-  }
+1871-
+1872-function aicmAvdCurrentCompany() {
+1873-    var c = aicmAvdCtx();
+1874-    var rows = aicmAvdArray(c.companies);
+1875-    var selected = null;
+1876-
+1877-    try {
+1878-      if (typeof selectedCompany === "function") selected = selectedCompany();
+1879-    } catch (_) {}
+--
+2476-      setMessage("error", "部門を選択してください。");
+2477-      render();
+2478-      return;
+2479-    }
+2480-
+2481-    if (!deliverableName || !taskName) {
+2482-      setMessage("error", "成果物名と作業名を入力してください。");
+2483-      render();
+2484-      return;
+2485-    }
+2486-
+2487-    var payload = {
+2488:      owner_civilization_id: ownerCivilizationId(),
+2489-      aicm_user_company_id: company.aicm_user_company_id,
+2490-      aicm_user_company_department_id: departmentEl.value,
+2491-      aicm_user_company_section_id: sectionEl ? sectionEl.value : "",
+2492-      deliverable_name: deliverableName,
+2493-      task_name: taskName,
+2494-      work_type_code: valueOf("aicm-ledger-work-type") || "design",
+2495-      responsible_role_code: valueOf("aicm-ledger-role") || "Manager",
+2496-      priority_code: valueOf("aicm-ledger-priority") || "normal",
+2497-      task_status_code: valueOf("aicm-ledger-status") || "todo",
+2498-      note: valueOf("aicm-ledger-note")
+2499-    };
+2500-
+--
+2504-        headers: { "content-type": "application/json" },
+2505-        body: JSON.stringify(payload)
+2506-      });
+2507-
+2508-      var json = await response.json();
+2509-
+2510-      if (!response.ok || !json || json.result !== "ok") {
+2511-        throw new Error((json && json.error_message) || "台帳行追加に失敗しました。");
+2512-      }
+2513-
+2514-      setMessage("ok", "部門別タスク台帳に追加しました。");
+2515-
+2516:      if (typeof loadContext === "function") {
+2517:        await loadContext();
+2518-      }
+2519-
+2520-      state.screen = "task-ledger";
+2521-      render();
+2522-    } catch (error) {
+2523-      setMessage("error", error && error.message ? error.message : "台帳行追加に失敗しました。");
+2524-      render();
+2525-    }
+2526-  }
+2527-
+2528-  function ownerCivilizationId() {
+2529-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+--
+2742-        }
+2743-      }
+2744-
+2745-      if (!row.deliverable_name) errors.push("成果物名が空欄です");
+2746-      if (!row.task_name) errors.push("作業名が空欄です");
+2747-
+2748-      return {
+2749-        row_number: row.row_number,
+2750-        source: row,
+2751-        valid: errors.length === 0,
+2752-        errors: errors,
+2753-        payload: {
+2754:          owner_civilization_id: ownerCivilizationId(),
+2755-          aicm_user_company_id: company.aicm_user_company_id,
+2756-          aicm_user_company_department_id: department ? department.aicm_user_company_department_id : "",
+2757-          aicm_user_company_section_id: section ? section.aicm_user_company_section_id : "",
+2758-          deliverable_name: row.deliverable_name || "",
+2759-          task_name: row.task_name || "",
+2760-          work_type_code: row.work_type_code || "design",
+2761-          responsible_role_code: row.responsible_role_code || "Manager",
+2762-          task_status_code: row.task_status_code || "todo",
+2763-          priority_code: row.priority_code || "normal",
+2764-          due_date: row.due_date || "",
+2765-          reference_files_text: row.reference_files_text || "",
+2766-          supplemental_materials_text: row.supplemental_materials_text || "",
+--
+2771-      };
+2772-    });
+2773-  }
+2774-
+2775-  
+2776-
+2777-
+2778-
+2779-// AICM_PMLW_CSV_CONNECT_ARB_ARE_V1
+2780-// PMLW CSV/UI connector. Uses existing clean core state and selectedCompany().
+2781-function aicmPmlwOwnerId() {
+2782-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+2783:    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+2784:    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+2785-    return "00000000-0000-4000-8000-000000000001";
+2786-  }
+2787-
+2788-  async function aicmPmlwPostJson(path, body) {
+2789-    var response = await fetch(path, {
+2790-      method: "POST",
+2791-      headers: { "Content-Type": "application/json" },
+2792-      body: JSON.stringify(body || {})
+2793-    });
+2794-
+2795-    var text = await response.text();
+2796-    var json = {};
+--
+2799-      json = text ? JSON.parse(text) : {};
+2800-    } catch (_) {
+2801-      json = { result: "error", message: text || "Invalid server response" };
+2802-    }
+2803-
+2804-    if (!response.ok || (json.result && json.result !== "ok")) {
+2805-      throw new Error(json.message || json.error || ("API failed: " + path));
+2806-    }
+2807-
+2808-    return json;
+2809-  }
+2810-
+2811:  async function aicmPmlwReloadContext() {
+2812:    if (typeof loadContext === "function") {
+2813:      await loadContext();
+2814-      return;
+2815-    }
+2816-
+2817-    if (typeof refreshContext === "function") {
+2818-      await refreshContext();
+2819-      return;
+2820-    }
+2821-
+2822-    var owner = encodeURIComponent(aicmPmlwOwnerId());
+2823:    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+2824-    var json = await response.json();
+2825-
+2826-    if (json && json.result === "ok") {
+2827-      state.context = json;
+2828-    }
+2829-
+2830-    if (typeof render === "function") {
+2831-      render();
+2832-    }
+2833-  }
+2834-
+2835-  function aicmPmlwCsvPromptText() {
+--
+2959-      return;
+2960-    }
+2961-
+2962-    try {
+2963-      var rows = parseAicmCsv(text);
+2964-
+2965-      if (!rows.length) {
+2966-        setMessage("error", "取り込めるCSV行がありません。");
+2967-        return;
+2968-      }
+2969-
+2970-      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+2971:        owner_civilization_id: aicmPmlwOwnerId(),
+2972-        aicm_user_company_id: company.aicm_user_company_id,
+2973-        rows: rows
+2974-      });
+2975-
+2976-      var count = result.inserted_count || 0;
+2977-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+2978-      setMessage("ok", state.csvImportLastResult);
+2979-
+2980:      await aicmPmlwReloadContext();
+2981-    } catch (error) {
+2982-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+2983-    }
+2984-  }
+2985-
+2986-
+2987-  function renderCsvImportCard(company) {
+2988-    var fileName = state.csvImportFileName || "未選択";
+2989-    var lastResult = state.csvImportLastResult || "";
+2990-
+2991-    return [
+2992-      '<section class="aicm-core-card aicm-csv-panel">',
+--
+3145-
+3146-        if (!response.ok || !json || json.result !== "ok") {
+3147-          throw new Error((json && json.error_message) || "取り込み失敗");
+3148-        }
+3149-
+3150-        success++;
+3151-      } catch (error) {
+3152-        failed++;
+3153-        messages.push("行" + row.row_number + ": " + (error && error.message ? error.message : "取り込み失敗"));
+3154-      }
+3155-    }
+3156-
+3157:    if (typeof loadContext === "function") {
+3158:      await loadContext();
+3159-    }
+3160-
+3161-    if (failed > 0) {
+3162-      state.csvImportLastResult = "CSV取り込み: 成功 " + success + "件 / 失敗 " + failed + "件";
+3163-      setMessage("error", state.csvImportLastResult + "。 " + messages.slice(0, 3).join(" / "));
+3164-    } else {
+3165-      state.csvImportLastResult = "CSV取り込み完了: " + success + "件";
+3166-      state.csvImportText = "";
+3167-      state.csvImportFileName = "";
+3168-      setMessage("ok", state.csvImportLastResult);
+3169-    }
+3170-
+--
+3279-      '</section>'
+3280-    ].join(""));
+3281-  }
+3282-
+3283-  
+3284-// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+3285-// Human review queue UI.
+3286-// Human review only shows delivery summaries / exception summaries.
+3287-// AI review remains internal; the UI displays ai_review_result_text summary only.
+3288-
+3289-function aicmHumanReviewOwnerId() {
+3290-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+3291:    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+3292:    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+3293-    return "00000000-0000-4000-8000-000000000001";
+3294-  }
+3295-
+3296-  function aicmHumanReviewRows() {
+3297-    var ctx = state.context || state || {};
+3298-    var rows = ctx.review_wait_items || state.review_wait_items || [];
+3299-    return Array.isArray(rows) ? rows : [];
+3300-  }
+3301-
+3302-  function aicmHumanReviewRowsForCompany(companyId) {
+3303-    return aicmHumanReviewRows().filter(function (row) {
+3304-      return !companyId || row.aicm_user_company_id === companyId;
+--
+3320-    } catch (_) {
+3321-      json = { result: "error", message: text || "Invalid server response" };
+3322-    }
+3323-
+3324-    if (!response.ok || (json.result && json.result !== "ok")) {
+3325-      throw new Error(json.message || json.error || ("API failed: " + path));
+3326-    }
+3327-
+3328-    return json;
+3329-  }
+3330-
+3331-  async function aicmHumanReviewReload() {
+3332:    if (typeof aicmPmlwReloadContext === "function") {
+3333:      await aicmPmlwReloadContext();
+3334-      return;
+3335-    }
+3336-
+3337:    if (typeof loadContext === "function") {
+3338:      await loadContext();
+3339-      return;
+3340-    }
+3341-
+3342-    var owner = encodeURIComponent(aicmHumanReviewOwnerId());
+3343:    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+3344-    var json = await response.json();
+3345-
+3346-    if (json && json.result === "ok") state.context = json;
+3347-    if (typeof render === "function") render();
+3348-  }
+3349-
+3350-  async function approveHumanReviewFromAction(el) {
+3351-    var reviewId = el && el.getAttribute ? el.getAttribute("data-review-id") : "";
+3352-
+3353-    if (!reviewId) {
+3354-      setMessage("error", "レビュー項目を特定できません。");
+3355-      return;
+3356-    }
+3357-
+3358-    try {
+3359-      await aicmHumanReviewPostJson("/api/aicm/v2/human-review/approve", {
+3360:        owner_civilization_id: aicmHumanReviewOwnerId(),
+3361-        aicm_human_review_item_id: reviewId,
+3362-        human_reviewer_label: "user",
+3363-        human_review_note: ""
+3364-      });
+3365-
+3366-      setMessage("ok", "レビューを承認しました。");
+3367-      await aicmHumanReviewReload();
+3368-    } catch (error) {
+3369-      setMessage("error", error && error.message ? error.message : "承認に失敗しました。");
+3370-    }
+3371-  }
+3372-
+--
+3379-    }
+3380-
+3381-    var note = "";
+3382-
+3383-    try {
+3384-      if (typeof window !== "undefined" && window.prompt) {
+3385-        note = window.prompt("差し戻し理由を入力してください。", "") || "";
+3386-      }
+3387-    } catch (_) {}
+3388-
+3389-    try {
+3390-      await aicmHumanReviewPostJson("/api/aicm/v2/human-review/return", {
+3391:        owner_civilization_id: aicmHumanReviewOwnerId(),
+3392-        aicm_human_review_item_id: reviewId,
+3393-        human_reviewer_label: "user",
+3394-        human_review_note: note
+3395-      });
+3396-
+3397-      setMessage("ok", "レビューを差し戻しました。");
+3398-      await aicmHumanReviewReload();
+3399-    } catch (error) {
+3400-      setMessage("error", error && error.message ? error.message : "差し戻しに失敗しました。");
+3401-    }
+3402-  }
+3403-
+--
+3906-          nextScreenForMessageClear === "department-edit" ||
+3907-          nextScreenForMessageClear === "section-edit"
+3908-        ) {
+3909-          aicmClearTransientMessage();
+3910-        }
+3911-      }
+3912-
+3913-      go(button.getAttribute("data-screen") || "dashboard");
+3914-      return;
+3915-    }
+3916-
+3917-    if (action === "reload") {
+3918:      loadContext();
+3919-      return;
+3920-    }
+3921-  }
+3922-
+3923-  function handleRootChange(event) {
+3924-    var field = event.target;
+3925-    var fieldName = field.getAttribute("data-core-field") || "";
+3926-
+3927-    if (fieldName === "selectedCompanyId") {
+3928-      setSelectedCompany(field.value);
+3929-      render();
+3930-      return;
+--
+4079-    var target = event.target;
+4080-    if (target && target.getAttribute && target.getAttribute("data-core-file") === "task-ledger-csv") {
+4081-      readTaskLedgerCsvFile(target.files && target.files[0]);
+4082-    }
+4083-  });
+4084-root.addEventListener("click", handleRootClick);
+4085-    root.addEventListener("change", handleRootChange);
+4086-    root.addEventListener("submit", handleRootSubmit);
+4087-
+4088-    writeStorage(STORAGE.ownerCivilizationId, state.ownerCivilizationId);
+4089-
+4090-    render();
+4091:    loadContext();
+4092-  }
+4093-
+4094-  if (document.readyState === "loading") {
+4095-    document.addEventListener("DOMContentLoaded", boot, { once: true });
+4096-  } else {
+4097-    boot();
+4098-  }
+4099-})();
+
+============================================================
+context body with owner
+============================================================
+{
+  "result": "ok",
+  "sections": [
+    {
+      "purpose": "",
+      "created_at": "2026-04-30T02:26:42.671938+00:00",
+      "updated_at": "2026-04-30T02:26:42.671938+00:00",
+      "section_name": "課",
+      "display_order": 100,
+      "metadata_jsonb": {},
+      "section_status": "active",
+      "parent_section_id": null,
+      "aicm_user_company_id": "5bb29236-1f03-44c3-8e57-f1301cadfdec",
+      "leader_robot_pool_id": null,
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "leader_internal_nickname": "",
+      "leader_aiworker_model_code": "",
+      "aicm_user_company_section_id": "793243ed-3915-44db-ad77-3415be330498",
+      "aicm_user_company_department_id": "f8331d5d-aa4d-4524-b946-b3128c6abbdd"
+    },
+    {
+      "purpose": "ウワオーン？",
+      "created_at": "2026-04-30T10:57:52.711213+00:00",
+      "updated_at": "2026-04-30T20:06:22.715247+00:00",
+      "section_name": "遠吠え課？",
+      "display_order": 100,
+      "metadata_jsonb": {},
+      "section_status": "active",
+      "parent_section_id": null,
+      "aicm_user_company_id": "8b9be487-7b74-4517-9b59-6c84a82ae6aa",
+      "leader_robot_pool_id": null,
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "leader_internal_nickname": "",
+      "leader_aiworker_model_code": "",
+      "aicm_user_company_section_id": "22e61c25-2778-4f61-98a2-3612efa26d89",
+      "aicm_user_company_department_id": "71ed250e-5357-4c31-b1f0-ea7940a9f150"
+    }
+  ],
+  "companies": [
+    {
+      "created_at": "2026-04-30T10:57:02.284327+00:00",
+      "updated_at": "2026-04-30T20:04:54.648291+00:00",
+      "company_name": "ウルフ",
+      "display_order": 100,
+      "selected_flag": true,
+      "company_status": "active",
+      "metadata_jsonb": {},
+      "business_domain": "おおかみ",
+      "aicm_user_company_id": "8b9be487-7b74-4517-9b59-6c84a82ae6aa",
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "company_common_rules_text": "",
+      "president_policy_instruction_text": ""
+    },
+    {
+      "created_at": "2026-04-30T02:26:18.226307+00:00",
+      "updated_at": "2026-04-30T02:26:18.226307+00:00",
+      "company_name": "新規",
+      "display_order": 100,
+      "selected_flag": true,
+      "company_status": "active",
+      "metadata_jsonb": {},
+      "business_domain": "新規",
+      "aicm_user_company_id": "5bb29236-1f03-44c3-8e57-f1301cadfdec",
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "company_common_rules_text": "",
+      "president_policy_instruction_text": ""
+    },
+    {
+      "created_at": "2026-04-30T01:36:26.168982+00:00",
+      "updated_at": "2026-04-30T01:36:26.168982+00:00",
+      "company_name": "新規AI",
+      "display_order": 100,
+      "selected_flag": true,
+      "company_status": "active",
+      "metadata_jsonb": {},
+      "business_domain": "業務支援",
+      "aicm_user_company_id": "f34d5c5d-a11c-4ce2-a27e-44fab68edc36",
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "company_common_rules_text": "",
+      "president_policy_instruction_text": ""
+    },
+    {
+      "created_at": "2026-04-30T01:33:21.437929+00:00",
+      "updated_at": "2026-04-30T01:33:21.437929+00:00",
+      "company_name": "Aida",
+      "display_order": 100,
+      "selected_flag": true,
+      "company_status": "active",
+      "metadata_jsonb": {},
+      "business_domain": "AI 機器、アプリの開発、保守、運用",
+      "aicm_user_company_id": "00e87772-8a27-4406-85c3-4242c9146eef",
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "company_common_rules_text": "",
+      "president_policy_instruction_text": ""
+    },
+    {
+      "created_at": "2026-04-30T01:12:15.992175+00:00",
+      "updated_at": "2026-04-30T01:12:15.992175+00:00",
+      "company_name": "新規AI企業",
+      "display_order": 100,
+      "selected_flag": true,
+      "company_status": "active",
+      "metadata_jsonb": {},
+      "business_domain": "業務支援",
+      "aicm_user_company_id": "304acbe8-3f77-4958-bc12-a33fc3716465",
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "company_common_rules_text": "",
+      "president_policy_instruction_text": ""
+    }
+  ],
+  "placements": [
+    {
+      "app_code": "AICompanyManager",
+      "role_code": "President",
+      "target_id": "5bb29236-1f03-44c3-8e57-f1301cadfdec",
+      "created_at": "2026-04-30T02:27:04.041006+00:00",
+      "updated_at": "2026-04-30T02:27:04.041006+00:00",
+      "status_code": "active",
+      "company_name": "新規",
+      "section_name": "課",
+      "display_label": "BYD1-001@President",
+      "robot_pool_id": "7a56e9c4-8f08-42a7-8c37-19f11d8840a0",
+      "department_name": "部門",
+      "internal_nickname": "",
+      "target_level_code": "company",
+      "placement_quantity": 1,
+      "aiworker_model_code": "BYD1-001",
+      "placement_mode_code": "unlimited_system_use",
+      "aicm_user_company_id": "5bb29236-1f03-44c3-8e57-f1301cadfdec",
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "aicm_user_company_section_id": "793243ed-3915-44db-ad77-3415be330498",
+      "aicm_user_company_department_id": "f8331d5d-aa4d-4524-b946-b3128c6abbdd",
+      "aicm_user_company_worker_placement_id": "430c3bb7-d048-4540-bae7-901d762bc037"
+    },
+    {
+      "app_code": "AICompanyManager",
+      "role_code": "Leader",
+      "target_id": null,
+      "created_at": "2026-04-30T02:27:00.138351+00:00",
+      "updated_at": "2026-04-30T02:27:00.138351+00:00",
+      "status_code": "active",
+      "company_name": "新規",
+      "section_name": null,
+      "display_label": "BYD1-001@Leader",
+      "robot_pool_id": "7a56e9c4-8f08-42a7-8c37-19f11d8840a0",
+      "department_name": "部門",
+      "internal_nickname": "",
+      "target_level_code": "section",
+      "placement_quantity": 1,
+      "aiworker_model_code": "BYD1-001",
+      "placement_mode_code": "unlimited_system_use",
+      "aicm_user_company_id": "5bb29236-1f03-44c3-8e57-f1301cadfdec",
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "aicm_user_company_section_id": null,
+      "aicm_user_company_department_id": "f8331d5d-aa4d-4524-b946-b3128c6abbdd",
+      "aicm_user_company_worker_placement_id": "76448b0a-8ced-4eae-ac32-ffab753d983c"
+    }
+  ],
+  "departments": [
+    {
+      "purpose": "",
+      "created_at": "2026-04-30T02:26:30.815821+00:00",
+      "updated_at": "2026-04-30T02:26:30.815821+00:00",
+      "display_order": 100,
+      "metadata_jsonb": {},
+      "department_name": "部門",
+      "department_status": "active",
+      "aicm_user_company_id": "5bb29236-1f03-44c3-8e57-f1301cadfdec",
+      "manager_robot_pool_id": null,
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "manager_internal_nickname": "",
+      "manager_aiworker_model_code": "",
+      "aicm_user_company_department_id": "f8331d5d-aa4d-4524-b946-b3128c6abbdd"
+    },
+    {
+      "purpose": "ウオー？",
+      "created_at": "2026-04-30T10:57:27.512806+00:00",
+      "updated_at": "2026-04-30T20:05:27.468398+00:00",
+      "display_order": 100,
+      "metadata_jsonb": {},
+      "department_name": "遠吠え部？",
+      "department_status": "active",
+      "aicm_user_company_id": "8b9be487-7b74-4517-9b59-6c84a82ae6aa",
+      "manager_robot_pool_id": null,
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "manager_internal_nickname": "",
+      "manager_aiworker_model_code": "",
+      "aicm_user_company_department_id": "71ed250e-5357-4c31-b1f0-ea7940a9f150"
+    }
+  ],
+  "task_ledger": [
+    {
+      "note": "",
+      "due_date": null,
+      "task_name": "うんこさん",
+      "created_at": "2026-04-30T05:48:52.625415+00:00",
+      "updated_at": "2026-04-30T05:48:52.625415+00:00",
+      "company_name": "新規",
+      "handoff_link": "",
+      "section_name": "課",
+      "display_order": 100,
+      "priority_code": "normal",
+      "metadata_jsonb": {},
+      "work_type_code": "implementation",
+      "business_domain": "新規",
+      "department_name": "部門",
+      "deliverable_name": "うんこ",
+      "task_status_code": "todo",
+      "aicm_user_company_id": "5bb29236-1f03-44c3-8e57-f1301cadfdec",
+      "reference_files_text": "",
+      "applicable_rules_text": "",
+      "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+      "responsible_role_code": "Manager",
+      "responsible_robot_label": "",
+      "supplemental_materials_text": "",
+      "aicm_user_company_section_id": "793243ed-3915-44db-ad77-3415be330498",
+      "aicm_user_company_department_id": "f8331d5d-aa4d-4524-b946-b3128c6abbdd",
+      "aicm_user_company_department_task_ledger_id": "be5598bb-a9bf-4cb1-a521-e01559087068"
+    }
+  ],
+  "robot_catalog": [
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "ASIC Workers1",
+      "robot_pool_id": "7a56e9c4-8f08-42a7-8c37-19f11d8840a0",
+      "selector_label": "ASIC Workers1 / BYD1-001",
+      "usable_quantity": 0,
+      "manufacturer_code": "asic",
+      "aiworker_model_code": "BYD1-001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "Beyond",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Worker"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "ASIC Workers2",
+      "robot_pool_id": "0964def9-ae9e-4fee-99b2-52f0a3a775f2",
+      "selector_label": "ASIC Workers2 / BYD1-002",
+      "usable_quantity": 0,
+      "manufacturer_code": "asic",
+      "aiworker_model_code": "BYD1-002",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "Beyond",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Worker",
+        "Helper"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "ASIC Workers3",
+      "robot_pool_id": "9dc2af50-6a62-4881-ad41-e34373e50a8e",
+      "selector_label": "ASIC Workers3 / BYD1-003",
+      "usable_quantity": 0,
+      "manufacturer_code": "asic",
+      "aiworker_model_code": "BYD1-003",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "Beyond",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Worker",
+        "Specialist"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "ASIC Leader1",
+      "robot_pool_id": "b83c9d6b-aba1-416e-954a-0386fd303c40",
+      "selector_label": "ASIC Leader1 / BYD2-001",
+      "usable_quantity": 0,
+      "manufacturer_code": "asic",
+      "aiworker_model_code": "BYD2-001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "Beyond",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Leader"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "ASIC Leader2",
+      "robot_pool_id": "7902ab8b-4a89-465d-acaa-887f4d630127",
+      "selector_label": "ASIC Leader2 / BYD2-002",
+      "usable_quantity": 0,
+      "manufacturer_code": "asic",
+      "aiworker_model_code": "BYD2-002",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "Beyond",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Leader",
+        "Manager"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "ASIC Leader3",
+      "robot_pool_id": "9f7316fc-6f2f-46a8-bc81-ce1598450ce5",
+      "selector_label": "ASIC Leader3 / BYD2-003",
+      "usable_quantity": 0,
+      "manufacturer_code": "asic",
+      "aiworker_model_code": "BYD2-003",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "Beyond",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "President",
+        "Manager",
+        "ExecutiveManager"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "Helper",
+      "robot_pool_id": "0dd0a588-3411-4b38-8e21-865e80f60fbe",
+      "selector_label": "Helper / HD-R1",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R1",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Helper"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "Lover",
+      "robot_pool_id": "9e136961-5383-4fc9-aead-5dde28ede3fb",
+      "selector_label": "Lover / HD-R1A",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R1A",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "Friend",
+      "robot_pool_id": "65801091-3ca3-49a0-9f00-9399d21b0486",
+      "selector_label": "Friend / HD-R1C",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R1C",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Friend"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T21:13:27.100203+00:00",
+      "status_code": "active",
+      "display_name": "Butler",
+      "robot_pool_id": "17937122-aa70-412c-a02e-6a7981dc44e7",
+      "selector_label": "Butler / HD-R2",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R2",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Butler",
+        "Battler",
+        "Security"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T21:13:27.100203+00:00",
+      "status_code": "active",
+      "display_name": "General",
+      "robot_pool_id": "859f5066-5ee7-4ebe-801e-0e723e673866",
+      "selector_label": "General / HD-R2G",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R2G",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "StrategicCommander",
+        "TacticalLeader",
+        "Battler"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T21:13:27.100203+00:00",
+      "status_code": "active",
+      "display_name": "Sniper",
+      "robot_pool_id": "39542e29-5097-450c-94e3-ddc02d5c0fa5",
+      "selector_label": "Sniper / HD-R2S",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R2S",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "CombatSpecialist",
+        "Security",
+        "Battler"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T21:13:27.100203+00:00",
+      "status_code": "active",
+      "display_name": "Origin",
+      "robot_pool_id": "abbdc0b2-6c7e-47d5-9da7-e23fbe2a2ab7",
+      "selector_label": "Origin / HD-R2T-0",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R2T-0",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "StrategicCommander",
+        "TacticalLeader",
+        "Security"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "Worker",
+      "robot_pool_id": "d2b35302-4205-421f-9dc1-66cf21555aec",
+      "selector_label": "Worker / HD-R3",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R3",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Worker"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "Leader",
+      "robot_pool_id": "3cb46fb6-0e25-4c36-a4a2-a063f7211fb6",
+      "selector_label": "Leader / HD-R4",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R4",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Leader"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "Manager",
+      "robot_pool_id": "515f93b8-66e3-4cbb-b3aa-7bd54adad296",
+      "selector_label": "Manager / HD-R5",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R5",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "ExecutiveManager",
+        "Manager"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "President",
+      "robot_pool_id": "0bab0829-3ace-48f4-8f82-682d517eeda4",
+      "selector_label": "President / HD-R5P",
+      "usable_quantity": 0,
+      "manufacturer_code": "helios_dynamics",
+      "aiworker_model_code": "HD-R5P",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "HD",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "President"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 01F Genki",
+      "robot_pool_id": "d67f52bf-9569-4d00-9cf7-3915345a0705",
+      "selector_label": "LoVerS 01F Genki / LVS-01Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-01Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 01M Genki",
+      "robot_pool_id": "3a1058ba-0970-4c6b-9ec5-ff6312475a25",
+      "selector_label": "LoVerS 01M Genki / LVS-01Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-01Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 02F Seiso",
+      "robot_pool_id": "43b411b6-bce8-4331-b75c-fd8a8e8e0a85",
+      "selector_label": "LoVerS 02F Seiso / LVS-02Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-02Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 02M Seiso",
+      "robot_pool_id": "47323103-47e5-45cf-9b3b-236e717b01c7",
+      "selector_label": "LoVerS 02M Seiso / LVS-02Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-02Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 03F Ottori",
+      "robot_pool_id": "415f72bb-dec0-46bd-b4cf-4a8b4a6d8067",
+      "selector_label": "LoVerS 03F Ottori / LVS-03Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-03Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 03M Ottori",
+      "robot_pool_id": "37bf7a06-be0c-4445-b27b-945b009b5758",
+      "selector_label": "LoVerS 03M Ottori / LVS-03Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-03Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 04F Amae",
+      "robot_pool_id": "a2b768e0-400f-4a35-a6e4-ea5006ec1df3",
+      "selector_label": "LoVerS 04F Amae / LVS-04Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-04Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 04M Amae",
+      "robot_pool_id": "77f70408-0353-440f-b837-feae7a97c04d",
+      "selector_label": "LoVerS 04M Amae / LVS-04Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-04Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 05F Shikkari",
+      "robot_pool_id": "2c8dd7f8-d6d7-4eb9-b4c6-7eeb0b7bfd48",
+      "selector_label": "LoVerS 05F Shikkari / LVS-05Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-05Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 05M Shikkari",
+      "robot_pool_id": "99ff792d-0fa2-4410-b51d-3f882e44b71e",
+      "selector_label": "LoVerS 05M Shikkari / LVS-05Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-05Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 06F Cool",
+      "robot_pool_id": "0037ff2b-a8d0-43f9-97d3-9a433352c3a4",
+      "selector_label": "LoVerS 06F Cool / LVS-06Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-06Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 06M Cool",
+      "robot_pool_id": "c22f53f3-d601-4a75-ba40-a093e90a3d2f",
+      "selector_label": "LoVerS 06M Cool / LVS-06Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-06Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 07F Iyashi",
+      "robot_pool_id": "4a9d30ca-315f-4bb0-968b-9bce999a3838",
+      "selector_label": "LoVerS 07F Iyashi / LVS-07Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-07Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 07M Iyashi",
+      "robot_pool_id": "2a27a836-277d-42d9-8845-82dff6c75b75",
+      "selector_label": "LoVerS 07M Iyashi / LVS-07Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-07Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 08F Oneesan",
+      "robot_pool_id": "68dc4dc6-da6d-463a-a660-d0777ae61e5d",
+      "selector_label": "LoVerS 08F Oneesan / LVS-08Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-08Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 08M Oneesan",
+      "robot_pool_id": "025de6bd-e900-4cd7-91ed-53603c380ad4",
+      "selector_label": "LoVerS 08M Oneesan / LVS-08Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-08Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 09F Tsundere",
+      "robot_pool_id": "6d05e80f-ac11-4663-9e7e-605c150c230b",
+      "selector_label": "LoVerS 09F Tsundere / LVS-09Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-09Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 09M Tsundere",
+      "robot_pool_id": "0acd1b53-f6de-40be-afbc-af7e71868497",
+      "selector_label": "LoVerS 09M Tsundere / LVS-09Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-09Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 10F Mujaki",
+      "robot_pool_id": "0b77126a-8e65-4431-ba6e-47ff3291838d",
+      "selector_label": "LoVerS 10F Mujaki / LVS-10Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-10Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 10M Mujaki",
+      "robot_pool_id": "24483d6f-046d-4bda-b7b8-522d6dc5f8c6",
+      "selector_label": "LoVerS 10M Mujaki / LVS-10Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-10Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 11F Kuudere",
+      "robot_pool_id": "7ba49550-6d11-413c-a9e8-9b28b5c43e71",
+      "selector_label": "LoVerS 11F Kuudere / LVS-11Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-11Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 11M Kuudere",
+      "robot_pool_id": "a4543049-23f2-4d3a-b2ce-a91b84419791",
+      "selector_label": "LoVerS 11M Kuudere / LVS-11Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-11Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 12F Business Yandere",
+      "robot_pool_id": "ca24aacc-efb7-4576-ba7a-79447aa68ade",
+      "selector_label": "LoVerS 12F Business Yandere / LVS-12Fv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-12Fv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "LoVerS 12M Business Yandere",
+      "robot_pool_id": "86325c7f-d2b2-4702-a5d5-dcf4bea97829",
+      "selector_label": "LoVerS 12M Business Yandere / LVS-12Mv001",
+      "usable_quantity": 0,
+      "manufacturer_code": "lavi_corporation",
+      "aiworker_model_code": "LVS-12Mv001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "LoVerS",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "Urd",
+      "robot_pool_id": "7438a91b-3b40-4a59-b512-272c705d3fb9",
+      "selector_label": "Urd / MG-NORN-001",
+      "usable_quantity": 0,
+      "manufacturer_code": "mathers_garden",
+      "aiworker_model_code": "MG-NORN-001",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "MEGAMI",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Advisor",
+        "Worker",
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "Verdandi",
+      "robot_pool_id": "d1bb5aff-7a44-438e-b756-742c82179182",
+      "selector_label": "Verdandi / MG-NORN-002",
+      "usable_quantity": 0,
+      "manufacturer_code": "mathers_garden",
+      "aiworker_model_code": "MG-NORN-002",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "MEGAMI",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Advisor",
+        "Worker",
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    },
+    {
+      "app_code": "AICompanyManager",
+      "company_id": "00000000-0000-4000-8000-1db11893cb24",
+      "updated_at": "2026-04-27T13:19:09.265285+00:00",
+      "status_code": "active",
+      "display_name": "Skuld",
+      "robot_pool_id": "c354e7c5-2218-4586-a5e2-02cb030c8af0",
+      "selector_label": "Skuld / MG-NORN-003",
+      "usable_quantity": 0,
+      "manufacturer_code": "mathers_garden",
+      "aiworker_model_code": "MG-NORN-003",
+      "contracted_quantity": 0,
+      "aiworker_series_code": "MEGAMI",
+      "assignment_mode_code": "unlimited_system_use",
+      "entitlement_scope_code": "system_unlimited",
+      "recommended_role_codes": [
+        "Advisor",
+        "Worker",
+        "Lover"
+      ],
+      "company_robot_entitlement_id": null
+    }
+  ],
+  "api_identifier": "AICM_CLEAN_V2_API_SERVER_ANQ_ANT_V1",
+  "pmlw_major_items": [],
+  "pmlw_middle_items": [],
+  "review_wait_items": [],
+  "pmlw_workflow_tree": [],
+  "owner_civilization_id": "00000000-0000-4000-8000-000000000001",
+  "pmlw_worker_work_units": [],
+  "pmlw_president_policies": [],
+  "pmlw_deliverable_requirements": []
+}
+
+============================================================
+context body without owner
+============================================================
+{
+  "result": "error",
+  "api_identifier": "AICM_CLEAN_V2_API_SERVER_ANQ_ANT_V1",
+  "error_message": "owner_civilization_id must be UUID"
+}

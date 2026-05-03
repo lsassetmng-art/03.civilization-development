@@ -1,0 +1,851 @@
+---- core context fetch / param usage ----
+29-    selectedDepartmentId: "AICM_V2_SELECTED_DEPARTMENT_ID",
+30-    selectedSectionId: "AICM_V2_SELECTED_SECTION_ID",
+31-    contextCache: "AICM_V2_SELECTED_COMPANY_CONTEXT"
+32-  };
+33-
+34-  var DEFAULT_OWNER_CIVILIZATION_ID = "00000000-0000-4000-8000-000000000001";
+35-
+36-  var API = {
+37:    context: "/api/aicm/v2/context",
+38-    createCompany: "/api/aicm/v2/company/create",
+39-    createDepartment: "/api/aicm/v2/department/create",
+40-    createSection: "/api/aicm/v2/section/create",
+41-    createPlacement: "/api/aicm/v2/placement/create"
+42-  };
+43-
+44-  var root = null;
+45-
+--
+104-    message = message.replace(new RegExp("post" + "gres(?:ql)?://" + "[^\\s\'\\\"]+", "g"), "[DB_CONNECTION_REDACTED]");
+105-    if (message.length > 500) {
+106-      message = message.slice(0, 500) + "...";
+107-    }
+108-    return message;
+109-  }
+110-
+111-  function endpointWithOwner() {
+112:    return API.context + "?owner_civilization_id=" + encodeURIComponent(state.ownerCivilizationId);
+113-  }
+114-
+115-  function requestJson(url, body) {
+116-    var options = body ? {
+117-      method: "POST",
+118-      headers: { "content-type": "application/json" },
+119-      body: JSON.stringify(body)
+120-    } : {
+--
+280-        state.loading = false;
+281-        state.errorMessage = publicErrorMessage(error);
+282-        render();
+283-      });
+284-  }
+285-
+286-
+287-// AICM_R8Z_F_CANONICAL_CONTEXT_NORMALIZE_START
+288:  function aicmR8ZFArrayFromContext(rawContext, targetContext, names) {
+289-    var raw = rawContext && typeof rawContext === "object" ? rawContext : {};
+290:    var target = targetContext && typeof targetContext === "object" ? targetContext : {};
+291-    var current = state && state.context && typeof state.context === "object" ? state.context : {};
+292-
+293-    for (var i = 0; i < names.length; i += 1) {
+294-      var key = names[i];
+295-
+296-      if (Array.isArray(raw[key])) return raw[key];
+297-      if (Array.isArray(target[key])) return target[key];
+298-      if (Array.isArray(current[key])) return current[key];
+299-      if (Array.isArray(state && state[key])) return state[key];
+300-    }
+301-
+302-    return [];
+303-  }
+304-
+305:  function aicmNormalizePmlwContextR8ZF(rawContext, targetContext) {
+306-    var raw = rawContext && typeof rawContext === "object" ? rawContext : {};
+307:    var target = targetContext && typeof targetContext === "object" ? targetContext : {};
+308-
+309-    if (!target || typeof target !== "object") {
+310-      target = {};
+311-    }
+312-
+313-    var middleItems = aicmR8ZFArrayFromContext(raw, target, [
+314-      "pmlw_middle_items",
+315-      "pmlwMiddleItems",
+--
+395-
+396-    loadContext.__aicmR8ZF = true;
+397-  }
+398-// AICM_R8Z_F_CANONICAL_CONTEXT_NORMALIZE_END
+399-
+400-
+401-  function createCompany(payload) {
+402-    return requestJson(API.createCompany, {
+403:      owner_civilization_id: state.ownerCivilizationId,
+404-      company_name: payload.companyName,
+405-      business_domain: payload.businessDomain
+406-    }).then(function (json) {
+407-      if (json.company && json.company.aicm_user_company_id) {
+408-        state.selectedCompanyId = json.company.aicm_user_company_id;
+409-        writeStorage(STORAGE.selectedCompanyId, state.selectedCompanyId);
+410-      }
+411-      state.noticeMessage = "AI企業を作成しました。";
+--
+414-  }
+415-
+416-  function createDepartment(payload) {
+417-    if (!state.selectedCompanyId || !hasCompany(state.selectedCompanyId)) {
+418-      throw new Error("先にv2のAI企業を作成・選択してください。");
+419-    }
+420-
+421-    return requestJson(API.createDepartment, {
+422:      owner_civilization_id: state.ownerCivilizationId,
+423-      aicm_user_company_id: state.selectedCompanyId,
+424-      department_name: payload.departmentName,
+425-      purpose: payload.purpose
+426-    }).then(function (json) {
+427-      if (json.department && json.department.aicm_user_company_department_id) {
+428-        state.selectedDepartmentId = json.department.aicm_user_company_department_id;
+429-        writeStorage(STORAGE.selectedDepartmentId, state.selectedDepartmentId);
+430-      }
+--
+438-      throw new Error("先にv2のAI企業を作成・選択してください。");
+439-    }
+440-
+441-    if (!state.selectedDepartmentId || !hasDepartment(state.selectedDepartmentId)) {
+442-      throw new Error("先にv2の部門を作成・選択してください。");
+443-    }
+444-
+445-    return requestJson(API.createSection, {
+446:      owner_civilization_id: state.ownerCivilizationId,
+447-      aicm_user_company_id: state.selectedCompanyId,
+448-      aicm_user_company_department_id: state.selectedDepartmentId,
+449-      section_name: payload.sectionName,
+450-      purpose: payload.purpose
+451-    }).then(function (json) {
+452-      if (json.section && json.section.aicm_user_company_section_id) {
+453-        state.selectedSectionId = json.section.aicm_user_company_section_id;
+454-        writeStorage(STORAGE.selectedSectionId, state.selectedSectionId);
+--
+459-  }
+460-
+461-  function createPlacement(payload) {
+462-    if (!state.selectedCompanyId || !hasCompany(state.selectedCompanyId)) {
+463-      throw new Error("先にv2のAI企業を作成・選択してください。");
+464-    }
+465-
+466-    return requestJson(API.createPlacement, {
+467:      owner_civilization_id: state.ownerCivilizationId,
+468-      aicm_user_company_id: state.selectedCompanyId,
+469-      aicm_user_company_department_id: payload.departmentId || "",
+470-      aicm_user_company_section_id: payload.sectionId || "",
+471-      target_level_code: payload.targetLevelCode,
+472-      target_id: payload.targetId,
+473-      role_code: payload.roleCode,
+474-      robot_pool_id: payload.robotPoolId,
+475-      aiworker_model_code: payload.aiworkerModelCode,
+--
+671-// No bridge, no diagnostic layer, no legacy localStorage owner.
+672-
+673-function aicmOrgCtx() {
+674-    return state.context || state || {};
+675-  }
+676-
+677-  function aicmOrgOwnerId() {
+678-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+679:    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+680:    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+681-    return "00000000-0000-4000-8000-000000000001";
+682-  }
+683-
+684-  function aicmOrgCompanies() {
+685-    var ctx = aicmOrgCtx();
+686-    var rows = ctx.companies || state.companies || [];
+687-    return Array.isArray(rows) ? rows : [];
+688-  }
+--
+789-    }
+790-
+791-    if (typeof loadContext === "function") {
+792-      await loadContext();
+793-return;
+794-    }
+795-
+796-    var owner = encodeURIComponent(aicmOrgOwnerId());
+797:    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+798-    var json = await response.json();
+799-
+800-    if (json && json.result === "ok") state.context = json;
+801-    // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_CALL
+802-    if (typeof aicmHydrateManagerMajorContextArraysR8M === "function") {
+803-      aicmHydrateManagerMajorContextArraysR8M(
+804-        typeof json !== "undefined" ? json :
+805-        (typeof data !== "undefined" ? data :
+--
+978-    if (kind === "company") return "企業変更";
+979-    if (kind === "department") return "部門変更";
+980-    if (kind === "section") return "課変更";
+981-    return "変更";
+982-  }
+983-
+984-  function aicmOrgUpdateBodyRows(body) {
+985-    var keys = Object.keys(body || {}).filter(function (key) {
+986:      return key !== "owner_civilization_id" &&
+987-        key.indexOf("_id") === -1 &&
+988-        key !== "aicm_user_company_id" &&
+989-        key !== "aicm_user_company_department_id" &&
+990-        key !== "aicm_user_company_section_id";
+991-    });
+992-
+993-    if (!keys.length) return '<p class="aicm-core-empty">表示できる変更項目がありません。</p>';
+994-
+--
+1263-  var companyId = body.aicm_user_company_id || "";
+1264-
+1265-  if (!companyId && state && state.selectedCompanyId) {
+1266-    companyId = state.selectedCompanyId;
+1267-  }
+1268-
+1269-  return requestJson("/api/aicm/v2/placement/sync-role-settings", {
+1270-    // AICM_ROLE_SYNC_OWNER_RESOLVER_AXK_V1
+1271:    owner_civilization_id: (
+1272-      typeof aicmAvdOwnerId === "function"
+1273-        ? aicmAvdOwnerId()
+1274-        : ((typeof state !== "undefined" && state && state.ownerCivilizationId) ? state.ownerCivilizationId : "")
+1275-    ),
+1276-    aicm_user_company_id: companyId,
+1277-    role_placements: rows
+1278-  });
+1279-}
+--
+1283-    var companyId = aicmAvdTextById("aicm-company-edit-id");
+1284-
+1285-    if (!companyId) {
+1286-      setMessage("error", "変更対象の企業が見つかりません。");
+1287-      return;
+1288-    }
+1289-
+1290-    var body = {
+1291:      owner_civilization_id: aicmAvdOwnerId(),
+1292-      aicm_user_company_id: companyId,
+1293-      company_name: aicmAvdTextById("aicm-company-edit-name"),
+1294-      business_domain: aicmAvdTextById("aicm-company-edit-domain"),
+1295-      company_status: aicmAvdTextById("aicm-company-edit-status") || "active"
+1296-    };
+1297-
+1298-    var rows = [
+1299-      ["操作", "企業変更"],
+--
+1321-    var companyId = aicmAvdTextById("aicm-department-edit-company-id");
+1322-
+1323-    if (!departmentId || !companyId) {
+1324-      setMessage("error", "変更対象の部門が見つかりません。");
+1325-      return;
+1326-    }
+1327-
+1328-    var body = {
+1329:      owner_civilization_id: aicmAvdOwnerId(),
+1330-      aicm_user_company_id: companyId,
+1331-      aicm_user_company_department_id: departmentId,
+1332-      department_name: aicmAvdTextById("aicm-department-edit-name"),
+1333-      purpose: aicmAvdTextById("aicm-department-edit-purpose"),
+1334-      department_status: aicmAvdTextById("aicm-department-edit-status") || "active"
+1335-    };
+1336-
+1337-    var rows = [
+--
+1361-    var departmentId = aicmAvdTextById("aicm-section-edit-department-id");
+1362-
+1363-    if (!sectionId || !companyId || !departmentId) {
+1364-      setMessage("error", "変更対象の課が見つかりません。");
+1365-      return;
+1366-    }
+1367-
+1368-    var body = {
+1369:      owner_civilization_id: aicmAvdOwnerId(),
+1370-      aicm_user_company_id: companyId,
+1371-      aicm_user_company_department_id: departmentId,
+1372-      aicm_user_company_section_id: sectionId,
+1373-      section_name: aicmAvdTextById("aicm-section-edit-name"),
+1374-      purpose: aicmAvdTextById("aicm-section-edit-purpose"),
+1375-      section_status: aicmAvdTextById("aicm-section-edit-status") || "active"
+1376-    };
+1377-
+--
+2493-  }
+2494-
+2495-function aicmAvdArray(value) {
+2496-    return Array.isArray(value) ? value : [];
+2497-  }
+2498-
+2499-function aicmAvdOwnerId() {
+2500-    var c = aicmAvdCtx();
+2501:    if (c.owner_civilization_id) return c.owner_civilization_id;
+2502:    if (typeof state !== "undefined" && state && state.owner_civilization_id) return state.owner_civilization_id;
+2503-    if (typeof state !== "undefined" && state && state.ownerCivilizationId) return state.ownerCivilizationId;
+2504-    return "00000000-0000-4000-8000-000000000001";
+2505-  }
+2506-
+2507-function aicmAvdCurrentCompany() {
+2508-    var c = aicmAvdCtx();
+2509-    var rows = aicmAvdArray(c.companies);
+2510-    var selected = null;
+--
+3179-
+3180-    if (!deliverableName || !taskName) {
+3181-      setMessage("error", "成果物名と作業名を入力してください。");
+3182-      render();
+3183-      return;
+3184-    }
+3185-
+3186-    var payload = {
+3187:      owner_civilization_id: ownerCivilizationId(),
+3188-      aicm_user_company_id: company.aicm_user_company_id,
+3189-      aicm_user_company_department_id: departmentEl.value,
+3190-      aicm_user_company_section_id: sectionEl ? sectionEl.value : "",
+3191-      deliverable_name: deliverableName,
+3192-      task_name: taskName,
+3193-      work_type_code: valueOf("aicm-ledger-work-type") || "design",
+3194-      responsible_role_code: valueOf("aicm-ledger-role") || "Manager",
+3195-      priority_code: valueOf("aicm-ledger-priority") || "normal",
+--
+3426-      if (!row.task_name) errors.push("作業名が空欄です");
+3427-
+3428-      return {
+3429-        row_number: row.row_number,
+3430-        source: row,
+3431-        valid: errors.length === 0,
+3432-        errors: errors,
+3433-        payload: {
+3434:          owner_civilization_id: ownerCivilizationId(),
+3435-          aicm_user_company_id: company.aicm_user_company_id,
+3436-          aicm_user_company_department_id: department ? department.aicm_user_company_department_id : "",
+3437-          aicm_user_company_section_id: section ? section.aicm_user_company_section_id : "",
+3438-          deliverable_name: row.deliverable_name || "",
+3439-          task_name: row.task_name || "",
+3440-          work_type_code: row.work_type_code || "design",
+3441-          responsible_role_code: row.responsible_role_code || "Manager",
+3442-          task_status_code: row.task_status_code || "todo",
+--
+3455-  
+3456-
+3457-
+3458-
+3459-// AICM_PMLW_CSV_CONNECT_ARB_ARE_V1
+3460-// PMLW CSV/UI connector. Uses existing clean core state and selectedCompany().
+3461-function aicmPmlwOwnerId() {
+3462-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+3463:    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+3464:    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+3465-    return "00000000-0000-4000-8000-000000000001";
+3466-  }
+3467-
+3468-  async function aicmPmlwPostJson(path, body) {
+3469-    var response = await fetch(path, {
+3470-      method: "POST",
+3471-      headers: { "Content-Type": "application/json" },
+3472-      body: JSON.stringify(body || {})
+--
+3495-    }
+3496-
+3497-    if (typeof refreshContext === "function") {
+3498-      await refreshContext();
+3499-      return;
+3500-    }
+3501-
+3502-    var owner = encodeURIComponent(aicmPmlwOwnerId());
+3503:    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+3504-    var json = await response.json();
+3505-
+3506-    if (json && json.result === "ok") {
+3507-      state.context = json;
+3508-    // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_CALL
+3509-    if (typeof aicmHydrateManagerMajorContextArraysR8M === "function") {
+3510-      aicmHydrateManagerMajorContextArraysR8M(
+3511-        typeof json !== "undefined" ? json :
+--
+3673-      var rows = parseAicmCsv(text);
+3674-
+3675-      if (!rows.length) {
+3676-        setMessage("error", "取り込めるCSV行がありません。");
+3677-        return;
+3678-      }
+3679-
+3680-      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+3681:        owner_civilization_id: aicmPmlwOwnerId(),
+3682-        aicm_user_company_id: company.aicm_user_company_id,
+3683-        rows: rows
+3684-      });
+3685-
+3686-      var count = result.inserted_count || 0;
+3687-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+3688-      setMessage("ok", state.csvImportLastResult);
+3689-
+--
+3984-// Worker Runtime requestはここでは作らない。
+3985-// DB書込は既存確認画面を通して /api/aicm/v2/manager-major/update で実行する。
+3986-function aicmAxuR1Text(value) {
+3987-    return String(value === undefined || value === null ? "" : value).trim();
+3988-  }
+3989-
+3990-function aicmAxuR1OwnerId() {
+3991-    if (state && state.ownerCivilizationId) return aicmAxuR1Text(state.ownerCivilizationId);
+3992:    if (state && state.context && state.context.owner_civilization_id) return aicmAxuR1Text(state.context.owner_civilization_id);
+3993-    return "00000000-0000-4000-8000-000000000001";
+3994-  }
+3995-
+3996-function aicmAxuR1MajorId(row) {
+3997-    row = row || {};
+3998-    return aicmAxuR1Text(
+3999-      row.aicm_manager_major_work_item_id ||
+4000-      row.manager_major_work_item_id ||
+--
+4119-    }
+4120-
+4121-    return {
+4122-      kind: "manager-major-leader-handoff",
+4123-      title: "課長へ送る確認",
+4124-      endpoint: "/api/aicm/v2/manager-major/update",
+4125-      backScreen: "task-ledger",
+4126-      body: {
+4127:        owner_civilization_id: aicmAxuR1OwnerId(),
+4128-        aicm_manager_major_work_item_id: majorId,
+4129-        assigned_leader_label: leaderLabel,
+4130-        decomposition_status_code: "assigned_to_leader",
+4131-        handoff_status_code: "handed_off",
+4132-        note: aicmAxuR1Text(row.note)
+4133-      }
+4134-    };
+4135-  }
+--
+4509-  // AICM_R8S_LEADER_HANDOFF_CONFIRM_FLOW_HELPER_START
+4510-  function aicmLeaderHandoffTextR8S(value) {
+4511-    if (value === null || typeof value === "undefined") return "";
+4512-    return String(value).trim();
+4513-  }
+4514-
+4515-  function aicmLeaderHandoffOwnerIdR8S(payload) {
+4516-    var p = payload && typeof payload === "object" ? payload : {};
+4517:    if (p.owner_civilization_id) return aicmLeaderHandoffTextR8S(p.owner_civilization_id);
+4518-    if (p.ownerCivilizationId) return aicmLeaderHandoffTextR8S(p.ownerCivilizationId);
+4519-    if (state && state.ownerCivilizationId) return aicmLeaderHandoffTextR8S(state.ownerCivilizationId);
+4520:    if (state && state.owner_civilization_id) return aicmLeaderHandoffTextR8S(state.owner_civilization_id);
+4521:    if (state && state.context && state.context.owner_civilization_id) return aicmLeaderHandoffTextR8S(state.context.owner_civilization_id);
+4522-    if (state && state.context && state.context.ownerCivilizationId) return aicmLeaderHandoffTextR8S(state.context.ownerCivilizationId);
+4523-    if (typeof aicmHumanReviewOwnerId === "function") return aicmLeaderHandoffTextR8S(aicmHumanReviewOwnerId());
+4524-    return "00000000-0000-4000-8000-000000000001";
+4525-  }
+4526-
+4527-  function aicmLeaderHandoffActionTargetR8S(ev, btn) {
+4528-    if (typeof aicmActionTargetSafe === "function") {
+4529-      var safeTarget = aicmActionTargetSafe(ev, btn);
+--
+4699-    if (!payload || !payload.majorId) {
+4700-      setMessage("error", "課長へ送る対象がありません。");
+4701-      render();
+4702-      return;
+4703-    }
+4704-
+4705-    var ownerCivilizationId = aicmLeaderHandoffOwnerIdR8S(payload);
+4706-    if (!ownerCivilizationId) {
+4707:      setMessage("error", "owner_civilization_idを特定できません。");
+4708-      render();
+4709-      return;
+4710-    }
+4711-
+4712-    try {
+4713-      var body = {
+4714:        owner_civilization_id: ownerCivilizationId,
+4715-        aicm_manager_major_work_item_id: payload.majorId,
+4716-        decomposition_status_code: "assigned_to_leader",
+4717-        handoff_status_code: "handed_off"
+4718-      };
+4719-
+4720-      if (payload.leaderRaw) {
+4721-        body.assigned_leader_label = payload.leaderRaw;
+4722-      }
+--
+5196-    if (!owner && typeof aicmPmlwOwnerId === "function") {
+5197-      owner = String(aicmPmlwOwnerId() || "");
+5198-    }
+5199-
+5200-    if (!owner) {
+5201-      owner = "00000000-0000-4000-8000-000000000001";
+5202-    }
+5203-
+5204:    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + encodeURIComponent(owner) + "&v=" + Date.now());
+5205-    var json = await response.json();
+5206-
+5207-    if (json && json.result === "ok") {
+5208-      aicmHydrateManagerMajorContextArraysR8M(json);
+5209-    }
+5210-
+5211-    return json;
+5212-  }
+--
+5778-// AICM_R8Z_B_LEADER_AUTO_DECOMPOSITION_CORE_START
+5779-  function aicmR8ZBText(value) {
+5780-    if (value === null || typeof value === "undefined") return "";
+5781-    return String(value).trim();
+5782-  }
+5783-
+5784-  function aicmR8ZBOwnerId() {
+5785-    if (state && state.ownerCivilizationId) return aicmR8ZBText(state.ownerCivilizationId);
+5786:    if (state && state.owner_civilization_id) return aicmR8ZBText(state.owner_civilization_id);
+5787:    if (state && state.context && state.context.owner_civilization_id) return aicmR8ZBText(state.context.owner_civilization_id);
+5788-    if (typeof aicmHumanReviewOwnerId === "function") {
+5789-      try {
+5790-        var ownerFromReview = aicmHumanReviewOwnerId();
+5791-        if (ownerFromReview) return aicmR8ZBText(ownerFromReview);
+5792-      } catch (_) {}
+5793-    }
+5794-    return "00000000-0000-4000-8000-000000000001";
+5795-  }
+--
+5835-      safeMajorId = aicmR8ZBText(
+5836-        state.managerMajorLeaderHandoffConfirm.majorId ||
+5837-        state.managerMajorLeaderHandoffConfirm.aicm_manager_major_work_item_id ||
+5838-        state.managerMajorLeaderHandoffConfirm.manager_major_work_item_id
+5839-      );
+5840-    }
+5841-
+5842-    var companyId = aicmR8ZBCompanyId();
+5843:    var ownerId = aicmR8ZBOwnerId();
+5844-
+5845-    if (!safeMajorId) {
+5846-      return {
+5847-        ok: false,
+5848-        message: "Leader自動分解対象のManager大項目IDを特定できません。"
+5849-      };
+5850-    }
+5851-
+--
+5858-
+5859-    try {
+5860-      var response = await fetch("/api/aicm/v2/leader-auto-decomposition/run", {
+5861-        method: "POST",
+5862-        headers: {
+5863-          "content-type": "application/json"
+5864-        },
+5865-        body: JSON.stringify({
+5866:          owner_civilization_id: ownerId,
+5867-          aicm_user_company_id: companyId,
+5868-          aicm_manager_major_work_item_id: safeMajorId,
+5869-          mode: "single",
+5870-          source_app_ref: "AICompanyManager",
+5871-          auto_decomposition_version: "r8z_v1"
+5872-        })
+5873-      });
+5874-
+--
+5901-      };
+5902-    }
+5903-  }
+5904-
+5905-
+5906-// AICM_R8Z_I_WORKER_AUTO_EXECUTION_CORE_START
+5907-  async function aicmRunWorkerAutoExecutionAfterDecompositionR8ZI(majorId) {
+5908-    var body = {
+5909:      owner_civilization_id: state && state.ownerCivilizationId ? state.ownerCivilizationId : "00000000-0000-4000-8000-000000000001",
+5910-      aicm_user_company_id: state && state.selectedCompanyId ? state.selectedCompanyId : "",
+5911-      aicm_manager_major_work_item_id: majorId || "",
+5912-      limit: 10
+5913-    };
+5914-
+5915-    var response = await fetch("/api/aicm/v2/worker-auto-execution/run", {
+5916-      method: "POST",
+5917-      headers: {
+--
+6464-  
+6465-// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+6466-// Human review queue UI.
+6467-// Human review only shows delivery summaries / exception summaries.
+6468-// AI review remains internal; the UI displays ai_review_result_text summary only.
+6469-
+6470-function aicmHumanReviewOwnerId() {
+6471-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+6472:    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+6473:    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+6474-    return "00000000-0000-4000-8000-000000000001";
+6475-  }
+6476-
+6477-  function aicmHumanReviewRows() {
+6478-    var ctx = state.context || state || {};
+6479-    var rows = ctx.review_wait_items || state.review_wait_items || [];
+6480-    return Array.isArray(rows) ? rows : [];
+6481-  }
+--
+6516-    }
+6517-
+6518-    if (typeof loadContext === "function") {
+6519-      await loadContext();
+6520-      return;
+6521-    }
+6522-
+6523-    var owner = encodeURIComponent(aicmHumanReviewOwnerId());
+6524:    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+6525-    var json = await response.json();
+6526-
+6527-    if (json && json.result === "ok") state.context = json;
+6528-    // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_CALL
+6529-    if (typeof aicmHydrateManagerMajorContextArraysR8M === "function") {
+6530-      aicmHydrateManagerMajorContextArraysR8M(
+6531-        typeof json !== "undefined" ? json :
+6532-        (typeof data !== "undefined" ? data :
+--
+6542-
+6543-    if (!reviewId) {
+6544-      setMessage("error", "レビュー項目を特定できません。");
+6545-      return;
+6546-    }
+6547-
+6548-    try {
+6549-      await aicmHumanReviewPostJson("/api/aicm/v2/human-review/approve", {
+6550:        owner_civilization_id: aicmHumanReviewOwnerId(),
+6551-        aicm_human_review_item_id: reviewId,
+6552-        human_reviewer_label: "user",
+6553-        human_review_note: ""
+6554-      });
+6555-
+6556-      setMessage("ok", "レビューを承認しました。");
+6557-      await aicmHumanReviewReload();
+6558-    } catch (error) {
+--
+6573-    try {
+6574-      if (typeof window !== "undefined" && window.prompt) {
+6575-        note = window.prompt("差し戻し理由を入力してください。", "") || "";
+6576-      }
+6577-    } catch (_) {}
+6578-
+6579-    try {
+6580-      await aicmHumanReviewPostJson("/api/aicm/v2/human-review/return", {
+6581:        owner_civilization_id: aicmHumanReviewOwnerId(),
+6582-        aicm_human_review_item_id: reviewId,
+6583-        human_reviewer_label: "user",
+6584-        human_review_note: note
+6585-      });
+6586-
+6587-      setMessage("ok", "レビューを差し戻しました。");
+6588-      await aicmHumanReviewReload();
+6589-    } catch (error) {
+--
+7379-
+7380-    var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
+7381-    var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
+7382-
+7383-    return {
+7384-      endpoint: "/api/aicm/v2/worker-runtime/request",
+7385-      worker_label: aicmWrtWorkerLabel(worker),
+7386-      body: {
+7387:        owner_civilization_id: aicmWrtOwnerId(),
+7388-        aicm_user_company_id: aicmWrtText(company.aicm_user_company_id),
+7389-        aicm_user_company_department_id: aicmWrtText(worker.aicm_user_company_department_id),
+7390-        aicm_user_company_section_id: aicmWrtText(worker.aicm_user_company_section_id),
+7391-        aicm_user_company_worker_placement_id: placementId,
+7392-        model_code: aicmWrtText(worker.aiworker_model_code),
+7393-        robot_pool_id: aicmWrtText(worker.robot_pool_id),
+7394-        app_surface_code: "ai_company_manager",
+7395-        task_domain_code: aicmWrtValue("aicm-worker-runtime-task-domain") || "business_operation",
+--
+7802-    if (!Array.isArray(rows) || rows.length === 0) {
+7803-      setMessage("error", "取り込めるCSV行がありません。ヘッダーとデータ行を確認してください。");
+7804-      render();
+7805-      return;
+7806-    }
+7807-
+7808-    try {
+7809-      var payload = {
+7810:        owner_civilization_id: typeof aicmPmlwOwnerId === "function" ? aicmPmlwOwnerId() : ownerCivilizationId(),
+7811-        aicm_user_company_id: company.aicm_user_company_id,
+7812-        rows: rows
+7813-      };
+7814-
+7815-      var result;
+7816-
+7817-      if (typeof aicmPmlwPostJson === "function") {
+7818-        result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", payload);
+--
+7958-    if (!Array.isArray(rows) || rows.length === 0) {
+7959-      setMessage("error", "取り込めるCSV行がありません。ヘッダーとデータ行を確認してください。");
+7960-      render();
+7961-      return;
+7962-    }
+7963-
+7964-    try {
+7965-      var payload = {
+7966:        owner_civilization_id: typeof aicmPmlwOwnerId === "function" ? aicmPmlwOwnerId() : ownerCivilizationId(),
+7967-        aicm_user_company_id: company.aicm_user_company_id,
+7968-        rows: rows
+7969-      };
+7970-
+7971-      var result;
+7972-
+7973-      if (typeof aicmPmlwPostJson === "function") {
+7974-        result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", payload);
+--
+8084-    if (!Array.isArray(rows) || rows.length === 0) {
+8085-      setMessage("error", "取り込めるCSV行がありません。ヘッダーとデータ行を確認してください。");
+8086-      render();
+8087-      return;
+8088-    }
+8089-
+8090-    try {
+8091-      var payload = {
+8092:        owner_civilization_id: typeof aicmPmlwOwnerId === "function" ? aicmPmlwOwnerId() : ownerCivilizationId(),
+8093-        aicm_user_company_id: company.aicm_user_company_id,
+8094-        rows: rows
+8095-      };
+8096-
+8097-      var result;
+8098-
+8099-      if (typeof aicmPmlwPostJson === "function") {
+8100-        result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", payload);
+--
+9140-    else if (Array.isArray(ctx.human_review_wait_items)) rows = ctx.human_review_wait_items;
+9141-    else if (Array.isArray(ctx.humanReviewWaitItems)) rows = ctx.humanReviewWaitItems;
+9142-    else if (Array.isArray(state.review_wait_items)) rows = state.review_wait_items;
+9143-
+9144-    ctx.review_wait_items = rows;
+9145-    state.context = ctx;
+9146-    state.review_wait_items = rows;
+9147-
+9148:    if (ctx.owner_civilization_id) state.owner_civilization_id = ctx.owner_civilization_id;
+9149-    if (ctx.aicm_user_company_id) state.selectedCompanyId = ctx.aicm_user_company_id;
+9150-
+9151-    return ctx;
+9152-  }
+9153-
+9154-  function r8zV5dReviewRows() {
+9155-    var state = r8zV5dState();
+9156-    var ctx = r8zV5dNormalizeContext(r8zV5dContext());
+--
+9173-
+9174-    return [];
+9175-  }
+9176-
+9177-  function r8zV5dOwnerId() {
+9178-    var state = r8zV5dState();
+9179-    var ctx = r8zV5dContext();
+9180-    return r8zV5dText(
+9181:      state.owner_civilization_id ||
+9182-      state.ownerCivilizationId ||
+9183:      ctx.owner_civilization_id ||
+9184-      ctx.ownerCivilizationId ||
+9185-      "00000000-0000-4000-8000-000000000001"
+9186-    );
+9187-  }
+9188-
+9189-  function r8zV5dCompanyId() {
+9190-    var state = r8zV5dState();
+9191-    var ctx = r8zV5dContext();
+--
+9249-    var owner = r8zV5dOwnerId();
+9250-    var company = r8zV5dCompanyId();
+9251-
+9252-    if (!owner || !company || typeof fetch !== "function") return;
+9253-
+9254-    state.aicmR8zV5dHydrating = true;
+9255-
+9256-    var params = new URLSearchParams();
+9257:    params.set("owner_civilization_id", owner);
+9258-    params.set("aicm_user_company_id", company);
+9259-    params.set("v", "r8z_v5d_" + Date.now());
+9260-
+9261:    fetch("/api/aicm/v2/context?" + params.toString(), { method: "GET" })
+9262-      .then(function (res) {
+9263-        return res.text().then(function (bodyText) {
+9264-          var payload = {};
+9265-          try {
+9266-            payload = bodyText ? JSON.parse(bodyText) : {};
+9267-          } catch (error) {
+9268-            payload = {};
+9269-          }
+--
+9421-    else if (Array.isArray(ctx.human_review_wait_items)) rows = ctx.human_review_wait_items;
+9422-    else if (Array.isArray(ctx.humanReviewWaitItems)) rows = ctx.humanReviewWaitItems;
+9423-    else if (Array.isArray(appState.review_wait_items)) rows = appState.review_wait_items;
+9424-
+9425-    ctx.review_wait_items = rows;
+9426-    appState.context = ctx;
+9427-    appState.review_wait_items = rows;
+9428-
+9429:    if (ctx.owner_civilization_id) appState.owner_civilization_id = ctx.owner_civilization_id;
+9430-    if (ctx.aicm_user_company_id) appState.selectedCompanyId = ctx.aicm_user_company_id;
+9431-
+9432-    return ctx;
+9433-  }
+9434-
+9435-  function ctx(appState) {
+9436-    appState = appState || {};
+9437-    return normalize(appState, appState.context && typeof appState.context === "object" ? appState.context : {});
+--
+9453-        return candidates[i].filter(function (row) {
+9454-          return row && typeof row === "object";
+9455-        });
+9456-      }
+9457-    }
+9458-    return [];
+9459-  }
+9460-
+9461:  function ownerId(appState) {
+9462-    appState = appState || {};
+9463-    var c = appState.context || {};
+9464:    return t(appState.owner_civilization_id || appState.ownerCivilizationId || c.owner_civilization_id || c.ownerCivilizationId || "00000000-0000-4000-8000-000000000001");
+9465-  }
+9466-
+9467-  function companyId(appState) {
+9468-    appState = appState || {};
+9469-    var c = appState.context || {};
+9470-    return t(appState.selectedCompanyId || appState.aicm_user_company_id || appState.companyId || c.aicm_user_company_id || c.selectedCompanyId || c.company_id);
+9471-  }
+9472-
+--
+9493-    if (typeof window.aicmRender === "function") return window.aicmRender();
+9494-  }
+9495-
+9496-  function hydrateIfNeeded(appState) {
+9497-    appState = appState || {};
+9498-    if (appState.aicmR8zV7Hydrating) return;
+9499-    if (rows(appState).length > 0) return;
+9500-
+9501:    var owner = ownerId(appState);
+9502-    var company = companyId(appState);
+9503-
+9504-    if (!owner || !company || typeof fetch !== "function") {
+9505-      appState.aicmR8zV7HydrationError = "missing owner/company owner=" + owner + " company=" + company;
+9506-      return;
+9507-    }
+9508-
+9509-    appState.aicmR8zV7Hydrating = true;
+9510-
+9511-    var params = new URLSearchParams();
+9512:    params.set("owner_civilization_id", owner);
+9513-    params.set("aicm_user_company_id", company);
+9514-    params.set("v", "r8z_v7_" + Date.now());
+9515-
+9516:    fetch("/api/aicm/v2/context?" + params.toString(), { method: "GET" })
+9517-      .then(function (res) {
+9518-        return res.text().then(function (bodyText) {
+9519-          var payload = {};
+9520-          try {
+9521-            payload = bodyText ? JSON.parse(bodyText) : {};
+9522-          } catch (_error) {
+9523-            payload = {};
+9524-          }
+--
+9551-  window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) {
+9552-    appState = appState || {};
+9553-    var list = rows(appState);
+9554-
+9555-    if (!list.length) hydrateIfNeeded(appState);
+9556-
+9557-    var debug = [
+9558-      "selectedCompanyId=" + companyId(appState),
+9559:      "owner=" + ownerId(appState),
+9560-      "rows=" + String(list.length),
+9561-      appState.aicmR8zV7Hydrating ? "hydrating=YES" : "hydrating=NO",
+9562-      appState.aicmR8zV7HydrationError ? "error=" + t(appState.aicmR8zV7HydrationError) : ""
+9563-    ].filter(Boolean).join(" / ");
+9564-
+9565-    var html = [
+9566-      '<section class="aicm-core-card aicm-review-list-stable-r8z-v7">',
+9567-      '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',

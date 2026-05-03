@@ -1,0 +1,1972 @@
+============================================================
+after cleanup scan
+============================================================
+3759-          row.user_company_id ||
+3760-          row.companyId ||
+3761-          ""
+3762-        ) || ""
+3763-      );
+3764-    }
+3765-
+3766-    function rowOrder(row) {
+3767-      var n = Number(
+3768-        row && (
+3769-          row.display_order ||
+3770-          row.sort_order ||
+3771-          row.row_order ||
+3772-          0
+3773-        )
+3774-      );
+3775-
+3776-      return Number.isFinite(n) ? n : 0;
+3777-    }
+3778-
+3779-    var rows = []
+3780-      .concat(asArray(ctx.pmlw_major_items))
+3781-      .concat(asArray(ctx.manager_major_items))
+3782-      .concat(asArray(ctx.major_items));
+3783-
+3784-    var filtered = rows.filter(function (row) {
+3785-      if (!row) return false;
+3786-
+3787-      var cid = rowCompanyId(row);
+3788-
+3789-      if (!targetCompanyId) return true;
+3790-      if (!cid) return true;
+3791-
+3792-      return cid === targetCompanyId;
+3793-    });
+3794-
+3795-    filtered.sort(function (a, b) {
+3796-      var ao = rowOrder(a);
+3797-      var bo = rowOrder(b);
+3798-
+3799-      if (ao !== bo) return ao - bo;
+3800-
+3801-      var an = String((a && (a.major_item_name || a.title || a.task_name)) || "");
+3802-      var bn = String((b && (b.major_item_name || b.title || b.task_name)) || "");
+3803-
+3804-      return an.localeCompare(bn, "ja");
+3805-    });
+3806-
+3807-    return filtered;
+3808-  }
+3809-
+3810-  function pmlwValue(value, fallback) {
+3811-    var text = String(value || "").trim();
+3812-    return text || fallback || "-";
+3813-  }
+3814-
+3815-  function pmlwStatusLabel(value) {
+3816-    var map = {
+3817-      not_started: "未着手",
+3818-      assigned_to_leader: "Leader割当済",
+3819-      leader_decomposing: "Leader分解中",
+3820-      decomposed: "分解済",
+3821-      returned: "差戻し",
+3822-      archived: "削除済",
+3823-      draft: "下書き",
+3824-      ready_handoff: "引渡し準備",
+3825-      handed_off: "引渡し済",
+3826-      accepted: "受領済",
+3827-      completed: "完了",
+3828-      low: "低",
+3829-      normal: "通常",
+3830-      high: "高",
+3831-      urgent: "緊急"
+3832-    };
+3833-
+3834-    return map[value] || pmlwValue(value, "-");
+3835-  }
+3836-
+3837-  
+3838-// AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+3839-// Manager大項目 -> 課長/Leader引渡し。
+3840-// Worker Runtime requestはここでは作らない。
+3841-// DB書込は既存確認画面を通して /api/aicm/v2/manager-major/update で実行する。
+3842-function aicmAxuR1Text(value) {
+3843-    return String(value === undefined || value === null ? "" : value).trim();
+3844-  }
+3845-
+3846-function aicmAxuR1OwnerId() {
+3847-    if (state && state.ownerCivilizationId) return aicmAxuR1Text(state.ownerCivilizationId);
+3848-    if (state && state.context && state.context.owner_civilization_id) return aicmAxuR1Text(state.context.owner_civilization_id);
+3849-    return "00000000-0000-4000-8000-000000000001";
+3850-  }
+3851-
+3852-function aicmAxuR1MajorId(row) {
+3853-    row = row || {};
+3854-    return aicmAxuR1Text(
+3855-      row.aicm_manager_major_work_item_id ||
+3856-      row.manager_major_work_item_id ||
+3857-      row.major_work_item_id ||
+3858-      row.id
+3859-    );
+3860-  }
+3861-
+3862-function aicmAxuR1FindMajorById(majorId) {
+3863-    var rows = state && state.context && Array.isArray(state.context.pmlw_major_items)
+3864-      ? state.context.pmlw_major_items
+3865-      : [];
+3866-
+3867-    var id = aicmAxuR1Text(majorId);
+3868-
+3869-    for (var i = 0; i < rows.length; i += 1) {
+3870-      if (aicmAxuR1MajorId(rows[i]) === id) return rows[i];
+3871-    }
+3872-
+3873-    return null;
+3874-  }
+3875-
+3876-function aicmAxuR1PlacementRoleText(row) {
+3877-    row = row || {};
+3878-    return [
+3879-      row.role_code,
+3880-      row.placement_role_code,
+3881-      row.assignment_role_code,
+3882-      row.worker_role_code,
+3883-      row.role_name,
+3884-      row.role_label,
+3885-      row.display_role,
+3886-      row.role_display_name,
+3887-      row.display_label
+3888-    ].map(aicmAxuR1Text).join(" ").toLowerCase();
+3889-  }
+3890-
+3891-function aicmAxuR1IsActiveLeaderPlacement(row) {
+3892-    row = row || {};
+3893-    var status = aicmAxuR1Text(row.status_code || row.placement_status_code || "active").toLowerCase();
+3894-    var roleText = aicmAxuR1PlacementRoleText(row);
+3895-
+3896-    if (status && status !== "active") return false;
+3897-
+3898-    return (
+3899-      roleText.indexOf("leader") >= 0 ||
+3900-      roleText.indexOf("課長") >= 0 ||
+3901-      roleText.indexOf("リーダ") >= 0
+3902-    );
+3903-  }
+3904-
+3905-function aicmAxuR1LeaderPlacementsForCompany(companyId) {
+3906-    var rows = state && state.context && Array.isArray(state.context.placements)
+3907-      ? state.context.placements
+3908-      : [];
+3909-
+3910-    var cid = aicmAxuR1Text(companyId);
+3911-
+3912-    return rows.filter(function (row) {
+3913-      return aicmAxuR1Text(row.aicm_user_company_id) === cid && aicmAxuR1IsActiveLeaderPlacement(row);
+3914-    });
+3915-  }
+3916-
+3917-function aicmAxuR1BestLeaderForMajor(row) {
+3918-    row = row || {};
+3919-
+3920-    var companyId = aicmAxuR1Text(row.aicm_user_company_id || state.selectedCompanyId);
+3921-    var departmentId = aicmAxuR1Text(row.aicm_user_company_department_id);
+3922-    var sectionId = aicmAxuR1Text(row.aicm_user_company_section_id);
+3923-    var leaders = aicmAxuR1LeaderPlacementsForCompany(companyId);
+3924-
+3925-    if (!leaders.length) return null;
+3926-
+3927-    if (sectionId) {
+3928-      for (var i = 0; i < leaders.length; i += 1) {
+3929-        if (aicmAxuR1Text(leaders[i].aicm_user_company_section_id) === sectionId) return leaders[i];
+3930-      }
+3931-    }
+3932-
+3933-    if (departmentId) {
+3934-      for (var j = 0; j < leaders.length; j += 1) {
+3935-        if (aicmAxuR1Text(leaders[j].aicm_user_company_department_id) === departmentId) return leaders[j];
+3936-      }
+3937-    }
+3938-
+3939-    return leaders[0] || null;
+3940-  }
+3941-
+3942-function aicmAxuR1LeaderLabel(row) {
+3943-    row = row || {};
+3944-
+3945-    var existing = aicmAxuR1Text(row.assigned_leader_label);
+3946-    if (existing) return existing;
+3947-
+3948-    var leader = aicmAxuR1BestLeaderForMajor(row);
+3949-    if (!leader) return "";
+3950-
+3951-    var nickname = aicmAxuR1Text(leader.internal_nickname || leader.placement_nickname || leader.robot_internal_nickname);
+3952-    var role = aicmAxuR1Text(leader.role_code || "Leader");
+3953-    var model = aicmAxuR1Text(leader.aiworker_model_code || leader.model_code || leader.model_no);
+3954-    var display = aicmAxuR1Text(leader.display_label || leader.robot_pool_display_name || leader.robot_pool_label);
+3955-
+3956-    if (nickname) return nickname + "@" + role;
+3957-    if (display) return display;
+3958-    if (model) return model + "@" + role;
+3959-
+3960-    return role;
+3961-  }
+3962-
+3963-function aicmAxuR1BuildLeaderHandoffPayload(row) {
+3964-    row = row || {};
+3965-
+3966-    var majorId = aicmAxuR1MajorId(row);
+3967-    var leaderLabel = aicmAxuR1LeaderLabel(row);
+3968-
+3969-    if (!majorId) {
+3970-      throw new Error("Manager大項目IDを特定できません。");
+3971-    }
+3972-
+3973-    if (!leaderLabel) {
+3974-      throw new Error("課長/Leaderが未設定です。課変更でLeaderを設定するか、Manager大項目のLeader欄を設定してください。");
+3975-    }
+3976-
+3977-    return {
+3978-      kind: "manager-major-leader-handoff",
+3979:      title: "課長へ送る確認",
+3980-      endpoint: "/api/aicm/v2/manager-major/update",
+3981-      backScreen: "task-ledger",
+3982-      body: {
+3983-        owner_civilization_id: aicmAxuR1OwnerId(),
+3984-        aicm_manager_major_work_item_id: majorId,
+3985-        assigned_leader_label: leaderLabel,
+3986-        decomposition_status_code: "assigned_to_leader",
+3987-        handoff_status_code: "handed_off",
+3988-        note: aicmAxuR1Text(row.note)
+3989-      }
+3990-    };
+3991-  }
+3992-
+3993-function aicmAxuR1ShowLeaderHandoffConfirm(payload) {
+3994-    if (typeof aicmAvdShowDbConfirm === "function") {
+3995-      aicmAvdShowDbConfirm(payload);
+3996-      return;
+3997-    }
+3998-
+3999-    if (typeof aicmOrgShowUpdateConfirm === "function") {
+4000-      aicmOrgShowUpdateConfirm(payload);
+4001-      return;
+4002-    }
+4003-
+4004-    state.pendingOrgUpdate = payload;
+4005-    state.screen = "task-ledger";
+4006-
+4007-    if (typeof render === "function") render();
+4008-  }
+4009-
+4010-function aicmAxuR1OpenLeaderHandoffConfirm(button) {
+4011-    try {
+4012-      var majorId = button && button.getAttribute ? button.getAttribute("data-pmlw-major-id") : "";
+4013-      var row = aicmAxuR1FindMajorById(majorId);
+4014-
+4015-      if (!row) {
+4016-        throw new Error("Manager大項目を特定できません。");
+4017-      }
+4018-
+4019-      var payload = aicmAxuR1BuildLeaderHandoffPayload(row);
+4020-      aicmAxuR1ShowLeaderHandoffConfirm(payload);
+4021-    } catch (error) {
+4022-      setMessage("error", error && error.message ? error.message : "課長への引渡し確認を表示できません。");
+4023-      if (typeof render === "function") render();
+4024-    }
+4025-  }
+4026-
+4027-
+4028-
+4029-// AICM_AXU_R1B_LEADER_HANDOFF_BUTTON_VISIBLE_V1
+4030:// 保険表示: テーブル内ボタンが出ない場合でも、Manager大項目ごとの「課長へ送る」を出す。
+4031-function aicmAxuR1BLeaderHandoffStandalonePanel() {
+4032-    var rows = state && state.context && Array.isArray(state.context.pmlw_major_items)
+4033-      ? state.context.pmlw_major_items
+4034-      : [];
+4035-
+4036-    if (!rows.length) return "";
+4037-
+4038-    return [
+4039-      '<section class="aicm-core-card aicm-axu-r1b-leader-handoff-panel">',
+4040-      '  <p class="aicm-eyebrow">Manager大項目</p>',
+4041-      '  <h2>課長への引渡し</h2>',
+4042-      '  <p class="aicm-selected-note">Manager大項目を課長/Leaderへ送ります。Worker Runtime request はまだ作成しません。</p>',
+4043-      rows.map(function (row) {
+4044-        var majorId = typeof aicmAxuR1MajorId === "function" ? aicmAxuR1MajorId(row) : "";
+4045-        var title = row.major_item_name || row.deliverable_name || row.task_name || "Manager大項目";
+4046-        var leader = row.assigned_leader_label || row.leader_label || "Leader未設定";
+4047-        var status = row.decomposition_status_code || "-";
+4048-        var handoff = row.handoff_status_code || "-";
+4049-
+4050-        return [
+4051-          '<article class="aicm-org-update-row">',
+4052-          '  <div>',
+4053-          '    <strong>' + escapeHtml(title) + '</strong>',
+4054-          '    <p>Leader: ' + escapeHtml(leader) + ' / 状態: ' + escapeHtml(status) + ' / 引渡し: ' + escapeHtml(handoff) + '</p>',
+4055-          '  </div>',
+4056:          '  <button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + escapeHtml(majorId) + '">課長へ送る</button>',
+4057-          '</article>'
+4058-        ].join("");
+4059-      }).join(""),
+4060-      '</section>'
+4061-    ].join("");
+4062-  }
+4063-
+4064-
+4065-function renderPmlwMajorRowsBaseAxuR1B(rows) {
+4066-    if (!rows.length) {
+4067-      return [
+4068-        '<div class="aicm-empty-state">',
+4069:        '  <strong>登録済み大項目はまだありません</strong>',
+4070-        '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+4071-        '</div>'
+4072-      ].join("");
+4073-    }
+4074-
+4075-    return [
+4076-      '<div class="aicm-table-wrap">',
+4077-      '  <table class="aicm-core-table">',
+4078-      '    <thead>',
+4079-      '      <tr>',
+4080-      '        <th>方針元</th>',
+4081-      '        <th>大項目</th>',
+4082-      '        <th>部門</th>',
+4083-      '        <th>課</th>',
+4084-      '        <th>Leader</th>',
+4085-      '        <th>分解状態</th>',
+4086-      '        <th>引渡し</th>',
+4087-      '        <th>優先度</th>',
+4088-      '        <th>期限</th>',
+4089-      '        <th>操作</th>',
+4090-      '      </tr>',
+4091-      '    </thead>',
+4092-      '    <tbody>',
+4093-      rows.map(function (row) {
+4094-        return [
+4095-          '      <tr>',
+4096-          '        <td>' + escapeHtml(pmlwValue(row.policy_title, row.source_route_code || "-")) + '</td>',
+4097-          '        <td><strong>' + escapeHtml(pmlwValue(row.major_item_name, "-")) + '</strong><small>' + escapeHtml(pmlwValue(row.major_item_description, "")) + '</small></td>',
+4098-          '        <td>' + escapeHtml(pmlwValue(row.department_name, "未割当")) + '</td>',
+4099-          '        <td>' + escapeHtml(pmlwValue(row.section_name, "未割当")) + '</td>',
+4100-          '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+4101-          '        <td>' + escapeHtml(pmlwStatusLabel(row.decomposition_status_code)) + '</td>',
+4102-          '        <td>' + escapeHtml(pmlwStatusLabel(row.handoff_status_code)) + '</td>',
+4103-          '        <td>' + escapeHtml(pmlwStatusLabel(row.priority_code)) + '</td>',
+4104-          '        <td>' + escapeHtml(pmlwValue(row.due_date, "-")) + '</td>',
+4105:          '        <td><button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + escapeHtml(aicmAxuR1MajorId(row)) + '">課長へ送る</button></td>',
+4106-          '      </tr>'
+4107-        ].join("");
+4108-      }).join(""),
+4109-      '    </tbody>',
+4110-      '  </table>',
+4111-      '</div>'
+4112-    ].join("");
+4113-  }
+4114-
+4115-function renderPmlwMajorRows(rows) {
+4116-    // AICM_AXU_CSV_R8_RENDER_PMLW_MAJOR_ROWS_REPAIR_V1
+4117-    function h(value) {
+4118-      if (typeof escapeHtml === "function") return escapeHtml(value);
+4119-      return String(value == null ? "" : value)
+4120-        .replace(/&/g, "&amp;")
+4121-        .replace(/</g, "&lt;")
+4122-        .replace(/>/g, "&gt;")
+4123-        .replace(/"/g, "&quot;")
+4124-        .replace(/'/g, "&#39;");
+4125-    }
+4126-
+4127-    function value(row, keys, fallback) {
+4128-      for (var i = 0; i < keys.length; i += 1) {
+4129-        var key = keys[i];
+4130-        if (row && row[key] != null && String(row[key]) !== "") return row[key];
+4131-      }
+4132-      return fallback == null ? "" : fallback;
+4133-    }
+4134-
+4135-    function rowId(row, index) {
+4136-      if (typeof aicmAxuR1MajorId === "function") {
+4137-        var id = aicmAxuR1MajorId(row);
+4138-        if (id) return id;
+4139-      }
+4140-
+4141-      return String(
+4142-        value(row, [
+4143-          "aicm_manager_major_work_item_id",
+4144-          "manager_major_work_item_id",
+4145-          "pmlw_major_item_id",
+4146-          "major_item_id",
+4147-          "id"
+4148-        ], "row-" + String(index))
+4149-      );
+4150-    }
+4151-
+4152-    var list = Array.isArray(rows) ? rows : [];
+4153-
+4154-    if (!list.length && typeof selectedCompany === "function" && typeof pmlwMajorRowsForCompany === "function") {
+4155-      var company = selectedCompany();
+4156-      list = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+4157-    }
+4158-
+4159-    if (!Array.isArray(list) || list.length === 0) {
+4160-      return [
+4161-        '<div class="aicm-empty-state">',
+4162:        '  <strong>登録済み大項目はまだありません</strong>',
+4163-        '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+4164-        '</div>'
+4165-      ].join("");
+4166-    }
+4167-
+4168-    return [
+4169-      '<div class="aicm-table-wrap">',
+4170-      '  <table class="aicm-table">',
+4171-      '    <thead>',
+4172-      '      <tr>',
+4173-      '        <th>大項目</th>',
+4174-      '        <th>部門</th>',
+4175-      '        <th>課</th>',
+4176-      '        <th>優先度</th>',
+4177-      '        <th>期限</th>',
+4178-      '        <th>状態</th>',
+4179-      '        <th>操作</th>',
+4180-      '      </tr>',
+4181-      '    </thead>',
+4182-      '    <tbody>',
+4183-      list.map(function (row, index) {
+4184-        var id = rowId(row, index);
+4185-        var title = value(row, ["major_item_name", "title", "task_name", "deliverable_name"], "-");
+4186-        var description = value(row, ["major_item_description", "description", "note"], "");
+4187-        var department = value(row, ["department_name", "department_label"], "-");
+4188-        var section = value(row, ["section_name", "section_label"], "-");
+4189-        var priority = value(row, ["priority_code"], "normal");
+4190-        var dueDate = value(row, ["due_date"], "-");
+4191-        var status = value(row, ["handoff_status_code", "decomposition_status_code", "status_code"], "-");
+4192-
+4193-        return [
+4194-          '      <tr>',
+4195-          '        <td><strong>' + h(title) + '</strong>' + (description ? '<p class="aicm-selected-note">' + h(description) + '</p>' : '') + '</td>',
+4196-          '        <td>' + h(department) + '</td>',
+4197-          '        <td>' + h(section) + '</td>',
+4198-          '        <td>' + h(priority) + '</td>',
+4199-          '        <td>' + h(dueDate || "-") + '</td>',
+4200-          '        <td>' + h(status || "-") + '</td>',
+4201:          '        <td><button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + h(id) + '">課長へ送る</button></td>',
+4202-          '      </tr>'
+4203-        ].join("");
+4204-      }).join(""),
+4205-      '    </tbody>',
+4206-      '  </table>',
+4207-      '</div>'
+4208-    ].join("");
+4209-  }
+4210-
+4211-
+4212-  
+4213-
+4214-
+4215-
+4216-
+4217-
+4218-
+4219-
+4220-  
+4221:function aicmGetManagerMajorRowsForSelectedCompany(companyId) {
+4222:    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: rows
+4223-    var ctx = state && state.context ? state.context : {};
+4224-    var selectedId = String(companyId || "");
+4225-
+4226-    if (!selectedId && state && state.selectedCompanyId) {
+4227-      selectedId = String(state.selectedCompanyId || "");
+4228-    }
+4229-
+4230-    if (!selectedId && typeof selectedCompany === "function") {
+4231-      var company = selectedCompany();
+4232-      if (company && company.aicm_user_company_id) {
+4233-        selectedId = String(company.aicm_user_company_id || "");
+4234-      }
+4235-    }
+4236-
+4237-    function asArray(value) {
+4238-      return Array.isArray(value) ? value : [];
+4239-    }
+4240-
+4241-    function rowCompanyId(row) {
+4242-      return String(
+4243-        row && (
+4244-          row.aicm_user_company_id ||
+4245-          row.company_id ||
+4246-          row.user_company_id ||
+4247-          row.companyId ||
+4248-          ""
+4249-        ) || ""
+4250-      );
+4251-    }
+4252-
+4253-    function statusText(row, keys) {
+4254-      for (var i = 0; i < keys.length; i += 1) {
+4255-        var key = keys[i];
+4256-        if (row && row[key] != null && String(row[key]) !== "") {
+4257-          return String(row[key]).toLowerCase();
+4258-        }
+4259-      }
+4260-
+4261-      return "";
+4262-    }
+4263-
+4264-    function isPendingMajor(row) {
+4265-      var handoff = statusText(row, ["handoff_status_code", "handoff_status", "leader_handoff_status_code"]);
+4266-      var decomposition = statusText(row, ["decomposition_status_code", "work_status_code", "status_code"]);
+4267-
+4268-      var closed = {
+4269-        sent: true,
+4270-        handed_off: true,
+4271-        leader_handoff_done: true,
+4272-        submitted: true,
+4273-        delivered: true,
+4274-        done: true,
+4275-        completed: true,
+4276-        complete: true,
+4277-        cancelled: true,
+4278-        canceled: true,
+4279-        archived: true
+4280-      };
+4281-
+4282-      if (closed[handoff]) return false;
+4283-      if (closed[decomposition]) return false;
+4284-
+4285-      return true;
+4286-    }
+4287-
+4288-    function rowOrder(row) {
+4289-      var n = Number(row && (row.display_order || row.sort_order || row.row_order || 0));
+4290-      return Number.isFinite(n) ? n : 0;
+4291-    }
+4292-
+4293-    var rows = []
+4294-      .concat(asArray(ctx.pmlw_major_items))
+4295-      .concat(asArray(ctx.manager_major_items))
+4296-      .concat(asArray(ctx.major_items));
+4297-
+4298-    rows = rows.filter(function (row) {
+4299-      if (!row) return false;
+4300-
+4301-      var cid = rowCompanyId(row);
+4302-
+4303-      if (selectedId && cid && cid !== selectedId) return false;
+4304-
+4305-      return isPendingMajor(row);
+4306-    });
+4307-
+4308-    rows.sort(function (a, b) {
+4309-      var ao = rowOrder(a);
+4310-      var bo = rowOrder(b);
+4311-
+4312-      if (ao !== bo) return ao - bo;
+4313-
+4314-      var an = String((a && (a.major_item_name || a.title || a.task_name || a.deliverable_name)) || "");
+4315-      var bn = String((b && (b.major_item_name || b.title || b.task_name || b.deliverable_name)) || "");
+4316-
+4317-      return an.localeCompare(bn, "ja");
+4318-    });
+4319-
+4320-    return rows;
+4321-  }
+4322-
+4323:  function aicmRenderManagerMajorRows(rows) {
+4324:    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: render
+4325-    function h(value) {
+4326-      if (typeof escapeHtml === "function") return escapeHtml(value);
+4327-      return String(value == null ? "" : value)
+4328-        .replace(/&/g, "&amp;")
+4329-        .replace(/</g, "&lt;")
+4330-        .replace(/>/g, "&gt;")
+4331-        .replace(/"/g, "&quot;")
+4332-        .replace(/'/g, "&#39;");
+4333-    }
+4334-
+4335-    function pick(row, keys, fallback) {
+4336-      for (var i = 0; i < keys.length; i += 1) {
+4337-        var key = keys[i];
+4338-        if (row && row[key] != null && String(row[key]) !== "") return row[key];
+4339-      }
+4340-      return fallback == null ? "" : fallback;
+4341-    }
+4342-
+4343-    function rowId(row, index) {
+4344-      var direct = pick(row, [
+4345-        "aicm_manager_major_work_item_id",
+4346-        "manager_major_work_item_id",
+4347-        "pmlw_major_item_id",
+4348-        "major_item_id",
+4349-        "id"
+4350-      ], "");
+4351-
+4352-      if (direct) return String(direct);
+4353-
+4354-      if (typeof aicmAxuR1MajorId === "function") {
+4355-        var fallback = aicmAxuR1MajorId(row);
+4356-        if (fallback) return String(fallback);
+4357-      }
+4358-
+4359-      return "manager-major-row-" + String(index);
+4360-    }
+4361-
+4362-    var list = Array.isArray(rows) ? rows.filter(function (row) { return !!row; }) : [];
+4363-
+4364-    if (!list.length) {
+4365-      return [
+4366-        '<div class="aicm-empty-state">',
+4367:        '  <strong>登録済み大項目はまだありません</strong>',
+4368-        '  <p>未実行の大項目がDBに登録されていません。AI企業業務開始またはCSV取り込みを行うと、ここに表示されます。</p>',
+4369-        '</div>'
+4370-      ].join("");
+4371-    }
+4372-
+4373-    return [
+4374:      '<div class="aicm-selected-note">未実行大項目: <strong>' + String(list.length) + '</strong>件</div>',
+4375-      '<div class="aicm-table-wrap">',
+4376-      '  <table class="aicm-table">',
+4377-      '    <thead>',
+4378-      '      <tr>',
+4379-      '        <th>大項目</th>',
+4380-      '        <th>部門</th>',
+4381-      '        <th>課</th>',
+4382-      '        <th>優先度</th>',
+4383-      '        <th>期限</th>',
+4384-      '        <th>状態</th>',
+4385-      '        <th>操作</th>',
+4386-      '      </tr>',
+4387-      '    </thead>',
+4388-      '    <tbody>',
+4389-      list.map(function (row, index) {
+4390-        var title = pick(row, ["major_item_name", "title", "task_name", "deliverable_name"], "-");
+4391-        var description = pick(row, ["major_item_description", "description", "note"], "");
+4392-        var department = pick(row, ["department_name", "department_label"], "-");
+4393-        var section = pick(row, ["section_name", "section_label"], "-");
+4394-        var priority = pick(row, ["priority_code"], "normal");
+4395-        var dueDate = pick(row, ["due_date"], "-");
+4396-        var handoff = pick(row, ["handoff_status_code", "handoff_status"], "draft");
+4397-        var decomposition = pick(row, ["decomposition_status_code", "status_code"], "not_started");
+4398-        var id = rowId(row, index);
+4399-
+4400-        return [
+4401-          '      <tr>',
+4402-          '        <td><strong>' + h(title) + '</strong>' + (description ? '<p class="aicm-selected-note">' + h(description) + '</p>' : '') + '</td>',
+4403-          '        <td>' + h(department) + '</td>',
+4404-          '        <td>' + h(section) + '</td>',
+4405-          '        <td>' + h(priority) + '</td>',
+4406-          '        <td>' + h(dueDate || "-") + '</td>',
+4407-          '        <td>' + h(decomposition) + ' / ' + h(handoff) + '</td>',
+4408:          '        <td><button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + h(id) + '">課長へ送る</button></td>',
+4409-          '      </tr>'
+4410-        ].join("");
+4411-      }).join(""),
+4412-      '    </tbody>',
+4413-      '  </table>',
+4414-      '</div>'
+4415-    ].join("");
+4416-  }
+4417-
+4418:  async function aicmReloadTaskLedgerContext() {
+4419:    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: reload
+4420-    state.screen = "task-ledger";
+4421-    state.errorMessage = "";
+4422-
+4423-    if (typeof loadContext === "function") {
+4424-      await loadContext();
+4425-    }
+4426-
+4427-    state.screen = "task-ledger";
+4428-
+4429-    if (typeof render === "function") {
+4430-      render();
+4431-    }
+4432-  }
+4433-
+4434:function renderTaskLedgerPlaceholder() {
+4435:    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: screen
+4436-    var company = typeof selectedCompany === "function" ? selectedCompany() : null;
+4437-    var companyId = company && company.aicm_user_company_id ? company.aicm_user_company_id : "";
+4438-    var rows = aicmGetManagerMajorRowsForSelectedCompany(companyId);
+4439-
+4440-    return renderShell([
+4441-      '<section class="aicm-core-card">',
+4442-      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+4443-      '  <h2>部門別タスク台帳</h2>',
+4444-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+4445-      '  <p class="aicm-selected-note">未実行のManager大項目だけをDB/contextから表示します。CSV取り込みは部長/Manager分解済み大項目の新規追加です。</p>',
+4446-      '  <div class="aicm-dashboard-action-row">',
+4447:      '    <button type="button" data-core-action="task-ledger-refresh">登録済み大項目をリロード</button>',
+4448-      '  </div>',
+4449-      '</section>',
+4450-      renderCsvImportCard(company),
+4451-      '<section class="aicm-core-card">',
+4452-      '  <p class="aicm-eyebrow">Manager大項目</p>',
+4453:      '  <h2>登録済み大項目</h2>',
+4454-      aicmRenderManagerMajorRows(rows),
+4455-      '</section>'
+4456-    ].join(""));
+4457-  }
+4458-
+4459-  
+4460-// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+4461-// Human review queue UI.
+4462-// Human review only shows delivery summaries / exception summaries.
+4463-// AI review remains internal; the UI displays ai_review_result_text summary only.
+4464-
+4465-function aicmHumanReviewOwnerId() {
+4466-    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+4467-    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+4468-    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+4469-    return "00000000-0000-4000-8000-000000000001";
+4470-  }
+4471-
+4472-  function aicmHumanReviewRows() {
+4473-    var ctx = state.context || state || {};
+4474-    var rows = ctx.review_wait_items || state.review_wait_items || [];
+4475-    return Array.isArray(rows) ? rows : [];
+4476-  }
+4477-
+4478-  function aicmHumanReviewRowsForCompany(companyId) {
+4479-    return aicmHumanReviewRows().filter(function (row) {
+4480-      return !companyId || row.aicm_user_company_id === companyId;
+4481-    });
+4482-  }
+4483-
+4484-  async function aicmHumanReviewPostJson(path, body) {
+4485-    var response = await fetch(path, {
+4486-      method: "POST",
+4487-      headers: { "Content-Type": "application/json" },
+4488-      body: JSON.stringify(body || {})
+4489-    });
+4490-
+4491-    var text = await response.text();
+4492-    var json = {};
+4493-
+4494-    try {
+4495-      json = text ? JSON.parse(text) : {};
+4496-    } catch (_) {
+4497-      json = { result: "error", message: text || "Invalid server response" };
+4498-    }
+4499-
+4500-    if (!response.ok || (json.result && json.result !== "ok")) {
+4501-      throw new Error(json.message || json.error || ("API failed: " + path));
+4502-    }
+4503-
+4504-    return json;
+4505-  }
+4506-
+4507-  async function aicmHumanReviewReload() {
+4508-    if (typeof aicmPmlwReloadContext === "function") {
+4509-      await aicmReloadTaskLedgerContext();
+4510-      return;
+4511-    }
+4512-
+4513-    if (typeof loadContext === "function") {
+4514-      await loadContext();
+4515-      return;
+4516-    }
+4517-
+4518-    var owner = encodeURIComponent(aicmHumanReviewOwnerId());
+4519-    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+4520-    var json = await response.json();
+4521-
+4522-    if (json && json.result === "ok") state.context = json;
+4523-    if (typeof render === "function") render();
+4524-  }
+4525-
+4526-  async function approveHumanReviewFromAction(el) {
+4527-    var reviewId = el && el.getAttribute ? el.getAttribute("data-review-id") : "";
+4528-
+4529-    if (!reviewId) {
+4530-      setMessage("error", "レビュー項目を特定できません。");
+4531-      return;
+4532-    }
+4533-
+4534-    try {
+4535-      await aicmHumanReviewPostJson("/api/aicm/v2/human-review/approve", {
+4536-        owner_civilization_id: aicmHumanReviewOwnerId(),
+4537-        aicm_human_review_item_id: reviewId,
+4538-        human_reviewer_label: "user",
+4539-        human_review_note: ""
+4540-      });
+4541-
+4542-      setMessage("ok", "レビューを承認しました。");
+4543-      await aicmHumanReviewReload();
+4544-    } catch (error) {
+4545-      setMessage("error", error && error.message ? error.message : "承認に失敗しました。");
+4546-    }
+4547-  }
+4548-
+4549-  async function returnHumanReviewFromAction(el) {
+4550-    var reviewId = el && el.getAttribute ? el.getAttribute("data-review-id") : "";
+4551-
+4552-    if (!reviewId) {
+4553-      setMessage("error", "レビュー項目を特定できません。");
+4554-      return;
+4555-    }
+4556-
+4557-    var note = "";
+4558-
+4559-    try {
+4560-      if (typeof window !== "undefined" && window.prompt) {
+4561-        note = window.prompt("差し戻し理由を入力してください。", "") || "";
+4562-      }
+4563-    } catch (_) {}
+4564-
+4565-    try {
+4566-      await aicmHumanReviewPostJson("/api/aicm/v2/human-review/return", {
+4567-        owner_civilization_id: aicmHumanReviewOwnerId(),
+4568-        aicm_human_review_item_id: reviewId,
+4569-        human_reviewer_label: "user",
+4570-        human_review_note: note
+4571-      });
+4572-
+4573-      setMessage("ok", "レビューを差し戻しました。");
+4574-      await aicmHumanReviewReload();
+4575-    } catch (error) {
+4576-      setMessage("error", error && error.message ? error.message : "差し戻しに失敗しました。");
+4577-    }
+4578-  }
+4579-
+4580-  function renderHumanReviewRows(rows) {
+4581-    if (!rows.length) {
+4582-      return [
+4583-        '<div class="aicm-empty-state">',
+4584-        '  <strong>レビュー・承認待ちはありません</strong>',
+4585-        '  <p>設計書と実装は、納品時にAIがまとめた要約だけがここに表示されます。</p>',
+4586-        '  <p>AIレビューは内部工程で通常通り実施され、ここにはAIレビュー結果の要約だけが出ます。</p>',
+4587-        '</div>'
+4588-      ].join("");
+4589-    }
+4590-
+4591-    return rows.map(function (row) {
+4592-      var id = row.aicm_human_review_item_id || "";
+4593-      var title = row.review_title || "レビュー項目";
+4594-      var kind = row.review_kind_label || row.review_kind_code || "納品サマリー";
+4595-      var artifact = row.artifact_kind_label || row.artifact_kind_code || "";
+4596-      var status = row.human_review_status_label || row.human_review_status_code || "承認待ち";
+4597-      var company = row.company_name || "";
+4598-      var department = row.department_name || "";
+4599-      var section = row.section_name || "";
+4600-      var aiLabel = row.responsible_ai_label || row.requested_by_ai_label || "";
+4601-      var summary = row.delivery_summary_text || "要約未設定";
+4602-      var changes = row.main_changes_text || "";
+4603-      var aiReview = row.ai_review_result_text || "";
+4604-      var unresolved = row.unresolved_issues_text || "";
+4605-      var link = row.artifact_link || "";
+4606-
+4607-      return [
+4608-        '<article class="aicm-core-card aicm-review-card">',
+4609-        '  <div class="aicm-review-head">',
+4610-        '    <div>',
+4611-        '      <p class="aicm-eyebrow">' + escapeHtml(kind) + (artifact ? ' / ' + escapeHtml(artifact) : '') + '</p>',
+4612-        '      <h2>' + escapeHtml(title) + '</h2>',
+4613-        '    </div>',
+4614-        '    <span class="aicm-pill">' + escapeHtml(status) + '</span>',
+4615-        '  </div>',
+4616-        '  <div class="aicm-review-meta">',
+4617-        company ? '<span>会社: ' + escapeHtml(company) + '</span>' : '',
+4618-        department ? '<span>部門: ' + escapeHtml(department) + '</span>' : '',
+4619-        section ? '<span>課: ' + escapeHtml(section) + '</span>' : '',
+4620-        aiLabel ? '<span>担当AI: ' + escapeHtml(aiLabel) + '</span>' : '',
+4621-        '  </div>',
+4622-        '  <section class="aicm-review-summary">',
+4623-        '    <h3>納品サマリー</h3>',
+4624-        '    <p>' + escapeHtml(summary) + '</p>',
+4625-        changes ? '    <h3>主な変更点</h3><p>' + escapeHtml(changes) + '</p>' : '',
+4626-        aiReview ? '    <h3>AIレビュー結果</h3><p>' + escapeHtml(aiReview) + '</p>' : '',
+4627-        unresolved ? '    <h3>注意点 / 未解決事項</h3><p>' + escapeHtml(unresolved) + '</p>' : '',
+4628-        link ? '    <p><a href="' + escapeHtml(link) + '" target="_blank" rel="noopener">成果物を開く</a></p>' : '',
+4629-        '  </section>',
+4630-        '  <div class="aicm-dashboard-action-row">',
+4631-        '    <button type="button" data-core-action="human-review-approve" data-review-id="' + escapeHtml(id) + '">承認</button>',
+4632-        '    <button type="button" data-core-action="human-review-return" data-review-id="' + escapeHtml(id) + '">差し戻し</button>',
+4633-        '  </div>',
+4634-        '</article>'
+4635-      ].join("");
+4636-    }).join("");
+4637-  }
+4638-
+4639-
+4640-  
+4641-function renderReviewListPlaceholder() {
+4642-    var company = selectedCompany();
+4643-    var rows = company ? aicmHumanReviewRowsForCompany(company.aicm_user_company_id) : aicmHumanReviewRows();
+4644-
+4645-    return renderShell([
+4646-      '<section class="aicm-core-card">',
+4647-      '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+4648-      '  <h2>納品サマリー確認</h2>',
+4649-      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+4650-      '  <p class="aicm-selected-note">人間レビューは、設計書・実装・例外対応の納品時サマリーだけを確認します。AIレビューは内部工程で通常通り実施されます。</p>',
+4651-      '</section>',
+4652-      renderHumanReviewRows(rows)
+4653-    ].join(""));
+4654-  }
+4655-
+4656-
+4657-  
+4658-
+4659-
+4660-
+4661-// AICM_DEPT_SECTION_EDIT_FORM_WORKER_ROUTE_ASW_ASZ_V1
+4662-
+4663-
+4664-
+4665-
+4666-
+4667-function renderDepartmentEditPlaceholder() {
+4668-    var company = aicmAvdCurrentCompany();
+4669-    var department = aicmAvdCurrentDepartment(company && company.aicm_user_company_id);
+4670-
+4671-    if (!company) {
+4672-      return renderShell([
+4673-        '<section class="aicm-core-card">',
+--
+5205-      company
+5206-        ? '  <p class="aicm-selected-note">対象会社: <strong>' + aicmWrtEscape(company.company_name || "") + '</strong></p>'
+5207-        : '  <p class="aicm-core-empty">AI企業が選択されていません。</p>',
+5208-      workers.length
+5209-        ? '  <p class="aicm-selected-note">配置済みWorker: ' + String(workers.length) + '件</p>'
+5210-        : '  <p class="aicm-core-empty">この会社に配置済みAI/Workerがありません。先に課変更で従業員Workerを配置してください。</p>',
+5211-      '</section>',
+5212-      '<section class="aicm-core-card">',
+5213-      '  <label>実行AI/Worker<select id="aicm-worker-runtime-placement-id">' + aicmWrtWorkerOptions() + '</select></label>',
+5214-      '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
+5215-      '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
+5216-      '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
+5217-      '  <label>source_request_ref<input id="aicm-worker-runtime-source-ref" type="text" placeholder="空なら manual:<timestamp>"></label>',
+5218-      '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
+5219-      '</section>',
+5220-      '<section class="aicm-core-card aicm-operation-card">',
+5221-      '  <p class="aicm-eyebrow">操作</p>',
+5222-      '  <div class="aicm-dashboard-action-row">',
+5223-      '    <button type="button" data-core-action="worker-runtime-confirm">確認へ進む</button>',
+5224-      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+5225-      '  </div>',
+5226-      '</section>',
+5227-      lastHtml
+5228-    ].join(""));
+5229-  }
+5230-
+5231-function renderWorkerRuntimeRequest() {
+5232-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+5233-    return renderWorkerRuntimeRequestBaseAxtR9R1() + aicmRuntimeStatusPanelRender();
+5234-  }
+5235-
+5236-function aicmWrtValue(id) {
+5237-    var el = document.getElementById(id);
+5238-    return el ? aicmWrtText(el.value) : "";
+5239-  }
+5240-
+5241-function buildWorkerRuntimePendingPayload() {
+5242-    var company = aicmWrtCurrentCompany();
+5243-    if (!company) throw new Error("AI企業を選択してください。");
+5244-
+5245-    var placementId = aicmWrtValue("aicm-worker-runtime-placement-id");
+5246-    if (!placementId) throw new Error("実行AI/AI/Workerを選択してください。");
+5247-
+5248-    var worker = aicmWrtPlacementById(placementId);
+5249-    if (!worker) throw new Error("選択したWorker配置が見つかりません。");
+5250-
+5251-    var title = aicmWrtValue("aicm-worker-runtime-title");
+5252-    if (!title) throw new Error("作業タイトルを入力してください。");
+5253-
+5254-    var instruction = aicmWrtValue("aicm-worker-runtime-instruction");
+5255-    if (!instruction) throw new Error("作業指示を入力してください。");
+5256-
+5257-    var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
+5258-    var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
+5259-
+5260-    return {
+5261-      endpoint: "/api/aicm/v2/worker-runtime/request",
+5262-      worker_label: aicmWrtWorkerLabel(worker),
+5263-      body: {
+5264-        owner_civilization_id: aicmWrtOwnerId(),
+5265-        aicm_user_company_id: aicmWrtText(company.aicm_user_company_id),
+5266-        aicm_user_company_department_id: aicmWrtText(worker.aicm_user_company_department_id),
+5267-        aicm_user_company_section_id: aicmWrtText(worker.aicm_user_company_section_id),
+5268-        aicm_user_company_worker_placement_id: placementId,
+5269-        model_code: aicmWrtText(worker.aiworker_model_code),
+5270-        robot_pool_id: aicmWrtText(worker.robot_pool_id),
+5271-        app_surface_code: "ai_company_manager",
+5272-        task_domain_code: aicmWrtValue("aicm-worker-runtime-task-domain") || "business_operation",
+5273-        task_title: title,
+5274-        task_instruction_ja: instruction,
+5275-        source_app_ref: "AICompanyManager",
+5276-        source_request_ref: sourceRef,
+5277-        requested_by_ref: "human",
+5278-        idempotency_key: idempotencyKey
+5279-      }
+5280-    };
+5281-  }
+5282-
+5283-function renderWorkerRuntimeConfirm() {
+5284-    var payload = state.pendingWorkerRuntimeRequest || null;
+5285-    if (!payload || !payload.body) {
+5286-      return renderShell([
+5287-        '<section class="aicm-core-card">',
+5288-        '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+5289-        '  <h2>確認対象がありません</h2>',
+5290-        '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="worker-runtime-cancel">戻る</button></div>',
+5291-        '</section>'
+5292-      ].join(""));
+5293-    }
+5294-
+5295-    var body = payload.body;
+5296-    var rows = [
+5297-      ["実行AI/Worker", payload.worker_label],
+5298-      ["model_code", body.model_code],
+5299-      ["app_surface_code", body.app_surface_code],
+5300-      ["task_domain_code", body.task_domain_code],
+5301-      ["作業タイトル", body.task_title],
+5302-      ["作業指示", body.task_instruction_ja],
+5303-      ["source_request_ref", body.source_request_ref],
+5304-      ["idempotency_key", body.idempotency_key]
+5305-    ];
+5306-
+5307-    return renderShell([
+5308-      '<section class="aicm-core-card">',
+5309-      '  <p class="aicm-eyebrow">確認画面</p>',
+5310-      '  <h2>AI実行Workbenchを確定しますか？</h2>',
+5311-      '  <p class="aicm-selected-note">この操作はAIWorkerOS Runtime Executionへ実行依頼を作成します。</p>',
+5312-      '</section>',
+5313-      '<section class="aicm-core-card aicm-confirm-card">',
+5314-      rows.map(function (row) {
+5315-        return '<div class="aicm-confirm-row"><strong>' + aicmWrtEscape(row[0]) + '</strong><p>' + aicmWrtEscape(row[1]) + '</p></div>';
+5316-      }).join(""),
+5317-      '</section>',
+5318-      '<section class="aicm-core-card aicm-operation-card">',
+5319-      '  <p class="aicm-eyebrow">操作</p>',
+5320-      '  <div class="aicm-dashboard-action-row">',
+5321-      '    <button type="button" data-core-action="worker-runtime-execute">確定して実行</button>',
+5322-      '    <button type="button" data-core-action="worker-runtime-cancel">戻る</button>',
+5323-      '  </div>',
+5324-      '</section>'
+5325-    ].join(""));
+5326-  }
+5327-
+5328-async function aicmWrtPostJson(path, body) {
+5329-    var response = await fetch(path, {
+5330-      method: "POST",
+5331-      headers: {
+5332-        "Content-Type": "application/json"
+5333-      },
+5334-      body: JSON.stringify(body || {})
+5335-    });
+5336-
+5337-    var json = await response.json().catch(function () {
+5338-      return {};
+5339-    });
+5340-
+5341-    if (!response.ok || !json || json.result !== "ok") {
+5342-      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+5343-    }
+5344-
+5345-    return json;
+5346-  }
+5347-
+5348-async function executeWorkerRuntimeConfirmBaseAxtR9R1() {
+5349-    var payload = state.pendingWorkerRuntimeRequest || null;
+5350-    if (!payload || !payload.endpoint || !payload.body) {
+5351-      setMessage("error", "確認対象がありません。");
+5352-      return;
+5353-    }
+5354-
+5355-    try {
+5356-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+5357-      state.pendingWorkerRuntimeRequest = null;
+5358-      state.workerRuntimeLastResult = result;
+5359-      state.screen = "worker-runtime-request";
+5360-      setMessage("ok", "AI実行Workbenchを作成しました。");
+5361-      if (typeof render === "function") render();
+5362-    } catch (error) {
+5363-      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+5364-      if (typeof render === "function") render();
+5365-    }
+5366-  }
+5367-
+5368-async function executeWorkerRuntimeConfirm() {
+5369-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+5370-    var result = await executeWorkerRuntimeConfirmBaseAxtR9R1();
+5371-
+5372-    setTimeout(function () {
+5373-      if (typeof aicmRuntimeStatusRefresh === "function") {
+5374-        aicmRuntimeStatusRefresh();
+5375-      }
+5376-    }, 250);
+5377-
+5378-    return result;
+5379-  }
+5380-
+5381-function confirmWorkerRuntimeRequestFromForm() {
+5382-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+5383-    try {
+5384-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+5385-      state.screen = "worker-runtime-confirm";
+5386-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5387-      if (typeof render === "function") render();
+5388-    } catch (error) {
+5389-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+5390-      if (typeof render === "function") render();
+5391-    }
+5392-  }
+5393-
+5394-function cancelWorkerRuntimeConfirm() {
+5395-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+5396-    state.pendingWorkerRuntimeRequest = null;
+5397-    state.screen = "worker-runtime-request";
+5398-    if (typeof render === "function") render();
+5399-  }
+5400-
+5401-// AICM_AXU_MAINT_R3_PRESIDENT_CSV_ROUTE_V1
+5402-function renderAicmBusinessStartScreen() {
+5403-    var company = null;
+5404-    if (typeof selectedCompany === "function") company = selectedCompany();
+5405-    if (!company && typeof aicmOrgSelectedCompany === "function") company = aicmOrgSelectedCompany();
+5406-
+5407-    return renderShell([
+5408-      '<section class="aicm-core-card">',
+5409-      '  <p class="aicm-eyebrow">AI企業業務開始</p>',
+5410-      '  <h2>President起点で業務を開始</h2>',
+5411-      company ? '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || "") + '</strong></p>' : '  <p class="aicm-core-empty">AI企業を選択してください。</p>',
+5412-      '  <p class="aicm-selected-note">Presidentが会社方針・事業方針から業務を送り、Manager/部長が大項目へ分解し、課長へ引き継ぎます。</p>',
+5413-      '</section>',
+5414-      '<section class="aicm-core-card">',
+5415-      '  <p class="aicm-eyebrow">正本ルート</p>',
+5416-      '  <h2>業務開始ルート</h2>',
+5417-      '  <div class="aicm-confirm-row"><strong>1. President</strong><p>会社方針・事業方針から業務を送ります。</p></div>',
+5418-      '  <div class="aicm-confirm-row"><strong>2. Manager/部長</strong><p>受け取った業務を大項目レベルへ分解します。</p></div>',
+5419-      '  <div class="aicm-confirm-row"><strong>3. 課長</strong><p>大項目を受け取り、中項目・作業単位へ分解します。</p></div>',
+5420-      '  <div class="aicm-confirm-row"><strong>4. Worker</strong><p>作業単位を実行し、成果物を作成します。</p></div>',
+5421-      '</section>',
+5422-      '<section class="aicm-core-card">',
+5423-      '  <p class="aicm-eyebrow">CSV代替ルート</p>',
+5424-      '  <h2>部長分解済み大項目の取り込み</h2>',
+5425:      '  <p class="aicm-selected-note">CSVは、Manager/部長による大項目分解結果を代替入力するルートです。CSV取り込み後、登録済み大項目から課長へ引き継ぎます。</p>',
+5426-      '</section>',
+5427-      '<section class="aicm-core-card aicm-operation-card">',
+5428-      '  <p class="aicm-eyebrow">操作</p>',
+5429-      '  <div class="aicm-dashboard-action-row">',
+5430-      '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳へ</button>',
+5431-      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+5432-      '  </div>',
+5433-      '</section>'
+5434-    ].join(""));
+5435-  }
+5436-
+5437-function renderAicmBusinessStartDashboardCard() {
+5438-    var company = null;
+5439-    if (typeof selectedCompany === "function") company = selectedCompany();
+5440-    if (!company && typeof aicmOrgSelectedCompany === "function") company = aicmOrgSelectedCompany();
+5441-
+5442-    return [
+5443-      '<section class="aicm-core-card aicm-operation-card">',
+5444-      '  <p class="aicm-eyebrow">AI企業業務開始</p>',
+5445-      '  <h2>President起点で業務を開始</h2>',
+5446-      company ? '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || "") + '</strong></p>' : '  <p class="aicm-core-empty">AI企業を選択してください。</p>',
+5447-      '  <p class="aicm-selected-note">Presidentが業務を送り、Manager/部長が大項目へ分解し、課長へ引き継ぐ正本ルートです。</p>',
+5448-      '  <div class="aicm-dashboard-action-row">',
+5449-      '    <button type="button" data-core-action="go" data-screen="ai-business-start">AI企業業務開始</button>',
+5450-      '  </div>',
+5451-      '</section>'
+5452-    ].join("");
+5453-  }
+5454-
+5455-function render() {
+5456-    if (!root) return;
+5457-
+5458-    var html = "";
+5459-
+5460-    if (state.screen === "company-new") {
+5461-      html = renderCompanyNew();
+5462-    } else if (state.screen === "department-new") {
+5463-      html = renderDepartmentNew();
+5464-    } else if (state.screen === "section-new") {
+5465-      html = renderSectionNew();
+5466-    } else if (state.screen === "placement-new") {
+5467-      html = renderPlacementNew();
+5468-    } else if (state.screen === "worker-runtime-confirm") {
+5469-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+5470-      html = renderWorkerRuntimeConfirm();
+5471-    } else if (state.screen === "worker-runtime-request") {
+5472-      html = renderWorkerRuntimeRequest();
+5473-    } else if (state.screen === "settings") {
+5474-      html = renderSettings();
+5475-    } else if (state.screen === "department-edit") {
+5476-      html = renderDepartmentEditPlaceholder();
+5477-    } else if (state.screen === "section-edit") {
+5478-      html = renderSectionEditPlaceholder();
+5479-    } else if (state.screen === "ai-business-start") {
+5480-      html = renderAicmBusinessStartScreen();
+5481-    } else if (state.screen === "task-ledger") {
+5482-      html = renderTaskLedgerPlaceholder();
+5483-    } else if (state.screen === "review-list") {
+5484-      html = renderReviewListPlaceholder();
+5485-    } else {
+5486-      html = renderDashboard();
+5487-    }
+5488-
+5489-    
+5490-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+5491-    if (
+5492-      state &&
+5493-      (
+5494-        state.screen === "company-edit" ||
+5495-        state.screen === "company-change" ||
+5496-        state.screen === "company-update"
+5497-      )
+5498-    ) {
+5499-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5500-      html = renderCompanyEditPlaceholder();
+5501-    }
+5502-
+5503-
+5504-    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+5505-    if (state && state.screen === "company-edit") {
+5506-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5507-      html = renderCompanyEditPlaceholder();
+5508-    }
+5509-
+5510-    if (state && state.screen === "department-edit") {
+5511-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5512-      html = renderDepartmentEditPlaceholder();
+5513-    }
+5514-
+5515-    if (state && state.screen === "section-edit") {
+5516-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5517-      html = renderSectionEditPlaceholder();
+5518-    }
+5519-
+5520-
+5521-    // AICM_INLINE_ROLE_ADD_SCREEN_INJECTION_ATQ_ATT
+5522-    if (typeof aicmInjectInlineRoleSettingsForAddScreens === "function") {
+5523-      html = aicmInjectInlineRoleSettingsForAddScreens(html);
+5524-    }
+5525-
+5526-root.innerHTML = html;
+5527-  }
+5528-
+5529-  function fieldValue(form, name) {
+5530-    var field = form.elements[name];
+5531-    return field && typeof field.value === "string" ? field.value.trim() : "";
+5532-  }
+5533-
+5534-  function submitForm(form) {
+5535-    var formName = form.getAttribute("data-core-form") || "";
+5536-    state.errorMessage = "";
+5537-    state.noticeMessage = "";
+5538-
+5539-    var task;
+5540-
+5541-    if (formName === "company-create") {
+5542-      task = createCompany({
+5543-        companyName: fieldValue(form, "companyName"),
+5544-        businessDomain: fieldValue(form, "businessDomain")
+5545-      });
+5546-    } else if (formName === "department-create") {
+5547-      task = createDepartment({
+5548-        departmentName: fieldValue(form, "departmentName"),
+5549-        purpose: fieldValue(form, "purpose")
+5550-      });
+5551-    } else if (formName === "section-create") {
+5552-      task = createSection({
+5553-        sectionName: fieldValue(form, "sectionName"),
+5554-        purpose: fieldValue(form, "purpose")
+5555-      });
+5556-    } else if (formName === "placement-create") {
+5557-      var robotSelect = form.elements.robotPoolId;
+5558-      var selectedRobot = robotSelect && robotSelect.selectedOptions ? robotSelect.selectedOptions[0] : null;
+5559-      var targetLevelCode = fieldValue(form, "targetLevelCode");
+5560-      var sectionId = fieldValue(form, "sectionId");
+5561-      var targetId = state.selectedCompanyId;
+5562-
+5563-      if (targetLevelCode === "department") {
+5564-        targetId = state.selectedDepartmentId;
+5565-      }
+5566-
+5567-      if (targetLevelCode === "section") {
+5568-        targetId = sectionId;
+5569-      }
+5570-
+5571-      task = createPlacement({
+5572-        departmentId: state.selectedDepartmentId,
+5573-        sectionId: sectionId,
+5574-        targetLevelCode: targetLevelCode,
+5575-        targetId: targetId,
+5576-        roleCode: fieldValue(form, "roleCode"),
+5577-        robotPoolId: fieldValue(form, "robotPoolId"),
+5578-        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",
+5579-        internalNickname: fieldValue(form, "internalNickname")
+5580-      });
+5581-    } else {
+5582-      task = Promise.reject(new Error("未知のフォームです。"));
+5583-    }
+5584-
+5585-    state.loading = true;
+5586-    render();
+5587-
+5588-    task.catch(function (error) {
+5589-      state.loading = false;
+5590-      state.errorMessage = publicErrorMessage(error);
+5591-      render();
+5592-    });
+5593-  }
+5594-
+5595-  // AICM_AXU_CSV_R1_FILE_CHANGE_HANDLER_V1
+5596-function aicmAxuCsvR1OpenFileInput() {
+5597-    var input = document.getElementById("aicm-ledger-csv-file");
+5598-    if (!input) {
+5599-      setMessage("error", "CSVファイル入力が見つかりません。");
+5600-      render();
+5601-      return;
+5602-    }
+5603-
+5604-    try {
+5605-      input.value = "";
+5606-    } catch (_) {}
+5607-
+5608-    input.click();
+5609-  }
+5610-
+5611-function aicmAxuCsvR1ReadSelectedFile(input) {
+5612-    var file = input && input.files && input.files.length ? input.files[0] : null;
+5613-
+5614-    if (!file) {
+5615-      state.csvImportFileName = "未選択";
+5616-      state.csvImportText = "";
+5617-      state.csvImportRows = [];
+5618-      setMessage("error", "CSVファイルが選択されていません。");
+5619-      render();
+5620-      return;
+5621-    }
+5622-
+5623-    function finish(text) {
+5624-      var csvText = String(text || "").replace(/^\uFEFF/, "");
+5625-      state.csvImportFileName = file.name || "選択済みCSV";
+5626-      state.csvImportText = csvText;
+5627-      state.csvImportRawText = csvText;
+5628-      state.csvImportFileContent = csvText;
+5629-      state.csvImportLastResult = "";
+5630-
+5631-      try {
+5632-        state.csvImportRows = typeof parseCsv === "function" ? parseCsv(csvText) : [];
+5633-      } catch (_) {
+5634-        state.csvImportRows = [];
+5635-      }
+5636-
+5637-      setMessage("ok", "CSVファイルを読み込みました: " + state.csvImportFileName);
+5638-      render();
+5639-    }
+5640-
+5641-    function failRead(error) {
+5642-      state.csvImportFileName = file.name || "選択済みCSV";
+5643-      state.csvImportText = "";
+5644-      state.csvImportRows = [];
+5645-      setMessage("error", error && error.message ? error.message : "CSVファイルの読み込みに失敗しました。");
+--
+5821-      render();
+5822-      return;
+5823-    }
+5824-
+5825-    var text = String(state.csvImportText || state.csvImportRawText || state.csvImportFileContent || "");
+5826-
+5827-    if (!text.trim()) {
+5828-      setMessage("error", "CSVファイルを先に読み込んでください。");
+5829-      render();
+5830-      return;
+5831-    }
+5832-
+5833-    var rows = typeof parseCsv === "function" ? parseCsv(text) : [];
+5834-
+5835-    if (!Array.isArray(rows) || rows.length === 0) {
+5836-      setMessage("error", "取り込めるCSV行がありません。ヘッダーとデータ行を確認してください。");
+5837-      render();
+5838-      return;
+5839-    }
+5840-
+5841-    try {
+5842-      var payload = {
+5843-        owner_civilization_id: typeof aicmPmlwOwnerId === "function" ? aicmPmlwOwnerId() : ownerCivilizationId(),
+5844-        aicm_user_company_id: company.aicm_user_company_id,
+5845-        rows: rows
+5846-      };
+5847-
+5848-      var result;
+5849-
+5850-      if (typeof aicmPmlwPostJson === "function") {
+5851-        result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", payload);
+5852-      } else {
+5853-        var response = await fetch("/api/aicm/v2/manager-major/import-csv", {
+5854-          method: "POST",
+5855-          headers: { "content-type": "application/json" },
+5856-          body: JSON.stringify(payload)
+5857-        });
+5858-        result = await response.json();
+5859-
+5860-        if (!response.ok || !result || result.result !== "ok") {
+5861-          throw new Error((result && result.error_message) || "CSV取り込みに失敗しました。");
+5862-        }
+5863-      }
+5864-
+5865-      var count = result.inserted_count || result.imported_count || result.created_count || rows.length;
+5866-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+5867-      setMessage("ok", state.csvImportLastResult);
+5868-
+5869-      if (typeof aicmPmlwReloadContext === "function") {
+5870-        await aicmReloadTaskLedgerContext();
+5871-      } else if (typeof loadContext === "function") {
+5872-        await loadContext();
+5873-      }
+5874-
+5875-      state.screen = "task-ledger";
+5876-      render();
+5877-    } catch (error) {
+5878-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+5879-      render();
+5880-    }
+5881-  }
+5882-
+5883-// AICM_AXU_CSV_R3_READ_BEFORE_IMPORT_V1
+5884-function aicmCsvReadCurrentFileTextForImport() {
+5885-    var existing = String(state.csvImportText || state.csvImportRawText || state.csvImportFileContent || "");
+5886-
+5887-    if (existing.trim()) {
+5888-      return Promise.resolve(existing);
+5889-    }
+5890-
+5891-    var input = document.getElementById("aicm-ledger-csv-file");
+5892-    var file = input && input.files && input.files.length ? input.files[0] : null;
+5893-
+5894-    if (!file) {
+5895-      return Promise.resolve("");
+5896-    }
+5897-
+5898-    function store(text) {
+5899-      var csvText = String(text || "").replace(/^\uFEFF/, "");
+5900-      state.csvImportText = csvText;
+5901-      state.csvImportRawText = csvText;
+5902-      state.csvImportFileContent = csvText;
+5903-      state.csvImportFileName = file.name || state.csvImportFileName || "選択済みCSV";
+5904-
+5905-      try {
+5906-        state.csvImportRows = typeof parseCsv === "function" ? parseCsv(csvText) : [];
+5907-      } catch (_) {
+5908-        state.csvImportRows = [];
+5909-      }
+5910-
+5911-      return csvText;
+5912-    }
+5913-
+5914-    if (file && typeof file.text === "function") {
+5915-      return file.text().then(store);
+5916-    }
+5917-
+5918-    return new Promise(function (resolve, reject) {
+5919-      try {
+5920-        var reader = new FileReader();
+5921-        reader.onload = function () {
+5922-          resolve(store(reader.result));
+5923-        };
+5924-        reader.onerror = function () {
+5925-          reject(new Error("CSVファイルの読み込みに失敗しました。"));
+5926-        };
+5927-        reader.readAsText(file, "utf-8");
+5928-      } catch (error) {
+5929-        reject(error);
+5930-      }
+5931-    });
+5932-  }
+5933-
+5934-async function aicmCsvImportLoadedReadBeforeImport() {
+5935-    var company = typeof selectedCompany === "function" ? selectedCompany() : null;
+5936-
+5937-    if (!company || !company.aicm_user_company_id) {
+5938-      setMessage("error", "AI企業を選択してください。");
+5939-      render();
+5940-      return;
+5941-    }
+5942-
+5943-    var text = "";
+5944-
+5945-    try {
+5946-      text = await aicmCsvReadCurrentFileTextForImport();
+5947-    } catch (error) {
+5948-      setMessage("error", error && error.message ? error.message : "CSVファイルの読み込みに失敗しました。");
+5949-      render();
+5950-      return;
+5951-    }
+5952-
+5953-    if (!String(text || "").trim()) {
+5954-      setMessage("error", "CSVファイルを先に選択してください。");
+5955-      render();
+5956-      return;
+5957-    }
+5958-
+5959-    var rows = typeof parseCsv === "function" ? parseCsv(text) : [];
+5960-
+5961-    if (!Array.isArray(rows) || rows.length === 0) {
+5962-      setMessage("error", "取り込めるCSV行がありません。ヘッダーとデータ行を確認してください。");
+5963-      render();
+5964-      return;
+5965-    }
+5966-
+5967-    try {
+5968-      var payload = {
+5969-        owner_civilization_id: typeof aicmPmlwOwnerId === "function" ? aicmPmlwOwnerId() : ownerCivilizationId(),
+5970-        aicm_user_company_id: company.aicm_user_company_id,
+5971-        rows: rows
+5972-      };
+5973-
+5974-      var result;
+5975-
+5976-      if (typeof aicmPmlwPostJson === "function") {
+5977-        result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", payload);
+5978-      } else {
+5979-        var response = await fetch("/api/aicm/v2/manager-major/import-csv", {
+5980-          method: "POST",
+5981-          headers: { "content-type": "application/json" },
+5982-          body: JSON.stringify(payload)
+5983-        });
+5984-
+5985-        result = await response.json();
+5986-
+5987-        if (!response.ok || !result || result.result !== "ok") {
+5988-          throw new Error((result && result.error_message) || "CSV取り込みに失敗しました。");
+5989-        }
+5990-      }
+5991-
+5992-      var count = result.inserted_count || result.imported_count || result.created_count || rows.length;
+5993-      state.csvImportLastResult = "CSV取り込み完了: " + count + "件";
+5994-      setMessage("ok", state.csvImportLastResult);
+5995-
+5996-      if (typeof aicmPmlwReloadContext === "function") {
+5997-        await aicmReloadTaskLedgerContext();
+5998-      } else if (typeof loadContext === "function") {
+5999-        await loadContext();
+6000-      }
+6001-
+6002-      state.screen = "task-ledger";
+6003-      render();
+6004-    } catch (error) {
+6005-      setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+6006-      render();
+6007-    }
+6008-  }
+6009-
+6010-function handleRootClick(event) {
+6011-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+6012-  var aicmRawClickTarget = event.target;
+6013-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+6014-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+6015-    : aicmRawClickTarget;
+6016-
+6017-    var button = aicmActionTarget.closest("[data-core-action]");
+6018-    if (!button) {
+6019-      // AICM_AXU_R1C_SCREEN_ONLY_NAV_FALLBACK
+6020-      var aicmScreenOnlyTarget = aicmActionTarget && aicmActionTarget.closest
+6021-        ? aicmActionTarget.closest("[data-screen]")
+6022-        : null;
+6023-
+6024-      if (aicmScreenOnlyTarget && aicmScreenOnlyTarget.getAttribute) {
+6025-        var aicmScreenOnlyName = String(aicmScreenOnlyTarget.getAttribute("data-screen") || "").trim();
+6026-
+6027-        if (aicmScreenOnlyName) {
+6028-          state.screen = aicmScreenOnlyName;
+6029-          if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+6030-          if (typeof render === "function") render();
+6031-          return;
+6032-        }
+6033-      }
+6034-
+6035-      return;
+6036-    }
+6037-
+6038-    var action = button.getAttribute("data-core-action") || "";
+6039-
+6040-    // AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+6041:    if (action === "pmlw-major-leader-handoff") {
+6042-      aicmAxuR1OpenLeaderHandoffConfirm(button);
+6043-      return;
+6044-    }
+6045-
+6046-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+6047-    if (action === "worker-runtime-status-refresh") {
+6048-      aicmRuntimeStatusRefresh();
+6049-      return;
+6050-    }
+6051-
+6052-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+6053-    if (action === "worker-runtime-confirm") {
+6054-      confirmWorkerRuntimeRequestFromForm();
+6055-      return;
+6056-    }
+6057-
+6058-    if (action === "worker-runtime-execute") {
+6059-      executeWorkerRuntimeConfirm();
+6060-      return;
+6061-    }
+6062-
+6063-    if (action === "worker-runtime-cancel") {
+6064-      cancelWorkerRuntimeConfirm();
+6065-      return;
+6066-    }
+6067-
+6068-            if (action === "task-ledger-fill-csv-template") {
+6069-      fillTaskLedgerCsvTemplate();
+6070-      return;
+6071-    }
+6072-
+6073-        if (action === "task-ledger-csv-file-open") {
+6074-      openTaskLedgerCsvFilePicker();
+6075-      return;
+6076-    }
+6077-
+6078-    if (action === "task-ledger-chatgpt-prompt") {
+6079-      handleTaskLedgerChatGptPrompt();
+6080-      return;
+6081-    }
+6082-if (action === "task-ledger-csv-preview") {
+6083-      previewTaskLedgerCsv();
+6084-      return;
+6085-    }
+6086-
+6087-    if (action === "task-ledger-csv-import") {
+6088-      importTaskLedgerCsvToPmlwMajor();
+6089-      return;
+6090-    }
+6091-if (action === "task-ledger-create") {
+6092-      createTaskLedgerFromForm();
+6093-      return;
+6094-    }
+6095-if (action === "human-review-approve") {
+6096-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+6097-      return;
+6098-    }
+6099-
+6100-    if (action === "human-review-return") {
+6101-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+6102-      return;
+6103-    }
+6104-
+6105-    if (action === "department-update-select") {
+6106-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+6107-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+6108-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+6109-      if (typeof render === "function") render();
+6110-      return;
+6111-    }
+6112-
+6113-    if (action === "department-update-clear") {
+6114-      state.editingDepartmentId = "";
+6115-      if (typeof render === "function") render();
+6116-      return;
+6117-    }
+6118-
+6119-    if (action === "section-update-select") {
+6120-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+6121-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+6122-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+6123-      if (typeof render === "function") render();
+6124-      return;
+6125-    }
+6126-
+6127-    if (action === "section-update-clear") {
+6128-      state.editingSectionId = "";
+6129-      if (typeof render === "function") render();
+6130-      return;
+6131-    }
+6132-
+6133-    if (action === "company-update-save") {
+6134-      saveCompanyUpdateFromForm();
+6135-      return;
+6136-    }
+6137-
+6138-    if (action === "department-update-save") {
+6139-      saveDepartmentUpdateFromForm();
+6140-      return;
+6141-    }
+6142-
+6143-    if (action === "section-update-save") {
+6144-      saveSectionUpdateFromForm();
+6145-      return;
+6146-    }
+6147-
+6148-    if (action === "org-update-confirm-execute") {
+6149-      executeAicmOrgUpdateConfirm();
+6150-      return;
+6151-    }
+6152-
+6153-    if (action === "org-update-confirm-cancel") {
+6154-      cancelAicmOrgUpdateConfirm();
+6155-      return;
+6156-    }
+6157-
+6158-    if (action === "company-edit-open") {
+6159-      state.screen = "company-edit";
+6160-      if (typeof render === "function") render();
+6161-      return;
+6162-    }
+6163-
+6164-    if (action === "department-edit-pick") {
+6165-      var actionTarget = aicmActionTargetSafe(event, button);
+6166-      state.editingDepartmentId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-department-id") || "") : "";
+6167-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+6168-      if (typeof render === "function") render();
+6169-      return;
+6170-    }
+6171-
+6172-    if (action === "section-edit-pick") {
+6173-      var actionTarget = aicmActionTargetSafe(event, button);
+6174-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : "";
+6175-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+6176-      if (typeof render === "function") render();
+6177-      return;
+6178-    }
+6179-
+6180-    if (action === "section-worker-update-open") {
+6181-      var actionTarget = aicmActionTargetSafe(event, button);
+6182-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : (state.editingSectionId || "");
+6183-      state.workerPlacementSectionId = state.editingSectionId || "";
+6184-      state.screen = "worker-placement";
+6185-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+6186-      if (typeof render === "function") render();
+6187-      return;
+6188-    }
+6189-
+6190-        // AICM_REMOVE_STALE_ROLE_SETTING_OPEN_AUC_AUF_V1: stale role setting open action removed
+6191-
+6192-    
+6193-
+6194-    if (action === "inline-worker-slot-add") {
+6195-      // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
+6196-      aicmAxoCaptureCurrentEditFormDraft();
+6197-      if (!state.inlineWorkerSlotCount) state.inlineWorkerSlotCount = 3;
+6198-      state.inlineWorkerSlotCount = Math.min(20, Number(state.inlineWorkerSlotCount || 3) + 1);
+6199-      if (typeof render === "function") render();
+6200-      return;
+6201-    }
+6202-
+6203-    if (action === "task-ledger-csv-file-open") {
+6204-      aicmCsvOpenFileInput();
+6205-      return;
+6206-    }
+6207-    // AICM_AXU_CSV_R3_FIX1_LITERAL_NEWLINE_REPAIR_V1
+6208-    if (action === "task-ledger-csv-import") {
+6209-      aicmCsvImportLoadedReadBeforeImport();
+6210-      return;
+6211-    }
+6212-    if (action === "go") {
+6213-      // AICM_CLEAR_TRANSIENT_ON_GO_ASS_ASV
+6214-      if (typeof aicmClearTransientMessage === "function") {
+6215-        var nextScreenForMessageClear = "";
+6216-        try {
+6217-          nextScreenForMessageClear = button && button.getAttribute ? String(button.getAttribute("data-screen") || "") : "";
+6218-        } catch (_) {
+6219-          nextScreenForMessageClear = "";
+6220-        }
+6221-
+6222-        if (
+6223-          nextScreenForMessageClear === "company-edit" ||
+6224-          nextScreenForMessageClear === "company-change" ||
+6225-          nextScreenForMessageClear === "company-update" ||
+6226-          nextScreenForMessageClear === "department-edit" ||
+6227-          nextScreenForMessageClear === "section-edit"
+6228-        ) {
+6229-          aicmClearTransientMessage();
+6230-        }
+6231-      }
+6232-
+6233-      go(button.getAttribute("data-screen") || "dashboard");
+6234-      return;
+6235-    }
+6236-
+6237-
+6238:    if (action === "task-ledger-refresh") {
+6239-      aicmReloadTaskLedgerContext();
+6240-      return;
+6241-    }
+6242-
+6243-    if (action === "reload") {
+6244-      loadContext();
+6245-      return;
+6246-    }
+6247-  }
+6248-
+6249-  function handleRootChange(event) {
+6250-    var field = event.target;
+6251-    var fileKind = field.getAttribute("data-core-file") || "";
+6252-    if (fileKind === "task-ledger-csv") {
+6253-      aicmCsvReadSelectedFile(field);
+6254-      return;
+6255-    }
+6256-
+6257-    var fieldName = field.getAttribute("data-core-field") || "";
+6258-
+6259-    if (fieldName === "selectedCompanyId") {
+6260-      setSelectedCompany(field.value);
+6261-      render();
+6262-      return;
+6263-    }
+6264-
+6265-    if (fieldName === "selectedDepartmentId") {
+6266-      setSelectedDepartment(field.value);
+6267-      render();
+6268-    }
+6269-  }
+6270-
+6271-  function handleRootSubmit(event) {
+6272-    var form = event.target.closest("form[data-core-form]");
+6273-    if (!form) return;
+6274-
+6275-    event.preventDefault();
+6276-    submitForm(form);
+6277-  }
+6278-
+6279-  
+6280-
+6281-function injectMinimalCss() {
+6282-    if (document.getElementById("aicm-production-core-css")) return;
+6283-
+6284-    var style = document.createElement("style");
+6285-    style.id = "aicm-production-core-css";
+6286-    style.textContent = [
+6287-      ".aicm-core{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:980px;margin:0 auto;padding:20px;color:#172033;background:#f6f7fb;min-height:100vh}",
+6288-      ".aicm-core-header{padding:10px 0 18px}",
+6289-      ".aicm-core-header h1{font-size:32px;margin:0;letter-spacing:-.04em}",
+6290-      ".aicm-core-tabs{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px}",
+6291-      ".aicm-core button{border:1px solid #d8dee9;background:#eef2ff;border-radius:14px;padding:11px 15px;font-weight:800;color:#1f2a44;box-shadow:0 4px 10px rgba(31,42,68,.06)}",
+6292-      ".aicm-core-main{display:grid;gap:16px}",
+6293-      ".aicm-core-card{background:#fff;border:1px solid #e6eaf2;border-radius:22px;padding:20px;box-shadow:0 10px 24px rgba(15,23,42,.06)}",
+6294-      ".aicm-core-card h2{font-size:26px;margin:0 0 14px;letter-spacing:-.03em}",
+6295-      ".aicm-core label{display:block;font-weight:800;margin:12px 0 6px;color:#25324a}",
+6296-      ".aicm-core input,.aicm-core select,.aicm-core textarea{width:100%;box-sizing:border-box;border:1px solid #cfd6e4;border-radius:14px;padding:12px;font-size:16px;background:#fff}",
+6297-      ".aicm-core-message{border-radius:14px;padding:12px 14px;margin:12px 0;background:#f3f4f6}",
+6298-      ".aicm-core-message-ok{background:#ecfdf5;color:#047857}",
+6299-      ".aicm-core-message-error{background:#fef2f2;color:#b91c1c}",
+6300-      ".aicm-core-empty{color:#6b7280;margin:8px 0}",
+6301-      ".aicm-dashboard-grid{display:grid;gap:16px}",
+6302-      ".aicm-dashboard-main-grid{grid-template-columns:minmax(0,1fr)}",
+6303-      ".aicm-card-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}",
+6304-      ".aicm-eyebrow{margin:0 0 6px;color:#64748b;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}",
+6305-      ".aicm-selected-note{background:#f8fafc;border:1px solid #edf2f7;border-radius:14px;padding:10px 12px;margin:12px 0 0}",
+6306-      ".aicm-overview-block{display:grid;gap:14px}",
+6307-      ".aicm-overview-main strong{display:block;font-size:22px;letter-spacing:-.03em}",
+6308-      ".aicm-overview-main span{color:#5f6c80}",
+6309-      ".aicm-overview-list{display:grid;gap:10px;margin:0}",
+6310-      ".aicm-overview-list div{background:#f8fafc;border:1px solid #edf2f7;border-radius:14px;padding:10px 12px}",
+6311-      ".aicm-overview-list dt{font-size:12px;color:#64748b;font-weight:900}",
+6312-      ".aicm-overview-list dd{margin:4px 0 0;word-break:break-all}",
+6313-      ".aicm-empty-state{border:1px dashed #cbd5e1;background:#f8fafc;border-radius:18px;padding:18px}",
+6314-      ".aicm-empty-state strong{display:block;font-size:18px;margin-bottom:6px}",
+6315-      ".aicm-org-tree{display:grid;gap:12px}",
+6316-      ".aicm-org-node{border:1px solid #edf2f7;background:#fbfdff;border-radius:18px;padding:14px}",
+6317-      ".aicm-org-node-head{display:flex;align-items:center;gap:8px}",
+6318-      ".aicm-org-node-head strong{font-size:18px}",
+6319-      ".aicm-node-badge{display:inline-flex;align-items:center;border-radius:999px;background:#e0ecff;color:#1d4ed8;font-size:12px;font-weight:900;padding:4px 8px}",
+6320-      ".aicm-node-badge-section{background:#ecfdf5;color:#047857}",
+6321-      ".aicm-section-list{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}",
+6322-      ".aicm-section-list li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;background:#fff;border:1px solid #edf2f7;border-radius:14px;padding:10px}",
+6323-      ".aicm-section-list small{grid-column:2;color:#6b7280}",
+6324-      ".aicm-section-empty{margin-top:10px;color:#94a3b8;border:1px dashed #dbe3ef;border-radius:12px;padding:10px}",
+6325-
+6326-      ".aicm-overview-count-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}",
+6327-      ".aicm-overview-count-row div{background:#f8fafc;border:1px solid #edf2f7;border-radius:14px;padding:12px}",
+6328-      ".aicm-overview-count-row dt{font-size:12px;color:#64748b;font-weight:900}",
+6329-      ".aicm-overview-count-row dd{font-size:22px;font-weight:900;margin:4px 0 0}",
+6330-      ".aicm-dashboard-action-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}",
+6331-      ".aicm-tree-toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}",
+6332-      ".aicm-org-node-head button,.aicm-section-list button{margin-left:auto;padding:7px 10px;border-radius:10px;font-size:13px}",
+6333-      "@media(max-width:520px){.aicm-overview-count-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.aicm-overview-count-row div{padding:10px 8px}.aicm-overview-count-row dd{font-size:18px}.aicm-dashboard-action-row button,.aicm-tree-toolbar button{flex:1 1 44%}}",
+6334-
+6335-      ".aicm-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}",
+6336-      ".aicm-ledger-list{display:grid;gap:12px}",
+6337-      ".aicm-ledger-row{border:1px solid #edf2f7;background:#fbfdff;border-radius:18px;padding:14px}",
+6338-      ".aicm-ledger-row-head{display:flex;align-items:center;gap:8px}",
+6339-      ".aicm-ledger-row-head strong{font-size:18px}",
+6340-      ".aicm-ledger-row-head em{margin-left:auto;color:#64748b;font-style:normal;font-weight:800}",
+6341-      ".aicm-ledger-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 0}",
+6342-      ".aicm-ledger-meta div{background:#f8fafc;border:1px solid #edf2f7;border-radius:12px;padding:8px}",
+6343-      ".aicm-ledger-meta dt{font-size:11px;color:#64748b;font-weight:900}",
+6344-      ".aicm-ledger-meta dd{margin:3px 0 0}",
+6345-      ".aicm-ledger-note{background:#fff;border:1px solid #edf2f7;border-radius:12px;padding:10px;margin:10px 0 0}",
+6346-      "@media(max-width:720px){.aicm-form-grid{grid-template-columns:1fr}.aicm-ledger-meta{grid-template-columns:repeat(2,minmax(0,1fr))}}",
+6347-      ".aicm-csv-preview{overflow:auto;border:1px solid #edf2f7;border-radius:14px;margin-top:14px}",
+6348-      ".aicm-csv-preview table{width:100%;border-collapse:collapse;background:#fff;font-size:13px}",
+6349-      ".aicm-csv-preview th,.aicm-csv-preview td{border-bottom:1px solid #edf2f7;padding:8px;text-align:left;vertical-align:top}",
+6350-      ".aicm-csv-preview tr.is-error td{background:#fff5f5;color:#991b1b}",
+6351-      ".aicm-csv-preview tr.is-valid td:first-child{font-weight:900}",
+6352-      ".aicm-csv-template{margin-top:14px;border:1px solid #edf2f7;background:#f8fafc;border-radius:14px;padding:12px}",
+6353-      ".aicm-csv-template summary{font-weight:900;cursor:pointer}",
+6354-
+6355-      ".aicm-hidden-file{display:none}",
+6356-      ".aicm-csv-flow{display:grid;gap:12px;margin-top:12px}",
+6357-      ".aicm-csv-flow-step{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid #edf2f7;background:#f8fafc;border-radius:16px;padding:12px}",
+6358-      ".aicm-csv-flow-step span{display:grid;place-items:center;width:34px;height:34px;border-radius:999px;background:#e0ecff;color:#1d4ed8;font-weight:900}",
+6359-      ".aicm-csv-flow-step strong{display:block}",
+6360-      ".aicm-csv-flow-step p{margin:4px 0 0;color:#64748b;font-size:13px}",
+6361-      ".aicm-csv-flow-main{background:#eef2ff}",
+6362-      ".aicm-csv-file-name{border:1px solid #edf2f7;background:#fff;border-radius:14px;padding:10px 12px;min-width:0}",
+6363-      ".aicm-csv-file-name span{display:block;color:#64748b;font-size:12px;font-weight:900}",
+6364-      ".aicm-csv-file-name strong{display:block;word-break:break-all;margin-top:4px}",
+6365-      "@media(max-width:620px){.aicm-csv-flow-step{grid-template-columns:auto minmax(0,1fr)}.aicm-csv-flow-step button{grid-column:1 / -1}}",
+6366-
+6367-      ".aicm-table-wrap{overflow:auto;border:1px solid #edf2f7;border-radius:16px;background:#fff}",
+6368-      ".aicm-core-table{width:100%;border-collapse:collapse;min-width:980px}",
+6369-      ".aicm-core-table th,.aicm-core-table td{border-bottom:1px solid #edf2f7;padding:10px 12px;text-align:left;vertical-align:top;font-size:13px}",
+6370-      ".aicm-core-table th{background:#f8fafc;color:#334155;font-weight:900}",
+6371-      ".aicm-core-table small{display:block;color:#64748b;margin-top:4px;line-height:1.45}",
+6372-
+6373-      ".aicm-review-card{display:grid;gap:14px}",
+6374-      ".aicm-review-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}",
+6375-      ".aicm-review-meta{display:flex;flex-wrap:wrap;gap:8px;color:#64748b;font-size:13px}",
+6376-      ".aicm-review-meta span{background:#f8fafc;border:1px solid #e5e7eb;border-radius:999px;padding:5px 10px}",
+6377-      ".aicm-review-summary{display:grid;gap:8px}",
+6378-      ".aicm-review-summary h3{margin:6px 0 0;font-size:14px}",
+6379-      ".aicm-review-summary p{margin:0;color:#334155;white-space:pre-wrap}",
+6380-
+6381-      ".aicm-org-update-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px;border:1px solid #e5e7eb;border-radius:16px;background:#f8fafc;margin-top:10px}",
+6382-      ".aicm-org-update-row p{margin:4px 0 0;color:#64748b}",
+6383-
+6384-      ".aicm-confirm-card{display:grid;gap:14px}",
+6385-      ".aicm-confirm-list{display:grid;gap:10px}",
+6386-      ".aicm-confirm-row{padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f8fafc}",
+6387-      ".aicm-confirm-row p{margin:4px 0 0;color:#334155;white-space:pre-wrap}",
+6388-
+6389-      ".aicm-company-overview-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}",
+6390-      ".aicm-company-overview-stat{padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f8fafc}",
+6391-      ".aicm-company-overview-stat span{display:block;color:#64748b;font-size:13px;font-weight:700}",
+6392-      ".aicm-company-overview-stat strong{display:block;margin-top:4px;font-size:20px}",
+6393-      "@media(min-width:820px){.aicm-dashboard-main-grid{grid-template-columns:minmax(0,1fr) minmax(320px,.75fr)}}",
+6394-      "@media(max-width:720px){.aicm-core{padding:18px}.aicm-core-header h1{font-size:30px}.aicm-card-title-row{flex-direction:column}.aicm-core-tabs button{flex:1 1 auto}}"
+6395-    ].join("\n");
+6396-    document.head.appendChild(style);
+6397-  }
+6398-
+6399-  function boot() {
+6400-    root = document.getElementById("aicm-root");
+6401-
+6402-    if (!root) {
+6403-      root = document.createElement("div");
+6404-      root.id = "aicm-root";
+6405-      document.body.appendChild(root);
+6406-    }
+6407-
+6408-    injectMinimalCss();
+6409-
+6410-      root.addEventListener("change", function (event) {
+6411-    var target = event.target;
+6412-    if (target && target.getAttribute && target.getAttribute("data-core-file") === "task-ledger-csv") {
+6413-      readTaskLedgerCsvFile(target.files && target.files[0]);
+6414-    }
+6415-  });
+6416-root.addEventListener("click", handleRootClick);
+6417-    root.addEventListener("change", handleRootChange);
+6418-    root.addEventListener("submit", handleRootSubmit);
+6419-
+6420-    writeStorage(STORAGE.ownerCivilizationId, state.ownerCivilizationId);
+6421-
+6422-    render();
+6423-    loadContext();
+6424-  }
+6425-
+6426-  if (document.readyState === "loading") {
+6427-    document.addEventListener("DOMContentLoaded", boot, { once: true });
+6428-  } else {
+6429-    boot();
+6430-  }
+6431-})();

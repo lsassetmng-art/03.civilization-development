@@ -1,0 +1,213 @@
+============================================================
+AXC-R2 scan
+============================================================
+
+---- server sync route ----
+1374-
+1375-    if (route === "/api/aicm/v2/section/create" && req.method === "POST") {
+1376-      const payload = createSection(await readBody(req));
+1377-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1378-      return true;
+1379-    }
+1380-
+1381-    
+1382-    if (route === "/api/aicm/v2/task-ledger/create" && req.method === "POST") {
+1383-      const payload = createTaskLedger(await readBody(req));
+1384-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1385-      return true;
+1386-    }
+1387-
+1388:    if (route === "/api/aicm/v2/placement/sync-role-settings" && req.method === "POST") {
+1389-      const payload = syncRoleSettings(await readBody(req));
+1390-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1391-      return true;
+1392-    }
+1393-
+1394-if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
+1395-      const payload = createPlacement(await readBody(req));
+1396-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1397-      return true;
+1398-    }
+1399-
+1400-    if (route.startsWith("/api/aicm/v2/")) {
+1401-      sendJson(res, 404, {
+1402-        result: "error",
+
+---- server sync marker ----
+1064-    "      'result', 'error',",
+1065-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1066-    "      'error_message', '先にv2のAI企業を作成・選択してください。'",
+1067-    "    )::text",
+1068-    "END;"
+1069-  ].join("\n");
+1070-
+1071-  return runPsqlJson(sql);
+1072-}
+1073-
+1074-
+1075-
+1076:// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+1077-// Synchronize President / Manager / Leader / Worker role settings.
+1078-// Canonical table: business.aicm_user_company_worker_placement.
+1079-// This endpoint archives current active placements for each submitted target+role,
+1080-// then recreates submitted active rows. This prevents duplicate single-slot assignments.
+1081-function aicmRoleSyncOptionalUuidSql(value) {
+1082-  const text = String(value || "").trim();
+1083-  return /^[0-9a-fA-F-]{36}$/.test(text) ? sqlLiteral(text) + "::uuid" : "NULL";
+1084-}
+1085-
+1086-function aicmRoleSyncRole(value) {
+1087-  const text = String(value || "").trim().toLowerCase();
+1088-  if (text === "president") return "President";
+
+---- core sync marker ----
+896-    state.pendingOrgUpdate = null;
+897-
+898-    if (payload.returnScreen) {
+899-      state.screen = payload.returnScreen;
+900-    }
+901-
+902-    if (typeof render === "function") render();
+903-  }
+904-
+905-
+906-  
+907-
+908:// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+909-// Role settings are saved through a dedicated placement sync endpoint after the main entity update succeeds.
+910-// Main company/department/section fields remain separate from robot placement truth.
+911-function aicmAxcUuidLike(value) {
+912-  return /^[0-9a-fA-F-]{36}$/.test(String(value || "").trim());
+913-}
+914-
+915-function aicmAxcFindElement(ids) {
+916-  for (var i = 0; i < ids.length; i += 1) {
+917-    var el = document.getElementById(ids[i]);
+918-    if (el) return el;
+919-  }
+920-  return null;
+
+---- core rolePlacements payload ----
+1121-      ["状態", body.company_status]
+1122-    ].concat(aicmAvdRoleSummaryRows("company"));
+1123-
+1124-    aicmAvdShowDbConfirm({
+1125-      kind: "company-update",
+1126-      title: "企業変更",
+1127-      endpoint: "/api/aicm/v2/company/update",
+1128-      body: body,
+1129:      rolePlacements: aicmAxcCompanyRolePlacements(company),
+1130-      summary_rows: rows
+1131-    });
+1132-  }
+1133-
+1134-
+1135-function saveDepartmentUpdateFromForm() {
+1136-    var departmentId = aicmAvdTextById("aicm-department-edit-id");
+1137-    var companyId = aicmAvdTextById("aicm-department-edit-company-id");
+--
+1157-      ["状態", body.department_status]
+1158-    ].concat(aicmAvdRoleSummaryRows("department"));
+1159-
+1160-    aicmAvdShowDbConfirm({
+1161-      kind: "department-update",
+1162-      title: "部門変更",
+1163-      endpoint: "/api/aicm/v2/department/update",
+1164-      body: body,
+1165:      rolePlacements: aicmAxcDepartmentRolePlacements(department),
+1166-      summary_rows: rows
+1167-    });
+1168-  }
+1169-
+1170-
+1171-function saveSectionUpdateFromForm() {
+1172-    var sectionId = aicmAvdTextById("aicm-section-edit-id");
+1173-    var companyId = aicmAvdTextById("aicm-section-edit-company-id");
+--
+1195-      ["状態", body.section_status]
+1196-    ].concat(aicmAvdRoleSummaryRows("section"));
+1197-
+1198-    aicmAvdShowDbConfirm({
+1199-      kind: "section-update",
+1200-      title: "課変更",
+1201-      endpoint: "/api/aicm/v2/section/update",
+1202-      body: body,
+1203:      rolePlacements: aicmAxcSectionRolePlacements(section),
+1204-      summary_rows: rows
+1205-    });
+1206-  }
+1207-
+1208-
+1209-
+1210-  
+1211-
+
+---- core confirmation sync hook ----
+872-
+873-    if (!payload || !payload.endpoint || !payload.body) {
+874-      setMessage("error", "確認対象がありません。");
+875-      return;
+876-    }
+877-
+878-    try {
+879-      await aicmOrgPostJson(payload.endpoint, payload.body);
+880:            // AICM_AXC_EXECUTE_ROLE_PLACEMENT_SYNC_AFTER_MAIN_UPDATE
+881-      await aicmAxcSyncRolePlacementsForPayload(payload);
+882-state.pendingOrgUpdate = null;
+883-
+884-      if (payload.kind === "department") state.editingDepartmentId = "";
+885-      if (payload.kind === "section") state.editingSectionId = "";
+886-
+887-      setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
+888-      await aicmOrgReloadContext();
+
+---- execute function context ----
+846-      '</section>',
+847-      aicmAvdSummaryHtml(payload),
+848-      '<section class="aicm-core-card aicm-operation-card">',
+849-      '  <p class="aicm-eyebrow">操作</p>',
+850-      '  <div class="aicm-dashboard-action-row">',
+851-      '    <button type="button" data-core-action="org-update-confirm-execute">確定して保存</button>',
+852-      '    <button type="button" data-core-action="org-update-confirm-cancel">戻る</button>',
+853-      '  </div>',
+854-      '</section>'
+855-    ].join(""));
+856-  }
+857-
+858-
+859-  function aicmOrgShowUpdateConfirm(payload) {
+860-    state.pendingOrgUpdate = payload || null;
+861-    var root = document.getElementById("aicm-root");
+862-    if (!root) {
+863-      setMessage("error", "確認画面を表示できません。");
+864-      return;
+865-    }
+866-
+867-    root.innerHTML = renderAicmOrgUpdateConfirmation(payload || {});
+868-  }
+869-
+870:  async function executeAicmOrgUpdateConfirm() {
+871-    var payload = state.pendingOrgUpdate || null;
+872-
+873-    if (!payload || !payload.endpoint || !payload.body) {
+874-      setMessage("error", "確認対象がありません。");
+875-      return;
+876-    }
+877-
+878-    try {
+879-      await aicmOrgPostJson(payload.endpoint, payload.body);
+880-            // AICM_AXC_EXECUTE_ROLE_PLACEMENT_SYNC_AFTER_MAIN_UPDATE
+881-      await aicmAxcSyncRolePlacementsForPayload(payload);
+882-state.pendingOrgUpdate = null;
+883-
+884-      if (payload.kind === "department") state.editingDepartmentId = "";
+885-      if (payload.kind === "section") state.editingSectionId = "";
+886-
+887-      setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
+888-      await aicmOrgReloadContext();
+889-    } catch (error) {
+890-      setMessage("error", error && error.message ? error.message : "保存に失敗しました。");
+891-    }
+892-  }
+893-
+894-  function cancelAicmOrgUpdateConfirm() {

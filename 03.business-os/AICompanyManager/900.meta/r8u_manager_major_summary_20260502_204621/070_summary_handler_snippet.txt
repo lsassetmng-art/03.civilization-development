@@ -1,0 +1,71 @@
+
+    return [
+      '<div class="aicm-ledger-list">',
+      cards,
+      '</div>',
+      more
+    ].join("");
+  }
+
+  function aicmRenderManagerMajorSummaryDetailR8U(summary) {
+    var filter = aicmSummaryTextR8U(state && state.managerMajorSummaryFilterR8U);
+    if (!filter) {
+      return '<p class="aicm-selected-note">件数カードを押すと、その分類の詳細をここで確認できます。</p>';
+    }
+
+    var bucket = summary.map[filter] || summary.map.other;
+    var label = bucket ? bucket.label : "詳細";
+    var rows = bucket ? bucket.rows : [];
+
+    return [
+      '<section class="aicm-core-card" style="border:1px solid #c7d2fe;">',
+      '  <p class="aicm-eyebrow">サマリ詳細</p>',
+      '  <h3>' + escapeHtml(label) + ' の詳細</h3>',
+      '  <p class="aicm-selected-note">対象: <strong>' + escapeHtml(String(rows.length)) + '件</strong></p>',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="manager-major-summary-filter-clear">詳細表示を閉じる</button>',
+      '  </div>',
+      aicmRenderManagerMajorSummaryDetailRowsR8U(rows, label),
+      '</section>'
+    ].join("");
+  }
+
+  function aicmRenderManagerMajorSummarySectionR8U() {
+    var summary = aicmManagerMajorSummaryCountsR8U();
+    var cards = summary.buckets.map(function (bucket) {
+      var selected = aicmSummaryTextR8U(state && state.managerMajorSummaryFilterR8U) === bucket.code;
+      return [
+        '<button type="button" data-core-action="manager-major-summary-filter" data-summary-filter="' + escapeHtml(bucket.code) + '" style="text-align:left;display:block;">',
+        '  <span style="display:block;font-size:12px;color:#64748b;font-weight:900;">' + escapeHtml(bucket.label) + '</span>',
+        '  <strong style="display:block;font-size:24px;margin-top:4px;">' + escapeHtml(String(bucket.count)) + '件</strong>',
+        '  <span style="display:block;font-size:12px;margin-top:4px;color:#64748b;">' + escapeHtml(selected ? "選択中" : bucket.note) + '</span>',
+        '</button>'
+      ].join("");
+    }).join("");
+
+    return [
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Manager大項目サマリ</p>',
+      '  <h2>大項目 件数サマリ</h2>',
+      '  <p class="aicm-selected-note">Manager大項目から現在の状態別件数を表示します。件数カードを押すと詳細を確認できます。</p>',
+      '  <p class="aicm-selected-note">合計: <strong>' + escapeHtml(String(summary.total)) + '件</strong></p>',
+      '  <div class="aicm-dashboard-action-row">',
+      cards,
+      '  </div>',
+      aicmRenderManagerMajorSummaryDetailR8U(summary),
+      '</section>'
+    ].join("");
+  }
+
+  function aicmManagerMajorSummaryActionTargetR8U(ev, btn) {
+    if (typeof aicmActionTargetSafe === "function") {
+      var safeTarget = aicmActionTargetSafe(ev, btn);
+      if (safeTarget && safeTarget.getAttribute) return safeTarget;
+    }
+
+    if (btn && btn.getAttribute) return btn;
+
+    if (ev && ev.target && ev.target.closest) {
+      var closest = ev.target.closest("[data-core-action]");
+      if (closest && closest.getAttribute) return closest;
+    }

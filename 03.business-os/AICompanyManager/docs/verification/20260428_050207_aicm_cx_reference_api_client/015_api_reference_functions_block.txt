@@ -1,0 +1,58 @@
+function referenceRoles(roleCode) {
+  const sql =
+    "SELECT jsonb_build_object(" +
+    "  'ok', true, " +
+    "  'items', COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.sort_order, t.role_code), '[]'::jsonb) " +
+    ") " +
+    "FROM ( " +
+    "  SELECT * FROM cx22073jw.vw_robot_role_reference_v1 " +
+    "  WHERE (" + sqlLit(roleCode) + " = '' OR role_code = " + sqlLit(roleCode) + ") " +
+    ") t;";
+  return parseJsonFromPsql(runPsql(sql));
+}
+
+function referencePersonalities(modelCode, seriesCode) {
+  const sql =
+    "SELECT jsonb_build_object(" +
+    "  'ok', true, " +
+    "  'items', COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.aiworker_series_code, t.aiworker_model_code), '[]'::jsonb) " +
+    ") " +
+    "FROM ( " +
+    "  SELECT * FROM cx22073jw.vw_robot_personality_reference_v1 " +
+    "  WHERE (" + sqlLit(modelCode) + " = '' OR aiworker_model_code = " + sqlLit(modelCode) + ") " +
+    "    AND (" + sqlLit(seriesCode) + " = '' OR aiworker_series_code = " + sqlLit(seriesCode) + ") " +
+    ") t;";
+  return parseJsonFromPsql(runPsql(sql));
+}
+
+function referencePublicProfiles(modelCode, seriesCode, profileStatusCode) {
+  const sql =
+    "SELECT jsonb_build_object(" +
+    "  'ok', true, " +
+    "  'items', COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.aiworker_series_code, t.aiworker_model_code), '[]'::jsonb) " +
+    ") " +
+    "FROM ( " +
+    "  SELECT * FROM cx22073jw.vw_robot_public_profile_reference_v1 " +
+    "  WHERE (" + sqlLit(modelCode) + " = '' OR aiworker_model_code = " + sqlLit(modelCode) + ") " +
+    "    AND (" + sqlLit(seriesCode) + " = '' OR aiworker_series_code = " + sqlLit(seriesCode) + ") " +
+    "    AND (" + sqlLit(profileStatusCode) + " = '' OR public_profile_status_code = " + sqlLit(profileStatusCode) + ") " +
+    ") t;";
+  return parseJsonFromPsql(runPsql(sql));
+}
+
+function referenceModelFull(modelCode, seriesCode, roleCode) {
+  const sql =
+    "SELECT jsonb_build_object(" +
+    "  'ok', true, " +
+    "  'items', COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.aiworker_series_code, t.aiworker_model_code), '[]'::jsonb) " +
+    ") " +
+    "FROM ( " +
+    "  SELECT * FROM cx22073jw.vw_robot_model_full_reference_v2 " +
+    "  WHERE (" + sqlLit(modelCode) + " = '' OR aiworker_model_code = " + sqlLit(modelCode) + ") " +
+    "    AND (" + sqlLit(seriesCode) + " = '' OR aiworker_series_code = " + sqlLit(seriesCode) + ") " +
+    "    AND (" + sqlLit(roleCode) + " = '' OR " + sqlLit(roleCode) + " = ANY(placement_role_codes)) " +
+    ") t;";
+  return parseJsonFromPsql(runPsql(sql));
+}
+
+async function handle(req, res) {

@@ -1,0 +1,189 @@
+============================================================
+AXQ-R1 scan
+============================================================
+
+---- unlimited force marker ----
+1738-    return roles.indexOf(wanted) >= 0;
+1739-  }
+1740-
+1741-
+1742-
+1743-// AICM_ROBOT_OPTION_AVAILABILITY_LABEL_AXQ_V1
+1744-// Robot option availability display helpers.
+1745-// Canonical data comes from business.vw_ai_company_manager_system_robot_selector_options.
+1746-// This is display/selectability only. It does not write DB.
+1747-function aicmAxqText(value) {
+1748-    return String(value || "").trim();
+1749-  }
+1750-
+1751-function aicmAxqBool(value) {
+1752-    if (value === true) return true;
+1753-    if (value === false) return false;
+1754-
+1755-    var text = String(value || "").trim().toLowerCase();
+1756-    return text === "true" || text === "t" || text === "1" || text === "yes" || text === "y";
+1757-  }
+1758-
+1759-function aicmAxqNumberOrNull(value) {
+1760-    if (value === undefined || value === null || value === "") return null;
+1761-    var n = Number(value);
+1762-    return Number.isFinite(n) ? n : null;
+1763-  }
+1764-
+1765-function aicmAxqUnlimited(row) {
+1766:    // AICM_ROBOT_OPTION_UNLIMITED_FORCE_AXQ_R1_V1
+1767-    // AICompanyManager robot placement is unlimited allocation by app design.
+1768-    // Do not treat available_quantity=0 as unavailable in this app.
+1769-    // Candidate eligibility is controlled by recommended_role_codes, not inventory consumption.
+1770-    return true;
+1771-  }
+1772-
+1773-function aicmAxqAvailableQuantity(row) {
+1774-    row = row || {};
+1775-
+1776-    var candidates = [
+1777-      row.usable_quantity,
+1778-      row.available_quantity,
+1779-      row.remaining_quantity,
+1780-      row.contract_available_quantity,
+1781-      row.available_count,
+1782-      row.quantity_available
+1783-    ];
+1784-
+1785-    for (var i = 0; i < candidates.length; i += 1) {
+1786-      var n = aicmAxqNumberOrNull(candidates[i]);
+1787-      if (n !== null) return n;
+1788-    }
+1789-
+1790-    return null;
+1791-  }
+1792-
+1793-function aicmAxqAvailabilityText(row) {
+1794:    // AICM_ROBOT_OPTION_UNLIMITED_FORCE_AXQ_R1_V1
+1795-    return "利用可能:無制限";
+1796-  }
+1797-
+1798-function aicmAxqSelectable(row) {
+1799:    // AICM_ROBOT_OPTION_UNLIMITED_FORCE_AXQ_R1_V1
+1800-    return true;
+1801-  }
+1802-
+1803-function aicmAxqBaseRobotLabel(row) {
+1804-    row = row || {};
+1805-
+1806-    var name = aicmAxqText(
+1807-      row.display_name ||
+1808-      row.aiworker_model_name ||
+1809-      row.robot_name ||
+1810-      row.robot_pool_label ||
+1811-      row.aiworker_model_code ||
+1812-      row.model_code ||
+1813-      row.robot_pool_id ||
+1814-      row.robot_id
+1815-    );
+1816-
+1817-    var code = aicmAxqText(row.aiworker_model_code || row.model_code);
+1818-
+1819-    if (name && code && name.indexOf(code) < 0) {
+1820-      return name + " / " + code;
+1821-    }
+1822-
+1823-    return name || code || "ロボット";
+1824-  }
+1825-
+1826-function aicmRobotOptionLabel(row) {
+1827-    // AICM_ROBOT_OPTION_AVAILABILITY_LABEL_AXQ_V1
+
+---- option label function ----
+1802-
+1803-function aicmAxqBaseRobotLabel(row) {
+1804-    row = row || {};
+1805-
+1806-    var name = aicmAxqText(
+1807-      row.display_name ||
+1808-      row.aiworker_model_name ||
+1809-      row.robot_name ||
+1810-      row.robot_pool_label ||
+1811-      row.aiworker_model_code ||
+1812-      row.model_code ||
+1813-      row.robot_pool_id ||
+1814-      row.robot_id
+1815-    );
+1816-
+1817-    var code = aicmAxqText(row.aiworker_model_code || row.model_code);
+1818-
+1819-    if (name && code && name.indexOf(code) < 0) {
+1820-      return name + " / " + code;
+1821-    }
+1822-
+1823-    return name || code || "ロボット";
+1824-  }
+1825-
+1826:function aicmRobotOptionLabel(row) {
+1827-    // AICM_ROBOT_OPTION_AVAILABILITY_LABEL_AXQ_V1
+1828-    return aicmAxqBaseRobotLabel(row) + " / " + aicmAxqAvailabilityText(row);
+1829-  }
+1830-
+1831-
+1832-// AICM_EXPAND_ROBOT_CANDIDATES_ATY_AUB_V1
+1833-
+1834-// AICM_RECOMMENDED_ONLY_ROBOT_COMBOS_AUK_AUN_V1
+1835-function aicmInlineRobotRows(roleCode) {
+1836-    var all = aicmRobotCatalogSafe().filter(function (row) {
+1837-      return aicmRobotValue(row);
+1838-    });
+1839-
+1840-    var recommended = all.filter(function (row) {
+1841-      return aicmRobotMatchesInlineRole(row, roleCode);
+1842-    });
+1843-
+1844-    var seen = Object.create(null);
+1845-    var rows = [];
+1846-
+1847-    recommended.forEach(function (row) {
+1848-      var key = aicmRobotValue(row);
+1849-      if (!key || seen[key]) return;
+1850-      seen[key] = true;
+
+---- inline options disabled usage ----
+2024-
+2025-function aicmAxnOptionSelected(row, selectedValue) {
+2026-    var selected = aicmAxnText(selectedValue);
+2027-    if (!selected) return false;
+2028-
+2029-    var values = [
+2030-      typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "",
+2031-      row.robot_pool_id,
+2032-      row.business_robot_pool_id,
+2033-      row.aicm_robot_pool_id,
+2034-      row.worker_pool_id,
+2035-      row.placement_robot_pool_id,
+2036-      row.aiworker_model_code,
+2037-      row.model_code,
+2038-      row.robot_id
+2039-    ].map(aicmAxnText);
+2040-
+2041-    return values.indexOf(selected) >= 0;
+2042-  }
+2043-
+2044:function aicmInlineRobotOptions(roleCode, selectedValue, selectedLabel) {
+2045-    // AICM_ROBOT_OPTION_AVAILABILITY_LABEL_AXQ_V1
+2046-    var rows = aicmInlineRobotRows(roleCode);
+2047-    var selected = typeof aicmAxnText === "function" ? aicmAxnText(selectedValue) : String(selectedValue || "").trim();
+2048-    var selectedFound = false;
+2049-
+2050-    if (!rows.length && !selected) {
+2051-      return '<option value="">未設定</option><option value="" disabled>候補がありません</option>';
+2052-    }
+2053-
+2054-    var options = ['<option value="">未設定</option>'];
+2055-
+2056-    rows.forEach(function (row) {
+2057-      var value = typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "";
+2058-      var isSelected = selected && typeof aicmAxnOptionSelected === "function" && aicmAxnOptionSelected(row, selected);
+2059-      var selectable = aicmAxqSelectable(row);
+2060-
+2061-      if (isSelected) selectedFound = true;
+2062-
+2063-      options.push(
+2064-        '<option value="' + escapeHtml(value) + '"' +

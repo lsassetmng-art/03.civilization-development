@@ -1,0 +1,145 @@
+============================================================
+MATCH line=907 pattern=function currentCompany
+============================================================
+
+    for (i = 0; i < data.companies.length; i += 1) {
+      c = data.companies[i];
+      if (!c.company_common_rules) c.company_common_rules = [];
+      if (!c.departments) c.departments = [];
+      for (j = 0; j < c.departments.length; j += 1) {
+        d = c.departments[j];
+        if (!d.organizations) d.organizations = [];
+        if (!d.task_ledger) d.task_ledger = [];
+        if (!d.review_items) d.review_items = [];
+      }
+    }
+
+    return data;
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return normalize(JSON.parse(raw));
+    } catch (error) {
+      return baseData();
+    }
+    return baseData();
+  }
+
+  function save(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalize(data)));
+  }
+
+  function currentCompany(data) {
+    var i;
+    for (i = 0; i < data.companies.length; i += 1) {
+      if (data.companies[i].id === app.companyId) return data.companies[i];
+    }
+    return data.companies[0] || null;
+  }
+
+  function currentDepartment(company) {
+    var i;
+    if (!company || !company.departments || !company.departments.length) return null;
+    for (i = 0; i < company.departments.length; i += 1) {
+      if (company.departments[i].id === app.departmentId) return company.departments[i];
+    }
+    return company.departments[0];
+  }
+
+  function currentOrganization(company) {
+    var all = allOrganizations(company);
+    var i;
+    for (i = 0; i < all.length; i += 1) {
+      if (all[i].org.id === app.organizationId) return all[i];
+    }
+    return all[0] || null;
+  }
+
+  function findCompany(data, id) {
+    var i;
+    for (i = 0; i < data.companies.length; i += 1) {
+      if (data.companies[i].id === id) return data.companies[i];
+    }
+    return null;
+  }
+
+  function findDepartment(company, id) {
+    var i;
+    if (!company) return null;
+    for (i = 0; i < company.departments.length; i += 1) {
+      if (company.departments[i].id === id) return company.departments[i];
+    }
+    return null;
+  }
+
+  function findOrgInCompany(company, orgId) {
+    var i;
+    var j;
+    if (!company) return null;
+    for (i = 0; i < company.departments.length; i += 1) {
+      for (j = 0; j < company.departments[i].organizations.length; j += 1) {
+        if (company.departments[i].organizations[j].id === orgId) {
+          return { dept: company.departments[i], org: company.departments[i].organizations[j] };
+        }
+      }
+    }
+    return null;
+  }
+
+  function findLedgerRow(dept, id) {
+    var i;
+    if (!dept) return null;
+    for (i = 0; i < dept.task_ledger.length; i += 1) {
+      if (dept.task_ledger[i].id === id) return dept.task_ledger[i];
+    }
+    return null;
+  }
+
+  function allOrganizations(company) {
+    var rows = [];
+    if (!company) return rows;
+    company.departments.forEach(function (d) {
+      d.organizations.forEach(function (o) {
+        rows.push({ dept: d, org: o });
+      });
+    });
+    return rows;
+  }
+
+  function robotLabels(data, ids) {
+    var labels = [];
+    data.aiworkers.forEach(function (w) {
+      if (ids.indexOf(w.id) >= 0) labels.push(w.name + "@" + w.role);
+    });
+    return labels;
+  }
+
+  function selectedValues(id) {
+    var select = document.getElementById(id);
+    var values = [];
+    var i;
+    if (!select) return values;
+    for (i = 0; i < select.options.length; i += 1) {
+      if (select.options[i].selected) values.push(select.options[i].value);
+    }
+    return values;
+  }
+
+  function companyOptions(data) {
+    return data.companies.map(function (c) {
+      return '<option value="' + esc(c.id) + '"' + (c.id === app.companyId ? " selected" : "") + '>' + esc(c.name) + '</option>';
+    }).join("");
+  }
+
+  function departmentOptions(company, selected) {
+    var selectedId = selected || app.departmentId;
+    if (!company || !company.departments.length) return '<option value="">部門なし</option>';
+    return company.departments.map(function (d) {
+      return '<option value="' + esc(d.id) + '"' + (d.id === selectedId ? " selected" : "") + '>' + esc(d.name) + '</option>';
+    }).join("");
+  }
+
+  function organizationOptions(company, selected) {
+

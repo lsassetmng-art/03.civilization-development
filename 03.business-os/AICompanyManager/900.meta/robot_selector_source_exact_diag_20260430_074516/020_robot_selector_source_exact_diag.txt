@@ -1,0 +1,184 @@
+Pager usage is off.
+============================================================
+AICompanyManager robot selector source exact diagnosis
+============================================================
+BEGIN
+------------------------------------------------------------
+1. relation existence
+------------------------------------------------------------
+                         relname                          | status 
+----------------------------------------------------------+--------
+ business.aicm_company                                    | exists
+ business.aicm_department                                 | exists
+ business.aicm_organization                               | exists
+ business.company_robot_entitlement                       | exists
+ business.company_robot_placement                         | exists
+ business.company_robot_placement_event                   | exists
+ business.vw_aicm_company_robot_active_assignment_display | exists
+ business.vw_aicm_company_robot_assignment_display        | exists
+ business.vw_company_robot_placement_display              | exists
+ business.vw_company_robot_placement_status               | exists
+ business.vw_company_robot_selector_options               | exists
+(11 rows)
+
+------------------------------------------------------------
+2. row counts
+------------------------------------------------------------
+           relation_name            | total_rows 
+------------------------------------+------------
+ business.company_robot_entitlement |          0
+(1 row)
+
+          relation_name           | total_rows 
+----------------------------------+------------
+ business.company_robot_placement |          4
+(1 row)
+
+               relation_name                | total_rows 
+--------------------------------------------+------------
+ business.vw_company_robot_selector_options |          0
+(1 row)
+
+                relation_name                | total_rows 
+---------------------------------------------+------------
+ business.vw_company_robot_placement_display |          4
+(1 row)
+
+               relation_name                | total_rows 
+--------------------------------------------+------------
+ business.vw_company_robot_placement_status |          4
+(1 row)
+
+                   relation_name                   | total_rows 
+---------------------------------------------------+------------
+ business.vw_aicm_company_robot_assignment_display |          4
+(1 row)
+
+                      relation_name                       | total_rows 
+----------------------------------------------------------+------------
+ business.vw_aicm_company_robot_active_assignment_display |          4
+(1 row)
+
+------------------------------------------------------------
+3. selector view definition
+------------------------------------------------------------
+                                                                                          selector_viewdef                                                                                          
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  SELECT cre.company_robot_entitlement_id,                                                                                                                                                         +
+     cre.company_id,                                                                                                                                                                               +
+     cre.robot_pool_id,                                                                                                                                                                            +
+     cre.aiworker_model_code,                                                                                                                                                                      +
+     COALESCE(rp.display_name, cre.aiworker_model_code) AS display_name,                                                                                                                           +
+     (COALESCE(rp.display_name, cre.aiworker_model_code) || ' / '::text) || cre.aiworker_model_code AS selector_label,                                                                             +
+     rp.aiworker_series_code,                                                                                                                                                                      +
+     rp.manufacturer_code,                                                                                                                                                                         +
+     cre.business_offer_code,                                                                                                                                                                      +
+     cre.entitlement_scope_code,                                                                                                                                                                   +
+     cre.contracted_quantity,                                                                                                                                                                      +
+     cre.usable_quantity,                                                                                                                                                                          +
+     cre.assignment_mode_code,                                                                                                                                                                     +
+     cre.status_code,                                                                                                                                                                              +
+     array_remove(ARRAY[NULLIF(rp.placement_role_code_1, ''::text), NULLIF(rp.placement_role_code_2, ''::text), NULLIF(rp.placement_role_code_3, ''::text)], NULL::text) AS recommended_role_codes,+
+     cre.updated_at                                                                                                                                                                                +
+    FROM business.company_robot_entitlement cre                                                                                                                                                    +
+      LEFT JOIN business.robot_pool rp ON rp.robot_pool_id = cre.robot_pool_id                                                                                                                     +
+   WHERE cre.status_code = 'active'::text;
+(1 row)
+
+------------------------------------------------------------
+4. placement table columns
+------------------------------------------------------------
+ ordinal_position |         column_name          |        data_type         | is_nullable 
+------------------+------------------------------+--------------------------+-------------
+                1 | company_robot_placement_id   | uuid                     | NO
+                2 | company_id                   | uuid                     | NO
+                3 | company_robot_entitlement_id | uuid                     | YES
+                4 | robot_pool_id                | uuid                     | YES
+                5 | aiworker_model_code          | text                     | NO
+                6 | target_level_code            | text                     | NO
+                7 | target_id                    | uuid                     | YES
+                8 | app_code                     | text                     | NO
+                9 | role_code                    | text                     | NO
+               10 | internal_nickname            | text                     | NO
+               11 | placement_quantity           | integer                  | NO
+               12 | placement_mode_code          | text                     | NO
+               13 | status_code                  | text                     | NO
+               14 | metadata_jsonb               | jsonb                    | NO
+               15 | created_at                   | timestamp with time zone | NO
+               16 | updated_at                   | timestamp with time zone | NO
+(16 rows)
+
+------------------------------------------------------------
+5. entitlement table columns
+------------------------------------------------------------
+ ordinal_position |         column_name          |        data_type         | is_nullable 
+------------------+------------------------------+--------------------------+-------------
+                1 | company_robot_entitlement_id | uuid                     | NO
+                2 | company_id                   | uuid                     | NO
+                3 | robot_pool_id                | uuid                     | YES
+                4 | aiworker_model_code          | text                     | NO
+                5 | business_offer_code          | text                     | NO
+                6 | entitlement_scope_code       | text                     | NO
+                7 | contracted_quantity          | integer                  | NO
+                8 | usable_quantity              | integer                  | NO
+                9 | assignment_mode_code         | text                     | NO
+               10 | status_code                  | text                     | NO
+               11 | starts_at                    | timestamp with time zone | YES
+               12 | ends_at                      | timestamp with time zone | YES
+               13 | metadata_jsonb               | jsonb                    | NO
+               14 | created_at                   | timestamp with time zone | NO
+               15 | updated_at                   | timestamp with time zone | NO
+(15 rows)
+
+------------------------------------------------------------
+6. placement sample rows
+------------------------------------------------------------
+      company_robot_placement_id      |              company_id              | company_robot_entitlement_id |            robot_pool_id             | aiworker_model_code | target_level_code |              target_id               |     app_code     | role_code | internal_nickname | placement_quantity | placement_mode_code | status_code | metadata_jsonb |          created_at          |          updated_at           
+--------------------------------------+--------------------------------------+------------------------------+--------------------------------------+---------------------+-------------------+--------------------------------------+------------------+-----------+-------------------+--------------------+---------------------+-------------+----------------+------------------------------+-------------------------------
+ 2e98233f-390c-4969-8ffe-84607c10c9a9 | 00000000-0000-4000-8000-1db11893cb24 |                              | 9f7316fc-6f2f-46a8-bc81-ce1598450ce5 | BYD2-003            | company           |                                      | AICompanyManager | President | Triple            |                  1 | role_assignment     | active      | {}             | 2026-04-28 22:41:59.06426+00 | 2026-04-29 02:46:12.39622+00
+ 7d800c4f-a1af-4482-abea-742da7a9b923 | 00000000-0000-4000-8000-1db11893cb24 |                              | 9dc2af50-6a62-4881-ad41-e34373e50a8e | BYD1-003            | section           | 00000000-0000-4000-8000-4da5c1a6977e | AICompanyManager | Worker    | ASIC Workers3     |                  1 | role_assignment     | active      | {}             | 2026-04-28 22:41:59.06426+00 | 2026-04-28 22:55:52.936699+00
+ b0f617fb-d24c-4c9e-839d-e5ae8c5deaf7 | 00000000-0000-4000-8000-1db11893cb24 |                              | 7902ab8b-4a89-465d-acaa-887f4d630127 | BYD2-002            | section           | 00000000-0000-4000-8000-4da5c1a6977e | AICompanyManager | Leader    | 佐藤太郎          |                  1 | role_assignment     | active      | {}             | 2026-04-28 22:41:59.06426+00 | 2026-04-28 22:41:59.06426+00
+ eb7b876c-3c1b-4f66-84ac-f0aedc4ab2d4 | 00000000-0000-4000-8000-1db11893cb24 |                              | 515f93b8-66e3-4cbb-b3aa-7bd54adad296 | HD-R5               | department        | 00000000-0000-4000-8000-f6d6b5b3d38c | AICompanyManager | Manager   | ナイト・ベイカー  |                  1 | role_assignment     | active      | {}             | 2026-04-28 22:41:59.06426+00 | 2026-04-28 22:41:59.06426+00
+(4 rows)
+
+------------------------------------------------------------
+7. placement display sample rows
+------------------------------------------------------------
+      company_robot_placement_id      |              company_id              | target_level_code |              target_id               |     app_code     | role_code | internal_nickname |      display_label       | aiworker_model_code | model_display_name | aiworker_series_code | manufacturer_code | placement_quantity | status_code |          created_at          |          updated_at           
+--------------------------------------+--------------------------------------+-------------------+--------------------------------------+------------------+-----------+-------------------+--------------------------+---------------------+--------------------+----------------------+-------------------+--------------------+-------------+------------------------------+-------------------------------
+ eb7b876c-3c1b-4f66-84ac-f0aedc4ab2d4 | 00000000-0000-4000-8000-1db11893cb24 | department        | 00000000-0000-4000-8000-f6d6b5b3d38c | AICompanyManager | Manager   | ナイト・ベイカー  | ナイト・ベイカー@Manager | HD-R5               | Manager            | HD                   | helios_dynamics   |                  1 | active      | 2026-04-28 22:41:59.06426+00 | 2026-04-28 22:41:59.06426+00
+ 2e98233f-390c-4969-8ffe-84607c10c9a9 | 00000000-0000-4000-8000-1db11893cb24 | company           |                                      | AICompanyManager | President | Triple            | Triple@President         | BYD2-003            | ASIC Leader3       | Beyond               | asic              |                  1 | active      | 2026-04-28 22:41:59.06426+00 | 2026-04-29 02:46:12.39622+00
+ b0f617fb-d24c-4c9e-839d-e5ae8c5deaf7 | 00000000-0000-4000-8000-1db11893cb24 | section           | 00000000-0000-4000-8000-4da5c1a6977e | AICompanyManager | Leader    | 佐藤太郎          | 佐藤太郎@Leader          | BYD2-002            | ASIC Leader2       | Beyond               | asic              |                  1 | active      | 2026-04-28 22:41:59.06426+00 | 2026-04-28 22:41:59.06426+00
+ 7d800c4f-a1af-4482-abea-742da7a9b923 | 00000000-0000-4000-8000-1db11893cb24 | section           | 00000000-0000-4000-8000-4da5c1a6977e | AICompanyManager | Worker    | ASIC Workers3     | ASIC Workers3@Worker     | BYD1-003            | ASIC Workers3      | Beyond               | asic              |                  1 | active      | 2026-04-28 22:41:59.06426+00 | 2026-04-28 22:55:52.936699+00
+(4 rows)
+
+------------------------------------------------------------
+8. active assignment display sample rows
+------------------------------------------------------------
+      company_robot_placement_id      |              company_id              | target_level_code |              target_id               |     app_code     | role_code | internal_nickname |      display_label       | aiworker_model_code | model_display_name |      selector_label      | aiworker_series_code | manufacturer_code | placement_quantity | status_code |          created_at          |          updated_at           | metadata_jsonb 
+--------------------------------------+--------------------------------------+-------------------+--------------------------------------+------------------+-----------+-------------------+--------------------------+---------------------+--------------------+--------------------------+----------------------+-------------------+--------------------+-------------+------------------------------+-------------------------------+----------------
+ eb7b876c-3c1b-4f66-84ac-f0aedc4ab2d4 | 00000000-0000-4000-8000-1db11893cb24 | department        | 00000000-0000-4000-8000-f6d6b5b3d38c | AICompanyManager | Manager   | ナイト・ベイカー  | ナイト・ベイカー@Manager | HD-R5               | Manager            | Manager / HD-R5          | HD                   | helios_dynamics   |                  1 | active      | 2026-04-28 22:41:59.06426+00 | 2026-04-28 22:41:59.06426+00  | {}
+ b0f617fb-d24c-4c9e-839d-e5ae8c5deaf7 | 00000000-0000-4000-8000-1db11893cb24 | section           | 00000000-0000-4000-8000-4da5c1a6977e | AICompanyManager | Leader    | 佐藤太郎          | 佐藤太郎@Leader          | BYD2-002            | ASIC Leader2       | ASIC Leader2 / BYD2-002  | Beyond               | asic              |                  1 | active      | 2026-04-28 22:41:59.06426+00 | 2026-04-28 22:41:59.06426+00  | {}
+ 7d800c4f-a1af-4482-abea-742da7a9b923 | 00000000-0000-4000-8000-1db11893cb24 | section           | 00000000-0000-4000-8000-4da5c1a6977e | AICompanyManager | Worker    | ASIC Workers3     | ASIC Workers3@Worker     | BYD1-003            | ASIC Workers3      | ASIC Workers3 / BYD1-003 | Beyond               | asic              |                  1 | active      | 2026-04-28 22:41:59.06426+00 | 2026-04-28 22:55:52.936699+00 | {}
+ 2e98233f-390c-4969-8ffe-84607c10c9a9 | 00000000-0000-4000-8000-1db11893cb24 | company           |                                      | AICompanyManager | President | Triple            | Triple@President         | BYD2-003            | ASIC Leader3       | ASIC Leader3 / BYD2-003  | Beyond               | asic              |                  1 | active      | 2026-04-28 22:41:59.06426+00 | 2026-04-29 02:46:12.39622+00  | {}
+(4 rows)
+
+------------------------------------------------------------
+9. company / department / organization rows
+------------------------------------------------------------
+              company_id              |                  company_name                   |    business_domain     | company_status |                              company_common_rules_text                              |          created_at           |          updated_at           
+--------------------------------------+-------------------------------------------------+------------------------+----------------+-------------------------------------------------------------------------------------+-------------------------------+-------------------------------
+ 00000000-0000-4000-8000-1db11893cb24 | AICM Persistent Smoke Company 20260427023301250 | persistent_write_smoke | active         | persistent write smoke row created by Phase JI-JL; do not use as production company | 2026-04-27 02:33:01.133594+00 | 2026-04-27 02:33:01.133594+00
+(1 row)
+
+            department_id             |              company_id              |                  department_name                   |                                        purpose                                         | department_status | display_order |          created_at           |          updated_at           
+--------------------------------------+--------------------------------------+----------------------------------------------------+----------------------------------------------------------------------------------------+-------------------+---------------+-------------------------------+-------------------------------
+ 00000000-0000-4000-8000-f6d6b5b3d38c | 00000000-0000-4000-8000-1db11893cb24 | AICM Persistent Smoke Department 20260427025052887 | persistent write smoke row created by Phase JQ-JT; do not use as production department | active            |             0 | 2026-04-27 02:50:52.768574+00 | 2026-04-27 02:50:52.768574+00
+(1 row)
+
+           organization_id            |              company_id              |            department_id             | parent_organization_id |                  organization_name                   |                                         purpose                                          | organization_status | display_order |          created_at           |          updated_at           
+--------------------------------------+--------------------------------------+--------------------------------------+------------------------+------------------------------------------------------+------------------------------------------------------------------------------------------+---------------------+---------------+-------------------------------+-------------------------------
+ 00000000-0000-4000-8000-4da5c1a6977e | 00000000-0000-4000-8000-1db11893cb24 | 00000000-0000-4000-8000-f6d6b5b3d38c |                        | AICM Persistent Smoke Organization 20260427030122021 | persistent write smoke row created by Phase JY-KB; do not use as production organization | active              |             0 | 2026-04-27 03:01:21.924935+00 | 2026-04-27 03:01:21.924935+00
+(1 row)
+
+ROLLBACK

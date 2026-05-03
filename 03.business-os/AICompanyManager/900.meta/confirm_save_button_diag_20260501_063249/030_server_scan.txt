@@ -1,0 +1,242 @@
+============================================================
+Server placement sync scan
+============================================================
+
+---- syncRoleSettings ----
+1032-    "    owner_civilization_id, aicm_user_company_id,",
+1033-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1034-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1035-    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1036-    "  )",
+1037-    "  SELECT",
+1038-    "    " + sqlLiteral(owner) + "::uuid,",
+1039-    "    aicm_user_company_id,",
+1040-    "    " + departmentSql + ",",
+1041-    "    " + sectionSql + ",",
+1042-    "    " + sqlLiteral(targetLevelCode) + ",",
+1043-    "    " + targetSql + ",",
+1044-    "    'AICompanyManager',",
+1045-    "    " + sqlLiteral(roleCode) + ",",
+1046-    "    " + robotPoolSql + ",",
+1047-    "    " + sqlLiteral(modelCode) + ",",
+1048-    "    " + sqlLiteral(nickname) + ",",
+1049-    "    1,",
+1050-    "    'unlimited_system_use',",
+1051-    "    'active'",
+1052-    "  FROM company_ok",
+1053-    "  RETURNING *",
+1054-    ")",
+1055-    "SELECT CASE",
+1056-    "  WHEN EXISTS (SELECT 1 FROM inserted) THEN",
+1057-    "    (SELECT jsonb_build_object(",
+1058-    "      'result', 'ok',",
+1059-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1060-    "      'placement', to_jsonb(inserted)",
+1061-    "    ) FROM inserted)::text",
+1062-    "  ELSE",
+1063-    "    jsonb_build_object(",
+1064-    "      'result', 'error',",
+1065-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1066-    "      'error_message', '先にv2のAI企業を作成・選択してください。'",
+1067-    "    )::text",
+1068-    "END;"
+1069-  ].join("\n");
+1070-
+1071-  return runPsqlJson(sql);
+1072-}
+1073-
+1074-
+1075-
+1076-// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+1077-// Synchronize President / Manager / Leader / Worker role settings.
+1078-// Canonical table: business.aicm_user_company_worker_placement.
+1079-// This endpoint archives current active placements for each submitted target+role,
+1080-// then recreates submitted active rows. This prevents duplicate single-slot assignments.
+1081-function aicmRoleSyncOptionalUuidSql(value) {
+1082-  const text = String(value || "").trim();
+1083-  return /^[0-9a-fA-F-]{36}$/.test(text) ? sqlLiteral(text) + "::uuid" : "NULL";
+1084-}
+1085-
+1086-function aicmRoleSyncRole(value) {
+1087-  const text = String(value || "").trim().toLowerCase();
+1088-  if (text === "president") return "President";
+1089-  if (text === "manager") return "Manager";
+1090-  if (text === "leader") return "Leader";
+1091-  if (text === "worker" || text === "employee") return "Worker";
+1092-  throw new Error("invalid role_code");
+1093-}
+1094-
+1095-function aicmRoleSyncTargetLevel(value) {
+1096-  const text = String(value || "").trim().toLowerCase();
+1097-  if (text === "company") return "company";
+1098-  if (text === "department") return "department";
+1099-  if (text === "section" || text === "organization") return "section";
+1100-  throw new Error("invalid target_level_code");
+1101-}
+1102-
+1103-function aicmRoleSyncRows(body) {
+1104-  const rows = Array.isArray(body.role_placements) ? body.role_placements : [];
+1105-  return rows.slice(0, 30).map((row, index) => {
+1106-    const roleCode = aicmRoleSyncRole(row.role_code || row.roleCode);
+1107-    const targetLevelCode = aicmRoleSyncTargetLevel(row.target_level_code || row.targetLevelCode);
+1108-    return {
+1109-      row_order: index,
+1110-      role_code: roleCode,
+1111-      target_level_code: targetLevelCode,
+1112-      aicm_user_company_department_id: String(row.aicm_user_company_department_id || row.departmentId || "").trim(),
+1113-      aicm_user_company_section_id: String(row.aicm_user_company_section_id || row.sectionId || row.organizationId || "").trim(),
+1114-      target_id: String(row.target_id || row.targetId || "").trim(),
+1115-      robot_pool_id: String(row.robot_pool_id || row.robotPoolId || "").trim(),
+1116-      aiworker_model_code: String(row.aiworker_model_code || row.aiworkerModelCode || "").trim(),
+1117-      internal_nickname: String(row.internal_nickname || row.internalNickname || "").trim()
+1118-    };
+1119-  });
+1120-}
+1121-
+1122:function syncRoleSettings(body) {
+1123-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1124-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1125-  const submittedRows = aicmRoleSyncRows(body);
+1126-
+1127-  const targetKeys = [];
+1128-  const insertRows = [];
+1129-
+1130-  for (const row of submittedRows) {
+1131-    const targetId = row.target_id ||
+1132-      (row.target_level_code === "company" ? companyId : "") ||
+1133-      (row.target_level_code === "department" ? row.aicm_user_company_department_id : "") ||
+1134-      (row.target_level_code === "section" ? row.aicm_user_company_section_id : "");
+1135-
+1136-    if (!targetId) continue;
+1137-
+1138-    const key = [row.target_level_code, targetId, row.role_code].join("|");
+1139-
+1140-    if (!targetKeys.some((item) => item.key === key)) {
+1141-      targetKeys.push({
+1142-        key,
+1143-        target_level_code: row.target_level_code,
+1144-        target_id: targetId,
+1145-        role_code: row.role_code,
+1146-        aicm_user_company_department_id: row.aicm_user_company_department_id,
+1147-        aicm_user_company_section_id: row.aicm_user_company_section_id
+1148-      });
+1149-    }
+1150-
+1151-    if (!row.robot_pool_id && !row.aiworker_model_code) continue;
+1152-
+1153-    insertRows.push({
+1154-      ...row,
+1155-      target_id: targetId,
+1156-      aiworker_model_code: row.aiworker_model_code || "unknown"
+1157-    });
+1158-  }
+1159-
+1160-  if (targetKeys.length === 0) {
+1161-    return {
+1162-      result: "ok",
+1163-      api_identifier: SERVER_MARK,
+1164-      archived_count: 0,
+1165-      inserted_count: 0,
+1166-      placements: [],
+1167-      note: "no role placement targets"
+1168-    };
+1169-  }
+1170-
+1171-  const targetValues = targetKeys.map((row, index) => [
+1172-    "(",
+1173-    String(index),
+1174-    ", " + sqlLiteral(row.target_level_code),
+1175-    ", " + sqlLiteral(row.target_id) + "::uuid",
+1176-    ", " + sqlLiteral(row.role_code),
+1177-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_department_id),
+1178-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_section_id),
+1179-    ")"
+1180-  ].join("")).join(",\n    ");
+1181-
+1182-  const insertValues = insertRows.length ? insertRows.map((row, index) => [
+1183-    "(",
+1184-    String(index),
+1185-    ", " + sqlLiteral(row.target_level_code),
+1186-    ", " + sqlLiteral(row.target_id) + "::uuid",
+1187-    ", " + sqlLiteral(row.role_code),
+1188-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_department_id),
+1189-    ", " + aicmRoleSyncOptionalUuidSql(row.aicm_user_company_section_id),
+1190-    ", " + aicmRoleSyncOptionalUuidSql(row.robot_pool_id),
+1191-    ", " + sqlLiteral(row.aiworker_model_code),
+1192-    ", " + sqlLiteral(row.internal_nickname),
+1193-    ")"
+1194-  ].join("")).join(",\n    ") : "";
+1195-
+1196-  const insertCte = insertRows.length ? [
+1197-    "), insert_rows(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id, robot_pool_id, aiworker_model_code, internal_nickname) AS (",
+1198-    "  VALUES",
+1199-    "    " + insertValues,
+1200-    "), inserted AS (",
+1201-    "  INSERT INTO business.aicm_user_company_worker_placement (",
+1202-    "    owner_civilization_id, aicm_user_company_id,",
+1203-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1204-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1205-    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1206-    "  )",
+1207-    "  SELECT",
+1208-    "    " + sqlLiteral(owner) + "::uuid,",
+1209-    "    c.aicm_user_company_id,",
+1210-    "    i.aicm_user_company_department_id,",
+1211-    "    i.aicm_user_company_section_id,",
+1212-    "    i.target_level_code,",
+
+---- placement sync route ----
+1363-
+1364-    if (route === "/api/aicm/v2/company/create" && req.method === "POST") {
+1365-      sendJson(res, 200, createCompany(await readBody(req)));
+1366-      return true;
+1367-    }
+1368-
+1369-    if (route === "/api/aicm/v2/department/create" && req.method === "POST") {
+1370-      const payload = createDepartment(await readBody(req));
+1371-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1372-      return true;
+1373-    }
+1374-
+1375-    if (route === "/api/aicm/v2/section/create" && req.method === "POST") {
+1376-      const payload = createSection(await readBody(req));
+1377-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1378-      return true;
+1379-    }
+1380-
+1381-    
+1382-    if (route === "/api/aicm/v2/task-ledger/create" && req.method === "POST") {
+1383-      const payload = createTaskLedger(await readBody(req));
+1384-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1385-      return true;
+1386-    }
+1387-
+1388:    if (route === "/api/aicm/v2/placement/sync-role-settings" && req.method === "POST") {
+1389-      const payload = syncRoleSettings(await readBody(req));
+1390-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1391-      return true;
+1392-    }
+1393-
+1394-if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
+1395-      const payload = createPlacement(await readBody(req));
+1396-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1397-      return true;
+1398-    }
+1399-
+1400-    if (route.startsWith("/api/aicm/v2/")) {
+1401-      sendJson(res, 404, {
+1402-        result: "error",
+1403-        api_identifier: SERVER_MARK,
+1404-        error_message: "unknown v2 endpoint"
+1405-      });
+1406-      return true;
+1407-    }
+1408-
+1409-    return false;
+1410-  } catch (error) {
+1411-    sendJson(res, 500, {
+1412-      result: "error",
+1413-      api_identifier: SERVER_MARK,
+
+---- sendJson/return discipline ----
+grep: Unmatched ( or \(

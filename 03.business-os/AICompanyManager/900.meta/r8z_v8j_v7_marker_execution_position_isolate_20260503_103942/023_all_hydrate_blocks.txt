@@ -1,0 +1,152 @@
+
+===== HYDRATE_BLOCK_0 =====
+===== L9496-L9644 =====
+  9496: function hydrateIfNeeded(appState) {
+  9497: 
+  9498:   // AICM_R8Z_V8G_V7_REVIEW_WAIT_ITEMS_MERGE: helper begin
+  9499:   function aicmR8zV8gMergeReviewWaitItemsFromPayload(appState, payload) {
+  9500:     appState = appState || {};
+  9501:     payload = payload && typeof payload === "object" ? payload : {};
+  9502: 
+  9503:     var payloadContext = payload.context && typeof payload.context === "object" ? payload.context : {};
+  9504:     var payloadData = payload.data && typeof payload.data === "object" ? payload.data : {};
+  9505: 
+  9506:     var rows = [];
+  9507:     if (Array.isArray(payload.review_wait_items)) rows = payload.review_wait_items;
+  9508:     else if (Array.isArray(payloadContext.review_wait_items)) rows = payloadContext.review_wait_items;
+  9509:     else if (Array.isArray(payloadData.review_wait_items)) rows = payloadData.review_wait_items;
+  9510:     else if (Array.isArray(payload.human_review_wait_items)) rows = payload.human_review_wait_items;
+  9511:     else if (Array.isArray(payload.reviewWaitItems)) rows = payload.reviewWaitItems;
+  9512:     else if (Array.isArray(payload.humanReviewWaitItems)) rows = payload.humanReviewWaitItems;
+  9513: 
+  9514:     if (!Array.isArray(rows)) rows = [];
+  9515: 
+  9516:     if (!appState.context || typeof appState.context !== "object") {
+  9517:       appState.context = {};
+  9518:     }
+  9519: 
+  9520:     appState.context.review_wait_items = rows;
+  9521:     appState.review_wait_items = rows;
+  9522: 
+  9523:     if (payload.owner_civilization_id) {
+  9524:       appState.context.owner_civilization_id = payload.owner_civilization_id;
+  9525:       appState.owner_civilization_id = payload.owner_civilization_id;
+  9526:     }
+  9527: 
+  9528:     if (payload.aicm_user_company_id) {
+  9529:       appState.context.aicm_user_company_id = payload.aicm_user_company_id;
+  9530:       appState.selectedCompanyId = payload.aicm_user_company_id;
+  9531:     }
+  9532: 
+  9533:     if (typeof state !== "undefined" && state && state !== appState) {
+  9534:       if (!state.context || typeof state.context !== "object") {
+  9535:         state.context = {};
+  9536:       }
+  9537:       state.context.review_wait_items = rows;
+  9538:       state.review_wait_items = rows;
+  9539: 
+  9540:       if (payload.owner_civilization_id) {
+  9541:         state.context.owner_civilization_id = payload.owner_civilization_id;
+  9542:         state.owner_civilization_id = payload.owner_civilization_id;
+  9543:       }
+  9544: 
+  9545:       if (payload.aicm_user_company_id) {
+  9546:         state.context.aicm_user_company_id = payload.aicm_user_company_id;
+  9547:         state.selectedCompanyId = payload.aicm_user_company_id;
+  9548:       }
+  9549:     }
+  9550: 
+  9551:     appState.aicmR8zV8gReviewWaitItemsMergedCount = rows.length;
+  9552:     return rows;
+  9553:   }
+  9554:   // AICM_R8Z_V8G_V7_REVIEW_WAIT_ITEMS_MERGE: helper end
+  9555: 
+  9556:     appState = appState || {};
+  9557:     if (appState.aicmR8zV7Hydrating) return;
+  9558:     if (rows(appState).length > 0) return;
+  9559: 
+  9560:     var owner = ownerId(appState);
+  9561:     var company = companyId(appState);
+  9562: 
+  9563:     if (!owner || !company || typeof fetch !== "function") {
+  9564:       appState.aicmR8zV7HydrationError = "missing owner/company owner=" + owner + " company=" + company;
+  9565:       return;
+  9566:     }
+  9567: 
+  9568:     appState.aicmR8zV7Hydrating = true;
+  9569: 
+  9570:     var params = new URLSearchParams();
+  9571:     params.set("owner_civilization_id", owner);
+  9572:     params.set("aicm_user_company_id", company);
+  9573:     params.set("v", "r8z_v7_" + Date.now());
+  9574: 
+  9575:     fetch("/api/aicm/v2/context?" + params.toString(), { method: "GET" })
+  9576:       .then(function (res) {
+  9577:         return res.text().then(function (bodyText) {
+  9578:           var payload = {};
+  9579:           try {
+  9580:             payload = bodyText ? JSON.parse(bodyText) : {};
+  9581:           } catch (_error) {
+  9582:             payload = {};
+  9583:           }
+  9584: 
+  9585:           // AICM_R8Z_V8G_V7_REVIEW_WAIT_ITEMS_MERGE: merge payload review_wait_items into appState/state
+  9586:           aicmR8zV8gMergeReviewWaitItemsFromPayload(appState, payload);
+  9587: 
+  9588:           // AICM_R8Z_V8H_V7_MERGE_FINALIZER_RERENDER: force finalizer and one-shot rerender after review_wait_items merge
+  9589:           try {
+  9590:             if (appState && typeof appState === "object") {
+  9591:               appState.aicmR8zV7Hydrating = false;
+  9592:               appState.aicmR8zV7HydrationError = "";
+  9593:             }
+  9594: 
+  9595:             if (typeof state !== "undefined" && state && typeof state === "object") {
+  9596:               state.aicmR8zV7Hydrating = false;
+  9597:               state.aicmR8zV7HydrationError = "";
+  9598: 
+  9599:               if (appState && appState.review_wait_items && Array.isArray(appState.review_wait_items)) {
+  9600:                 state.review_wait_items = appState.review_wait_items;
+  9601:               }
+  9602: 
+  9603:               if (appState && appState.context && typeof appState.context === "object") {
+  9604:                 if (!state.context || typeof state.context !== "object") state.context = {};
+  9605:                 state.context.review_wait_items = appState.context.review_wait_items || appState.review_wait_items || [];
+  9606:               }
+  9607:             }
+  9608:           } catch (_r8zV8hFinalizeError) {}
+  9609: 
+  9610:           try {
+  9611:             setTimeout(function aicmR8zV8hReviewListRerender() {
+  9612:               try {
+  9613:                 if (typeof render === "function") {
+  9614:                   render();
+  9615:                   return;
+  9616:                 }
+  9617:               } catch (_r8zV8hRenderError) {}
+  9618: 
+  9619:               try {
+  9620:                 if (typeof window !== "undefined" && typeof window.aicmRender === "function") {
+  9621:                   window.aicmRender();
+  9622:                   return;
+  9623:                 }
+  9624:               } catch (_r8zV8hWindowRenderError) {}
+  9625:             }, 0);
+  9626:           } catch (_r8zV8hScheduleError) {}
+  9627: 
+  9628: 
+  9629: 
+  9630:           if (res.ok && payload && payload.result === "ok") {
+  9631:             normalize(appState, payload);
+  9632:           } else {
+  9633:             appState.aicmR8zV7HydrationError = payload.error_message || ("context status " + String(res.status));
+  9634:           }
+  9635:         });
+  9636:       })
+  9637:       .catch(function (error) {
+  9638:         appState.aicmR8zV7HydrationError = String(error && error.message ? error.message : error);
+  9639:       })
+  9640:       .finally(function () {
+  9641:         appState.aicmR8zV7Hydrating = false;
+  9642:         if (appState.screen === "review-list") rerender();
+  9643:       });
+  9644:   }

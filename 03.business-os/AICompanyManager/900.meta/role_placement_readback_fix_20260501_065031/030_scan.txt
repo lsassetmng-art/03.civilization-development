@@ -1,0 +1,391 @@
+============================================================
+AXN scan
+============================================================
+1727-
+1728-
+1729-// AICM_EXPAND_ROBOT_CANDIDATES_ATY_AUB_V1
+1730-
+1731-// AICM_RECOMMENDED_ONLY_ROBOT_COMBOS_AUK_AUN_V1
+1732-function aicmInlineRobotRows(roleCode) {
+1733-    var all = aicmRobotCatalogSafe().filter(function (row) {
+1734-      return aicmRobotValue(row);
+1735-    });
+1736-
+1737-    var recommended = all.filter(function (row) {
+1738-      return aicmRobotMatchesInlineRole(row, roleCode);
+1739-    });
+1740-
+1741-    var seen = Object.create(null);
+1742-    var rows = [];
+1743-
+1744-    recommended.forEach(function (row) {
+1745-      var key = aicmRobotValue(row);
+1746-      if (!key || seen[key]) return;
+1747-      seen[key] = true;
+1748-      rows.push(row);
+1749-    });
+1750-
+1751-    return rows;
+1752-  }
+1753-
+1754-
+1755-
+1756-
+1757:// AICM_ROLE_PLACEMENT_READBACK_AXN_V1
+1758-// Read back saved AICompanyManager role placements into edit forms.
+1759-// Source: state.context.placements from business.vw_aicm_user_company_worker_placement_display.
+1760-// This is UI prefill only. It does not write DB.
+1761-function aicmAxnText(value) {
+1762-    return String(value || "").trim();
+1763-  }
+1764-
+1765-function aicmAxnLower(value) {
+1766-    return aicmAxnText(value).toLowerCase();
+1767-  }
+1768-
+1769-function aicmAxnCurrentCompany() {
+1770-    if (typeof aicmOrgSelectedCompany === "function") {
+1771-      var orgCompany = aicmOrgSelectedCompany();
+1772-      if (orgCompany) return orgCompany;
+1773-    }
+1774-
+1775-    if (typeof selectedCompany === "function") {
+1776-      var selected = selectedCompany();
+1777-      if (selected) return selected;
+1778-    }
+1779-
+1780-    if (typeof aicmAvdCurrentCompany === "function") {
+1781-      var avd = aicmAvdCurrentCompany();
+1782-      if (avd) return avd;
+1783-    }
+1784-
+1785-    var companies = state && state.context && Array.isArray(state.context.companies) ? state.context.companies : [];
+1786-    if (state && state.selectedCompanyId) {
+1787-      for (var i = 0; i < companies.length; i += 1) {
+--
+1912-      row.robot_pool_display_name ||
+1913-      row.display_label ||
+1914-      row.aiworker_model_name ||
+1915-      row.aiworker_model_code ||
+1916-      row.robot_name ||
+1917-      row.robot_pool_label ||
+1918-      row.robot_pool_id
+1919-    );
+1920-  }
+1921-
+1922-function aicmAxnOptionSelected(row, selectedValue) {
+1923-    var selected = aicmAxnText(selectedValue);
+1924-    if (!selected) return false;
+1925-
+1926-    var values = [
+1927-      typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "",
+1928-      row.robot_pool_id,
+1929-      row.business_robot_pool_id,
+1930-      row.aicm_robot_pool_id,
+1931-      row.worker_pool_id,
+1932-      row.placement_robot_pool_id,
+1933-      row.aiworker_model_code,
+1934-      row.model_code,
+1935-      row.robot_id
+1936-    ].map(aicmAxnText);
+1937-
+1938-    return values.indexOf(selected) >= 0;
+1939-  }
+1940-
+1941-function aicmInlineRobotOptions(roleCode, selectedValue, selectedLabel) {
+1942:    // AICM_ROLE_PLACEMENT_READBACK_AXN_V1
+1943-    var rows = aicmInlineRobotRows(roleCode);
+1944-    var selected = aicmAxnText(selectedValue);
+1945-    var selectedFound = false;
+1946-
+1947-    if (!rows.length && !selected) {
+1948-      return '<option value="">未設定</option><option value="" disabled>候補がありません</option>';
+1949-    }
+1950-
+1951-    var options = ['<option value="">未設定</option>'];
+1952-
+1953-    rows.forEach(function (row) {
+1954-      var value = typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "";
+1955-      var isSelected = selected && aicmAxnOptionSelected(row, selected);
+1956-      if (isSelected) selectedFound = true;
+1957-      options.push('<option value="' + escapeHtml(value) + '"' + (isSelected ? ' selected' : '') + '>' + escapeHtml(aicmRobotOptionLabel(row)) + '</option>');
+1958-    });
+1959-
+1960-    if (selected && !selectedFound) {
+1961-      options.push('<option value="' + escapeHtml(selected) + '" selected>' + escapeHtml(selectedLabel || selected) + '</option>');
+1962-    }
+1963-
+1964-    return options.join("");
+1965-  }
+1966-
+1967-function aicmWorkerSlotCount() {
+1968-    if (!state) return 3;
+1969-
+1970-    var n = Number(state.inlineWorkerSlotCount || 3);
+1971-    if (!Number.isFinite(n) || n < 3) n = 3;
+1972-    if (n > 20) n = 20;
+1973-    state.inlineWorkerSlotCount = n;
+1974-
+1975-    return n;
+1976-  }
+1977-
+1978-function renderAicmWorkerInlineRows(fieldPrefix) {
+1979:    // AICM_ROLE_PLACEMENT_READBACK_AXN_V1
+1980-    var savedRows = aicmAxnCurrentPlacements("worker");
+1981-    var baseCount = typeof aicmWorkerSlotCount === "function" ? aicmWorkerSlotCount() : 3;
+1982-    var count = Math.max(baseCount, savedRows.length || 0, 1);
+1983-    var safePrefix = fieldPrefix || "worker";
+1984-    var html = [];
+1985-
+1986-    for (var i = 0; i < count; i += 1) {
+1987-      var existing = savedRows[i] || null;
+1988-      var selectedValue = aicmAxnPlacementValue(existing);
+1989-      var selectedLabel = aicmAxnPlacementLabel(existing);
+1990-      var nickname = aicmAxnPlacementNickname(existing);
+1991-
+1992-      html.push([
+1993-        '<div class="aicm-worker-inline-row">',
+1994-        '  <label>従業員設定ロボット ' + String(i + 1) + '<select id="aicm-role-' + escapeHtml(safePrefix) + '-robot-' + String(i) + '" data-inline-role-code="worker" data-worker-slot-index="' + String(i) + '">',
+1995-        aicmInlineRobotOptions("worker", selectedValue, selectedLabel),
+1996-        '  </select></label>',
+1997-        '  <label>社内通称<input id="aicm-role-' + escapeHtml(safePrefix) + '-nickname-' + String(i) + '" type="text" value="' + escapeHtml(nickname) + '" placeholder="例: ウルフ@従業員' + String(i + 1) + '"></label>',
+1998-        '</div>'
+1999-      ].join(""));
+2000-    }
+2001-
+2002-    return html.join("");
+2003-  }
+2004-
+2005-function renderAicmInlineRoleSetting(roleCode, title, subtitle, fieldPrefix) {
+2006-    var safePrefix = fieldPrefix || roleCode;
+2007-
+2008-    if (roleCode === "worker") {
+2009-      return [
+--
+2126-      if (rows[i] && rows[i].aicm_user_company_id === id) return rows[i];
+2127-    }
+2128-
+2129-    return rows[0] || null;
+2130-  }
+2131-
+2132-function aicmAvdCurrentSection(companyId, departmentId) {
+2133-    var c = aicmAvdCtx();
+2134-    var rows = aicmAvdArray(c.sections);
+2135-    var cid = companyId || (aicmAvdCurrentCompany() || {}).aicm_user_company_id;
+2136-    var did = departmentId || (aicmAvdCurrentDepartment(cid) || {}).aicm_user_company_department_id;
+2137-
+2138-    for (var i = 0; i < rows.length; i++) {
+2139-      if (!rows[i]) continue;
+2140-      if (rows[i].aicm_user_company_id === cid && rows[i].aicm_user_company_department_id === did) return rows[i];
+2141-    }
+2142-
+2143-    for (var j = 0; j < rows.length; j++) {
+2144-      if (rows[j] && rows[j].aicm_user_company_id === cid) return rows[j];
+2145-    }
+2146-
+2147-    return rows[0] || null;
+2148-  }
+2149-
+2150-function aicmAvdTextById(id) {
+2151-    var el = document.getElementById(id);
+2152-    return el ? String(el.value || "").trim() : "";
+2153-  }
+2154-
+2155-function aicmAvdRoleSelect(id, roleCode) {
+2156:    // AICM_ROLE_PLACEMENT_READBACK_AXN_V1
+2157-    var role = roleCode || {};
+2158-    var existing = aicmAxnFirstPlacement(role.code);
+2159-    var selectedValue = aicmAxnPlacementValue(existing);
+2160-    var selectedLabel = aicmAxnPlacementLabel(existing);
+2161-    var nickname = aicmAxnPlacementNickname(existing);
+2162-
+2163-    return [
+2164-      '<label>' + escapeHtml(role.label) + 'ロボット',
+2165-      '<select id="' + escapeHtml(id) + '" data-inline-role-code="' + escapeHtml(role.code) + '">',
+2166-      aicmInlineRobotOptions(role.code, selectedValue, selectedLabel),
+2167-      '</select></label>',
+2168-      '<label>' + escapeHtml(role.label) + '社内通称',
+2169-      '<input id="' + escapeHtml(id + "-nickname") + '" type="text" value="' + escapeHtml(nickname) + '" placeholder="例: ' + escapeHtml(role.placeholder) + '">',
+2170-      '</label>'
+2171-    ].join("");
+2172-  }
+2173-
+2174-function aicmAvdWorkerRows() {
+2175-    if (typeof renderAicmWorkerInlineRows === "function") {
+2176-      return renderAicmWorkerInlineRows();
+2177-    }
+2178-
+2179-    return [
+2180-      '<div class="aicm-inline-worker-row" data-worker-slot-index="0">',
+2181-      '<label>従業員ロボット<select id="aicm-inline-worker-0-robot">' + aicmInlineRobotOptions("worker") + '</select></label>',
+2182-      '<label>従業員社内通称<input id="aicm-inline-worker-0-nickname" type="text" placeholder="例: 作業担当A"></label>',
+2183-      '</div>'
+2184-    ].join("");
+2185-  }
+2186-
+
+1916-      row.robot_name ||
+1917-      row.robot_pool_label ||
+1918-      row.robot_pool_id
+1919-    );
+1920-  }
+1921-
+1922-function aicmAxnOptionSelected(row, selectedValue) {
+1923-    var selected = aicmAxnText(selectedValue);
+1924-    if (!selected) return false;
+1925-
+1926-    var values = [
+1927-      typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "",
+1928-      row.robot_pool_id,
+1929-      row.business_robot_pool_id,
+1930-      row.aicm_robot_pool_id,
+1931-      row.worker_pool_id,
+1932-      row.placement_robot_pool_id,
+1933-      row.aiworker_model_code,
+1934-      row.model_code,
+1935-      row.robot_id
+1936-    ].map(aicmAxnText);
+1937-
+1938-    return values.indexOf(selected) >= 0;
+1939-  }
+1940-
+1941:function aicmInlineRobotOptions(roleCode, selectedValue, selectedLabel) {
+1942-    // AICM_ROLE_PLACEMENT_READBACK_AXN_V1
+1943-    var rows = aicmInlineRobotRows(roleCode);
+1944-    var selected = aicmAxnText(selectedValue);
+1945-    var selectedFound = false;
+1946-
+1947-    if (!rows.length && !selected) {
+1948-      return '<option value="">未設定</option><option value="" disabled>候補がありません</option>';
+1949-    }
+1950-
+1951-    var options = ['<option value="">未設定</option>'];
+1952-
+1953-    rows.forEach(function (row) {
+1954-      var value = typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "";
+1955-      var isSelected = selected && aicmAxnOptionSelected(row, selected);
+1956-      if (isSelected) selectedFound = true;
+1957-      options.push('<option value="' + escapeHtml(value) + '"' + (isSelected ? ' selected' : '') + '>' + escapeHtml(aicmRobotOptionLabel(row)) + '</option>');
+1958-    });
+1959-
+1960-    if (selected && !selectedFound) {
+1961-      options.push('<option value="' + escapeHtml(selected) + '" selected>' + escapeHtml(selectedLabel || selected) + '</option>');
+1962-    }
+1963-
+1964-    return options.join("");
+1965-  }
+1966-
+
+2130-  }
+2131-
+2132-function aicmAvdCurrentSection(companyId, departmentId) {
+2133-    var c = aicmAvdCtx();
+2134-    var rows = aicmAvdArray(c.sections);
+2135-    var cid = companyId || (aicmAvdCurrentCompany() || {}).aicm_user_company_id;
+2136-    var did = departmentId || (aicmAvdCurrentDepartment(cid) || {}).aicm_user_company_department_id;
+2137-
+2138-    for (var i = 0; i < rows.length; i++) {
+2139-      if (!rows[i]) continue;
+2140-      if (rows[i].aicm_user_company_id === cid && rows[i].aicm_user_company_department_id === did) return rows[i];
+2141-    }
+2142-
+2143-    for (var j = 0; j < rows.length; j++) {
+2144-      if (rows[j] && rows[j].aicm_user_company_id === cid) return rows[j];
+2145-    }
+2146-
+2147-    return rows[0] || null;
+2148-  }
+2149-
+2150-function aicmAvdTextById(id) {
+2151-    var el = document.getElementById(id);
+2152-    return el ? String(el.value || "").trim() : "";
+2153-  }
+2154-
+2155:function aicmAvdRoleSelect(id, roleCode) {
+2156-    // AICM_ROLE_PLACEMENT_READBACK_AXN_V1
+2157-    var role = roleCode || {};
+2158-    var existing = aicmAxnFirstPlacement(role.code);
+2159-    var selectedValue = aicmAxnPlacementValue(existing);
+2160-    var selectedLabel = aicmAxnPlacementLabel(existing);
+2161-    var nickname = aicmAxnPlacementNickname(existing);
+2162-
+2163-    return [
+2164-      '<label>' + escapeHtml(role.label) + 'ロボット',
+2165-      '<select id="' + escapeHtml(id) + '" data-inline-role-code="' + escapeHtml(role.code) + '">',
+2166-      aicmInlineRobotOptions(role.code, selectedValue, selectedLabel),
+2167-      '</select></label>',
+2168-      '<label>' + escapeHtml(role.label) + '社内通称',
+2169-      '<input id="' + escapeHtml(id + "-nickname") + '" type="text" value="' + escapeHtml(nickname) + '" placeholder="例: ' + escapeHtml(role.placeholder) + '">',
+2170-      '</label>'
+2171-    ].join("");
+2172-  }
+2173-
+2174-function aicmAvdWorkerRows() {
+2175-    if (typeof renderAicmWorkerInlineRows === "function") {
+2176-      return renderAicmWorkerInlineRows();
+2177-    }
+2178-
+2179-    return [
+2180-      '<div class="aicm-inline-worker-row" data-worker-slot-index="0">',
+
+1948-      return '<option value="">未設定</option><option value="" disabled>候補がありません</option>';
+1949-    }
+1950-
+1951-    var options = ['<option value="">未設定</option>'];
+1952-
+1953-    rows.forEach(function (row) {
+1954-      var value = typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "";
+1955-      var isSelected = selected && aicmAxnOptionSelected(row, selected);
+1956-      if (isSelected) selectedFound = true;
+1957-      options.push('<option value="' + escapeHtml(value) + '"' + (isSelected ? ' selected' : '') + '>' + escapeHtml(aicmRobotOptionLabel(row)) + '</option>');
+1958-    });
+1959-
+1960-    if (selected && !selectedFound) {
+1961-      options.push('<option value="' + escapeHtml(selected) + '" selected>' + escapeHtml(selectedLabel || selected) + '</option>');
+1962-    }
+1963-
+1964-    return options.join("");
+1965-  }
+1966-
+1967-function aicmWorkerSlotCount() {
+1968-    if (!state) return 3;
+1969-
+1970-    var n = Number(state.inlineWorkerSlotCount || 3);
+1971-    if (!Number.isFinite(n) || n < 3) n = 3;
+1972-    if (n > 20) n = 20;
+1973-    state.inlineWorkerSlotCount = n;
+1974-
+1975-    return n;
+1976-  }
+1977-
+1978:function renderAicmWorkerInlineRows(fieldPrefix) {
+1979-    // AICM_ROLE_PLACEMENT_READBACK_AXN_V1
+1980-    var savedRows = aicmAxnCurrentPlacements("worker");
+1981-    var baseCount = typeof aicmWorkerSlotCount === "function" ? aicmWorkerSlotCount() : 3;
+1982-    var count = Math.max(baseCount, savedRows.length || 0, 1);
+1983-    var safePrefix = fieldPrefix || "worker";
+1984-    var html = [];
+1985-
+1986-    for (var i = 0; i < count; i += 1) {
+1987-      var existing = savedRows[i] || null;
+1988-      var selectedValue = aicmAxnPlacementValue(existing);
+1989-      var selectedLabel = aicmAxnPlacementLabel(existing);
+1990-      var nickname = aicmAxnPlacementNickname(existing);
+1991-
+1992-      html.push([
+1993-        '<div class="aicm-worker-inline-row">',
+1994-        '  <label>従業員設定ロボット ' + String(i + 1) + '<select id="aicm-role-' + escapeHtml(safePrefix) + '-robot-' + String(i) + '" data-inline-role-code="worker" data-worker-slot-index="' + String(i) + '">',
+1995-        aicmInlineRobotOptions("worker", selectedValue, selectedLabel),
+1996-        '  </select></label>',
+1997-        '  <label>社内通称<input id="aicm-role-' + escapeHtml(safePrefix) + '-nickname-' + String(i) + '" type="text" value="' + escapeHtml(nickname) + '" placeholder="例: ウルフ@従業員' + String(i + 1) + '"></label>',
+1998-        '</div>'
+1999-      ].join(""));
+2000-    }
+2001-
+2002-    return html.join("");
+2003-  }
+2004-
+2005-function renderAicmInlineRoleSetting(roleCode, title, subtitle, fieldPrefix) {
+2006-    var safePrefix = fieldPrefix || roleCode;
+2007-
+2008-    if (roleCode === "worker") {

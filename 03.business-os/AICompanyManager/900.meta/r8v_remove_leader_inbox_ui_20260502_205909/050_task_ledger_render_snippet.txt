@@ -1,0 +1,166 @@
+        '</button>'
+      ].join("");
+    }).join("");
+
+    return [
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Manager大項目サマリ</p>',
+      '  <h2>大項目 件数サマリ</h2>',
+      '  <p class="aicm-selected-note">Manager大項目から現在の状態別件数を表示します。件数カードを押すと詳細を確認できます。</p>',
+      '  <p class="aicm-selected-note">合計: <strong>' + escapeHtml(String(summary.total)) + '件</strong></p>',
+      '  <div class="aicm-dashboard-action-row">',
+      cards,
+      '  </div>',
+      aicmRenderManagerMajorSummaryDetailR8U(summary),
+      '</section>'
+    ].join("");
+  }
+
+  function aicmManagerMajorSummaryActionTargetR8U(ev, btn) {
+    if (typeof aicmActionTargetSafe === "function") {
+      var safeTarget = aicmActionTargetSafe(ev, btn);
+      if (safeTarget && safeTarget.getAttribute) return safeTarget;
+    }
+
+    if (btn && btn.getAttribute) return btn;
+
+    if (ev && ev.target && ev.target.closest) {
+      var closest = ev.target.closest("[data-core-action]");
+      if (closest && closest.getAttribute) return closest;
+    }
+
+    return null;
+  }
+// AICM_R8U_MANAGER_MAJOR_SUMMARY_HELPER_END
+
+function renderTaskLedgerPlaceholder() {
+    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: screen
+    var company = typeof selectedCompany === "function" ? selectedCompany() : null;
+    var companyId = company && company.aicm_user_company_id ? company.aicm_user_company_id : "";
+    var rows = aicmGetManagerMajorRowsForSelectedCompany(companyId);
+    
+
+    // AICM_R8V_REMOVE_LEADER_INBOX_UI_START
+  // Leader受信箱 routine section removed.
+  // Manager大項目サマリの Leader受信済み 件数/詳細を正面表示として使う。
+// AICM_R8V_REMOVE_LEADER_INBOX_UI_END
+return renderShell([
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+      '  <h2>部門別タスク台帳</h2>',
+      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+      '  <p class="aicm-selected-note">未実行のManager大項目だけをDB/contextから表示します。CSV取り込みは部長/Manager分解済み大項目の新規追加です。</p>',
+'  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="task-ledger-refresh">登録済み大項目をリロード</button>',
+      '  </div>',
+      '</section>',
+      aicmRenderManagerMajorSummarySectionR8U(),
+      renderCsvImportCard(company),
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Manager大項目</p>',
+      '  <h2>登録済み大項目</h2>',
+      aicmRenderManagerMajorRows(rows),
+      '</section>'
+    ].join(""));
+  }
+
+  
+// AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+// Human review queue UI.
+// Human review only shows delivery summaries / exception summaries.
+// AI review remains internal; the UI displays ai_review_result_text summary only.
+
+function aicmHumanReviewOwnerId() {
+    if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+    if (state && state.owner_civilization_id) return state.owner_civilization_id;
+    if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+    return "00000000-0000-4000-8000-000000000001";
+  }
+
+  function aicmHumanReviewRows() {
+    var ctx = state.context || state || {};
+    var rows = ctx.review_wait_items || state.review_wait_items || [];
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  function aicmHumanReviewRowsForCompany(companyId) {
+    return aicmHumanReviewRows().filter(function (row) {
+      return !companyId || row.aicm_user_company_id === companyId;
+    });
+  }
+
+  async function aicmHumanReviewPostJson(path, body) {
+    var response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    });
+
+    var text = await response.text();
+    var json = {};
+
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (_) {
+      json = { result: "error", message: text || "Invalid server response" };
+    }
+
+    if (!response.ok || (json.result && json.result !== "ok")) {
+      throw new Error(json.message || json.error || ("API failed: " + path));
+    }
+
+    return json;
+  }
+
+  async function aicmHumanReviewReload() {
+    if (typeof aicmPmlwReloadContext === "function") {
+      await aicmReloadTaskLedgerContext();
+      return;
+    }
+
+    if (typeof loadContext === "function") {
+      await loadContext();
+      return;
+    }
+
+    var owner = encodeURIComponent(aicmHumanReviewOwnerId());
+    var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+    var json = await response.json();
+
+    if (json && json.result === "ok") state.context = json;
+    // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_CALL
+    if (typeof aicmHydrateManagerMajorContextArraysR8M === "function") {
+      aicmHydrateManagerMajorContextArraysR8M(
+        typeof json !== "undefined" ? json :
+        (typeof data !== "undefined" ? data :
+        (typeof contextJson !== "undefined" ? contextJson :
+        (typeof ctx !== "undefined" ? ctx : null)))
+      );
+    }
+    if (typeof render === "function") render();
+  }
+
+  async function approveHumanReviewFromAction(el) {
+    var reviewId = el && el.getAttribute ? el.getAttribute("data-review-id") : "";
+
+    if (!reviewId) {
+      setMessage("error", "レビュー項目を特定できません。");
+      return;
+    }
+
+    try {
+      await aicmHumanReviewPostJson("/api/aicm/v2/human-review/approve", {
+        owner_civilization_id: aicmHumanReviewOwnerId(),
+        aicm_human_review_item_id: reviewId,
+        human_reviewer_label: "user",
+        human_review_note: ""
+      });
+
+      setMessage("ok", "レビューを承認しました。");
+      await aicmHumanReviewReload();
+    } catch (error) {
+      setMessage("error", error && error.message ? error.message : "承認に失敗しました。");
+    }
+  }
+
+  async function returnHumanReviewFromAction(el) {

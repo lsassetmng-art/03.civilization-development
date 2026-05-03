@@ -1,0 +1,323 @@
+============================================================
+AXT-R9-R2 scan
+============================================================
+
+---- filter marker ----
+4317-          if (nested.length) return nested;
+4318-        }
+4319-
+4320-        return [];
+4321-      }
+4322-
+4323-      if (value && typeof value === "object") {
+4324-        var keys = Object.keys(value);
+4325-
+4326-        for (var k = 0; k < keys.length; k += 1) {
+4327-          var found = firstUsefulArray(value[keys[k]]);
+4328-          if (found.length) return found;
+4329-        }
+4330-      }
+4331-
+4332-      return [];
+4333-    }
+4334-
+4335-    if (Array.isArray(payload)) return firstUsefulArray(payload);
+4336-    if (payload.payload) return firstUsefulArray(payload.payload);
+4337-
+4338-    return firstUsefulArray(payload);
+4339-  }
+4340-
+4341-function aicmRuntimeStatusShort(value, max) {
+4342-    var text = String(value === undefined || value === null ? "" : value);
+4343-    var limit = Number(max || 120);
+4344-
+4345-    return text.length > limit ? text.slice(0, limit) + "..." : text;
+4346-  }
+4347-
+4348-function aicmRuntimeStatusField(row, names) {
+4349-    row = row || {};
+4350-
+4351-    for (var i = 0; i < names.length; i += 1) {
+4352-      var value = row[names[i]];
+4353-
+4354-      if (value !== undefined && value !== null && String(value).length > 0) {
+4355-        return value;
+4356-      }
+4357-    }
+4358-
+4359-    return "";
+4360-  }
+4361-
+4362-function aicmRuntimeStatusRowsHtml(rows) {
+4363-    rows = Array.isArray(rows) ? rows.slice(0, 5) : [];
+4364-
+4365-    if (!rows.length) {
+4366-      return '<p class="aicm-core-empty">AICompanyManager由来の実行状況はまだありません。作成後に「実行状況を更新」を押してください。</p>';
+4367-    }
+4368-
+4369-    return rows.map(function (row) {
+4370-      var requestId = aicmRuntimeStatusField(row, ["request_id", "runtime_execution_request_id"]);
+4371-      var title = aicmRuntimeStatusField(row, ["task_title", "title"]);
+4372-      var model = aicmRuntimeStatusField(row, ["model_code", "aiworker_model_code", "model_no"]);
+4373-      var status = aicmRuntimeStatusField(row, ["request_status_code", "status_code"]);
+4374-      var outputStatus = aicmRuntimeStatusField(row, ["output_status_code"]);
+4375-      var deliveryStatus = aicmRuntimeStatusField(row, ["delivery_status_code"]);
+4376-      var reviewRequired = aicmRuntimeStatusField(row, ["review_required_flag"]);
+4377-      var humanGoRequired = aicmRuntimeStatusField(row, ["human_go_required_flag"]);
+4378-
+4379-      return [
+4380-        '<article class="aicm-core-card aicm-runtime-status-row">',
+4381-        '  <p class="aicm-eyebrow">Runtime request</p>',
+4382-        '  <h3>' + escapeHtml(aicmRuntimeStatusShort(title || requestId || "実行依頼", 80)) + '</h3>',
+4383-        '  <div class="aicm-confirm-list">',
+4384-        '    <div class="aicm-confirm-row"><strong>request_id</strong><p>' + escapeHtml(String(requestId || "-")) + '</p></div>',
+4385-        '    <div class="aicm-confirm-row"><strong>model_code</strong><p>' + escapeHtml(String(model || "-")) + '</p></div>',
+4386-        '    <div class="aicm-confirm-row"><strong>request_status</strong><p>' + escapeHtml(String(status || "-")) + '</p></div>',
+4387-        '    <div class="aicm-confirm-row"><strong>output_status</strong><p>' + escapeHtml(String(outputStatus || "-")) + '</p></div>',
+4388-        '    <div class="aicm-confirm-row"><strong>delivery_status</strong><p>' + escapeHtml(String(deliveryStatus || "-")) + '</p></div>',
+4389-        '    <div class="aicm-confirm-row"><strong>review / human GO</strong><p>' + escapeHtml("review=" + String(reviewRequired || "-") + " / human_go=" + String(humanGoRequired || "-")) + '</p></div>',
+4390-        '  </div>',
+4391-        '</article>'
+4392-      ].join("");
+4393-    }).join("");
+4394-  }
+4395-
+4396-
+4397:// AICM_RUNTIME_STATUS_PANEL_FILTER_AXT_R9_R2_V1
+4398-// Runtime Status Panel display filter.
+4399-// AIOperationDesk can reuse the same idea later by changing expected app surface/source rules.
+4400-function aicmRuntimeStatusNormalizeText(value) {
+4401-    return String(value === undefined || value === null ? "" : value).trim();
+4402-  }
+4403-
+4404-function aicmRuntimeStatusRowSearchText(row) {
+4405-    try {
+4406-      return JSON.stringify(row || {}).toLowerCase();
+4407-    } catch (error) {
+4408-      return "";
+4409-    }
+4410-  }
+4411-
+4412-function aicmRuntimeStatusIsTestLikeRow(row) {
+4413-    var title = aicmRuntimeStatusNormalizeText(aicmRuntimeStatusField(row, [
+4414-      "task_title",
+4415-      "title",
+4416-      "output_title_ja",
+4417-      "request_title"
+4418-    ]));
+4419-
+4420-    var code = aicmRuntimeStatusNormalizeText(aicmRuntimeStatusField(row, [
+4421-      "request_code",
+4422-      "source_request_ref",
+4423-      "idempotency_key"
+4424-    ]));
+4425-
+4426-    var text = (title + " " + code).toLowerCase();
+4427-
+4428-    return (
+4429-      text.indexOf("smoke") >= 0 ||
+4430-      text.indexOf("runtime execution http api fix") >= 0 ||
+4431-      text.indexOf("persistent smoke") >= 0
+4432-    );
+4433-  }
+4434-
+4435-function aicmRuntimeStatusIsCurrentAppRow(row) {
+4436-    var appSurface = aicmRuntimeStatusNormalizeText(aicmRuntimeStatusField(row, [
+4437-      "app_surface_code",
+4438-      "surface_code"
+4439-    ]));
+4440-
+4441-    var sourceApp = aicmRuntimeStatusNormalizeText(aicmRuntimeStatusField(row, [
+4442-      "source_app_ref",
+4443-      "source_app_code",
+4444-      "app_code"
+4445-    ]));
+4446-
+4447-    var searchText = aicmRuntimeStatusRowSearchText(row);
+4448-
+4449-    if (aicmRuntimeStatusIsTestLikeRow(row)) {
+4450-      return false;
+4451-    }
+4452-
+4453-    if (appSurface === "ai_company_manager") {
+4454-      return true;
+4455-    }
+4456-
+4457-    if (sourceApp === "AICompanyManager" || sourceApp === "ai_company_manager") {
+4458-      return true;
+4459-    }
+4460-
+4461-    if (searchText.indexOf('"app_surface_code":"ai_company_manager"') >= 0) {
+4462-      return true;
+4463-    }
+4464-
+4465-    if (searchText.indexOf('"source_app_ref":"AICompanyManager"'.toLowerCase()) >= 0) {
+4466-      return true;
+4467-    }
+4468-
+4469-    return false;
+4470-  }
+4471-
+4472-function aicmRuntimeStatusFilterRowsForCurrentApp(rows) {
+4473-    rows = Array.isArray(rows) ? rows : [];
+4474-
+4475-    var filtered = rows.filter(function (row) {
+4476-      return aicmRuntimeStatusIsCurrentAppRow(row);
+4477-    });
+
+---- assignment ----
+4442-      "source_app_ref",
+4443-      "source_app_code",
+4444-      "app_code"
+4445-    ]));
+4446-
+4447-    var searchText = aicmRuntimeStatusRowSearchText(row);
+4448-
+4449-    if (aicmRuntimeStatusIsTestLikeRow(row)) {
+4450-      return false;
+4451-    }
+4452-
+4453-    if (appSurface === "ai_company_manager") {
+4454-      return true;
+4455-    }
+4456-
+4457-    if (sourceApp === "AICompanyManager" || sourceApp === "ai_company_manager") {
+4458-      return true;
+4459-    }
+4460-
+4461-    if (searchText.indexOf('"app_surface_code":"ai_company_manager"') >= 0) {
+4462-      return true;
+4463-    }
+4464-
+4465-    if (searchText.indexOf('"source_app_ref":"AICompanyManager"'.toLowerCase()) >= 0) {
+4466-      return true;
+4467-    }
+4468-
+4469-    return false;
+4470-  }
+4471-
+4472:function aicmRuntimeStatusFilterRowsForCurrentApp(rows) {
+4473-    rows = Array.isArray(rows) ? rows : [];
+4474-
+4475-    var filtered = rows.filter(function (row) {
+4476-      return aicmRuntimeStatusIsCurrentAppRow(row);
+4477-    });
+4478-
+4479-    return filtered;
+4480-  }
+4481-
+4482-
+4483-function aicmRuntimeStatusPanelRender() {
+4484-    var loading = !!state.runtimeStatusLoading;
+4485-    var error = state.runtimeStatusError || "";
+4486-    var rows = Array.isArray(state.runtimeStatusRows) ? state.runtimeStatusRows : [];
+4487-    var lastUpdated = state.runtimeStatusUpdatedAt || "";
+4488-
+4489-    return [
+4490-      '<section class="aicm-core-card aicm-runtime-status-panel">',
+4491-      '  <p class="aicm-eyebrow">AIWorkerOS 実行状況</p>',
+4492-      '  <h2>Runtime request / pipeline</h2>',
+4493-      '  <p class="aicm-selected-note">AIWorkerOSの app-read-payload / pipeline-board をAICM server経由で読みます。DB書込は行いません。</p>',
+4494-      error ? '  <p class="aicm-core-error">' + escapeHtml(error) + '</p>' : '',
+4495-      lastUpdated ? '  <p class="aicm-core-empty">最終更新: ' + escapeHtml(lastUpdated) + '</p>' : '',
+4496-      '  <div class="aicm-dashboard-action-row">',
+4497-      '    <button type="button" data-core-action="worker-runtime-status-refresh">' + (loading ? '更新中...' : '実行状況を更新') + '</button>',
+4498-      '  </div>',
+4499-      aicmRuntimeStatusRowsHtml(rows),
+4500-      '</section>'
+4501-    ].join("");
+4502-  }
+4503-
+4504-async function aicmRuntimeStatusRefresh() {
+4505-    state.runtimeStatusLoading = true;
+4506-    state.runtimeStatusError = "";
+4507-
+4508-    if (typeof render === "function") render();
+4509-
+4510-    try {
+4511-      var response = await fetch("/api/aicm/v2/worker-runtime/pipeline-board?app_surface_code=ai_company_manager&source_app_ref=AICompanyManager", { method: "GET" });
+4512-      var json = await response.json();
+4513-
+4514-      if (!response.ok || (json && json.result === "error")) {
+4515-        var message = (json && json.error_message) || "実行状況の取得に失敗しました。";
+4516-        throw new Error(message);
+4517-      }
+4518-
+4519-      var runtimeRows = aicmRuntimeStatusRowsFromPayload(json);
+4520-      state.runtimeStatusRawRows = runtimeRows;
+4521:      state.runtimeStatusRows = aicmRuntimeStatusFilterRowsForCurrentApp(runtimeRows);
+4522-      state.runtimeStatusRaw = json;
+4523-      state.runtimeStatusUpdatedAt = new Date().toLocaleString();
+4524-      state.runtimeStatusLoading = false;
+4525-      state.runtimeStatusError = "";
+4526-
+4527-      if (typeof render === "function") render();
+4528-    } catch (error) {
+4529-      state.runtimeStatusLoading = false;
+4530-      state.runtimeStatusError = error && error.message ? error.message : "実行状況の取得に失敗しました。";
+4531-
+4532-      if (typeof render === "function") render();
+4533-    }
+4534-  }
+4535-
+4536-
+4537-function renderWorkerRuntimeRequestBaseAxtR9R1() {
+4538-    var company = aicmWrtCurrentCompany();
+4539-    var workers = aicmWrtActiveWorkerPlacements();
+4540-    var last = state.workerRuntimeLastResult || null;
+4541-
+4542-    var lastHtml = "";
+4543-    if (last && last.runtime_request) {
+4544-      lastHtml = [
+4545-        '<section class="aicm-core-card">',
+4546-        '  <p class="aicm-eyebrow">直近の実行依頼</p>',
+4547-        '  <h2>request_id</h2>',
+4548-        '  <p class="aicm-selected-note">' + aicmWrtEscape(last.runtime_request.request_id || "未返却") + '</p>',
+4549-        '  <p>status: ' + aicmWrtEscape(last.runtime_request.request_status_code || "-") + '</p>',
+4550-        '</section>'
+4551-      ].join("");
+
+---- pipeline fetch ----
+4491-      '  <p class="aicm-eyebrow">AIWorkerOS 実行状況</p>',
+4492-      '  <h2>Runtime request / pipeline</h2>',
+4493-      '  <p class="aicm-selected-note">AIWorkerOSの app-read-payload / pipeline-board をAICM server経由で読みます。DB書込は行いません。</p>',
+4494-      error ? '  <p class="aicm-core-error">' + escapeHtml(error) + '</p>' : '',
+4495-      lastUpdated ? '  <p class="aicm-core-empty">最終更新: ' + escapeHtml(lastUpdated) + '</p>' : '',
+4496-      '  <div class="aicm-dashboard-action-row">',
+4497-      '    <button type="button" data-core-action="worker-runtime-status-refresh">' + (loading ? '更新中...' : '実行状況を更新') + '</button>',
+4498-      '  </div>',
+4499-      aicmRuntimeStatusRowsHtml(rows),
+4500-      '</section>'
+4501-    ].join("");
+4502-  }
+4503-
+4504-async function aicmRuntimeStatusRefresh() {
+4505-    state.runtimeStatusLoading = true;
+4506-    state.runtimeStatusError = "";
+4507-
+4508-    if (typeof render === "function") render();
+4509-
+4510-    try {
+4511:      var response = await fetch("/api/aicm/v2/worker-runtime/pipeline-board?app_surface_code=ai_company_manager&source_app_ref=AICompanyManager", { method: "GET" });
+4512-      var json = await response.json();
+4513-
+4514-      if (!response.ok || (json && json.result === "error")) {
+4515-        var message = (json && json.error_message) || "実行状況の取得に失敗しました。";
+4516-        throw new Error(message);
+4517-      }
+4518-
+4519-      var runtimeRows = aicmRuntimeStatusRowsFromPayload(json);
+4520-      state.runtimeStatusRawRows = runtimeRows;
+4521-      state.runtimeStatusRows = aicmRuntimeStatusFilterRowsForCurrentApp(runtimeRows);
+4522-      state.runtimeStatusRaw = json;
+4523-      state.runtimeStatusUpdatedAt = new Date().toLocaleString();
+4524-      state.runtimeStatusLoading = false;
+4525-      state.runtimeStatusError = "";
+4526-
+4527-      if (typeof render === "function") render();
+4528-    } catch (error) {
+4529-      state.runtimeStatusLoading = false;
+4530-      state.runtimeStatusError = error && error.message ? error.message : "実行状況の取得に失敗しました。";
+4531-
+
+---- token leakage ----

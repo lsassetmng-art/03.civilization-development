@@ -1,0 +1,803 @@
+============================================================
+AXT-R3 scan
+============================================================
+
+---- confirm transition marker ----
+4429-      '</section>'
+4430-    ].join(""));
+4431-  }
+4432-
+4433-async function aicmWrtPostJson(path, body) {
+4434-    var response = await fetch(path, {
+4435-      method: "POST",
+4436-      headers: {
+4437-        "Content-Type": "application/json"
+4438-      },
+4439-      body: JSON.stringify(body || {})
+4440-    });
+4441-
+4442-    var json = await response.json().catch(function () {
+4443-      return {};
+4444-    });
+4445-
+4446-    if (!response.ok || !json || json.result !== "ok") {
+4447-      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+4448-    }
+4449-
+4450-    return json;
+4451-  }
+4452-
+4453-async function executeWorkerRuntimeConfirm() {
+4454-    var payload = state.pendingWorkerRuntimeRequest || null;
+4455-    if (!payload || !payload.endpoint || !payload.body) {
+4456-      setMessage("error", "確認対象がありません。");
+4457-      return;
+4458-    }
+4459-
+4460-    try {
+4461-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4462-      state.pendingWorkerRuntimeRequest = null;
+4463-      state.workerRuntimeLastResult = result;
+4464-      state.screen = "worker-runtime-request";
+4465-      setMessage("ok", "AI実行Workbenchを作成しました。");
+4466-      if (typeof render === "function") render();
+4467-    } catch (error) {
+4468-      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+4469-      if (typeof render === "function") render();
+4470-    }
+4471-  }
+4472-
+4473-function confirmWorkerRuntimeRequestFromForm() {
+4474:    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4475-    try {
+4476-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4477-      state.screen = "worker-runtime-confirm";
+4478-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4479-      if (typeof render === "function") render();
+4480-    } catch (error) {
+4481-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4482-      if (typeof render === "function") render();
+4483-    }
+4484-  }
+4485-
+4486-function cancelWorkerRuntimeConfirm() {
+4487:    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4488-    state.pendingWorkerRuntimeRequest = null;
+4489-    state.screen = "worker-runtime-request";
+4490-    if (typeof render === "function") render();
+4491-  }
+4492-
+4493-function render() {
+4494-    if (!root) return;
+4495-
+4496-    var html = "";
+4497-
+4498-    if (state.screen === "company-new") {
+4499-      html = renderCompanyNew();
+4500-    } else if (state.screen === "department-new") {
+4501-      html = renderDepartmentNew();
+4502-    } else if (state.screen === "section-new") {
+4503-      html = renderSectionNew();
+4504-    } else if (state.screen === "placement-new") {
+4505-      html = renderPlacementNew();
+4506-    } else if (state.screen === "worker-runtime-confirm") {
+4507:      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4508-      html = renderWorkerRuntimeConfirm();
+4509-    } else if (state.screen === "worker-runtime-request") {
+4510-      html = renderWorkerRuntimeRequest();
+4511-    } else if (state.screen === "settings") {
+4512-      html = renderSettings();
+4513-    } else if (state.screen === "department-edit") {
+4514-      html = renderDepartmentEditPlaceholder();
+4515-    } else if (state.screen === "section-edit") {
+4516-      html = renderSectionEditPlaceholder();
+4517-    } else if (state.screen === "task-ledger") {
+4518-      html = renderTaskLedgerPlaceholder();
+4519-    } else if (state.screen === "review-list") {
+4520-      html = renderReviewListPlaceholder();
+4521-    } else {
+4522-      html = renderDashboard();
+4523-    }
+4524-
+4525-    
+4526-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+4527-    if (
+4528-      state &&
+4529-      (
+4530-        state.screen === "company-edit" ||
+4531-        state.screen === "company-change" ||
+4532-        state.screen === "company-update"
+4533-      )
+4534-    ) {
+4535-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4536-      html = renderCompanyEditPlaceholder();
+4537-    }
+4538-
+4539-
+4540-    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+4541-    if (state && state.screen === "company-edit") {
+4542-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4543-      html = renderCompanyEditPlaceholder();
+4544-    }
+4545-
+4546-    if (state && state.screen === "department-edit") {
+4547-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4548-      html = renderDepartmentEditPlaceholder();
+4549-    }
+4550-
+4551-    if (state && state.screen === "section-edit") {
+4552-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+--
+4598-
+4599-      if (targetLevelCode === "department") {
+4600-        targetId = state.selectedDepartmentId;
+4601-      }
+4602-
+4603-      if (targetLevelCode === "section") {
+4604-        targetId = sectionId;
+4605-      }
+4606-
+4607-      task = createPlacement({
+4608-        departmentId: state.selectedDepartmentId,
+4609-        sectionId: sectionId,
+4610-        targetLevelCode: targetLevelCode,
+4611-        targetId: targetId,
+4612-        roleCode: fieldValue(form, "roleCode"),
+4613-        robotPoolId: fieldValue(form, "robotPoolId"),
+4614-        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",
+4615-        internalNickname: fieldValue(form, "internalNickname")
+4616-      });
+4617-    } else {
+4618-      task = Promise.reject(new Error("未知のフォームです。"));
+4619-    }
+4620-
+4621-    state.loading = true;
+4622-    render();
+4623-
+4624-    task.catch(function (error) {
+4625-      state.loading = false;
+4626-      state.errorMessage = publicErrorMessage(error);
+4627-      render();
+4628-    });
+4629-  }
+4630-
+4631-  function handleRootClick(event) {
+4632-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+4633-  var aicmRawClickTarget = event.target;
+4634-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+4635-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+4636-    : aicmRawClickTarget;
+4637-
+4638-    var button = aicmActionTarget.closest("[data-core-action]");
+4639-    if (!button) return;
+4640-
+4641-    var action = button.getAttribute("data-core-action") || "";
+4642-
+4643:    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4644-    if (action === "worker-runtime-confirm") {
+4645-      confirmWorkerRuntimeRequestFromForm();
+4646-      return;
+4647-    }
+4648-
+4649-    if (action === "worker-runtime-execute") {
+4650-      executeWorkerRuntimeConfirm();
+4651-      return;
+4652-    }
+4653-
+4654-    if (action === "worker-runtime-cancel") {
+4655-      cancelWorkerRuntimeConfirm();
+4656-      return;
+4657-    }
+4658-
+4659-            if (action === "task-ledger-fill-csv-template") {
+4660-      fillTaskLedgerCsvTemplate();
+4661-      return;
+4662-    }
+4663-
+4664-        if (action === "task-ledger-csv-file-open") {
+4665-      openTaskLedgerCsvFilePicker();
+4666-      return;
+4667-    }
+4668-
+4669-    if (action === "task-ledger-chatgpt-prompt") {
+4670-      handleTaskLedgerChatGptPrompt();
+4671-      return;
+4672-    }
+4673-if (action === "task-ledger-csv-preview") {
+4674-      previewTaskLedgerCsv();
+4675-      return;
+4676-    }
+4677-
+4678-    if (action === "task-ledger-csv-import") {
+4679-      importTaskLedgerCsvToPmlwMajor();
+4680-      return;
+4681-    }
+4682-if (action === "task-ledger-create") {
+4683-      createTaskLedgerFromForm();
+4684-      return;
+4685-    }
+4686-if (action === "human-review-approve") {
+4687-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+4688-      return;
+
+---- worker runtime screen branches ----
+4308-      ].join("");
+4309-    }
+4310-
+4311-    return renderShell([
+4312-      '<section class="aicm-core-card">',
+4313-      '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4314-      '  <h2>配置済みAI/Workerに作業を依頼</h2>',
+4315-      company
+4316-        ? '  <p class="aicm-selected-note">対象会社: <strong>' + aicmWrtEscape(company.company_name || "") + '</strong></p>'
+4317-        : '  <p class="aicm-core-empty">AI企業が選択されていません。</p>',
+4318-      workers.length
+4319-        ? '  <p class="aicm-selected-note">配置済みWorker: ' + String(workers.length) + '件</p>'
+4320-        : '  <p class="aicm-core-empty">この会社に配置済みAI/Workerがありません。先に課変更で従業員Workerを配置してください。</p>',
+4321-      '</section>',
+4322-      '<section class="aicm-core-card">',
+4323-      '  <label>実行AI/Worker<select id="aicm-worker-runtime-placement-id">' + aicmWrtWorkerOptions() + '</select></label>',
+4324-      '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
+4325-      '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
+4326-      '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
+4327-      '  <label>source_request_ref<input id="aicm-worker-runtime-source-ref" type="text" placeholder="空なら manual:<timestamp>"></label>',
+4328-      '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
+4329-      '</section>',
+4330-      '<section class="aicm-core-card aicm-operation-card">',
+4331-      '  <p class="aicm-eyebrow">操作</p>',
+4332-      '  <div class="aicm-dashboard-action-row">',
+4333:      '    <button type="button" data-core-action="worker-runtime-confirm">確認へ進む</button>',
+4334-      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+4335-      '  </div>',
+4336-      '</section>',
+4337-      lastHtml
+4338-    ].join(""));
+4339-  }
+4340-
+4341-function aicmWrtValue(id) {
+4342-    var el = document.getElementById(id);
+4343-    return el ? aicmWrtText(el.value) : "";
+4344-  }
+4345-
+4346-function buildWorkerRuntimePendingPayload() {
+4347-    var company = aicmWrtCurrentCompany();
+4348-    if (!company) throw new Error("AI企業を選択してください。");
+4349-
+4350-    var placementId = aicmWrtValue("aicm-worker-runtime-placement-id");
+4351-    if (!placementId) throw new Error("実行AI/AI/Workerを選択してください。");
+4352-
+4353-    var worker = aicmWrtPlacementById(placementId);
+4354-    if (!worker) throw new Error("選択したWorker配置が見つかりません。");
+4355-
+4356-    var title = aicmWrtValue("aicm-worker-runtime-title");
+4357-    if (!title) throw new Error("作業タイトルを入力してください。");
+4358-
+--
+4452-
+4453-async function executeWorkerRuntimeConfirm() {
+4454-    var payload = state.pendingWorkerRuntimeRequest || null;
+4455-    if (!payload || !payload.endpoint || !payload.body) {
+4456-      setMessage("error", "確認対象がありません。");
+4457-      return;
+4458-    }
+4459-
+4460-    try {
+4461-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4462-      state.pendingWorkerRuntimeRequest = null;
+4463-      state.workerRuntimeLastResult = result;
+4464-      state.screen = "worker-runtime-request";
+4465-      setMessage("ok", "AI実行Workbenchを作成しました。");
+4466-      if (typeof render === "function") render();
+4467-    } catch (error) {
+4468-      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+4469-      if (typeof render === "function") render();
+4470-    }
+4471-  }
+4472-
+4473-function confirmWorkerRuntimeRequestFromForm() {
+4474-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4475-    try {
+4476-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4477:      state.screen = "worker-runtime-confirm";
+4478-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4479-      if (typeof render === "function") render();
+4480-    } catch (error) {
+4481-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4482-      if (typeof render === "function") render();
+4483-    }
+4484-  }
+4485-
+4486-function cancelWorkerRuntimeConfirm() {
+4487-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4488-    state.pendingWorkerRuntimeRequest = null;
+4489-    state.screen = "worker-runtime-request";
+4490-    if (typeof render === "function") render();
+4491-  }
+4492-
+4493-function render() {
+4494-    if (!root) return;
+4495-
+4496-    var html = "";
+4497-
+4498-    if (state.screen === "company-new") {
+4499-      html = renderCompanyNew();
+4500-    } else if (state.screen === "department-new") {
+4501-      html = renderDepartmentNew();
+4502-    } else if (state.screen === "section-new") {
+4503-      html = renderSectionNew();
+4504-    } else if (state.screen === "placement-new") {
+4505-      html = renderPlacementNew();
+4506:    } else if (state.screen === "worker-runtime-confirm") {
+4507-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4508-      html = renderWorkerRuntimeConfirm();
+4509-    } else if (state.screen === "worker-runtime-request") {
+4510-      html = renderWorkerRuntimeRequest();
+4511-    } else if (state.screen === "settings") {
+4512-      html = renderSettings();
+4513-    } else if (state.screen === "department-edit") {
+4514-      html = renderDepartmentEditPlaceholder();
+4515-    } else if (state.screen === "section-edit") {
+4516-      html = renderSectionEditPlaceholder();
+4517-    } else if (state.screen === "task-ledger") {
+4518-      html = renderTaskLedgerPlaceholder();
+4519-    } else if (state.screen === "review-list") {
+4520-      html = renderReviewListPlaceholder();
+4521-    } else {
+4522-      html = renderDashboard();
+4523-    }
+4524-
+4525-    
+4526-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+4527-    if (
+4528-      state &&
+4529-      (
+4530-        state.screen === "company-edit" ||
+4531-        state.screen === "company-change" ||
+--
+4619-    }
+4620-
+4621-    state.loading = true;
+4622-    render();
+4623-
+4624-    task.catch(function (error) {
+4625-      state.loading = false;
+4626-      state.errorMessage = publicErrorMessage(error);
+4627-      render();
+4628-    });
+4629-  }
+4630-
+4631-  function handleRootClick(event) {
+4632-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+4633-  var aicmRawClickTarget = event.target;
+4634-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+4635-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+4636-    : aicmRawClickTarget;
+4637-
+4638-    var button = aicmActionTarget.closest("[data-core-action]");
+4639-    if (!button) return;
+4640-
+4641-    var action = button.getAttribute("data-core-action") || "";
+4642-
+4643-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4644:    if (action === "worker-runtime-confirm") {
+4645-      confirmWorkerRuntimeRequestFromForm();
+4646-      return;
+4647-    }
+4648-
+4649-    if (action === "worker-runtime-execute") {
+4650-      executeWorkerRuntimeConfirm();
+4651-      return;
+4652-    }
+4653-
+4654-    if (action === "worker-runtime-cancel") {
+4655-      cancelWorkerRuntimeConfirm();
+4656-      return;
+4657-    }
+4658-
+4659-            if (action === "task-ledger-fill-csv-template") {
+4660-      fillTaskLedgerCsvTemplate();
+4661-      return;
+4662-    }
+4663-
+4664-        if (action === "task-ledger-csv-file-open") {
+4665-      openTaskLedgerCsvFilePicker();
+4666-      return;
+4667-    }
+4668-
+4669-    if (action === "task-ledger-chatgpt-prompt") {
+373-    state.errorMessage = "";
+374-    render();
+375-  }
+376-
+377-  function pageTitle() {
+378-    if (state.screen === "company-new") return "AI企業新規追加";
+379-    if (state.screen === "department-new") return "部門新規追加";
+380-    if (state.screen === "section-new") return "課新規追加";
+381-    if (state.screen === "placement-new") return "Worker配置";
+382-    if (state.screen === "settings") return "AI企業設定";
+383-    return "AI企業ダッシュボード";
+384-  }
+385-
+386-  
+387-// AICM_WORKER_RUNTIME_UI_NAV_AXT_R1_V1
+388-function renderShell(content) {
+389-    return [
+390-      '<div class="aicm-core" data-core-mark="' + CORE_MARK + '">',
+391-      '  <header class="aicm-core-header">',
+392-      '    <h1>AI企業運営アプリ</h1>',
+393-      '  </header>',
+394-      '  <nav class="aicm-core-tabs" aria-label="AICompanyManager navigation">',
+395-      '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
+396-      '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳</button>',
+397-      '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
+398:      '  <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
+399-      '  </nav>',
+400-      renderMessages(),
+401-      '  <main class="aicm-core-main">',
+402-      content,
+403-      '  </main>',
+404-      '</div>'
+405-    ].join("");
+406-  }
+407-
+408-  function renderMessages() {
+409-    var parts = [];
+410-
+411-    if (state.loading) {
+412-      parts.push('<div class="aicm-core-message">読込中...</div>');
+413-    }
+414-
+415-    if (state.noticeMessage) {
+416-      parts.push('<div class="aicm-core-message aicm-core-message-ok">' + escapeHtml(state.noticeMessage) + '</div>');
+417-    }
+418-
+419-    if (state.errorMessage) {
+420-      parts.push('<div class="aicm-core-message aicm-core-message-error">' + escapeHtml(state.errorMessage) + '</div>');
+421-    }
+422-
+423-    return parts.join("");
+--
+4439-      body: JSON.stringify(body || {})
+4440-    });
+4441-
+4442-    var json = await response.json().catch(function () {
+4443-      return {};
+4444-    });
+4445-
+4446-    if (!response.ok || !json || json.result !== "ok") {
+4447-      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+4448-    }
+4449-
+4450-    return json;
+4451-  }
+4452-
+4453-async function executeWorkerRuntimeConfirm() {
+4454-    var payload = state.pendingWorkerRuntimeRequest || null;
+4455-    if (!payload || !payload.endpoint || !payload.body) {
+4456-      setMessage("error", "確認対象がありません。");
+4457-      return;
+4458-    }
+4459-
+4460-    try {
+4461-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4462-      state.pendingWorkerRuntimeRequest = null;
+4463-      state.workerRuntimeLastResult = result;
+4464:      state.screen = "worker-runtime-request";
+4465-      setMessage("ok", "AI実行Workbenchを作成しました。");
+4466-      if (typeof render === "function") render();
+4467-    } catch (error) {
+4468-      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+4469-      if (typeof render === "function") render();
+4470-    }
+4471-  }
+4472-
+4473-function confirmWorkerRuntimeRequestFromForm() {
+4474-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4475-    try {
+4476-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4477-      state.screen = "worker-runtime-confirm";
+4478-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4479-      if (typeof render === "function") render();
+4480-    } catch (error) {
+4481-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4482-      if (typeof render === "function") render();
+4483-    }
+4484-  }
+4485-
+4486-function cancelWorkerRuntimeConfirm() {
+4487-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4488-    state.pendingWorkerRuntimeRequest = null;
+4489:    state.screen = "worker-runtime-request";
+4490-    if (typeof render === "function") render();
+4491-  }
+4492-
+4493-function render() {
+4494-    if (!root) return;
+4495-
+4496-    var html = "";
+4497-
+4498-    if (state.screen === "company-new") {
+4499-      html = renderCompanyNew();
+4500-    } else if (state.screen === "department-new") {
+4501-      html = renderDepartmentNew();
+4502-    } else if (state.screen === "section-new") {
+4503-      html = renderSectionNew();
+4504-    } else if (state.screen === "placement-new") {
+4505-      html = renderPlacementNew();
+4506-    } else if (state.screen === "worker-runtime-confirm") {
+4507-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4508-      html = renderWorkerRuntimeConfirm();
+4509:    } else if (state.screen === "worker-runtime-request") {
+4510-      html = renderWorkerRuntimeRequest();
+4511-    } else if (state.screen === "settings") {
+4512-      html = renderSettings();
+4513-    } else if (state.screen === "department-edit") {
+4514-      html = renderDepartmentEditPlaceholder();
+4515-    } else if (state.screen === "section-edit") {
+4516-      html = renderSectionEditPlaceholder();
+4517-    } else if (state.screen === "task-ledger") {
+4518-      html = renderTaskLedgerPlaceholder();
+4519-    } else if (state.screen === "review-list") {
+4520-      html = renderReviewListPlaceholder();
+4521-    } else {
+4522-      html = renderDashboard();
+4523-    }
+4524-
+4525-    
+4526-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+4527-    if (
+4528-      state &&
+4529-      (
+4530-        state.screen === "company-edit" ||
+4531-        state.screen === "company-change" ||
+4532-        state.screen === "company-update"
+4533-      )
+4534-    ) {
+
+---- action branches ----
+4298-
+4299-    var lastHtml = "";
+4300-    if (last && last.runtime_request) {
+4301-      lastHtml = [
+4302-        '<section class="aicm-core-card">',
+4303-        '  <p class="aicm-eyebrow">直近の実行依頼</p>',
+4304-        '  <h2>request_id</h2>',
+4305-        '  <p class="aicm-selected-note">' + aicmWrtEscape(last.runtime_request.request_id || "未返却") + '</p>',
+4306-        '  <p>status: ' + aicmWrtEscape(last.runtime_request.request_status_code || "-") + '</p>',
+4307-        '</section>'
+4308-      ].join("");
+4309-    }
+4310-
+4311-    return renderShell([
+4312-      '<section class="aicm-core-card">',
+4313-      '  <p class="aicm-eyebrow">AI実行Workbench</p>',
+4314-      '  <h2>配置済みAI/Workerに作業を依頼</h2>',
+4315-      company
+4316-        ? '  <p class="aicm-selected-note">対象会社: <strong>' + aicmWrtEscape(company.company_name || "") + '</strong></p>'
+4317-        : '  <p class="aicm-core-empty">AI企業が選択されていません。</p>',
+4318-      workers.length
+4319-        ? '  <p class="aicm-selected-note">配置済みWorker: ' + String(workers.length) + '件</p>'
+4320-        : '  <p class="aicm-core-empty">この会社に配置済みAI/Workerがありません。先に課変更で従業員Workerを配置してください。</p>',
+4321-      '</section>',
+4322-      '<section class="aicm-core-card">',
+4323-      '  <label>実行AI/Worker<select id="aicm-worker-runtime-placement-id">' + aicmWrtWorkerOptions() + '</select></label>',
+4324-      '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
+4325-      '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
+4326-      '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
+4327-      '  <label>source_request_ref<input id="aicm-worker-runtime-source-ref" type="text" placeholder="空なら manual:<timestamp>"></label>',
+4328-      '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
+4329-      '</section>',
+4330-      '<section class="aicm-core-card aicm-operation-card">',
+4331-      '  <p class="aicm-eyebrow">操作</p>',
+4332-      '  <div class="aicm-dashboard-action-row">',
+4333:      '    <button type="button" data-core-action="worker-runtime-confirm">確認へ進む</button>',
+4334-      '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+4335-      '  </div>',
+4336-      '</section>',
+4337-      lastHtml
+4338-    ].join(""));
+4339-  }
+4340-
+4341-function aicmWrtValue(id) {
+4342-    var el = document.getElementById(id);
+4343-    return el ? aicmWrtText(el.value) : "";
+4344-  }
+4345-
+4346-function buildWorkerRuntimePendingPayload() {
+4347-    var company = aicmWrtCurrentCompany();
+4348-    if (!company) throw new Error("AI企業を選択してください。");
+4349-
+4350-    var placementId = aicmWrtValue("aicm-worker-runtime-placement-id");
+4351-    if (!placementId) throw new Error("実行AI/AI/Workerを選択してください。");
+4352-
+4353-    var worker = aicmWrtPlacementById(placementId);
+4354-    if (!worker) throw new Error("選択したWorker配置が見つかりません。");
+4355-
+4356-    var title = aicmWrtValue("aicm-worker-runtime-title");
+4357-    if (!title) throw new Error("作業タイトルを入力してください。");
+4358-
+4359-    var instruction = aicmWrtValue("aicm-worker-runtime-instruction");
+4360-    if (!instruction) throw new Error("作業指示を入力してください。");
+4361-
+4362-    var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
+4363-    var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
+4364-
+4365-    return {
+4366-      endpoint: "/api/aicm/v2/worker-runtime/request",
+4367-      worker_label: aicmWrtWorkerLabel(worker),
+4368-      body: {
+--
+4442-    var json = await response.json().catch(function () {
+4443-      return {};
+4444-    });
+4445-
+4446-    if (!response.ok || !json || json.result !== "ok") {
+4447-      throw new Error((json && (json.error_message || json.message || json.error)) || "AI実行Workbenchに失敗しました。");
+4448-    }
+4449-
+4450-    return json;
+4451-  }
+4452-
+4453-async function executeWorkerRuntimeConfirm() {
+4454-    var payload = state.pendingWorkerRuntimeRequest || null;
+4455-    if (!payload || !payload.endpoint || !payload.body) {
+4456-      setMessage("error", "確認対象がありません。");
+4457-      return;
+4458-    }
+4459-
+4460-    try {
+4461-      var result = await aicmWrtPostJson(payload.endpoint, payload.body);
+4462-      state.pendingWorkerRuntimeRequest = null;
+4463-      state.workerRuntimeLastResult = result;
+4464-      state.screen = "worker-runtime-request";
+4465-      setMessage("ok", "AI実行Workbenchを作成しました。");
+4466-      if (typeof render === "function") render();
+4467-    } catch (error) {
+4468-      setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
+4469-      if (typeof render === "function") render();
+4470-    }
+4471-  }
+4472-
+4473-function confirmWorkerRuntimeRequestFromForm() {
+4474-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4475-    try {
+4476-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4477:      state.screen = "worker-runtime-confirm";
+4478-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4479-      if (typeof render === "function") render();
+4480-    } catch (error) {
+4481-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4482-      if (typeof render === "function") render();
+4483-    }
+4484-  }
+4485-
+4486-function cancelWorkerRuntimeConfirm() {
+4487-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4488-    state.pendingWorkerRuntimeRequest = null;
+4489-    state.screen = "worker-runtime-request";
+4490-    if (typeof render === "function") render();
+4491-  }
+4492-
+4493-function render() {
+4494-    if (!root) return;
+4495-
+4496-    var html = "";
+4497-
+4498-    if (state.screen === "company-new") {
+4499-      html = renderCompanyNew();
+4500-    } else if (state.screen === "department-new") {
+4501-      html = renderDepartmentNew();
+4502-    } else if (state.screen === "section-new") {
+4503-      html = renderSectionNew();
+4504-    } else if (state.screen === "placement-new") {
+4505-      html = renderPlacementNew();
+4506:    } else if (state.screen === "worker-runtime-confirm") {
+4507-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4508-      html = renderWorkerRuntimeConfirm();
+4509-    } else if (state.screen === "worker-runtime-request") {
+4510-      html = renderWorkerRuntimeRequest();
+4511-    } else if (state.screen === "settings") {
+4512-      html = renderSettings();
+4513-    } else if (state.screen === "department-edit") {
+4514-      html = renderDepartmentEditPlaceholder();
+4515-    } else if (state.screen === "section-edit") {
+4516-      html = renderSectionEditPlaceholder();
+4517-    } else if (state.screen === "task-ledger") {
+4518-      html = renderTaskLedgerPlaceholder();
+4519-    } else if (state.screen === "review-list") {
+4520-      html = renderReviewListPlaceholder();
+4521-    } else {
+4522-      html = renderDashboard();
+4523-    }
+4524-
+4525-    
+4526-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+4527-    if (
+4528-      state &&
+4529-      (
+4530-        state.screen === "company-edit" ||
+4531-        state.screen === "company-change" ||
+4532-        state.screen === "company-update"
+4533-      )
+4534-    ) {
+4535-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4536-      html = renderCompanyEditPlaceholder();
+4537-    }
+4538-
+4539-
+4540-    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+4541-    if (state && state.screen === "company-edit") {
+--
+4609-        sectionId: sectionId,
+4610-        targetLevelCode: targetLevelCode,
+4611-        targetId: targetId,
+4612-        roleCode: fieldValue(form, "roleCode"),
+4613-        robotPoolId: fieldValue(form, "robotPoolId"),
+4614-        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",
+4615-        internalNickname: fieldValue(form, "internalNickname")
+4616-      });
+4617-    } else {
+4618-      task = Promise.reject(new Error("未知のフォームです。"));
+4619-    }
+4620-
+4621-    state.loading = true;
+4622-    render();
+4623-
+4624-    task.catch(function (error) {
+4625-      state.loading = false;
+4626-      state.errorMessage = publicErrorMessage(error);
+4627-      render();
+4628-    });
+4629-  }
+4630-
+4631-  function handleRootClick(event) {
+4632-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+4633-  var aicmRawClickTarget = event.target;
+4634-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+4635-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+4636-    : aicmRawClickTarget;
+4637-
+4638-    var button = aicmActionTarget.closest("[data-core-action]");
+4639-    if (!button) return;
+4640-
+4641-    var action = button.getAttribute("data-core-action") || "";
+4642-
+4643-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4644:    if (action === "worker-runtime-confirm") {
+4645-      confirmWorkerRuntimeRequestFromForm();
+4646-      return;
+4647-    }
+4648-
+4649-    if (action === "worker-runtime-execute") {
+4650-      executeWorkerRuntimeConfirm();
+4651-      return;
+4652-    }
+4653-
+4654-    if (action === "worker-runtime-cancel") {
+4655-      cancelWorkerRuntimeConfirm();
+4656-      return;
+4657-    }
+4658-
+4659-            if (action === "task-ledger-fill-csv-template") {
+4660-      fillTaskLedgerCsvTemplate();
+4661-      return;
+4662-    }
+4663-
+4664-        if (action === "task-ledger-csv-file-open") {
+4665-      openTaskLedgerCsvFilePicker();
+4666-      return;
+4667-    }
+4668-
+4669-    if (action === "task-ledger-chatgpt-prompt") {
+4670-      handleTaskLedgerChatGptPrompt();
+4671-      return;
+4672-    }
+4673-if (action === "task-ledger-csv-preview") {
+4674-      previewTaskLedgerCsv();
+4675-      return;
+4676-    }
+4677-
+4678-    if (action === "task-ledger-csv-import") {
+4679-      importTaskLedgerCsvToPmlwMajor();
+
+---- token leakage check ----

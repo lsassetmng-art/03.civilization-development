@@ -1,0 +1,1093 @@
+============================================================
+before: helper scan
+============================================================
+63-      raw = "unknown error";
+64-    }
+65-  }
+66-
+67-  const pgProtocol = "post" + "gres(?:ql)?://";
+68-  raw = raw.replace(new RegExp(pgProtocol + "[^\\s'\\\"]+", "g"), "[DB_CONNECTION_REDACTED]");
+69-
+70-  if (raw.includes("violates foreign key constraint")) {
+71-    return "DB operation failed: selected company or department is not a v2 record.";
+72-  }
+73-
+74-  const errorLine = raw.match(/ERROR:\s*[^\n]+/);
+75-  if (errorLine && errorLine[0]) {
+76-    return "DB operation failed: " + errorLine[0];
+77-  }
+78-
+79-  return raw.slice(0, 400);
+80-}
+81-
+82-function sqlLiteral(value) {
+83-  return "'" + String(value == null ? "" : value).replace(/'/g, "''") + "'";
+84-}
+85-
+86-function requiredUuid(value, name) {
+87-  const text = String(value || "").trim();
+88-  if (!/^[0-9a-fA-F-]{36}$/.test(text)) {
+89-    throw new Error(name + " must be UUID");
+90-  }
+91-  return text;
+92-}
+93-
+94-function requiredText(value, name) {
+95-  const text = String(value || "").trim();
+96-  if (!text) {
+97-    throw new Error(name + " is required");
+98-  }
+99-  return text;
+100-}
+101-
+102-function runPsqlJson(sql) {
+103-  const connection = process.env[DB_ENV_KEY];
+104-
+105-  if (!connection) {
+106-    throw new Error("DB connection env is not set");
+107-  }
+108-
+109-  try {
+110-    const out = execFileSync(
+111-      "psql",
+112-      [
+113-        connection,
+114-        "-X",
+115-        "-q",
+116-        "-t",
+117-        "-A",
+118-        "-v",
+119-        "ON_ERROR_STOP=1",
+120-        "-c",
+121-        sql
+122-      ],
+123-      {
+124-        encoding: "utf8",
+125-        timeout: 20000,
+126-        maxBuffer: 1024 * 1024 * 12
+127-      }
+128-    );
+129-
+130-    const text = String(out || "").trim();
+131-    if (!text) return null;
+132-    return JSON.parse(text);
+133-  } catch (error) {
+134-    throw new Error(safePublicError(error));
+135-  }
+136-}
+137-
+138-function readBody(req) {
+139-  return new Promise((resolve, reject) => {
+140-    const chunks = [];
+141-
+142-    req.on("data", (chunk) => {
+143-      chunks.push(chunk);
+144-    });
+145-
+146-    req.on("end", () => {
+147-      const raw = Buffer.concat(chunks).toString("utf8");
+148-      if (!raw) {
+149-        resolve({});
+150-        return;
+151-      }
+152-
+153-      try {
+154-        resolve(JSON.parse(raw));
+155-      } catch (_) {
+156-        reject(new Error("Invalid JSON body"));
+157-      }
+158-    });
+159-
+160-    req.on("error", reject);
+161-  });
+162-}
+163-
+164-
+165-
+166-// AICM_PMLW_API_ARJ_ARM_V1
+167-// PMLW API functions use the existing SQL-array + runPsqlJson(sql) pattern.
+168-// No new Pool, no new DB helper, no new connection path.
+169-
+170-function aicmPmlwOptionalText(value) {
+171-  return String(value || "").trim();
+172-}
+173-
+174-function aicmPmlwTextSql(value) {
+175-  return sqlLiteral(String(value || ""));
+176-}
+177-
+178-function aicmPmlwOptionalUuidSql(value) {
+179-  const text = String(value || "").trim();
+180-  return text ? sqlLiteral(text) + "::uuid" : "NULL";
+181-}
+182-
+183:function aicmPmlwOptionalDateSql(value) {
+184-  const text = String(value || "").trim();
+185-  return /^\\d{4}-\\d{2}-\\d{2}$/.test(text) ? sqlLiteral(text) + "::date" : "NULL";
+186-}
+187-
+188-function aicmPmlwPriority(value) {
+189-  const text = String(value || "normal").trim();
+190-  return ["low", "normal", "high", "urgent"].includes(text) ? text : "normal";
+191-}
+192-
+193-function aicmPmlwMajorStatus(value) {
+194-  const text = String(value || "not_started").trim();
+195-  return ["not_started", "assigned_to_leader", "leader_decomposing", "decomposed", "returned", "archived"].includes(text) ? text : "not_started";
+196-}
+197-
+198-function aicmPmlwHandoffStatus(value) {
+199-  const text = String(value || "draft").trim();
+200-  return ["draft", "ready_handoff", "handed_off", "accepted", "completed", "archived"].includes(text) ? text : "draft";
+201-}
+202-
+203-function aicmPmlwCsvRows(body) {
+204-  const rows = Array.isArray(body.rows) ? body.rows : [];
+205-  return rows.slice(0, 300).map((row) => {
+206-    const majorName = aicmPmlwOptionalText(
+207-      row.major_item_name ||
+208-      row.major_name ||
+209-      row.deliverable_name ||
+210-      row.task_name ||
+211-      row.title
+212-    );
+213-
+214-    return {
+215-      department_name: aicmPmlwOptionalText(row.department_name),
+216-      section_name: aicmPmlwOptionalText(row.section_name),
+217-      major_item_name: majorName,
+218-      major_item_description: aicmPmlwOptionalText(row.major_item_description || row.description || row.task_name || row.note),
+219-      assigned_leader_label: aicmPmlwOptionalText(row.assigned_leader_label || row.leader_label || row.responsible_role_code),
+220-      priority_code: aicmPmlwPriority(row.priority_code),
+221-      due_date: aicmPmlwOptionalText(row.due_date),
+222-      note: aicmPmlwOptionalText(row.note)
+223-    };
+224-  }).filter((row) => row.major_item_name.length > 0);
+225-}
+226-
+227-function createPresidentPolicy(body) {
+228-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+229-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+230-  const title = requiredText(body.policy_title || body.title, "policy_title");
+231-  const text = requiredText(body.policy_text || body.president_policy_instruction_text || body.description, "policy_text");
+232-
+233-  const sql = [
+234-    "WITH inserted AS (",
+235-    "  INSERT INTO business.aicm_president_policy (",
+236-    "    owner_civilization_id, aicm_user_company_id, source_route_code, policy_title, policy_text,",
+237-    "    president_robot_label, requested_by_text, company_common_rules_snapshot,",
+238-    "    policy_status_code, priority_code, due_date,",
+239-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+240-    "  ) VALUES (",
+241-    "    " + sqlLiteral(owner) + "::uuid,",
+242-    "    " + sqlLiteral(companyId) + "::uuid,",
+243-    "    " + sqlLiteral(body.source_route_code || "user_to_president") + ",",
+244-    "    " + sqlLiteral(title) + ",",
+245-    "    " + sqlLiteral(text) + ",",
+246-    "    " + aicmPmlwTextSql(body.president_robot_label) + ",",
+247-    "    " + aicmPmlwTextSql(body.requested_by_text || "user") + ",",
+248-    "    " + aicmPmlwTextSql(body.company_common_rules_snapshot) + ",",
+249-    "    " + sqlLiteral(body.policy_status_code || "submitted") + ",",
+250-    "    " + sqlLiteral(aicmPmlwPriority(body.priority_code)) + ",",
+251-    "    " + aicmPmlwOptionalDateSql(body.due_date) + ",",
+252-    "    " + aicmPmlwTextSql(body.reference_files_text) + ",",
+253-    "    " + aicmPmlwTextSql(body.supplemental_materials_text) + ",",
+254-    "    " + aicmPmlwTextSql(body.applicable_rules_text) + ",",
+255-    "    " + aicmPmlwTextSql(body.note) + ",",
+256-    "    " + aicmPmlwTextSql(body.handoff_link),
+257-    "  )",
+258-    "  RETURNING *",
+259-    ")",
+260-    "SELECT jsonb_build_object(",
+261-    "  'result', 'ok',",
+262-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+263-    "  'president_policy', to_jsonb(inserted)",
+264-    ")::text",
+265-    "FROM inserted;"
+266-  ].join("\n");
+267-
+268-  return runPsqlJson(sql);
+269-}
+270-
+271-function createManagerMajorItem(body) {
+272-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+273-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+274-  const majorName = requiredText(body.major_item_name || body.deliverable_name || body.task_name, "major_item_name");
+275-
+276-  const sql = [
+277-    "WITH inserted AS (",
+278-    "  INSERT INTO business.aicm_manager_major_work_item (",
+279-    "    owner_civilization_id, aicm_user_company_id, aicm_president_policy_id,",
+280-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+281-    "    major_item_name, major_item_description, source_route_code,",
+282-    "    manager_robot_label, assigned_leader_label,",
+283-    "    decomposition_status_code, handoff_status_code, priority_code, due_date,",
+284-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+285-    "  ) VALUES (",
+286-    "    " + sqlLiteral(owner) + "::uuid,",
+287-    "    " + sqlLiteral(companyId) + "::uuid,",
+288-    "    " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id) + ",",
+289-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+290-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+291-    "    " + sqlLiteral(majorName) + ",",
+292-    "    " + aicmPmlwTextSql(body.major_item_description || body.description || body.note) + ",",
+293-    "    " + sqlLiteral(body.source_route_code || "manual") + ",",
+294-    "    " + aicmPmlwTextSql(body.manager_robot_label) + ",",
+295-    "    " + aicmPmlwTextSql(body.assigned_leader_label) + ",",
+296-    "    " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)) + ",",
+297-    "    " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)) + ",",
+298-    "    " + sqlLiteral(aicmPmlwPriority(body.priority_code)) + ",",
+299-    "    " + aicmPmlwOptionalDateSql(body.due_date) + ",",
+300-    "    " + aicmPmlwTextSql(body.reference_files_text) + ",",
+301-    "    " + aicmPmlwTextSql(body.supplemental_materials_text) + ",",
+302-    "    " + aicmPmlwTextSql(body.applicable_rules_text) + ",",
+303-    "    " + aicmPmlwTextSql(body.note) + ",",
+
+============================================================
+before: import usage scan
+============================================================
+225-}
+226-
+227-function createPresidentPolicy(body) {
+228-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+229-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+230-  const title = requiredText(body.policy_title || body.title, "policy_title");
+231-  const text = requiredText(body.policy_text || body.president_policy_instruction_text || body.description, "policy_text");
+232-
+233-  const sql = [
+234-    "WITH inserted AS (",
+235-    "  INSERT INTO business.aicm_president_policy (",
+236-    "    owner_civilization_id, aicm_user_company_id, source_route_code, policy_title, policy_text,",
+237-    "    president_robot_label, requested_by_text, company_common_rules_snapshot,",
+238-    "    policy_status_code, priority_code, due_date,",
+239-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+240-    "  ) VALUES (",
+241-    "    " + sqlLiteral(owner) + "::uuid,",
+242-    "    " + sqlLiteral(companyId) + "::uuid,",
+243-    "    " + sqlLiteral(body.source_route_code || "user_to_president") + ",",
+244-    "    " + sqlLiteral(title) + ",",
+245-    "    " + sqlLiteral(text) + ",",
+246-    "    " + aicmPmlwTextSql(body.president_robot_label) + ",",
+247-    "    " + aicmPmlwTextSql(body.requested_by_text || "user") + ",",
+248-    "    " + aicmPmlwTextSql(body.company_common_rules_snapshot) + ",",
+249-    "    " + sqlLiteral(body.policy_status_code || "submitted") + ",",
+250-    "    " + sqlLiteral(aicmPmlwPriority(body.priority_code)) + ",",
+251-    "    " + aicmPmlwOptionalDateSql(body.due_date) + ",",
+252-    "    " + aicmPmlwTextSql(body.reference_files_text) + ",",
+253-    "    " + aicmPmlwTextSql(body.supplemental_materials_text) + ",",
+254-    "    " + aicmPmlwTextSql(body.applicable_rules_text) + ",",
+255-    "    " + aicmPmlwTextSql(body.note) + ",",
+256-    "    " + aicmPmlwTextSql(body.handoff_link),
+257-    "  )",
+258-    "  RETURNING *",
+259-    ")",
+260-    "SELECT jsonb_build_object(",
+261-    "  'result', 'ok',",
+262-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+263-    "  'president_policy', to_jsonb(inserted)",
+264-    ")::text",
+265-    "FROM inserted;"
+266-  ].join("\n");
+267-
+268-  return runPsqlJson(sql);
+269-}
+270-
+271-function createManagerMajorItem(body) {
+272-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+273-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+274-  const majorName = requiredText(body.major_item_name || body.deliverable_name || body.task_name, "major_item_name");
+275-
+276-  const sql = [
+277-    "WITH inserted AS (",
+278-    "  INSERT INTO business.aicm_manager_major_work_item (",
+279-    "    owner_civilization_id, aicm_user_company_id, aicm_president_policy_id,",
+280-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+281-    "    major_item_name, major_item_description, source_route_code,",
+282-    "    manager_robot_label, assigned_leader_label,",
+283-    "    decomposition_status_code, handoff_status_code, priority_code, due_date,",
+284-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+285-    "  ) VALUES (",
+286-    "    " + sqlLiteral(owner) + "::uuid,",
+287-    "    " + sqlLiteral(companyId) + "::uuid,",
+288-    "    " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id) + ",",
+289-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+290-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+291-    "    " + sqlLiteral(majorName) + ",",
+292-    "    " + aicmPmlwTextSql(body.major_item_description || body.description || body.note) + ",",
+293-    "    " + sqlLiteral(body.source_route_code || "manual") + ",",
+294-    "    " + aicmPmlwTextSql(body.manager_robot_label) + ",",
+295-    "    " + aicmPmlwTextSql(body.assigned_leader_label) + ",",
+296-    "    " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)) + ",",
+297-    "    " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)) + ",",
+298-    "    " + sqlLiteral(aicmPmlwPriority(body.priority_code)) + ",",
+299-    "    " + aicmPmlwOptionalDateSql(body.due_date) + ",",
+300-    "    " + aicmPmlwTextSql(body.reference_files_text) + ",",
+301-    "    " + aicmPmlwTextSql(body.supplemental_materials_text) + ",",
+302-    "    " + aicmPmlwTextSql(body.applicable_rules_text) + ",",
+303-    "    " + aicmPmlwTextSql(body.note) + ",",
+304-    "    " + aicmPmlwTextSql(body.handoff_link),
+305-    "  )",
+306-    "  RETURNING *",
+307-    ")",
+308-    "SELECT jsonb_build_object(",
+309-    "  'result', 'ok',",
+310-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+311-    "  'manager_major_item', to_jsonb(inserted)",
+312-    ")::text",
+313-    "FROM inserted;"
+314-  ].join("\n");
+315-
+316-  return runPsqlJson(sql);
+317-}
+318-
+319-function updateManagerMajorItem(body) {
+320-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+321-  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+322-  const updates = [];
+323-
+324-  if (body.major_item_name !== undefined) updates.push("major_item_name = " + sqlLiteral(String(body.major_item_name || "").trim()));
+325-  if (body.major_item_description !== undefined) updates.push("major_item_description = " + aicmPmlwTextSql(body.major_item_description));
+326-  if (body.aicm_president_policy_id !== undefined) updates.push("aicm_president_policy_id = " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id));
+327-  if (body.aicm_user_company_department_id !== undefined) updates.push("aicm_user_company_department_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id));
+328-  if (body.aicm_user_company_section_id !== undefined) updates.push("aicm_user_company_section_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id));
+329-  if (body.manager_robot_label !== undefined) updates.push("manager_robot_label = " + aicmPmlwTextSql(body.manager_robot_label));
+330-  if (body.assigned_leader_label !== undefined) updates.push("assigned_leader_label = " + aicmPmlwTextSql(body.assigned_leader_label));
+331-  if (body.decomposition_status_code !== undefined) updates.push("decomposition_status_code = " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)));
+332-  if (body.handoff_status_code !== undefined) updates.push("handoff_status_code = " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)));
+333-  if (body.priority_code !== undefined) updates.push("priority_code = " + sqlLiteral(aicmPmlwPriority(body.priority_code)));
+334-  if (body.due_date !== undefined) updates.push("due_date = " + aicmPmlwOptionalDateSql(body.due_date));
+335-  if (body.reference_files_text !== undefined) updates.push("reference_files_text = " + aicmPmlwTextSql(body.reference_files_text));
+336-  if (body.supplemental_materials_text !== undefined) updates.push("supplemental_materials_text = " + aicmPmlwTextSql(body.supplemental_materials_text));
+337-  if (body.applicable_rules_text !== undefined) updates.push("applicable_rules_text = " + aicmPmlwTextSql(body.applicable_rules_text));
+338-  if (body.note !== undefined) updates.push("note = " + aicmPmlwTextSql(body.note));
+339-  if (body.handoff_link !== undefined) updates.push("handoff_link = " + aicmPmlwTextSql(body.handoff_link));
+340-
+341-  updates.push("updated_at = now()");
+342-
+343-  const sql = [
+344-    "WITH updated AS (",
+345-    "  UPDATE business.aicm_manager_major_work_item",
+346-    "  SET " + updates.join(", "),
+347-    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+348-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+349-    "  RETURNING *",
+350-    ")",
+351-    "SELECT jsonb_build_object(",
+352-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+353-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+354-    "  'manager_major_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+355-    ")::text;"
+356-  ].join("\n");
+357-
+358-  return runPsqlJson(sql);
+359-}
+360-
+361-function archiveManagerMajorItem(body) {
+362-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+363-  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+364-
+365-  const sql = [
+366-    "WITH archived AS (",
+367-    "  UPDATE business.aicm_manager_major_work_item",
+368-    "  SET decomposition_status_code = 'archived',",
+369-    "      handoff_status_code = 'archived',",
+370-    "      updated_at = now()",
+371-    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+372-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+373-    "  RETURNING *",
+374-    ")",
+375-    "SELECT jsonb_build_object(",
+376-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM archived) THEN 'ok' ELSE 'not_found' END,",
+377-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+378-    "  'manager_major_item', COALESCE((SELECT to_jsonb(archived) FROM archived), '{}'::jsonb)",
+379-    ")::text;"
+380-  ].join("\n");
+381-
+382-  return runPsqlJson(sql);
+383-}
+384-
+385-function importManagerMajorItemsCsv(body) {
+386-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+387-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+388-  const rows = aicmPmlwCsvRows(body);
+389-
+390-  if (rows.length === 0) {
+391-    return { result: "ok", api_identifier: SERVER_MARK, inserted_count: 0, manager_major_items: [] };
+392-  }
+393-
+394-  const values = rows.map((row, index) => [
+395-    "(",
+396-    index,
+397-    ", " + sqlLiteral(owner) + "::uuid",
+398-    ", " + sqlLiteral(companyId) + "::uuid",
+399-    ", " + sqlLiteral(row.department_name),
+400-    ", " + sqlLiteral(row.section_name),
+401-    ", " + sqlLiteral(row.major_item_name),
+402-    ", " + sqlLiteral(row.major_item_description),
+403-    ", " + sqlLiteral(row.assigned_leader_label),
+404-    ", " + sqlLiteral(row.priority_code),
+405:    ", " + aicmPmlwOptionalDateSql(row.due_date),
+406-    ", " + sqlLiteral(row.note),
+407-    ")"
+408-  ].join("")).join(",\n    ");
+409-
+410-  const sql = [
+411-    "WITH input_rows(row_order, owner_civilization_id, aicm_user_company_id, department_name, section_name, major_item_name, major_item_description, assigned_leader_label, priority_code, due_date, note) AS (",
+412-    "  VALUES",
+413-    "    " + values,
+414-    "), resolved AS (",
+415-    "  SELECT i.*, (",
+416-    "    SELECT d.aicm_user_company_department_id",
+417-    "    FROM business.aicm_user_company_department d",
+418-    "    WHERE d.owner_civilization_id = i.owner_civilization_id",
+419-    "      AND d.aicm_user_company_id = i.aicm_user_company_id",
+420-    "      AND d.department_status = 'active'",
+421-    "      AND (i.department_name = '' OR d.department_name = i.department_name)",
+422-    "    ORDER BY CASE WHEN d.department_name = i.department_name THEN 0 ELSE 1 END, d.display_order, d.created_at",
+423-    "    LIMIT 1",
+424-    "  ) AS department_id",
+425-    "  FROM input_rows i",
+426-    "), resolved_section AS (",
+427-    "  SELECT r.*, (",
+428-    "    SELECT s.aicm_user_company_section_id",
+429-    "    FROM business.aicm_user_company_section s",
+430-    "    WHERE s.owner_civilization_id = r.owner_civilization_id",
+431-    "      AND s.aicm_user_company_id = r.aicm_user_company_id",
+432-    "      AND s.section_status = 'active'",
+433-    "      AND (r.department_id IS NULL OR s.aicm_user_company_department_id = r.department_id)",
+434-    "      AND (r.section_name = '' OR s.section_name = r.section_name)",
+435-    "    ORDER BY CASE WHEN s.section_name = r.section_name THEN 0 ELSE 1 END, s.display_order, s.created_at",
+436-    "    LIMIT 1",
+437-    "  ) AS section_id",
+438-    "  FROM resolved r",
+439-    "), inserted AS (",
+440-    "  INSERT INTO business.aicm_manager_major_work_item (",
+441-    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+442-    "    major_item_name, major_item_description, source_route_code, assigned_leader_label,",
+443-    "    decomposition_status_code, handoff_status_code, priority_code, due_date, note, display_order",
+444-    "  )",
+445-    "  SELECT owner_civilization_id, aicm_user_company_id, department_id, section_id,",
+446-    "         major_item_name, major_item_description, 'csv_import', assigned_leader_label,",
+447-    "         'not_started', 'draft', priority_code, due_date, note, 100 + row_order",
+448-    "  FROM resolved_section",
+449-    "  RETURNING *",
+450-    ")",
+451-    "SELECT jsonb_build_object(",
+452-    "  'result', 'ok',",
+453-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+454-    "  'inserted_count', (SELECT count(*) FROM inserted),",
+455-    "  'manager_major_items', COALESCE((SELECT jsonb_agg(to_jsonb(inserted) ORDER BY display_order, created_at) FROM inserted), '[]'::jsonb)",
+456-    ")::text;"
+457-  ].join("\n");
+458-
+459-  return runPsqlJson(sql);
+460-}
+461-
+462-
+463-
+464-// AICM_HUMAN_REVIEW_QUEUE_ARN_ARQ_V1
+465-// Human review queue functions.
+466-// Human review is limited to delivery summaries and exception summaries.
+467-// AI review remains internal; only ai_review_result_text summary is shown.
+468-
+469-function aicmHumanReviewOptionalText(value) {
+470-  return String(value || "").trim();
+471-}
+472-
+473-function aicmHumanReviewTextSql(value) {
+474-  return sqlLiteral(String(value || ""));
+475-}
+476-
+477-function aicmHumanReviewOptionalUuidSql(value) {
+478-  const text = String(value || "").trim();
+479-  return text ? sqlLiteral(text) + "::uuid" : "NULL";
+480-}
+481-
+482-function aicmHumanReviewOptionalDateSql(value) {
+483-  const text = String(value || "").trim();
+484-  return /^\\d{4}-\\d{2}-\\d{2}$/.test(text) ? sqlLiteral(text) + "::date" : "NULL";
+485-}
+486-
+487-function aicmHumanReviewKind(value) {
+488-  const text = String(value || "delivery_summary").trim();
+489-  return [
+490-    "design_delivery_summary",
+491-    "implementation_delivery_summary",
+492-    "exception_review",
+493-    "final_delivery_summary",
+494-    "delivery_summary"
+495-  ].includes(text) ? text : "delivery_summary";
+496-}
+497-
+498-function aicmHumanReviewArtifactKind(value) {
+499-  const text = String(value || "design_doc").trim();
+500-  return ["design_doc", "implementation", "exception", "delivery_package", "handoff"].includes(text) ? text : "design_doc";
+501-}
+502-
+503-function aicmHumanReviewPriority(value) {
+504-  const text = String(value || "normal").trim();
+505-  return ["low", "normal", "high", "urgent"].includes(text) ? text : "normal";
+506-}
+507-
+508-function createHumanReviewItem(body) {
+509-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+510-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+511-  const title = requiredText(body.review_title || body.title, "review_title");
+512-
+513-  const sql = [
+514-    "WITH inserted AS (",
+515-    "  INSERT INTO business.aicm_human_review_item (",
+516-    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+517-    "    related_president_policy_id, related_manager_major_work_item_id, related_leader_middle_work_item_id,",
+518-    "    related_deliverable_requirement_id, related_worker_work_unit_id,",
+519-    "    review_kind_code, artifact_kind_code, review_title,",
+520-    "    delivery_summary_text, main_changes_text, ai_review_result_text, unresolved_issues_text, artifact_link,",
+521-    "    responsible_ai_label, requested_by_ai_label, human_review_status_code, priority_code, due_date,",
+522-    "    display_order, metadata_jsonb",
+523-    "  ) VALUES (",
+524-    "    " + sqlLiteral(owner) + "::uuid,",
+525-    "    " + sqlLiteral(companyId) + "::uuid,",
+526-    "    " + aicmHumanReviewOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+527-    "    " + aicmHumanReviewOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+528-    "    " + aicmHumanReviewOptionalUuidSql(body.related_president_policy_id) + ",",
+529-    "    " + aicmHumanReviewOptionalUuidSql(body.related_manager_major_work_item_id) + ",",
+530-    "    " + aicmHumanReviewOptionalUuidSql(body.related_leader_middle_work_item_id) + ",",
+531-    "    " + aicmHumanReviewOptionalUuidSql(body.related_deliverable_requirement_id) + ",",
+532-    "    " + aicmHumanReviewOptionalUuidSql(body.related_worker_work_unit_id) + ",",
+533-    "    " + sqlLiteral(aicmHumanReviewKind(body.review_kind_code)) + ",",
+534-    "    " + sqlLiteral(aicmHumanReviewArtifactKind(body.artifact_kind_code)) + ",",
+535-    "    " + sqlLiteral(title) + ",",
+536-    "    " + aicmHumanReviewTextSql(body.delivery_summary_text) + ",",
+537-    "    " + aicmHumanReviewTextSql(body.main_changes_text) + ",",
+538-    "    " + aicmHumanReviewTextSql(body.ai_review_result_text) + ",",
+539-    "    " + aicmHumanReviewTextSql(body.unresolved_issues_text) + ",",
+540-    "    " + aicmHumanReviewTextSql(body.artifact_link) + ",",
+541-    "    " + aicmHumanReviewTextSql(body.responsible_ai_label) + ",",
+542-    "    " + aicmHumanReviewTextSql(body.requested_by_ai_label) + ",",
+543-    "    'pending',",
+544-    "    " + sqlLiteral(aicmHumanReviewPriority(body.priority_code)) + ",",
+545-    "    " + aicmHumanReviewOptionalDateSql(body.due_date) + ",",
+546-    "    COALESCE(NULLIF(" + sqlLiteral(String(body.display_order || "")) + ", '')::integer, 100),",
+547-    "    '{}'::jsonb",
+548-    "  )",
+549-    "  RETURNING *",
+550-    ")",
+551-    "SELECT jsonb_build_object(",
+552-    "  'result', 'ok',",
+553-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+554-    "  'human_review_item', to_jsonb(inserted)",
+555-    ")::text",
+556-    "FROM inserted;"
+557-  ].join("\n");
+558-
+559-  return runPsqlJson(sql);
+560-}
+561-
+562-function approveHumanReviewItem(body) {
+563-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+564-  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+565-
+566-  const sql = [
+567-    "WITH updated AS (",
+568-    "  UPDATE business.aicm_human_review_item",
+569-    "  SET human_review_status_code = 'approved',",
+570-    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+571-    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+572-    "      reviewed_at = now(),",
+573-    "      updated_at = now()",
+574-    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+575-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+576-    "  RETURNING *",
+577-    ")",
+578-    "SELECT jsonb_build_object(",
+579-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+580-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+581-    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+582-    ")::text;"
+583-  ].join("\n");
+584-
+585-  return runPsqlJson(sql);
+
+265-    "FROM inserted;"
+266-  ].join("\n");
+267-
+268-  return runPsqlJson(sql);
+269-}
+270-
+271-function createManagerMajorItem(body) {
+272-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+273-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+274-  const majorName = requiredText(body.major_item_name || body.deliverable_name || body.task_name, "major_item_name");
+275-
+276-  const sql = [
+277-    "WITH inserted AS (",
+278-    "  INSERT INTO business.aicm_manager_major_work_item (",
+279-    "    owner_civilization_id, aicm_user_company_id, aicm_president_policy_id,",
+280-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+281-    "    major_item_name, major_item_description, source_route_code,",
+282-    "    manager_robot_label, assigned_leader_label,",
+283-    "    decomposition_status_code, handoff_status_code, priority_code, due_date,",
+284-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+285-    "  ) VALUES (",
+286-    "    " + sqlLiteral(owner) + "::uuid,",
+287-    "    " + sqlLiteral(companyId) + "::uuid,",
+288-    "    " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id) + ",",
+289-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+290-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+291-    "    " + sqlLiteral(majorName) + ",",
+292-    "    " + aicmPmlwTextSql(body.major_item_description || body.description || body.note) + ",",
+293-    "    " + sqlLiteral(body.source_route_code || "manual") + ",",
+294-    "    " + aicmPmlwTextSql(body.manager_robot_label) + ",",
+295-    "    " + aicmPmlwTextSql(body.assigned_leader_label) + ",",
+296-    "    " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)) + ",",
+297-    "    " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)) + ",",
+298-    "    " + sqlLiteral(aicmPmlwPriority(body.priority_code)) + ",",
+299-    "    " + aicmPmlwOptionalDateSql(body.due_date) + ",",
+300-    "    " + aicmPmlwTextSql(body.reference_files_text) + ",",
+301-    "    " + aicmPmlwTextSql(body.supplemental_materials_text) + ",",
+302-    "    " + aicmPmlwTextSql(body.applicable_rules_text) + ",",
+303-    "    " + aicmPmlwTextSql(body.note) + ",",
+304-    "    " + aicmPmlwTextSql(body.handoff_link),
+305-    "  )",
+306-    "  RETURNING *",
+307-    ")",
+308-    "SELECT jsonb_build_object(",
+309-    "  'result', 'ok',",
+310-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+311-    "  'manager_major_item', to_jsonb(inserted)",
+312-    ")::text",
+313-    "FROM inserted;"
+314-  ].join("\n");
+315-
+316-  return runPsqlJson(sql);
+317-}
+318-
+319-function updateManagerMajorItem(body) {
+320-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+321-  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+322-  const updates = [];
+323-
+324-  if (body.major_item_name !== undefined) updates.push("major_item_name = " + sqlLiteral(String(body.major_item_name || "").trim()));
+325-  if (body.major_item_description !== undefined) updates.push("major_item_description = " + aicmPmlwTextSql(body.major_item_description));
+326-  if (body.aicm_president_policy_id !== undefined) updates.push("aicm_president_policy_id = " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id));
+327-  if (body.aicm_user_company_department_id !== undefined) updates.push("aicm_user_company_department_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id));
+328-  if (body.aicm_user_company_section_id !== undefined) updates.push("aicm_user_company_section_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id));
+329-  if (body.manager_robot_label !== undefined) updates.push("manager_robot_label = " + aicmPmlwTextSql(body.manager_robot_label));
+330-  if (body.assigned_leader_label !== undefined) updates.push("assigned_leader_label = " + aicmPmlwTextSql(body.assigned_leader_label));
+331-  if (body.decomposition_status_code !== undefined) updates.push("decomposition_status_code = " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)));
+332-  if (body.handoff_status_code !== undefined) updates.push("handoff_status_code = " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)));
+333-  if (body.priority_code !== undefined) updates.push("priority_code = " + sqlLiteral(aicmPmlwPriority(body.priority_code)));
+334-  if (body.due_date !== undefined) updates.push("due_date = " + aicmPmlwOptionalDateSql(body.due_date));
+335-  if (body.reference_files_text !== undefined) updates.push("reference_files_text = " + aicmPmlwTextSql(body.reference_files_text));
+336-  if (body.supplemental_materials_text !== undefined) updates.push("supplemental_materials_text = " + aicmPmlwTextSql(body.supplemental_materials_text));
+337-  if (body.applicable_rules_text !== undefined) updates.push("applicable_rules_text = " + aicmPmlwTextSql(body.applicable_rules_text));
+338-  if (body.note !== undefined) updates.push("note = " + aicmPmlwTextSql(body.note));
+339-  if (body.handoff_link !== undefined) updates.push("handoff_link = " + aicmPmlwTextSql(body.handoff_link));
+340-
+341-  updates.push("updated_at = now()");
+342-
+343-  const sql = [
+344-    "WITH updated AS (",
+345-    "  UPDATE business.aicm_manager_major_work_item",
+346-    "  SET " + updates.join(", "),
+347-    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+348-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+349-    "  RETURNING *",
+350-    ")",
+351-    "SELECT jsonb_build_object(",
+352-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+353-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+354-    "  'manager_major_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+355-    ")::text;"
+356-  ].join("\n");
+357-
+358-  return runPsqlJson(sql);
+359-}
+360-
+361-function archiveManagerMajorItem(body) {
+362-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+363-  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+364-
+365-  const sql = [
+366-    "WITH archived AS (",
+367-    "  UPDATE business.aicm_manager_major_work_item",
+368-    "  SET decomposition_status_code = 'archived',",
+369-    "      handoff_status_code = 'archived',",
+370-    "      updated_at = now()",
+371-    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+372-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+373-    "  RETURNING *",
+374-    ")",
+375-    "SELECT jsonb_build_object(",
+376-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM archived) THEN 'ok' ELSE 'not_found' END,",
+377-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+378-    "  'manager_major_item', COALESCE((SELECT to_jsonb(archived) FROM archived), '{}'::jsonb)",
+379-    ")::text;"
+380-  ].join("\n");
+381-
+382-  return runPsqlJson(sql);
+383-}
+384-
+385:function importManagerMajorItemsCsv(body) {
+386-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+387-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+388-  const rows = aicmPmlwCsvRows(body);
+389-
+390-  if (rows.length === 0) {
+391-    return { result: "ok", api_identifier: SERVER_MARK, inserted_count: 0, manager_major_items: [] };
+392-  }
+393-
+394-  const values = rows.map((row, index) => [
+395-    "(",
+396-    index,
+397-    ", " + sqlLiteral(owner) + "::uuid",
+398-    ", " + sqlLiteral(companyId) + "::uuid",
+399-    ", " + sqlLiteral(row.department_name),
+400-    ", " + sqlLiteral(row.section_name),
+401-    ", " + sqlLiteral(row.major_item_name),
+402-    ", " + sqlLiteral(row.major_item_description),
+403-    ", " + sqlLiteral(row.assigned_leader_label),
+404-    ", " + sqlLiteral(row.priority_code),
+405-    ", " + aicmPmlwOptionalDateSql(row.due_date),
+406-    ", " + sqlLiteral(row.note),
+407-    ")"
+408-  ].join("")).join(",\n    ");
+409-
+410-  const sql = [
+411-    "WITH input_rows(row_order, owner_civilization_id, aicm_user_company_id, department_name, section_name, major_item_name, major_item_description, assigned_leader_label, priority_code, due_date, note) AS (",
+412-    "  VALUES",
+413-    "    " + values,
+414-    "), resolved AS (",
+415-    "  SELECT i.*, (",
+416-    "    SELECT d.aicm_user_company_department_id",
+417-    "    FROM business.aicm_user_company_department d",
+418-    "    WHERE d.owner_civilization_id = i.owner_civilization_id",
+419-    "      AND d.aicm_user_company_id = i.aicm_user_company_id",
+420-    "      AND d.department_status = 'active'",
+421-    "      AND (i.department_name = '' OR d.department_name = i.department_name)",
+422-    "    ORDER BY CASE WHEN d.department_name = i.department_name THEN 0 ELSE 1 END, d.display_order, d.created_at",
+423-    "    LIMIT 1",
+424-    "  ) AS department_id",
+425-    "  FROM input_rows i",
+426-    "), resolved_section AS (",
+427-    "  SELECT r.*, (",
+428-    "    SELECT s.aicm_user_company_section_id",
+429-    "    FROM business.aicm_user_company_section s",
+430-    "    WHERE s.owner_civilization_id = r.owner_civilization_id",
+431-    "      AND s.aicm_user_company_id = r.aicm_user_company_id",
+432-    "      AND s.section_status = 'active'",
+433-    "      AND (r.department_id IS NULL OR s.aicm_user_company_department_id = r.department_id)",
+434-    "      AND (r.section_name = '' OR s.section_name = r.section_name)",
+435-    "    ORDER BY CASE WHEN s.section_name = r.section_name THEN 0 ELSE 1 END, s.display_order, s.created_at",
+436-    "    LIMIT 1",
+437-    "  ) AS section_id",
+438-    "  FROM resolved r",
+439-    "), inserted AS (",
+440-    "  INSERT INTO business.aicm_manager_major_work_item (",
+441-    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+442-    "    major_item_name, major_item_description, source_route_code, assigned_leader_label,",
+443-    "    decomposition_status_code, handoff_status_code, priority_code, due_date, note, display_order",
+444-    "  )",
+445-    "  SELECT owner_civilization_id, aicm_user_company_id, department_id, section_id,",
+446-    "         major_item_name, major_item_description, 'csv_import', assigned_leader_label,",
+447-    "         'not_started', 'draft', priority_code, due_date, note, 100 + row_order",
+448-    "  FROM resolved_section",
+449-    "  RETURNING *",
+450-    ")",
+451-    "SELECT jsonb_build_object(",
+452-    "  'result', 'ok',",
+453-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+454-    "  'inserted_count', (SELECT count(*) FROM inserted),",
+455-    "  'manager_major_items', COALESCE((SELECT jsonb_agg(to_jsonb(inserted) ORDER BY display_order, created_at) FROM inserted), '[]'::jsonb)",
+456-    ")::text;"
+457-  ].join("\n");
+458-
+459-  return runPsqlJson(sql);
+460-}
+461-
+462-
+463-
+464-// AICM_HUMAN_REVIEW_QUEUE_ARN_ARQ_V1
+465-// Human review queue functions.
+466-// Human review is limited to delivery summaries and exception summaries.
+467-// AI review remains internal; only ai_review_result_text summary is shown.
+468-
+469-function aicmHumanReviewOptionalText(value) {
+470-  return String(value || "").trim();
+471-}
+472-
+473-function aicmHumanReviewTextSql(value) {
+474-  return sqlLiteral(String(value || ""));
+475-}
+476-
+477-function aicmHumanReviewOptionalUuidSql(value) {
+478-  const text = String(value || "").trim();
+479-  return text ? sqlLiteral(text) + "::uuid" : "NULL";
+480-}
+481-
+482-function aicmHumanReviewOptionalDateSql(value) {
+483-  const text = String(value || "").trim();
+484-  return /^\\d{4}-\\d{2}-\\d{2}$/.test(text) ? sqlLiteral(text) + "::date" : "NULL";
+485-}
+486-
+487-function aicmHumanReviewKind(value) {
+488-  const text = String(value || "delivery_summary").trim();
+489-  return [
+490-    "design_delivery_summary",
+491-    "implementation_delivery_summary",
+492-    "exception_review",
+493-    "final_delivery_summary",
+494-    "delivery_summary"
+495-  ].includes(text) ? text : "delivery_summary";
+496-}
+497-
+498-function aicmHumanReviewArtifactKind(value) {
+499-  const text = String(value || "design_doc").trim();
+500-  return ["design_doc", "implementation", "exception", "delivery_package", "handoff"].includes(text) ? text : "design_doc";
+501-}
+502-
+503-function aicmHumanReviewPriority(value) {
+504-  const text = String(value || "normal").trim();
+505-  return ["low", "normal", "high", "urgent"].includes(text) ? text : "normal";
+--
+1535-    },
+1536-    runtime_request: {
+1537-      request_id: requestId,
+1538-      request_status_code: requestStatusCode,
+1539-      app_surface_code: appSurfaceCode,
+1540-      model_code: modelCode,
+1541-      task_domain_code: taskDomainCode,
+1542-      task_title: taskTitle,
+1543-      source_app_ref: sourceAppRef,
+1544-      source_request_ref: sourceRequestRef,
+1545-      idempotency_key: idempotencyKey
+1546-    },
+1547-    aiworker_response: responseJson
+1548-  };
+1549-}
+1550-
+1551-
+1552-
+1553-// AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+1554-// Reusable AIWorkerOS runtime read-only proxy helpers.
+1555-// Browser calls local app server only. AIWorkerOS token stays server-side.
+1556-function aicmRuntimeStatusAiworkerBaseUrl() {
+1557-  return String(process.env.PERSONA_AIWORKEROS_BASE_URL || "http://127.0.0.1:8787").replace(/\/+$/, "");
+1558-}
+1559-
+1560-function aicmRuntimeStatusAiworkerHeaders() {
+1561-  const headers = { "accept": "application/json" };
+1562-  const token = String(process.env.PERSONA_AIWORKEROS_AUTH_TOKEN || "").trim();
+1563-
+1564-  if (token) {
+1565-    headers.authorization = "Bearer " + token;
+1566-  }
+1567-
+1568-  return headers;
+1569-}
+1570-
+1571-async function aicmRuntimeStatusAiworkerGet(pathname, searchParams) {
+1572-  const base = aicmRuntimeStatusAiworkerBaseUrl();
+1573-  const params = new URLSearchParams();
+1574-
+1575-  if (searchParams && typeof searchParams.forEach === "function") {
+1576-    searchParams.forEach((value, key) => {
+1577-      if (key && value !== undefined && value !== null && String(value).length > 0) {
+1578-        params.set(key, String(value));
+1579-      }
+1580-    });
+1581-  }
+1582-
+1583-  const upstreamUrl = base + pathname + (params.toString() ? "?" + params.toString() : "");
+1584-  const response = await fetch(upstreamUrl, {
+1585-    method: "GET",
+1586-    headers: aicmRuntimeStatusAiworkerHeaders()
+1587-  });
+1588-
+1589-  const text = await response.text();
+1590-
+1591-  let payload;
+1592-  try {
+1593-    payload = text ? JSON.parse(text) : {};
+1594-  } catch (error) {
+1595-    payload = { raw_text: text };
+1596-  }
+1597-
+1598-  if (!response.ok) {
+1599-    return {
+1600-      result: "error",
+1601-      api_identifier: SERVER_MARK,
+1602-      upstream_status_code: response.status,
+1603-      upstream_path: pathname,
+1604-      error_message: "AIWorkerOS runtime GET failed: " + String(response.status),
+1605-      upstream_payload: payload
+1606-    };
+1607-  }
+1608-
+1609-  return {
+1610-    result: "ok",
+1611-    api_identifier: SERVER_MARK,
+1612-    upstream_status_code: response.status,
+1613-    upstream_path: pathname,
+1614-    payload
+1615-  };
+1616-}
+1617-
+1618-async function handleApi(req, res, url) {
+1619-  const route = url.pathname;
+1620-
+1621-  try {
+1622-    if (req.method === "OPTIONS") {
+1623-      sendJson(res, 200, { result: "ok", api_identifier: SERVER_MARK });
+1624-      return true;
+1625-    }
+1626-
+1627-    
+1628-    if (route === "/api/aicm/v2/president-policy/create" && req.method === "POST") {
+1629-      const body = await readBody(req);
+1630-      sendJson(res, 200, createPresidentPolicy(body));
+1631-      return true;
+1632-    }
+1633-
+1634-    if (route === "/api/aicm/v2/manager-major/create" && req.method === "POST") {
+1635-      const body = await readBody(req);
+1636-      sendJson(res, 200, createManagerMajorItem(body));
+1637-      return true;
+1638-    }
+1639-
+1640-    if (route === "/api/aicm/v2/manager-major/update" && req.method === "POST") {
+1641-      const body = await readBody(req);
+1642-      sendJson(res, 200, updateManagerMajorItem(body));
+1643-      return true;
+1644-    }
+1645-
+1646-    if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+1647-      const body = await readBody(req);
+1648-      sendJson(res, 200, archiveManagerMajorItem(body));
+1649-      return true;
+1650-    }
+1651-
+1652-// AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+1653-    if (route === "/api/aicm/v2/manager-major/import-csv" && req.method === "POST") {
+1654-      const body = await readBody(req);
+1655:      sendJson(res, 200, importManagerMajorItemsCsv(body));
+1656-      return true;
+1657-    }
+1658-
+1659-
+1660-    if (route === "/api/aicm/v2/human-review/create" && req.method === "POST") {
+1661-      const body = await readBody(req);
+1662-      sendJson(res, 200, createHumanReviewItem(body));
+1663-      return true;
+1664-    }
+1665-
+1666-    if (route === "/api/aicm/v2/human-review/approve" && req.method === "POST") {
+1667-      const body = await readBody(req);
+1668-      sendJson(res, 200, approveHumanReviewItem(body));
+1669-      return true;
+1670-    }
+1671-
+1672-    if (route === "/api/aicm/v2/human-review/return" && req.method === "POST") {
+1673-      const body = await readBody(req);
+1674-      sendJson(res, 200, returnHumanReviewItem(body));
+1675-      return true;
+1676-    }
+1677-
+1678-
+1679-    if (route === "/api/aicm/v2/company/update" && req.method === "POST") {
+1680-      const body = await readBody(req);
+1681-      sendJson(res, 200, updateCompany(body));
+1682-      return true;
+1683-    }
+1684-
+1685-    if (route === "/api/aicm/v2/department/update" && req.method === "POST") {
+1686-      const body = await readBody(req);
+1687-      sendJson(res, 200, updateDepartment(body));
+1688-      return true;
+1689-    }
+1690-
+1691-    // AICM_ORGANIZATION_UPDATE_DELEGATES_TO_SECTION_UPDATE
+1692-    // UI label "組織変更" is connected to the current section/k課 update responsibility.
+1693-    // Keep this as an explicit compatibility route so future split can be handled here.
+1694-    if (route === "/api/aicm/v2/organization/update" && req.method === "POST") {
+1695-      const body = await readBody(req);
+1696-      sendJson(res, 200, updateSection(body));
+1697-      return true;
+1698-    }
+1699-
+1700-    if (route === "/api/aicm/v2/section/update" && req.method === "POST") {
+1701-      const body = await readBody(req);
+1702-      sendJson(res, 200, updateSection(body));
+1703-      return true;
+1704-    }
+1705-
+1706-if (route === "/api/aicm/v2/context" && req.method === "GET") {
+1707-      sendJson(res, 200, getContext(url.searchParams.get("owner_civilization_id") || ""));
+1708-      return true;
+1709-    }
+1710-
+1711-    if (route === "/api/aicm/v2/company/create" && req.method === "POST") {
+1712-      sendJson(res, 200, createCompany(await readBody(req)));
+1713-      return true;
+1714-    }
+1715-
+1716-    if (route === "/api/aicm/v2/department/create" && req.method === "POST") {
+1717-      const payload = createDepartment(await readBody(req));
+1718-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1719-      return true;
+1720-    }
+1721-
+1722-    if (route === "/api/aicm/v2/section/create" && req.method === "POST") {
+1723-      const payload = createSection(await readBody(req));
+1724-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1725-      return true;
+1726-    }
+1727-
+1728-    
+1729-    if (route === "/api/aicm/v2/task-ledger/create" && req.method === "POST") {
+1730-      const payload = createTaskLedger(await readBody(req));
+1731-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1732-      return true;
+1733-    }
+1734-
+1735-    if (route === "/api/aicm/v2/placement/sync-role-settings" && req.method === "POST") {
+1736-      const payload = syncRoleSettings(await readBody(req));
+1737-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1738-      return true;
+1739-    }
+1740-
+1741-if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
+1742-      const payload = createPlacement(await readBody(req));
+1743-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1744-      return true;
+1745-    }
+1746-
+1747-    // AICM_WORKER_RUNTIME_REQUEST_ROUTE_AXS_V1
+1748-    if (route === "/api/aicm/v2/worker-runtime/request" && req.method === "POST") {
+1749-      const payload = await createWorkerRuntimeRequest(await readBody(req));
+1750-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1751-      return true;
+1752-    }
+1753-
+1754-    
+1755-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+1756-    if (route === "/api/aicm/v2/worker-runtime/pipeline-board" && req.method === "GET") {
+1757-      const payload = await aicmRuntimeStatusAiworkerGet("/aiworker/v1/runtime-execution/pipeline-board", url.searchParams);
+1758-      sendJson(res, payload && payload.result === "error" ? 502 : 200, payload);
+1759-      return true;
+1760-    }
+1761-
+1762-    if (route === "/api/aicm/v2/worker-runtime/app-read-payload" && req.method === "GET") {
+1763-      const payload = await aicmRuntimeStatusAiworkerGet("/aiworker/v1/runtime-execution/app-read-payload", url.searchParams);
+1764-      sendJson(res, payload && payload.result === "error" ? 502 : 200, payload);
+1765-      return true;
+1766-    }
+1767-
+1768-    if (route.startsWith("/api/aicm/v2/")) {
+1769-      sendJson(res, 404, {
+1770-        result: "error",
+1771-        api_identifier: SERVER_MARK,
+1772-        error_message: "unknown v2 endpoint"
+1773-      });
+1774-      return true;
+1775-    }

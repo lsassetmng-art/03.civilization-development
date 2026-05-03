@@ -1,0 +1,208 @@
+============================================================
+context body
+============================================================
+{
+  "result": "error",
+  "api_identifier": "AICM_CLEAN_V2_API_SERVER_ANQ_ANT_V1",
+  "error_message": "owner_civilization_id must be UUID"
+}
+============================================================
+context headers
+============================================================
+HTTP/1.1 500 Internal Server Error
+content-type: application/json; charset=utf-8
+access-control-allow-origin: *
+access-control-allow-methods: GET,POST,OPTIONS
+access-control-allow-headers: content-type
+cache-control: no-store
+Date: Thu, 30 Apr 2026 20:28:30 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+
+============================================================
+getContext scan
+============================================================
+671-    "      purpose = " + aicmOrgUpdateTextSql(body.purpose) + ",",
+672-    "      department_status = " + sqlLiteral(status) + ",",
+673-    "      updated_at = now()",
+674-    "  WHERE aicm_user_company_department_id = " + sqlLiteral(departmentId) + "::uuid",
+675-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+676-    "  RETURNING *",
+677-    ")",
+678-    "SELECT jsonb_build_object(",
+679-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+680-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+681-    "  'department', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+682-    ")::text;"
+683-  ].join("\n");
+684-
+685-  return runPsqlJson(sql);
+686-}
+687-
+688-function updateSection(body) {
+689-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+690-  const sectionId = requiredUuid(body.aicm_user_company_section_id, "aicm_user_company_section_id");
+691-  const name = requiredText(body.section_name || body.sectionName, "section_name");
+692-  const status = aicmOrgUpdateStatus(body.section_status || body.section_status_code, ["active", "inactive", "archived"], "active");
+693-
+694-  const sql = [
+695-    "WITH updated AS (",
+696-    "  UPDATE business.aicm_user_company_section",
+697-    "  SET section_name = " + sqlLiteral(name) + ",",
+698-    "      purpose = " + aicmOrgUpdateTextSql(body.purpose) + ",",
+699-    "      section_status = " + sqlLiteral(status) + ",",
+700-    "      updated_at = now()",
+701-    "  WHERE aicm_user_company_section_id = " + sqlLiteral(sectionId) + "::uuid",
+702-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+703-    "  RETURNING *",
+704-    ")",
+705-    "SELECT jsonb_build_object(",
+706-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+707-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+708-    "  'section', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+709-    ")::text;"
+710-  ].join("\n");
+711-
+712-  return runPsqlJson(sql);
+713-}
+714-
+715-
+716:function getContext(ownerCivilizationId) {
+717-  const owner = requiredUuid(ownerCivilizationId, "owner_civilization_id");
+718-
+719-  const sql = [
+720-    "SELECT jsonb_build_object(",
+721-    "  'result', 'ok',",
+722-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+723-    "  'owner_civilization_id', " + sqlLiteral(owner) + ",",
+724-    "  'companies', (",
+725-    "    SELECT COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.created_at DESC), '[]'::jsonb)",
+726-    "    FROM business.aicm_user_company c",
+727-    "    WHERE c.owner_civilization_id::text = " + sqlLiteral(owner),
+728-    "      AND c.company_status = 'active'",
+729-    "  ),",
+730-    "  'departments', (",
+731-    "    SELECT COALESCE(jsonb_agg(to_jsonb(d) ORDER BY d.display_order, d.created_at), '[]'::jsonb)",
+732-    "    FROM business.aicm_user_company_department d",
+733-    "    WHERE d.owner_civilization_id::text = " + sqlLiteral(owner),
+734-    "      AND d.department_status = 'active'",
+735-    "  ),",
+736-    "  'sections', (",
+737-    "    SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY s.display_order, s.created_at), '[]'::jsonb)",
+738-    "    FROM business.aicm_user_company_section s",
+739-    "    WHERE s.owner_civilization_id::text = " + sqlLiteral(owner),
+740-    "      AND s.section_status = 'active'",
+741-    "  ),",
+742-    "  'placements', (",
+743-    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.created_at DESC), '[]'::jsonb)",
+744-    "    FROM business.vw_aicm_user_company_worker_placement_display p",
+745-    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+746-    "      AND p.status_code = 'active'",
+747-    "  ),",
+748-    "  'task_ledger', (",
+749-    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.display_order, t.created_at DESC), '[]'::jsonb)",
+750-    "    FROM business.vw_aicm_user_company_department_task_ledger_display t",
+751-    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+752-    "      AND t.task_status_code <> 'archived'",
+753-    "  ),",
+754-    // AICM_PMLW_GETCONTEXT_SQL_EXTENSION_AQP_AQS_V1
+755-    "  'pmlw_president_policies', (",
+756-    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.display_order ASC, p.updated_at DESC, p.created_at DESC), '[]'::jsonb)",
+757-    "    FROM business.vw_aicm_pmlw_president_policy_display p",
+758-    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+759-    "  ),",
+760-    "  'pmlw_major_items', (",
+761-    "    SELECT COALESCE(jsonb_agg(to_jsonb(m) ORDER BY m.display_order ASC, m.updated_at DESC, m.created_at DESC), '[]'::jsonb)",
+
+============================================================
+AXC sync insertion scan
+============================================================
+1058-    "      'result', 'ok',",
+1059-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1060-    "      'placement', to_jsonb(inserted)",
+1061-    "    ) FROM inserted)::text",
+1062-    "  ELSE",
+1063-    "    jsonb_build_object(",
+1064-    "      'result', 'error',",
+1065-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1066-    "      'error_message', '先にv2のAI企業を作成・選択してください。'",
+1067-    "    )::text",
+1068-    "END;"
+1069-  ].join("\n");
+1070-
+1071-  return runPsqlJson(sql);
+1072-}
+1073-
+1074-
+1075-
+1076:// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+1077-// Synchronize President / Manager / Leader / Worker role settings.
+1078-// Canonical table: business.aicm_user_company_worker_placement.
+1079-// This endpoint archives current active placements for each submitted target+role,
+1080-// then recreates submitted active rows. This prevents duplicate single-slot assignments.
+1081-function aicmRoleSyncOptionalUuidSql(value) {
+1082-  const text = String(value || "").trim();
+1083-  return /^[0-9a-fA-F-]{36}$/.test(text) ? sqlLiteral(text) + "::uuid" : "NULL";
+1084-}
+1085-
+1086-function aicmRoleSyncRole(value) {
+1087-  const text = String(value || "").trim().toLowerCase();
+1088-  if (text === "president") return "President";
+1089-  if (text === "manager") return "Manager";
+1090-  if (text === "leader") return "Leader";
+1091-  if (text === "worker" || text === "employee") return "Worker";
+1092-  throw new Error("invalid role_code");
+1093-}
+1094-
+
+============================================================
+context route scan
+============================================================
+1351-    }
+1352-
+1353-    if (route === "/api/aicm/v2/section/update" && req.method === "POST") {
+1354-      const body = await readBody(req);
+1355-      sendJson(res, 200, updateSection(body));
+1356-      return true;
+1357-    }
+1358-
+1359:if (route === "/api/aicm/v2/context" && req.method === "GET") {
+1360-      sendJson(res, 200, getContext(url.searchParams.get("owner_civilization_id") || ""));
+1361-      return true;
+1362-    }
+1363-
+1364-    if (route === "/api/aicm/v2/company/create" && req.method === "POST") {
+1365-      sendJson(res, 200, createCompany(await readBody(req)));
+1366-      return true;
+1367-    }
+
+============================================================
+recent role sync route scan
+============================================================
+1376-      const payload = createSection(await readBody(req));
+1377-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1378-      return true;
+1379-    }
+1380-
+1381-    
+1382-    if (route === "/api/aicm/v2/task-ledger/create" && req.method === "POST") {
+1383-      const payload = createTaskLedger(await readBody(req));
+1384-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1385-      return true;
+1386-    }
+1387-
+1388:    if (route === "/api/aicm/v2/placement/sync-role-settings" && req.method === "POST") {
+1389-      const payload = syncRoleSettings(await readBody(req));
+1390-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1391-      return true;
+1392-    }
+1393-
+1394-if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
+1395-      const payload = createPlacement(await readBody(req));
+1396-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+1397-      return true;
+1398-    }
+1399-
+1400-    if (route.startsWith("/api/aicm/v2/")) {

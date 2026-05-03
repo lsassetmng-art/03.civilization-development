@@ -1,0 +1,870 @@
+============================================================
+MATCH line=3185 pattern=function setCurrentCompany|setCurrentCompany[[:space:]]*=
+============================================================
+    init();
+  }
+})(window);
+
+/* ============================================================
+ * Department local action wiring starts below
+ * ============================================================ */
+(function (global) {
+  "use strict";
+
+  var STORAGE_KEY = "AICM_PHASE_AN_SPLIT_ADD_EDIT_STATE";
+  var DEPARTMENT_ACTIONS = {
+    "add-department": true,
+    "save-department": true,
+    "delete-department": true
+  };
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function getState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : { aiworkers: [], companies: [] };
+    } catch (error) {
+      return { aiworkers: [], companies: [] };
+    }
+  }
+
+  function setCurrentCompany(companyId) {
+    if (companyId) {
+      sessionStorage.setItem("AICM_CURRENT_COMPANY_ID", companyId);
+      sessionStorage.setItem("AICM_PENDING_COMPANY_ID", companyId);
+    }
+  }
+
+  function getCurrentCompanyId() {
+    var select = byId("company-select");
+    var state;
+
+    if (select && select.value) return select.value;
+
+    if (sessionStorage.getItem("AICM_CURRENT_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_CURRENT_COMPANY_ID");
+    }
+
+    if (sessionStorage.getItem("AICM_PENDING_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_COMPANY_ID");
+    }
+
+    state = getState();
+    if (state.companies && state.companies[0]) {
+      return state.companies[0].id || state.companies[0].company_id || "";
+    }
+
+    return "";
+  }
+
+  function setPendingDepartment(departmentId) {
+    if (departmentId) {
+      sessionStorage.setItem("AICM_PENDING_DEPARTMENT_ID", departmentId);
+    }
+  }
+
+  function createRepository() {
+    if (!global.AICM || !global.AICM.AicmLocalRepository) {
+      return null;
+    }
+
+    return new global.AICM.AicmLocalRepository({
+      storageKey: STORAGE_KEY
+    });
+  }
+
+  function getRepository() {
+    return createRepository();
+  }
+
+  function resultDepartmentId(result) {
+    if (!result || !result.data) return "";
+    if (result.data.department && (result.data.department.id || result.data.department.department_id)) {
+      return result.data.department.id || result.data.department.department_id;
+    }
+    return "";
+  }
+
+  function currentDepartmentId() {
+    var select = byId("department-select");
+    var state;
+    var companyId;
+    var company;
+
+    if (select && select.value) return select.value;
+
+    if (sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID");
+    }
+
+    companyId = getCurrentCompanyId();
+    state = getState();
+
+    company = (state.companies || []).find(function (c) {
+      return c.id === companyId || c.company_id === companyId;
+    });
+
+    if (company && company.departments && company.departments[0]) {
+      return company.departments[0].id || company.departments[0].department_id || "";
+    }
+
+    return "";
+  }
+
+  function buildCreateDepartmentPayload() {
+    return {
+      company_id: getCurrentCompanyId(),
+      department_name: byId("new-department-name") ? byId("new-department-name").value : "新規部門",
+      purpose: byId("new-department-purpose") ? byId("new-department-purpose").value : "",
+      display_order: 100
+    };
+  }
+
+  function buildSaveDepartmentPayload() {
+    return {
+      company_id: getCurrentCompanyId(),
+      department_id: currentDepartmentId(),
+      department_name: byId("edit-department-name") ? byId("edit-department-name").value : "",
+      purpose: byId("edit-department-purpose") ? byId("edit-department-purpose").value : "",
+      department_status: "active",
+      display_order: 100
+    };
+  }
+
+  function buildDeleteDepartmentPayload() {
+    return {
+      company_id: getCurrentCompanyId(),
+      department_id: currentDepartmentId()
+    };
+  }
+
+  function isDepartmentAction(action) {
+
+============================================================
+MATCH line=3448 pattern=function setCurrentCompany|setCurrentCompany[[:space:]]*=
+============================================================
+    init();
+  }
+})(window);
+
+/* ============================================================
+ * Organization local action wiring starts below
+ * ============================================================ */
+(function (global) {
+  "use strict";
+
+  var STORAGE_KEY = "AICM_PHASE_AN_SPLIT_ADD_EDIT_STATE";
+  var ORGANIZATION_ACTIONS = {
+    "add-organization": true,
+    "save-organization": true,
+    "delete-organization": true
+  };
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function getState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : { aiworkers: [], companies: [] };
+    } catch (error) {
+      return { aiworkers: [], companies: [] };
+    }
+  }
+
+  function setCurrentCompany(companyId) {
+    if (companyId) {
+      sessionStorage.setItem("AICM_CURRENT_COMPANY_ID", companyId);
+      sessionStorage.setItem("AICM_PENDING_COMPANY_ID", companyId);
+    }
+  }
+
+  function setPendingDepartment(departmentId) {
+    if (departmentId) {
+      sessionStorage.setItem("AICM_PENDING_DEPARTMENT_ID", departmentId);
+    }
+  }
+
+  function setPendingOrganization(organizationId) {
+    if (organizationId) {
+      sessionStorage.setItem("AICM_PENDING_ORGANIZATION_ID", organizationId);
+    }
+  }
+
+  function getCurrentCompanyId() {
+    var select = byId("company-select");
+    var state;
+
+    if (select && select.value) return select.value;
+
+    if (sessionStorage.getItem("AICM_CURRENT_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_CURRENT_COMPANY_ID");
+    }
+
+    if (sessionStorage.getItem("AICM_PENDING_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_COMPANY_ID");
+    }
+
+    state = getState();
+    if (state.companies && state.companies[0]) {
+      return state.companies[0].id || state.companies[0].company_id || "";
+    }
+
+    return "";
+  }
+
+  function getCurrentCompany() {
+    var state = getState();
+    var companyId = getCurrentCompanyId();
+
+    return (state.companies || []).find(function (company) {
+      return company.id === companyId || company.company_id === companyId;
+    }) || null;
+  }
+
+  function getCurrentDepartmentId() {
+    var orgAddDepartment = byId("org-add-department");
+    var departmentSelect = byId("department-select");
+    var company;
+
+    if (orgAddDepartment && orgAddDepartment.value) return orgAddDepartment.value;
+    if (departmentSelect && departmentSelect.value) return departmentSelect.value;
+
+    if (sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID");
+    }
+
+    company = getCurrentCompany();
+
+    if (company && company.departments && company.departments[0]) {
+      return company.departments[0].id || company.departments[0].department_id || "";
+    }
+
+    return "";
+  }
+
+  function getCurrentDepartment() {
+    var company = getCurrentCompany();
+    var departmentId = getCurrentDepartmentId();
+
+    if (!company) return null;
+
+    return (company.departments || []).find(function (department) {
+      return department.id === departmentId || department.department_id === departmentId;
+    }) || null;
+  }
+
+  function getCurrentOrganizationId() {
+    var organizationSelect = byId("organization-select");
+    var department;
+
+    if (organizationSelect && organizationSelect.value) return organizationSelect.value;
+
+    if (sessionStorage.getItem("AICM_PENDING_ORGANIZATION_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_ORGANIZATION_ID");
+    }
+
+    department = getCurrentDepartment();
+
+    if (department && department.organizations && department.organizations[0]) {
+      return department.organizations[0].id || department.organizations[0].organization_id || "";
+    }
+
+    return "";
+  }
+
+  function selectedValues(id) {
+    var select = byId(id);
+    var values = [];
+    var i;
+
+    if (!select) return values;
+
+    for (i = 0; i < select.options.length; i += 1) {
+      if (select.options[i].selected) {
+        values.push(select.options[i].value);
+
+============================================================
+MATCH line=3849 pattern=function setCurrentCompany|setCurrentCompany[[:space:]]*=
+============================================================
+    "delete-ledger-row": true
+  };
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function fieldValue(ids, fallback) {
+    var i;
+    var el;
+
+    for (i = 0; i < ids.length; i += 1) {
+      el = byId(ids[i]);
+      if (el && el.value !== undefined && String(el.value).length > 0) {
+        return el.value;
+      }
+    }
+
+    return fallback || "";
+  }
+
+  function getState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : { aiworkers: [], companies: [] };
+    } catch (error) {
+      return { aiworkers: [], companies: [] };
+    }
+  }
+
+  function setCurrentCompany(companyId) {
+    if (companyId) {
+      sessionStorage.setItem("AICM_CURRENT_COMPANY_ID", companyId);
+      sessionStorage.setItem("AICM_PENDING_COMPANY_ID", companyId);
+    }
+  }
+
+  function setPendingDepartment(departmentId) {
+    if (departmentId) {
+      sessionStorage.setItem("AICM_PENDING_DEPARTMENT_ID", departmentId);
+    }
+  }
+
+  function setPendingLedgerRow(ledgerRowId) {
+    if (ledgerRowId) {
+      sessionStorage.setItem("AICM_PENDING_LEDGER_ROW_ID", ledgerRowId);
+    }
+  }
+
+  function getCurrentCompanyId() {
+    var select = byId("company-select");
+    var state;
+
+    if (select && select.value) return select.value;
+
+    if (sessionStorage.getItem("AICM_CURRENT_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_CURRENT_COMPANY_ID");
+    }
+
+    if (sessionStorage.getItem("AICM_PENDING_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_COMPANY_ID");
+    }
+
+    state = getState();
+    if (state.companies && state.companies[0]) {
+      return state.companies[0].id || state.companies[0].company_id || "";
+    }
+
+    return "";
+  }
+
+  function getCurrentCompany() {
+    var state = getState();
+    var companyId = getCurrentCompanyId();
+
+    return (state.companies || []).find(function (company) {
+      return company.id === companyId || company.company_id === companyId;
+    }) || null;
+  }
+
+  function getCurrentDepartmentId() {
+    var departmentSelect = byId("department-select");
+    var company;
+
+    if (departmentSelect && departmentSelect.value) return departmentSelect.value;
+
+    if (sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID");
+    }
+
+    company = getCurrentCompany();
+
+    if (company && company.departments && company.departments[0]) {
+      return company.departments[0].id || company.departments[0].department_id || "";
+    }
+
+    return "";
+  }
+
+  function getCurrentDepartment() {
+    var company = getCurrentCompany();
+    var departmentId = getCurrentDepartmentId();
+
+    if (!company) return null;
+
+    return (company.departments || []).find(function (department) {
+      return department.id === departmentId || department.department_id === departmentId;
+    }) || null;
+  }
+
+  function getCurrentLedgerRowId(button) {
+    var editId = byId("edit-ledger-id");
+    var department;
+
+    if (editId && editId.value) return editId.value;
+
+    if (button && button.getAttribute && button.getAttribute("data-ledger-id")) {
+      return button.getAttribute("data-ledger-id");
+    }
+
+    if (sessionStorage.getItem("AICM_PENDING_LEDGER_ROW_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_LEDGER_ROW_ID");
+    }
+
+    department = getCurrentDepartment();
+
+    if (department && department.task_ledger && department.task_ledger[0]) {
+      return department.task_ledger[0].id || department.task_ledger[0].ledger_row_id || "";
+    }
+
+    return "";
+  }
+
+  function createRepository() {
+    if (!global.AICM || !global.AICM.AicmLocalRepository) {
+      return null;
+    }
+
+    return new global.AICM.AicmLocalRepository({
+      storageKey: STORAGE_KEY
+    });
+
+============================================================
+MATCH line=4247 pattern=function setCurrentCompany|setCurrentCompany[[:space:]]*=
+============================================================
+
+  var REQUIRED_HEADER = [
+    "deliverable_name",
+    "task_name",
+    "work_type",
+    "status",
+    "priority",
+    "due_date",
+    "reference_files",
+    "supplemental_materials",
+    "note"
+  ];
+
+  var WORK_TYPES = ["設計", "実装", "デザイン", "修正", "調査", "レビュー", "資料作成", "納品準備", "引き継ぎ"];
+  var STATUSES = ["未着手", "進行中", "レビュー中", "完了", "保留"];
+  var PRIORITIES = ["高", "中", "低"];
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function getState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : { aiworkers: [], companies: [] };
+    } catch (error) {
+      return { aiworkers: [], companies: [] };
+    }
+  }
+
+  function setCurrentCompany(companyId) {
+    if (companyId) {
+      sessionStorage.setItem("AICM_CURRENT_COMPANY_ID", companyId);
+      sessionStorage.setItem("AICM_PENDING_COMPANY_ID", companyId);
+    }
+  }
+
+  function setPendingDepartment(departmentId) {
+    if (departmentId) {
+      sessionStorage.setItem("AICM_PENDING_DEPARTMENT_ID", departmentId);
+    }
+  }
+
+  function getCurrentCompanyId() {
+    var select = byId("company-select");
+    var state;
+
+    if (select && select.value) return select.value;
+
+    if (sessionStorage.getItem("AICM_CURRENT_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_CURRENT_COMPANY_ID");
+    }
+
+    if (sessionStorage.getItem("AICM_PENDING_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_COMPANY_ID");
+    }
+
+    state = getState();
+    if (state.companies && state.companies[0]) {
+      return state.companies[0].id || state.companies[0].company_id || "";
+    }
+
+    return "";
+  }
+
+  function getCurrentCompany() {
+    var state = getState();
+    var companyId = getCurrentCompanyId();
+
+    return (state.companies || []).find(function (company) {
+      return company.id === companyId || company.company_id === companyId;
+    }) || null;
+  }
+
+  function getCurrentDepartmentId() {
+    var departmentSelect = byId("department-select");
+    var company;
+
+    if (departmentSelect && departmentSelect.value) return departmentSelect.value;
+
+    if (sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID");
+    }
+
+    company = getCurrentCompany();
+
+    if (company && company.departments && company.departments[0]) {
+      return company.departments[0].id || company.departments[0].department_id || "";
+    }
+
+    return "";
+  }
+
+  function createRepository() {
+    if (!global.AICM || !global.AICM.AicmLocalRepository) {
+      return null;
+    }
+
+    return new global.AICM.AicmLocalRepository({
+      storageKey: STORAGE_KEY
+    });
+  }
+
+  function readCsvTextFromDom() {
+    var ids = [
+      "csv-text",
+      "csv-input",
+      "csv-import-text",
+      "task-ledger-csv",
+      "ledger-csv-text",
+      "csv-preview-text"
+    ];
+    var i;
+    var el;
+
+    for (i = 0; i < ids.length; i += 1) {
+      el = byId(ids[i]);
+      if (el && typeof el.value === "string" && el.value.trim().length > 0) {
+        return el.value;
+      }
+    }
+
+    return "";
+  }
+
+  function parseCsvLine(line) {
+    var cells = [];
+    var current = "";
+    var inQuotes = false;
+    var i;
+    var ch;
+    var next;
+
+    for (i = 0; i < line.length; i += 1) {
+      ch = line.charAt(i);
+      next = line.charAt(i + 1);
+
+      if (ch === '"' && inQuotes && next === '"') {
+        current += '"';
+        i += 1;
+      } else if (ch === '"') {
+
+============================================================
+MATCH line=4746 pattern=function setCurrentCompany|setCurrentCompany[[:space:]]*=
+============================================================
+/* ============================================================
+ * Review local action wiring starts below
+ * ============================================================ */
+(function (global) {
+  "use strict";
+
+  var STORAGE_KEY = "AICM_PHASE_AN_SPLIT_ADD_EDIT_STATE";
+  var REVIEW_ACTIONS = {
+    "approve-review": true,
+    "reject-review": true,
+    "request-review-revision": true
+  };
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function getState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : { aiworkers: [], companies: [] };
+    } catch (error) {
+      return { aiworkers: [], companies: [] };
+    }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state || { aiworkers: [], companies: [] }));
+  }
+
+  function setCurrentCompany(companyId) {
+    if (companyId) {
+      sessionStorage.setItem("AICM_CURRENT_COMPANY_ID", companyId);
+      sessionStorage.setItem("AICM_PENDING_COMPANY_ID", companyId);
+    }
+  }
+
+  function setPendingDepartment(departmentId) {
+    if (departmentId) {
+      sessionStorage.setItem("AICM_PENDING_DEPARTMENT_ID", departmentId);
+    }
+  }
+
+  function setPendingReview(reviewItemId) {
+    if (reviewItemId) {
+      sessionStorage.setItem("AICM_PENDING_REVIEW_ITEM_ID", reviewItemId);
+    }
+  }
+
+  function getCurrentCompanyId() {
+    var select = byId("company-select");
+    var state;
+
+    if (select && select.value) return select.value;
+
+    if (sessionStorage.getItem("AICM_CURRENT_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_CURRENT_COMPANY_ID");
+    }
+
+    if (sessionStorage.getItem("AICM_PENDING_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_COMPANY_ID");
+    }
+
+    state = getState();
+    if (state.companies && state.companies[0]) {
+      return state.companies[0].id || state.companies[0].company_id || "";
+    }
+
+    return "";
+  }
+
+  function getCurrentCompany() {
+    var state = getState();
+    var companyId = getCurrentCompanyId();
+
+    return (state.companies || []).find(function (company) {
+      return company.id === companyId || company.company_id === companyId;
+    }) || null;
+  }
+
+  function getCurrentDepartmentId() {
+    var departmentSelect = byId("department-select");
+    var company;
+
+    if (departmentSelect && departmentSelect.value) return departmentSelect.value;
+
+    if (sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID");
+    }
+
+    company = getCurrentCompany();
+
+    if (company && company.departments && company.departments[0]) {
+      return company.departments[0].id || company.departments[0].department_id || "";
+    }
+
+    return "";
+  }
+
+  function firstReviewItem() {
+    var state = getState();
+    var found = null;
+
+    (state.companies || []).forEach(function (company) {
+      (company.departments || []).forEach(function (department) {
+        if (!found && department.review_items && department.review_items[0]) {
+          found = department.review_items[0];
+        }
+      });
+    });
+
+    return found;
+  }
+
+  function getReviewItemId(button) {
+    var item;
+
+    if (button && button.getAttribute) {
+      if (button.getAttribute("data-review-id")) return button.getAttribute("data-review-id");
+      if (button.getAttribute("data-review_item_id")) return button.getAttribute("data-review_item_id");
+      if (button.getAttribute("data-id")) return button.getAttribute("data-id");
+    }
+
+    if (sessionStorage.getItem("AICM_PENDING_REVIEW_ITEM_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_REVIEW_ITEM_ID");
+    }
+
+    item = firstReviewItem();
+    if (item) return item.id || item.review_item_id || "";
+
+    return "";
+  }
+
+  function ensureDemoReviewIfMissing() {
+    var state = getState();
+    var company;
+    var department;
+    var reviewId;
+
+    if (!state.companies || state.companies.length === 0) return "";
+
+
+============================================================
+MATCH line=5128 pattern=function setCurrentCompany|setCurrentCompany[[:space:]]*=
+============================================================
+})(window);
+
+/* ============================================================
+ * Workflow local stub wiring starts below
+ * ============================================================ */
+(function (global) {
+  "use strict";
+
+  var STORAGE_KEY = "AICM_PHASE_AN_SPLIT_ADD_EDIT_STATE";
+  var LAST_WORKFLOW_KEY = "AICM_LAST_WORKFLOW_RUN";
+
+  var WORKFLOW_ACTIONS = {
+    "start-workflow": true,
+    "start-ai-workflow": true,
+    "run-workflow": true
+  };
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function getState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : { aiworkers: [], companies: [] };
+    } catch (error) {
+      return { aiworkers: [], companies: [] };
+    }
+  }
+
+  function setCurrentCompany(companyId) {
+    if (companyId) {
+      sessionStorage.setItem("AICM_CURRENT_COMPANY_ID", companyId);
+      sessionStorage.setItem("AICM_PENDING_COMPANY_ID", companyId);
+    }
+  }
+
+  function setPendingDepartment(departmentId) {
+    if (departmentId) {
+      sessionStorage.setItem("AICM_PENDING_DEPARTMENT_ID", departmentId);
+    }
+  }
+
+  function setPendingLedgerRow(ledgerRowId) {
+    if (ledgerRowId) {
+      sessionStorage.setItem("AICM_PENDING_LEDGER_ROW_ID", ledgerRowId);
+    }
+  }
+
+  function getCurrentCompanyId() {
+    var select = byId("company-select");
+    var state;
+
+    if (select && select.value) return select.value;
+
+    if (sessionStorage.getItem("AICM_CURRENT_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_CURRENT_COMPANY_ID");
+    }
+
+    if (sessionStorage.getItem("AICM_PENDING_COMPANY_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_COMPANY_ID");
+    }
+
+    state = getState();
+    if (state.companies && state.companies[0]) {
+      return state.companies[0].id || state.companies[0].company_id || "";
+    }
+
+    return "";
+  }
+
+  function getCurrentCompany() {
+    var state = getState();
+    var companyId = getCurrentCompanyId();
+
+    return (state.companies || []).find(function (company) {
+      return company.id === companyId || company.company_id === companyId;
+    }) || null;
+  }
+
+  function getCurrentDepartmentId() {
+    var departmentSelect = byId("department-select");
+    var company;
+
+    if (departmentSelect && departmentSelect.value) return departmentSelect.value;
+
+    if (sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_DEPARTMENT_ID");
+    }
+
+    company = getCurrentCompany();
+
+    if (company && company.departments && company.departments[0]) {
+      return company.departments[0].id || company.departments[0].department_id || "";
+    }
+
+    return "";
+  }
+
+  function getCurrentDepartment() {
+    var company = getCurrentCompany();
+    var departmentId = getCurrentDepartmentId();
+
+    if (!company) return null;
+
+    return (company.departments || []).find(function (department) {
+      return department.id === departmentId || department.department_id === departmentId;
+    }) || null;
+  }
+
+  function getCurrentLedgerRowId(button) {
+    var editId = byId("edit-ledger-id");
+    var department;
+
+    if (button && button.getAttribute && button.getAttribute("data-ledger-id")) {
+      return button.getAttribute("data-ledger-id");
+    }
+
+    if (editId && editId.value) return editId.value;
+
+    if (sessionStorage.getItem("AICM_PENDING_LEDGER_ROW_ID")) {
+      return sessionStorage.getItem("AICM_PENDING_LEDGER_ROW_ID");
+    }
+
+    department = getCurrentDepartment();
+
+    if (department && department.task_ledger && department.task_ledger[0]) {
+      return department.task_ledger[0].id || department.task_ledger[0].ledger_row_id || "";
+    }
+
+    return "";
+  }
+
+  function createRepository() {
+    if (!global.AICM || !global.AICM.AicmLocalRepository) {
+      return null;
+    }
+
+    return new global.AICM.AicmLocalRepository({
+      storageKey: STORAGE_KEY
+    });
+

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AICM local company source debug</title>
+  <style>
+    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:16px;background:#f8fafc;color:#0f172a}
+    h1{font-size:20px}
+    h2{font-size:16px;margin-top:18px}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px;margin:12px 0;box-shadow:0 2px 10px rgba(15,23,42,.05)}
+    .ok{color:#166534;font-weight:700}
+    .warn{color:#92400e;font-weight:700}
+    .bad{color:#991b1b;font-weight:700}
+    pre{white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e5e7eb;padding:10px;border-radius:10px;max-height:360px;overflow:auto}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{border-bottom:1px solid #e2e8f0;text-align:left;padding:6px;vertical-align:top}
+    button{padding:8px 12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-weight:700}
+  </style>
+</head>
+<body>
+  <h1>AICompanyManager local company source debug</h1>
+  <div class="card">
+    <button onclick="run()">再読み取り</button>
+    <p id="status">loading...</p>
+  </div>
+
+  <div class="card">
+    <h2>1. localStorage keys</h2>
+    <pre id="keys"></pre>
+  </div>
+
+  <div class="card">
+    <h2>2. AICM_PHASE_AN_SPLIT_ADD_EDIT_STATE companies</h2>
+    <p id="companySummary"></p>
+    <div id="companyTable"></div>
+  </div>
+
+  <div class="card">
+    <h2>3. ウルフ / Wolf 判定</h2>
+    <pre id="wolf"></pre>
+  </div>
+
+  <div class="card">
+    <h2>4. served phase-de-dh JS source scan</h2>
+    <pre id="jsScan"></pre>
+  </div>
+
+  <div class="card">
+    <h2>5. served index active scripts</h2>
+    <pre id="scriptScan"></pre>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "AICM_PHASE_AN_SPLIT_ADD_EDIT_STATE";
+
+  function text(v) {
+    return v === null || v === undefined ? "" : String(v);
+  }
+
+  function esc(v) {
+    return text(v).replace(/[&<>"']/g, function(ch){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch];
+    });
+  }
+
+  function set(id, value) {
+    document.getElementById(id).textContent = value;
+  }
+
+  function renderCompanies(companies) {
+    if (!companies || !companies.length) {
+      document.getElementById("companyTable").innerHTML = "<p class='warn'>companies is empty</p>";
+      return;
+    }
+
+    var html = "<table><thead><tr><th>#</th><th>id/company_id</th><th>name/company_name</th><th>business_domain</th><th>status</th></tr></thead><tbody>";
+    companies.forEach(function(c, i){
+      html += "<tr>";
+      html += "<td>" + (i + 1) + "</td>";
+      html += "<td>" + esc(c.company_id || c.id || "") + "</td>";
+      html += "<td>" + esc(c.company_name || c.name || "") + "</td>";
+      html += "<td>" + esc(c.business_domain || "") + "</td>";
+      html += "<td>" + esc(c.company_status || c.status || "") + "</td>";
+      html += "</tr>";
+    });
+    html += "</tbody></table>";
+    document.getElementById("companyTable").innerHTML = html;
+  }
+
+  function scanWolf(companies, raw) {
+    var rows = [];
+    var found = false;
+
+    (companies || []).forEach(function(c, i){
+      var blob = JSON.stringify(c);
+      if (/ウルフ|wolf/i.test(blob)) {
+        found = true;
+        rows.push("FOUND company index=" + i + " " + blob);
+      }
+    });
+
+    if (/ウルフ|wolf/i.test(raw || "")) {
+      rows.push("FOUND in raw localStorage JSON");
+      found = true;
+    }
+
+    if (!found) rows.push("NOT_FOUND: ウルフ/Wolf is not in this browser localStorage company state.");
+    return rows.join("\n");
+  }
+
+  async function fetchText(url) {
+    var res = await fetch(url + "?debug_ts=" + Date.now(), {cache:"no-store"});
+    return await res.text();
+  }
+
+  async function run() {
+    var keys = [];
+    var i;
+    var raw = "";
+    var data = null;
+    var companies = [];
+
+    document.getElementById("status").innerHTML = "<span class='warn'>reading...</span>";
+
+    for (i = 0; i < localStorage.length; i += 1) {
+      keys.push(localStorage.key(i));
+    }
+
+    set("keys", keys.sort().join("\n"));
+
+    raw = localStorage.getItem(STORAGE_KEY) || "";
+
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      data = null;
+      set("companySummary", "JSON parse error: " + error.message);
+    }
+
+    companies = data && Array.isArray(data.companies) ? data.companies : [];
+
+    document.getElementById("companySummary").innerHTML =
+      "storageKey=<strong>" + esc(STORAGE_KEY) + "</strong><br>" +
+      "rawLength=<strong>" + esc(raw.length) + "</strong><br>" +
+      "companies.length=<strong>" + esc(companies.length) + "</strong>";
+
+    renderCompanies(companies);
+    set("wolf", scanWolf(companies, raw));
+
+    try {
+      var js = await fetchText("./assets/js/phase-de-dh-workflow-final-local-ui.js");
+      var lines = js.split(/\n/);
+      var hits = [];
+      lines.forEach(function(line, idx){
+        if (/STORAGE_KEY|baseData|companies|company_id|company_name|business_domain|ウルフ|Wolf|wolf|companyOptions|currentCompany|switch-company/.test(line)) {
+          hits.push((idx + 1) + ": " + line);
+        }
+      });
+      set("jsScan", hits.slice(0, 260).join("\n"));
+    } catch (error) {
+      set("jsScan", "fetch JS failed: " + error.message);
+    }
+
+    try {
+      var html = await fetchText("./index.html");
+      var hlines = html.split(/\n/);
+      var shits = [];
+      hlines.forEach(function(line, idx){
+        if (/<script[^>]+src=/.test(line) && !/<!--/.test(line)) {
+          shits.push((idx + 1) + ": " + line);
+        }
+      });
+      set("scriptScan", shits.join("\n"));
+    } catch (error) {
+      set("scriptScan", "fetch index failed: " + error.message);
+    }
+
+    document.getElementById("status").innerHTML =
+      "<span class='ok'>read complete</span> origin=" + esc(location.origin) +
+      " path=" + esc(location.pathname);
+  }
+
+  window.run = run;
+  run();
+})();
+</script>
+</body>
+</html>

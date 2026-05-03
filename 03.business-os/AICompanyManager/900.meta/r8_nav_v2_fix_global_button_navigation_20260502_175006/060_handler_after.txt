@@ -1,0 +1,261 @@
+    }
+
+    if (action === "department-update-save") {
+      saveDepartmentUpdateFromForm();
+      return;
+    }
+
+    if (action === "section-update-save") {
+      saveSectionUpdateFromForm();
+      return;
+    }
+
+    if (action === "org-update-confirm-execute") {
+      executeAicmOrgUpdateConfirm();
+      return;
+    }
+
+    if (action === "org-update-confirm-cancel") {
+      cancelAicmOrgUpdateConfirm();
+      return;
+    }
+
+    if (action === "company-edit-open") {
+      state.screen = "company-edit";
+      if (typeof render === "function") render();
+      return;
+    }
+
+    if (action === "department-edit-pick") {
+      var actionTarget = aicmActionTargetSafe(event, button);
+      state.editingDepartmentId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-department-id") || "") : "";
+      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+      if (typeof render === "function") render();
+      return;
+    }
+
+    if (action === "section-edit-pick") {
+      var actionTarget = aicmActionTargetSafe(event, button);
+      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : "";
+      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+      if (typeof render === "function") render();
+      return;
+    }
+
+    if (action === "section-worker-update-open") {
+      var actionTarget = aicmActionTargetSafe(event, button);
+      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : (state.editingSectionId || "");
+      state.workerPlacementSectionId = state.editingSectionId || "";
+      state.screen = "worker-placement";
+      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+      if (typeof render === "function") render();
+      return;
+    }
+
+        // AICM_REMOVE_STALE_ROLE_SETTING_OPEN_AUC_AUF_V1: stale role setting open action removed
+
+    
+
+    if (action === "inline-worker-slot-add") {
+      // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
+      aicmAxoCaptureCurrentEditFormDraft();
+      if (!state.inlineWorkerSlotCount) state.inlineWorkerSlotCount = 3;
+      state.inlineWorkerSlotCount = Math.min(20, Number(state.inlineWorkerSlotCount || 3) + 1);
+      if (typeof render === "function") render();
+      return;
+    }
+
+    if (action === "task-ledger-csv-file-open") {
+      aicmCsvOpenFileInput();
+      return;
+    }
+    // AICM_AXU_CSV_R3_FIX1_LITERAL_NEWLINE_REPAIR_V1
+    if (action === "task-ledger-csv-import") {
+      aicmCsvImportLoadedReadBeforeImport();
+      return;
+    }
+    
+
+
+    
+// AICM_R8_NAV_TASK_LEDGER_EXPLICIT_GO_V2_START
+    var aicmNavTargetR8V2 = null;
+    var aicmNavEventR8V2 = null;
+
+    if (typeof target !== "undefined" && target && target.getAttribute) {
+      aicmNavTargetR8V2 = target;
+    } else if (typeof button !== "undefined" && button && button.getAttribute) {
+      aicmNavTargetR8V2 = button;
+    } else if (typeof el !== "undefined" && el && el.getAttribute) {
+      aicmNavTargetR8V2 = el;
+    }
+
+    if (typeof ev !== "undefined" && ev) {
+      aicmNavEventR8V2 = ev;
+    } else if (typeof e !== "undefined" && e) {
+      aicmNavEventR8V2 = e;
+    } else if (typeof event !== "undefined" && event) {
+      aicmNavEventR8V2 = event;
+    }
+
+    if (!aicmNavTargetR8V2 && aicmNavEventR8V2 && aicmNavEventR8V2.target) {
+      if (aicmNavEventR8V2.target.closest) {
+        aicmNavTargetR8V2 = aicmNavEventR8V2.target.closest("[data-core-action]");
+      } else {
+        aicmNavTargetR8V2 = aicmNavEventR8V2.target;
+      }
+    }
+
+    if (
+      typeof action !== "undefined" &&
+      action === "go" &&
+      aicmNavTargetR8V2 &&
+      aicmNavTargetR8V2.getAttribute &&
+      aicmNavTargetR8V2.getAttribute("data-screen") === "task-ledger"
+    ) {
+      if (aicmNavEventR8V2 && aicmNavEventR8V2.preventDefault) {
+        aicmNavEventR8V2.preventDefault();
+      }
+
+      state.screen = "task-ledger";
+      state.managerMajorDeleteConfirm = null;
+
+      if (typeof setMessage === "function") {
+        setMessage("ok", "部門別タスク台帳を表示します。");
+      }
+
+      if (typeof aicmReloadTaskLedgerContext === "function") {
+        Promise.resolve()
+          .then(function () {
+            return aicmReloadTaskLedgerContext();
+          })
+          .then(function () {
+            state.screen = "task-ledger";
+            render();
+          })
+          .catch(function (error) {
+            state.screen = "task-ledger";
+            if (typeof setMessage === "function") {
+              setMessage("error", error && error.message ? error.message : "部門別タスク台帳の読込に失敗しました。");
+            }
+            render();
+          });
+      } else {
+        render();
+      }
+
+      return;
+    }
+// AICM_R8_NAV_TASK_LEDGER_EXPLICIT_GO_V2_END
+
+    if (action === "go") {
+      // AICM_CLEAR_TRANSIENT_ON_GO_ASS_ASV
+      if (typeof aicmClearTransientMessage === "function") {
+        var nextScreenForMessageClear = "";
+        try {
+          nextScreenForMessageClear = button && button.getAttribute ? String(button.getAttribute("data-screen") || "") : "";
+        } catch (_) {
+          nextScreenForMessageClear = "";
+        }
+
+        if (
+          nextScreenForMessageClear === "company-edit" ||
+          nextScreenForMessageClear === "company-change" ||
+          nextScreenForMessageClear === "company-update" ||
+          nextScreenForMessageClear === "department-edit" ||
+          nextScreenForMessageClear === "section-edit"
+        ) {
+          aicmClearTransientMessage();
+        }
+      }
+
+      go(button.getAttribute("data-screen") || "dashboard");
+      return;
+    }
+
+
+    
+// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_ACTION_HANDLER_START
+    if (action === "pmlw-major-page-prev") {
+      aicmMajorItemSetPageR8O(-1);
+      return;
+    }
+
+    if (action === "pmlw-major-page-next") {
+      aicmMajorItemSetPageR8O(1);
+      return;
+    }
+
+    if (action === "pmlw-major-delete-open") {
+      aicmOpenMajorItemDeleteConfirmR8P(target);
+      return;
+    }
+
+    if (action === "pmlw-major-delete-cancel") {
+      aicmCancelMajorItemDeleteConfirmR8P();
+      return;
+    }
+
+    if (action === "pmlw-major-delete-execute") {
+      aicmExecuteMajorItemDeleteConfirmR8P();
+      return;
+    }
+// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_ACTION_HANDLER_END
+
+    if (action === "task-ledger-refresh") {
+      aicmReloadTaskLedgerContext();
+      return;
+    }
+
+    if (action === "reload") {
+      loadContext();
+      return;
+    }
+  }
+
+  function handleRootChange(event) {
+    var field = event.target;
+    var fileKind = field.getAttribute("data-core-file") || "";
+    if (fileKind === "task-ledger-csv") {
+      aicmCsvReadSelectedFile(field);
+      return;
+    }
+
+    var fieldName = field.getAttribute("data-core-field") || "";
+
+    if (fieldName === "selectedCompanyId") {
+      setSelectedCompany(field.value);
+      render();
+      return;
+    }
+
+    if (fieldName === "selectedDepartmentId") {
+      setSelectedDepartment(field.value);
+      render();
+    }
+  }
+
+  function handleRootSubmit(event) {
+    var form = event.target.closest("form[data-core-form]");
+    if (!form) return;
+
+    event.preventDefault();
+    submitForm(form);
+  }
+
+  
+
+function injectMinimalCss() {
+    if (document.getElementById("aicm-production-core-css")) return;
+
+    var style = document.createElement("style");
+    style.id = "aicm-production-core-css";
+    style.textContent = [
+      ".aicm-core{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:980px;margin:0 auto;padding:20px;color:#172033;background:#f6f7fb;min-height:100vh}",
+      ".aicm-core-header{padding:10px 0 18px}",
+      ".aicm-core-header h1{font-size:32px;margin:0;letter-spacing:-.04em}",
+      ".aicm-core-tabs{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 22px}",
+      ".aicm-core button{border:1px solid #d8dee9;background:#eef2ff;border-radius:14px;padding:11px 15px;font-weight:800;color:#1f2a44;box-shadow:0 4px 10px rgba(31,42,68,.06)}",
+      ".aicm-core-main{display:grid;gap:16px}",
+      ".aicm-core-card{background:#fff;border:1px solid #e6eaf2;border-radius:22px;padding:20px;box-shadow:0 10px 24px rgba(15,23,42,.06)}",
+      ".aicm-core-card h2{font-size:26px;margin:0 0 14px;letter-spacing:-.03em}",

@@ -1,0 +1,1134 @@
+============================================================
+click/action handler scan
+============================================================
+4923-  }
+4924-
+4925-function confirmWorkerRuntimeRequestFromForm() {
+4926-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4927-    try {
+4928-      state.pendingWorkerRuntimeRequest = buildWorkerRuntimePendingPayload();
+4929-      state.screen = "worker-runtime-confirm";
+4930-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4931-      if (typeof render === "function") render();
+4932-    } catch (error) {
+4933-      setMessage("error", error && error.message ? error.message : "確認画面を表示できません。");
+4934-      if (typeof render === "function") render();
+4935-    }
+4936-  }
+4937-
+4938-function cancelWorkerRuntimeConfirm() {
+4939-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4940-    state.pendingWorkerRuntimeRequest = null;
+4941-    state.screen = "worker-runtime-request";
+4942-    if (typeof render === "function") render();
+4943-  }
+4944-
+4945-function render() {
+4946-    if (!root) return;
+4947-
+4948-    var html = "";
+4949-
+4950-    if (state.screen === "company-new") {
+4951-      html = renderCompanyNew();
+4952-    } else if (state.screen === "department-new") {
+4953-      html = renderDepartmentNew();
+4954-    } else if (state.screen === "section-new") {
+4955-      html = renderSectionNew();
+4956-    } else if (state.screen === "placement-new") {
+4957-      html = renderPlacementNew();
+4958-    } else if (state.screen === "worker-runtime-confirm") {
+4959-      // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+4960-      html = renderWorkerRuntimeConfirm();
+4961-    } else if (state.screen === "worker-runtime-request") {
+4962-      html = renderWorkerRuntimeRequest();
+4963-    } else if (state.screen === "settings") {
+4964-      html = renderSettings();
+4965-    } else if (state.screen === "department-edit") {
+4966-      html = renderDepartmentEditPlaceholder();
+4967-    } else if (state.screen === "section-edit") {
+4968-      html = renderSectionEditPlaceholder();
+4969-    } else if (state.screen === "task-ledger") {
+4970-      html = renderTaskLedgerPlaceholder();
+4971-    } else if (state.screen === "review-list") {
+4972-      html = renderReviewListPlaceholder();
+4973-    } else {
+4974-      html = renderDashboard();
+4975-    }
+4976-
+4977-    
+4978-    // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+4979-    if (
+4980-      state &&
+4981-      (
+4982-        state.screen === "company-edit" ||
+4983-        state.screen === "company-change" ||
+4984-        state.screen === "company-update"
+4985-      )
+4986-    ) {
+4987-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4988-      html = renderCompanyEditPlaceholder();
+4989-    }
+4990-
+4991-
+4992-    // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+4993-    if (state && state.screen === "company-edit") {
+4994-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+4995-      html = renderCompanyEditPlaceholder();
+4996-    }
+4997-
+4998-    if (state && state.screen === "department-edit") {
+4999-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5000-      html = renderDepartmentEditPlaceholder();
+5001-    }
+5002-
+5003-    if (state && state.screen === "section-edit") {
+5004-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5005-      html = renderSectionEditPlaceholder();
+5006-    }
+5007-
+5008-
+5009-    // AICM_INLINE_ROLE_ADD_SCREEN_INJECTION_ATQ_ATT
+5010-    if (typeof aicmInjectInlineRoleSettingsForAddScreens === "function") {
+5011-      html = aicmInjectInlineRoleSettingsForAddScreens(html);
+5012-    }
+5013-
+5014-root.innerHTML = html;
+5015-  }
+5016-
+5017-  function fieldValue(form, name) {
+5018-    var field = form.elements[name];
+5019-    return field && typeof field.value === "string" ? field.value.trim() : "";
+5020-  }
+5021-
+5022-  function submitForm(form) {
+5023-    var formName = form.getAttribute("data-core-form") || "";
+5024-    state.errorMessage = "";
+5025-    state.noticeMessage = "";
+5026-
+5027-    var task;
+5028-
+5029-    if (formName === "company-create") {
+5030-      task = createCompany({
+5031-        companyName: fieldValue(form, "companyName"),
+5032-        businessDomain: fieldValue(form, "businessDomain")
+5033-      });
+5034-    } else if (formName === "department-create") {
+5035-      task = createDepartment({
+5036-        departmentName: fieldValue(form, "departmentName"),
+5037-        purpose: fieldValue(form, "purpose")
+5038-      });
+5039-    } else if (formName === "section-create") {
+5040-      task = createSection({
+5041-        sectionName: fieldValue(form, "sectionName"),
+5042-        purpose: fieldValue(form, "purpose")
+5043-      });
+5044-    } else if (formName === "placement-create") {
+5045-      var robotSelect = form.elements.robotPoolId;
+5046-      var selectedRobot = robotSelect && robotSelect.selectedOptions ? robotSelect.selectedOptions[0] : null;
+5047-      var targetLevelCode = fieldValue(form, "targetLevelCode");
+5048-      var sectionId = fieldValue(form, "sectionId");
+5049-      var targetId = state.selectedCompanyId;
+5050-
+5051-      if (targetLevelCode === "department") {
+5052-        targetId = state.selectedDepartmentId;
+5053-      }
+5054-
+5055-      if (targetLevelCode === "section") {
+5056-        targetId = sectionId;
+5057-      }
+5058-
+5059-      task = createPlacement({
+5060-        departmentId: state.selectedDepartmentId,
+5061-        sectionId: sectionId,
+5062-        targetLevelCode: targetLevelCode,
+5063-        targetId: targetId,
+5064-        roleCode: fieldValue(form, "roleCode"),
+5065-        robotPoolId: fieldValue(form, "robotPoolId"),
+5066-        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",
+5067-        internalNickname: fieldValue(form, "internalNickname")
+5068-      });
+5069-    } else {
+5070-      task = Promise.reject(new Error("未知のフォームです。"));
+5071-    }
+5072-
+5073-    state.loading = true;
+5074-    render();
+5075-
+5076-    task.catch(function (error) {
+5077-      state.loading = false;
+5078-      state.errorMessage = publicErrorMessage(error);
+5079-      render();
+5080-    });
+5081-  }
+5082-
+5083:  function handleRootClick(event) {
+5084-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+5085-  var aicmRawClickTarget = event.target;
+5086-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+5087-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+5088-    : aicmRawClickTarget;
+5089-
+5090-    var button = aicmActionTarget.closest("[data-core-action]");
+5091-    if (!button) return;
+5092-
+5093-    var action = button.getAttribute("data-core-action") || "";
+5094-
+5095-    // AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+5096-    if (action === "pmlw-major-leader-handoff") {
+5097-      aicmAxuR1OpenLeaderHandoffConfirm(button);
+5098-      return;
+5099-    }
+5100-
+5101-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+5102-    if (action === "worker-runtime-status-refresh") {
+5103-      aicmRuntimeStatusRefresh();
+5104-      return;
+5105-    }
+5106-
+5107-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+5108-    if (action === "worker-runtime-confirm") {
+5109-      confirmWorkerRuntimeRequestFromForm();
+5110-      return;
+5111-    }
+5112-
+5113-    if (action === "worker-runtime-execute") {
+5114-      executeWorkerRuntimeConfirm();
+5115-      return;
+5116-    }
+5117-
+5118-    if (action === "worker-runtime-cancel") {
+5119-      cancelWorkerRuntimeConfirm();
+5120-      return;
+5121-    }
+5122-
+5123-            if (action === "task-ledger-fill-csv-template") {
+5124-      fillTaskLedgerCsvTemplate();
+5125-      return;
+5126-    }
+5127-
+5128-        if (action === "task-ledger-csv-file-open") {
+5129-      openTaskLedgerCsvFilePicker();
+5130-      return;
+5131-    }
+5132-
+5133-    if (action === "task-ledger-chatgpt-prompt") {
+5134-      handleTaskLedgerChatGptPrompt();
+5135-      return;
+5136-    }
+5137-if (action === "task-ledger-csv-preview") {
+5138-      previewTaskLedgerCsv();
+5139-      return;
+5140-    }
+5141-
+5142-    if (action === "task-ledger-csv-import") {
+5143-      importTaskLedgerCsvToPmlwMajor();
+5144-      return;
+5145-    }
+5146-if (action === "task-ledger-create") {
+5147-      createTaskLedgerFromForm();
+5148-      return;
+5149-    }
+5150-if (action === "human-review-approve") {
+5151-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5152-      return;
+5153-    }
+5154-
+5155-    if (action === "human-review-return") {
+5156-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5157-      return;
+5158-    }
+5159-
+5160-    if (action === "department-update-select") {
+5161-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5162-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+5163-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5164-      if (typeof render === "function") render();
+5165-      return;
+5166-    }
+5167-
+5168-    if (action === "department-update-clear") {
+5169-      state.editingDepartmentId = "";
+5170-      if (typeof render === "function") render();
+5171-      return;
+5172-    }
+5173-
+5174-    if (action === "section-update-select") {
+5175-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5176-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+5177-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5178-      if (typeof render === "function") render();
+5179-      return;
+5180-    }
+5181-
+5182-    if (action === "section-update-clear") {
+5183-      state.editingSectionId = "";
+5184-      if (typeof render === "function") render();
+5185-      return;
+5186-    }
+5187-
+5188-    if (action === "company-update-save") {
+5189-      saveCompanyUpdateFromForm();
+5190-      return;
+5191-    }
+5192-
+5193-    if (action === "department-update-save") {
+5194-      saveDepartmentUpdateFromForm();
+5195-      return;
+5196-    }
+5197-
+5198-    if (action === "section-update-save") {
+5199-      saveSectionUpdateFromForm();
+5200-      return;
+5201-    }
+5202-
+5203-    if (action === "org-update-confirm-execute") {
+5204-      executeAicmOrgUpdateConfirm();
+5205-      return;
+5206-    }
+5207-
+5208-    if (action === "org-update-confirm-cancel") {
+5209-      cancelAicmOrgUpdateConfirm();
+5210-      return;
+5211-    }
+5212-
+5213-    if (action === "company-edit-open") {
+5214-      state.screen = "company-edit";
+5215-      if (typeof render === "function") render();
+5216-      return;
+5217-    }
+5218-
+5219-    if (action === "department-edit-pick") {
+5220-      var actionTarget = aicmActionTargetSafe(event, button);
+5221-      state.editingDepartmentId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-department-id") || "") : "";
+5222-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5223-      if (typeof render === "function") render();
+5224-      return;
+5225-    }
+5226-
+5227-    if (action === "section-edit-pick") {
+5228-      var actionTarget = aicmActionTargetSafe(event, button);
+5229-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : "";
+5230-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5231-      if (typeof render === "function") render();
+5232-      return;
+5233-    }
+5234-
+5235-    if (action === "section-worker-update-open") {
+5236-      var actionTarget = aicmActionTargetSafe(event, button);
+5237-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : (state.editingSectionId || "");
+5238-      state.workerPlacementSectionId = state.editingSectionId || "";
+5239-      state.screen = "worker-placement";
+5240-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5241-      if (typeof render === "function") render();
+5242-      return;
+5243-    }
+
+5013-
+5014-root.innerHTML = html;
+5015-  }
+5016-
+5017-  function fieldValue(form, name) {
+5018-    var field = form.elements[name];
+5019-    return field && typeof field.value === "string" ? field.value.trim() : "";
+5020-  }
+5021-
+5022-  function submitForm(form) {
+5023-    var formName = form.getAttribute("data-core-form") || "";
+5024-    state.errorMessage = "";
+5025-    state.noticeMessage = "";
+5026-
+5027-    var task;
+5028-
+5029-    if (formName === "company-create") {
+5030-      task = createCompany({
+5031-        companyName: fieldValue(form, "companyName"),
+5032-        businessDomain: fieldValue(form, "businessDomain")
+5033-      });
+5034-    } else if (formName === "department-create") {
+5035-      task = createDepartment({
+5036-        departmentName: fieldValue(form, "departmentName"),
+5037-        purpose: fieldValue(form, "purpose")
+5038-      });
+5039-    } else if (formName === "section-create") {
+5040-      task = createSection({
+5041-        sectionName: fieldValue(form, "sectionName"),
+5042-        purpose: fieldValue(form, "purpose")
+5043-      });
+5044-    } else if (formName === "placement-create") {
+5045-      var robotSelect = form.elements.robotPoolId;
+5046-      var selectedRobot = robotSelect && robotSelect.selectedOptions ? robotSelect.selectedOptions[0] : null;
+5047-      var targetLevelCode = fieldValue(form, "targetLevelCode");
+5048-      var sectionId = fieldValue(form, "sectionId");
+5049-      var targetId = state.selectedCompanyId;
+5050-
+5051-      if (targetLevelCode === "department") {
+5052-        targetId = state.selectedDepartmentId;
+5053-      }
+5054-
+5055-      if (targetLevelCode === "section") {
+5056-        targetId = sectionId;
+5057-      }
+5058-
+5059-      task = createPlacement({
+5060-        departmentId: state.selectedDepartmentId,
+5061-        sectionId: sectionId,
+5062-        targetLevelCode: targetLevelCode,
+5063-        targetId: targetId,
+5064-        roleCode: fieldValue(form, "roleCode"),
+5065-        robotPoolId: fieldValue(form, "robotPoolId"),
+5066-        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",
+5067-        internalNickname: fieldValue(form, "internalNickname")
+5068-      });
+5069-    } else {
+5070-      task = Promise.reject(new Error("未知のフォームです。"));
+5071-    }
+5072-
+5073-    state.loading = true;
+5074-    render();
+5075-
+5076-    task.catch(function (error) {
+5077-      state.loading = false;
+5078-      state.errorMessage = publicErrorMessage(error);
+5079-      render();
+5080-    });
+5081-  }
+5082-
+5083-  function handleRootClick(event) {
+5084-  // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+5085-  var aicmRawClickTarget = event.target;
+5086-  var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+5087-    ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+5088-    : aicmRawClickTarget;
+5089-
+5090-    var button = aicmActionTarget.closest("[data-core-action]");
+5091-    if (!button) return;
+5092-
+5093:    var action = button.getAttribute("data-core-action") || "";
+5094-
+5095-    // AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+5096-    if (action === "pmlw-major-leader-handoff") {
+5097-      aicmAxuR1OpenLeaderHandoffConfirm(button);
+5098-      return;
+5099-    }
+5100-
+5101-    // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+5102-    if (action === "worker-runtime-status-refresh") {
+5103-      aicmRuntimeStatusRefresh();
+5104-      return;
+5105-    }
+5106-
+5107-    // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+5108-    if (action === "worker-runtime-confirm") {
+5109-      confirmWorkerRuntimeRequestFromForm();
+5110-      return;
+5111-    }
+5112-
+5113-    if (action === "worker-runtime-execute") {
+5114-      executeWorkerRuntimeConfirm();
+5115-      return;
+5116-    }
+5117-
+5118-    if (action === "worker-runtime-cancel") {
+5119-      cancelWorkerRuntimeConfirm();
+5120-      return;
+5121-    }
+5122-
+5123-            if (action === "task-ledger-fill-csv-template") {
+5124-      fillTaskLedgerCsvTemplate();
+5125-      return;
+5126-    }
+5127-
+5128-        if (action === "task-ledger-csv-file-open") {
+5129-      openTaskLedgerCsvFilePicker();
+5130-      return;
+5131-    }
+5132-
+5133-    if (action === "task-ledger-chatgpt-prompt") {
+5134-      handleTaskLedgerChatGptPrompt();
+5135-      return;
+5136-    }
+5137-if (action === "task-ledger-csv-preview") {
+5138-      previewTaskLedgerCsv();
+5139-      return;
+5140-    }
+5141-
+5142-    if (action === "task-ledger-csv-import") {
+5143-      importTaskLedgerCsvToPmlwMajor();
+5144-      return;
+5145-    }
+5146-if (action === "task-ledger-create") {
+5147-      createTaskLedgerFromForm();
+5148-      return;
+5149-    }
+5150-if (action === "human-review-approve") {
+5151-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5152-      return;
+5153-    }
+5154-
+5155-    if (action === "human-review-return") {
+5156-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5157-      return;
+5158-    }
+5159-
+5160-    if (action === "department-update-select") {
+5161-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5162-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+5163-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5164-      if (typeof render === "function") render();
+5165-      return;
+5166-    }
+5167-
+5168-    if (action === "department-update-clear") {
+5169-      state.editingDepartmentId = "";
+5170-      if (typeof render === "function") render();
+5171-      return;
+5172-    }
+5173-
+
+773-      '  <label>課名<input id="aicm-section-edit-name" type="text" value="' + escapeHtml(section.section_name || '') + '"></label>',
+774-      '  <label>目的<textarea id="aicm-section-edit-purpose" rows="4">' + escapeHtml(section.purpose || '') + '</textarea></label>',
+775-      '  <label>状態<select id="aicm-section-edit-status">',
+776-      '    <option value="active"' + ((section.section_status || 'active') === 'active' ? ' selected' : '') + '>active</option>',
+777-      '    <option value="inactive"' + ((section.section_status || '') === 'inactive' ? ' selected' : '') + '>inactive</option>',
+778-      '    <option value="archived"' + ((section.section_status || '') === 'archived' ? ' selected' : '') + '>archived</option>',
+779-      '  </select></label>',
+780-      '  <div class="aicm-dashboard-action-row">',
+781-      '    <button type="button" data-core-action="section-update-save">変更を保存</button>',
+782-      '    <button type="button" data-core-action="section-update-clear">一覧へ戻る</button>',
+783-      '  </div>',
+784-      '</section>'
+785-    ].join("");
+786-  }
+787-
+788-  function renderAicmCompanyUpdateScreen() {
+789-    return renderShell(renderCompanyUpdateForm(aicmOrgSelectedCompany()));
+790-  }
+791-
+792-  function renderAicmDepartmentUpdateScreen() {
+793-    var company = aicmOrgSelectedCompany();
+794-    var selectedId = state.editingDepartmentId || "";
+795-    var selected = selectedId ? aicmOrgDepartmentById(selectedId) : null;
+796-    var rows = company ? aicmOrgDepartmentsForCompany(company.aicm_user_company_id) : [];
+797-    return renderShell(selected ? renderDepartmentUpdateForm(selected) : renderDepartmentUpdatePicker(company, rows));
+798-  }
+799-
+800-  function renderAicmSectionUpdateScreen() {
+801-    var company = aicmOrgSelectedCompany();
+802-    var selectedId = state.editingSectionId || "";
+803-    var selected = selectedId ? aicmOrgSectionById(selectedId) : null;
+804-    var rows = company ? aicmOrgSectionsForCompany(company.aicm_user_company_id) : [];
+805-    return renderShell(selected ? renderSectionUpdateForm(selected) : renderSectionUpdatePicker(company, rows));
+806-  }
+807-
+808-// AICM_DB_WRITE_CONFIRMATION_REQUIRED_ARY_ASB_V1
+809-// DB write operations must pass through a visible confirmation screen before POST.
+810-
+811-function aicmOrgUpdateLabel(kind) {
+812-    if (kind === "company") return "企業変更";
+813-    if (kind === "department") return "部門変更";
+814-    if (kind === "section") return "課変更";
+815-    return "変更";
+816-  }
+817-
+818-  function aicmOrgUpdateBodyRows(body) {
+819-    var keys = Object.keys(body || {}).filter(function (key) {
+820-      return key !== "owner_civilization_id" &&
+821-        key.indexOf("_id") === -1 &&
+822-        key !== "aicm_user_company_id" &&
+823-        key !== "aicm_user_company_department_id" &&
+824-        key !== "aicm_user_company_section_id";
+825-    });
+826-
+827-    if (!keys.length) return '<p class="aicm-core-empty">表示できる変更項目がありません。</p>';
+828-
+829-    return keys.map(function (key) {
+830-      return [
+831-        '<div class="aicm-confirm-row">',
+832-        '  <strong>' + escapeHtml(key) + '</strong>',
+833-        '  <p>' + escapeHtml(String(body[key] || "")) + '</p>',
+834-        '</div>'
+835-      ].join("");
+836-    }).join("");
+837-  }
+838-
+839-  
+840-function renderAicmOrgUpdateConfirmation(payload) {
+841-    payload = payload || {};
+842-
+843-    return renderShell([
+844-      '<section class="aicm-core-card">',
+845-      '  <p class="aicm-eyebrow">確認画面</p>',
+846-      '  <h2>' + escapeHtml(payload.title || "変更内容の確認") + '</h2>',
+847-      '  <p class="aicm-selected-note">この操作はDBへ保存されます。内容を確認してから確定してください。</p>',
+848-      '</section>',
+849-      aicmAvdSummaryHtml(payload),
+850-      '<section class="aicm-core-card aicm-operation-card">',
+851-      '  <p class="aicm-eyebrow">操作</p>',
+852-      '  <div class="aicm-dashboard-action-row">',
+853:      '    <button type="button" data-core-action="org-update-confirm-execute">確定して保存</button>',
+854-      '    <button type="button" data-core-action="org-update-confirm-cancel">戻る</button>',
+855-      '  </div>',
+856-      '</section>'
+857-    ].join(""));
+858-  }
+859-
+860-
+861-  function aicmOrgShowUpdateConfirm(payload) {
+862-    state.pendingOrgUpdate = payload || null;
+863-    var root = document.getElementById("aicm-root");
+864-    if (!root) {
+865-      setMessage("error", "確認画面を表示できません。");
+866-      return;
+867-    }
+868-
+869-    root.innerHTML = renderAicmOrgUpdateConfirmation(payload || {});
+870-  }
+871-
+872-  async function executeAicmOrgUpdateConfirm() {
+873-    var payload = state.pendingOrgUpdate || null;
+874-
+875-    if (!payload || !payload.endpoint || !payload.body) {
+876-      setMessage("error", "確認対象がありません。");
+877-      return;
+878-    }
+879-
+880-    try {
+881-      await aicmOrgPostJson(payload.endpoint, payload.body);
+882-            // AICM_AXC_EXECUTE_ROLE_PLACEMENT_SYNC_AFTER_MAIN_UPDATE
+883-      await aicmAxcSyncRolePlacementsForPayload(payload);
+884-state.pendingOrgUpdate = null;
+885-      // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
+886-      if (typeof aicmAxoClearDraftAfterSuccessfulSave === "function") aicmAxoClearDraftAfterSuccessfulSave();
+887-
+888-      if (payload.kind === "department") state.editingDepartmentId = "";
+889-      if (payload.kind === "section") state.editingSectionId = "";
+890-
+891-      setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
+892-      await aicmOrgReloadContext();
+893-    } catch (error) {
+894-      setMessage("error", error && error.message ? error.message : "保存に失敗しました。");
+895-      // AICM_CONFIRM_SAVE_ERROR_RENDER_AXM_V1
+896-      if (typeof render === "function") render();
+897-    }
+898-  }
+899-
+900-  function cancelAicmOrgUpdateConfirm() {
+901-    var payload = state.pendingOrgUpdate || {};
+902-    state.pendingOrgUpdate = null;
+903-
+904-    if (payload.returnScreen) {
+905-      state.screen = payload.returnScreen;
+906-    }
+907-
+908-    if (typeof render === "function") render();
+909-  }
+910-
+911-
+912-  
+913-
+914-// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+915-// Role settings are saved through a dedicated placement sync endpoint after the main entity update succeeds.
+916-// Main company/department/section fields remain separate from robot placement truth.
+917-function aicmAxcUuidLike(value) {
+918-  return /^[0-9a-fA-F-]{36}$/.test(String(value || "").trim());
+919-}
+920-
+921-function aicmAxcFindElement(ids) {
+922-  for (var i = 0; i < ids.length; i += 1) {
+923-    var el = document.getElementById(ids[i]);
+924-    if (el) return el;
+925-  }
+926-  return null;
+927-}
+928-
+929-function aicmAxcCatalogRowByValue(value) {
+930-  var text = String(value || "").trim();
+931-  if (!text) return null;
+932-  var rows = typeof aicmRobotCatalogSafe === "function" ? aicmRobotCatalogSafe() : [];
+933-  for (var i = 0; i < rows.length; i += 1) {
+--
+5123-            if (action === "task-ledger-fill-csv-template") {
+5124-      fillTaskLedgerCsvTemplate();
+5125-      return;
+5126-    }
+5127-
+5128-        if (action === "task-ledger-csv-file-open") {
+5129-      openTaskLedgerCsvFilePicker();
+5130-      return;
+5131-    }
+5132-
+5133-    if (action === "task-ledger-chatgpt-prompt") {
+5134-      handleTaskLedgerChatGptPrompt();
+5135-      return;
+5136-    }
+5137-if (action === "task-ledger-csv-preview") {
+5138-      previewTaskLedgerCsv();
+5139-      return;
+5140-    }
+5141-
+5142-    if (action === "task-ledger-csv-import") {
+5143-      importTaskLedgerCsvToPmlwMajor();
+5144-      return;
+5145-    }
+5146-if (action === "task-ledger-create") {
+5147-      createTaskLedgerFromForm();
+5148-      return;
+5149-    }
+5150-if (action === "human-review-approve") {
+5151-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5152-      return;
+5153-    }
+5154-
+5155-    if (action === "human-review-return") {
+5156-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5157-      return;
+5158-    }
+5159-
+5160-    if (action === "department-update-select") {
+5161-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5162-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+5163-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5164-      if (typeof render === "function") render();
+5165-      return;
+5166-    }
+5167-
+5168-    if (action === "department-update-clear") {
+5169-      state.editingDepartmentId = "";
+5170-      if (typeof render === "function") render();
+5171-      return;
+5172-    }
+5173-
+5174-    if (action === "section-update-select") {
+5175-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5176-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+5177-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5178-      if (typeof render === "function") render();
+5179-      return;
+5180-    }
+5181-
+5182-    if (action === "section-update-clear") {
+5183-      state.editingSectionId = "";
+5184-      if (typeof render === "function") render();
+5185-      return;
+5186-    }
+5187-
+5188-    if (action === "company-update-save") {
+5189-      saveCompanyUpdateFromForm();
+5190-      return;
+5191-    }
+5192-
+5193-    if (action === "department-update-save") {
+5194-      saveDepartmentUpdateFromForm();
+5195-      return;
+5196-    }
+5197-
+5198-    if (action === "section-update-save") {
+5199-      saveSectionUpdateFromForm();
+5200-      return;
+5201-    }
+5202-
+5203:    if (action === "org-update-confirm-execute") {
+5204-      executeAicmOrgUpdateConfirm();
+5205-      return;
+5206-    }
+5207-
+5208-    if (action === "org-update-confirm-cancel") {
+5209-      cancelAicmOrgUpdateConfirm();
+5210-      return;
+5211-    }
+5212-
+5213-    if (action === "company-edit-open") {
+5214-      state.screen = "company-edit";
+5215-      if (typeof render === "function") render();
+5216-      return;
+5217-    }
+5218-
+5219-    if (action === "department-edit-pick") {
+5220-      var actionTarget = aicmActionTargetSafe(event, button);
+5221-      state.editingDepartmentId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-department-id") || "") : "";
+5222-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5223-      if (typeof render === "function") render();
+5224-      return;
+5225-    }
+5226-
+5227-    if (action === "section-edit-pick") {
+5228-      var actionTarget = aicmActionTargetSafe(event, button);
+5229-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : "";
+5230-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5231-      if (typeof render === "function") render();
+5232-      return;
+5233-    }
+5234-
+5235-    if (action === "section-worker-update-open") {
+5236-      var actionTarget = aicmActionTargetSafe(event, button);
+5237-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : (state.editingSectionId || "");
+5238-      state.workerPlacementSectionId = state.editingSectionId || "";
+5239-      state.screen = "worker-placement";
+5240-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5241-      if (typeof render === "function") render();
+5242-      return;
+5243-    }
+5244-
+5245-        // AICM_REMOVE_STALE_ROLE_SETTING_OPEN_AUC_AUF_V1: stale role setting open action removed
+5246-
+5247-    
+5248-
+5249-    if (action === "inline-worker-slot-add") {
+5250-      // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
+5251-      aicmAxoCaptureCurrentEditFormDraft();
+5252-      if (!state.inlineWorkerSlotCount) state.inlineWorkerSlotCount = 3;
+5253-      state.inlineWorkerSlotCount = Math.min(20, Number(state.inlineWorkerSlotCount || 3) + 1);
+5254-      if (typeof render === "function") render();
+5255-      return;
+5256-    }
+5257-
+5258-    if (action === "go") {
+5259-      // AICM_CLEAR_TRANSIENT_ON_GO_ASS_ASV
+5260-      if (typeof aicmClearTransientMessage === "function") {
+5261-        var nextScreenForMessageClear = "";
+5262-        try {
+5263-          nextScreenForMessageClear = target && target.getAttribute ? String(target.getAttribute("data-screen") || "") : "";
+5264-        } catch (_) {
+5265-          nextScreenForMessageClear = "";
+5266-        }
+5267-
+5268-        if (
+5269-          nextScreenForMessageClear === "company-edit" ||
+5270-          nextScreenForMessageClear === "company-change" ||
+5271-          nextScreenForMessageClear === "company-update" ||
+5272-          nextScreenForMessageClear === "department-edit" ||
+5273-          nextScreenForMessageClear === "section-edit"
+5274-        ) {
+5275-          aicmClearTransientMessage();
+5276-        }
+5277-      }
+5278-
+5279-      go(button.getAttribute("data-screen") || "dashboard");
+5280-      return;
+5281-    }
+5282-
+5283-    if (action === "reload") {
+
+792-  function renderAicmDepartmentUpdateScreen() {
+793-    var company = aicmOrgSelectedCompany();
+794-    var selectedId = state.editingDepartmentId || "";
+795-    var selected = selectedId ? aicmOrgDepartmentById(selectedId) : null;
+796-    var rows = company ? aicmOrgDepartmentsForCompany(company.aicm_user_company_id) : [];
+797-    return renderShell(selected ? renderDepartmentUpdateForm(selected) : renderDepartmentUpdatePicker(company, rows));
+798-  }
+799-
+800-  function renderAicmSectionUpdateScreen() {
+801-    var company = aicmOrgSelectedCompany();
+802-    var selectedId = state.editingSectionId || "";
+803-    var selected = selectedId ? aicmOrgSectionById(selectedId) : null;
+804-    var rows = company ? aicmOrgSectionsForCompany(company.aicm_user_company_id) : [];
+805-    return renderShell(selected ? renderSectionUpdateForm(selected) : renderSectionUpdatePicker(company, rows));
+806-  }
+807-
+808-// AICM_DB_WRITE_CONFIRMATION_REQUIRED_ARY_ASB_V1
+809-// DB write operations must pass through a visible confirmation screen before POST.
+810-
+811-function aicmOrgUpdateLabel(kind) {
+812-    if (kind === "company") return "企業変更";
+813-    if (kind === "department") return "部門変更";
+814-    if (kind === "section") return "課変更";
+815-    return "変更";
+816-  }
+817-
+818-  function aicmOrgUpdateBodyRows(body) {
+819-    var keys = Object.keys(body || {}).filter(function (key) {
+820-      return key !== "owner_civilization_id" &&
+821-        key.indexOf("_id") === -1 &&
+822-        key !== "aicm_user_company_id" &&
+823-        key !== "aicm_user_company_department_id" &&
+824-        key !== "aicm_user_company_section_id";
+825-    });
+826-
+827-    if (!keys.length) return '<p class="aicm-core-empty">表示できる変更項目がありません。</p>';
+828-
+829-    return keys.map(function (key) {
+830-      return [
+831-        '<div class="aicm-confirm-row">',
+832-        '  <strong>' + escapeHtml(key) + '</strong>',
+833-        '  <p>' + escapeHtml(String(body[key] || "")) + '</p>',
+834-        '</div>'
+835-      ].join("");
+836-    }).join("");
+837-  }
+838-
+839-  
+840-function renderAicmOrgUpdateConfirmation(payload) {
+841-    payload = payload || {};
+842-
+843-    return renderShell([
+844-      '<section class="aicm-core-card">',
+845-      '  <p class="aicm-eyebrow">確認画面</p>',
+846-      '  <h2>' + escapeHtml(payload.title || "変更内容の確認") + '</h2>',
+847-      '  <p class="aicm-selected-note">この操作はDBへ保存されます。内容を確認してから確定してください。</p>',
+848-      '</section>',
+849-      aicmAvdSummaryHtml(payload),
+850-      '<section class="aicm-core-card aicm-operation-card">',
+851-      '  <p class="aicm-eyebrow">操作</p>',
+852-      '  <div class="aicm-dashboard-action-row">',
+853-      '    <button type="button" data-core-action="org-update-confirm-execute">確定して保存</button>',
+854-      '    <button type="button" data-core-action="org-update-confirm-cancel">戻る</button>',
+855-      '  </div>',
+856-      '</section>'
+857-    ].join(""));
+858-  }
+859-
+860-
+861-  function aicmOrgShowUpdateConfirm(payload) {
+862-    state.pendingOrgUpdate = payload || null;
+863-    var root = document.getElementById("aicm-root");
+864-    if (!root) {
+865-      setMessage("error", "確認画面を表示できません。");
+866-      return;
+867-    }
+868-
+869-    root.innerHTML = renderAicmOrgUpdateConfirmation(payload || {});
+870-  }
+871-
+872:  async function executeAicmOrgUpdateConfirm() {
+873-    var payload = state.pendingOrgUpdate || null;
+874-
+875-    if (!payload || !payload.endpoint || !payload.body) {
+876-      setMessage("error", "確認対象がありません。");
+877-      return;
+878-    }
+879-
+880-    try {
+881-      await aicmOrgPostJson(payload.endpoint, payload.body);
+882-            // AICM_AXC_EXECUTE_ROLE_PLACEMENT_SYNC_AFTER_MAIN_UPDATE
+883-      await aicmAxcSyncRolePlacementsForPayload(payload);
+884-state.pendingOrgUpdate = null;
+885-      // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
+886-      if (typeof aicmAxoClearDraftAfterSuccessfulSave === "function") aicmAxoClearDraftAfterSuccessfulSave();
+887-
+888-      if (payload.kind === "department") state.editingDepartmentId = "";
+889-      if (payload.kind === "section") state.editingSectionId = "";
+890-
+891-      setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
+892-      await aicmOrgReloadContext();
+893-    } catch (error) {
+894-      setMessage("error", error && error.message ? error.message : "保存に失敗しました。");
+895-      // AICM_CONFIRM_SAVE_ERROR_RENDER_AXM_V1
+896-      if (typeof render === "function") render();
+897-    }
+898-  }
+899-
+900-  function cancelAicmOrgUpdateConfirm() {
+901-    var payload = state.pendingOrgUpdate || {};
+902-    state.pendingOrgUpdate = null;
+903-
+904-    if (payload.returnScreen) {
+905-      state.screen = payload.returnScreen;
+906-    }
+907-
+908-    if (typeof render === "function") render();
+909-  }
+910-
+911-
+912-  
+913-
+914-// AICM_ROLE_SETTINGS_SYNC_AXC_V1
+915-// Role settings are saved through a dedicated placement sync endpoint after the main entity update succeeds.
+916-// Main company/department/section fields remain separate from robot placement truth.
+917-function aicmAxcUuidLike(value) {
+918-  return /^[0-9a-fA-F-]{36}$/.test(String(value || "").trim());
+919-}
+920-
+921-function aicmAxcFindElement(ids) {
+922-  for (var i = 0; i < ids.length; i += 1) {
+923-    var el = document.getElementById(ids[i]);
+924-    if (el) return el;
+925-  }
+926-  return null;
+927-}
+928-
+929-function aicmAxcCatalogRowByValue(value) {
+930-  var text = String(value || "").trim();
+931-  if (!text) return null;
+932-  var rows = typeof aicmRobotCatalogSafe === "function" ? aicmRobotCatalogSafe() : [];
+933-  for (var i = 0; i < rows.length; i += 1) {
+934-    var row = rows[i] || {};
+935-    var values = [
+936-      typeof aicmRobotValue === "function" ? aicmRobotValue(row) : "",
+937-      row.robot_pool_id,
+938-      row.business_robot_pool_id,
+939-      row.aicm_robot_pool_id,
+940-      row.worker_pool_id,
+941-      row.placement_robot_pool_id,
+942-      row.aiworker_model_code,
+943-      row.model_code,
+944-      row.robot_id
+945-    ].map(function (item) { return String(item || "").trim(); });
+946-
+947-    if (values.indexOf(text) >= 0) return row;
+948-  }
+949-  return null;
+950-}
+951-
+952-function aicmAxcSelectedRobotMeta(selectOrId) {
+--
+5124-      fillTaskLedgerCsvTemplate();
+5125-      return;
+5126-    }
+5127-
+5128-        if (action === "task-ledger-csv-file-open") {
+5129-      openTaskLedgerCsvFilePicker();
+5130-      return;
+5131-    }
+5132-
+5133-    if (action === "task-ledger-chatgpt-prompt") {
+5134-      handleTaskLedgerChatGptPrompt();
+5135-      return;
+5136-    }
+5137-if (action === "task-ledger-csv-preview") {
+5138-      previewTaskLedgerCsv();
+5139-      return;
+5140-    }
+5141-
+5142-    if (action === "task-ledger-csv-import") {
+5143-      importTaskLedgerCsvToPmlwMajor();
+5144-      return;
+5145-    }
+5146-if (action === "task-ledger-create") {
+5147-      createTaskLedgerFromForm();
+5148-      return;
+5149-    }
+5150-if (action === "human-review-approve") {
+5151-      approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5152-      return;
+5153-    }
+5154-
+5155-    if (action === "human-review-return") {
+5156-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+5157-      return;
+5158-    }
+5159-
+5160-    if (action === "department-update-select") {
+5161-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5162-      state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+5163-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5164-      if (typeof render === "function") render();
+5165-      return;
+5166-    }
+5167-
+5168-    if (action === "department-update-clear") {
+5169-      state.editingDepartmentId = "";
+5170-      if (typeof render === "function") render();
+5171-      return;
+5172-    }
+5173-
+5174-    if (action === "section-update-select") {
+5175-      // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+5176-      state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+5177-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5178-      if (typeof render === "function") render();
+5179-      return;
+5180-    }
+5181-
+5182-    if (action === "section-update-clear") {
+5183-      state.editingSectionId = "";
+5184-      if (typeof render === "function") render();
+5185-      return;
+5186-    }
+5187-
+5188-    if (action === "company-update-save") {
+5189-      saveCompanyUpdateFromForm();
+5190-      return;
+5191-    }
+5192-
+5193-    if (action === "department-update-save") {
+5194-      saveDepartmentUpdateFromForm();
+5195-      return;
+5196-    }
+5197-
+5198-    if (action === "section-update-save") {
+5199-      saveSectionUpdateFromForm();
+5200-      return;
+5201-    }
+5202-
+5203-    if (action === "org-update-confirm-execute") {
+5204:      executeAicmOrgUpdateConfirm();
+5205-      return;
+5206-    }
+5207-
+5208-    if (action === "org-update-confirm-cancel") {
+5209-      cancelAicmOrgUpdateConfirm();
+5210-      return;
+5211-    }
+5212-
+5213-    if (action === "company-edit-open") {
+5214-      state.screen = "company-edit";
+5215-      if (typeof render === "function") render();
+5216-      return;
+5217-    }
+5218-
+5219-    if (action === "department-edit-pick") {
+5220-      var actionTarget = aicmActionTargetSafe(event, button);
+5221-      state.editingDepartmentId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-department-id") || "") : "";
+5222-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5223-      if (typeof render === "function") render();
+5224-      return;
+5225-    }
+5226-
+5227-    if (action === "section-edit-pick") {
+5228-      var actionTarget = aicmActionTargetSafe(event, button);
+5229-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : "";
+5230-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5231-      if (typeof render === "function") render();
+5232-      return;
+5233-    }
+5234-
+5235-    if (action === "section-worker-update-open") {
+5236-      var actionTarget = aicmActionTargetSafe(event, button);
+5237-      state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : (state.editingSectionId || "");
+5238-      state.workerPlacementSectionId = state.editingSectionId || "";
+5239-      state.screen = "worker-placement";
+5240-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+5241-      if (typeof render === "function") render();
+5242-      return;
+5243-    }
+5244-
+5245-        // AICM_REMOVE_STALE_ROLE_SETTING_OPEN_AUC_AUF_V1: stale role setting open action removed
+5246-
+5247-    
+5248-
+5249-    if (action === "inline-worker-slot-add") {
+5250-      // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
+5251-      aicmAxoCaptureCurrentEditFormDraft();
+5252-      if (!state.inlineWorkerSlotCount) state.inlineWorkerSlotCount = 3;
+5253-      state.inlineWorkerSlotCount = Math.min(20, Number(state.inlineWorkerSlotCount || 3) + 1);
+5254-      if (typeof render === "function") render();
+5255-      return;
+5256-    }
+5257-
+5258-    if (action === "go") {
+5259-      // AICM_CLEAR_TRANSIENT_ON_GO_ASS_ASV
+5260-      if (typeof aicmClearTransientMessage === "function") {
+5261-        var nextScreenForMessageClear = "";
+5262-        try {
+5263-          nextScreenForMessageClear = target && target.getAttribute ? String(target.getAttribute("data-screen") || "") : "";
+5264-        } catch (_) {
+5265-          nextScreenForMessageClear = "";
+5266-        }
+5267-
+5268-        if (
+5269-          nextScreenForMessageClear === "company-edit" ||
+5270-          nextScreenForMessageClear === "company-change" ||
+5271-          nextScreenForMessageClear === "company-update" ||
+5272-          nextScreenForMessageClear === "department-edit" ||
+5273-          nextScreenForMessageClear === "section-edit"
+5274-        ) {
+5275-          aicmClearTransientMessage();
+5276-        }
+5277-      }
+5278-
+5279-      go(button.getAttribute("data-screen") || "dashboard");
+5280-      return;
+5281-    }
+5282-
+5283-    if (action === "reload") {
+5284-      loadContext();

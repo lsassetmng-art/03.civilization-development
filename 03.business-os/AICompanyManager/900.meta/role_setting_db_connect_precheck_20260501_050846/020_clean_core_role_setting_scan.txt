@@ -1,0 +1,406 @@
+============================================================
+clean core role-setting/save scan
+============================================================
+
+---- endpoint refs ----
+38:    createCompany: "/api/aicm/v2/company/create",
+39:    createDepartment: "/api/aicm/v2/department/create",
+40:    createSection: "/api/aicm/v2/section/create",
+41:    createPlacement: "/api/aicm/v2/placement/create"
+931:      endpoint: "/api/aicm/v2/company/update",
+966:      endpoint: "/api/aicm/v2/department/update",
+1003:      endpoint: "/api/aicm/v2/section/update",
+
+---- role setting refs ----
+2: * AICompanyManager production core
+41:    createPlacement: "/api/aicm/v2/placement/create"
+60:      placements: [],
+61:      robotCatalog: []
+142:      placements: Array.isArray(json.placements) ? json.placements : [],
+144:      robotCatalog: Array.isArray(json.robot_catalog) ? json.robot_catalog : []
+178:  function companyPlacements(companyId) {
+179:    return state.context.placements.filter(function (placement) {
+180:      return placement.aicm_user_company_id === companyId;
+337:  function createPlacement(payload) {
+342:    return requestJson(API.createPlacement, {
+349:      role_code: payload.roleCode,
+350:      robot_pool_id: payload.robotPoolId,
+351:      aiworker_model_code: payload.aiworkerModelCode,
+354:      state.noticeMessage = "Worker配置を作成しました。";
+381:    if (state.screen === "placement-new") return "Worker配置";
+393:      '  <nav class="aicm-core-tabs" aria-label="AICompanyManager navigation">',
+466:    var placements = company ? companyPlacements(company.aicm_user_company_id) : [];
+485:      company ? renderCompanyOverview(company, departments, sections, placements) : renderNoCompanyCard(),
+664:      '  <label>President方針指示<textarea id="aicm-company-edit-policy" rows="4">' + escapeHtml(company.president_policy_instruction_text || '') + '</textarea></label>',
+924:      ["事業領域", body.business_domain || "未設定"],
+926:    ].concat(aicmAvdRoleSummaryRows("company"));
+959:      ["目的", body.purpose || "未設定"],
+961:    ].concat(aicmAvdRoleSummaryRows("department"));
+996:      ["目的", body.purpose || "未設定"],
+998:    ].concat(aicmAvdRoleSummaryRows("section"));
+1229:// AICM_EDIT_ROLE_SETTING_CARDS_ATM_ATP_V1
+1230:// Role setting cards are UI navigation only in this phase.
+1233:function aicmPlacementRoleText(row) {
+1236:      row.role_code,
+1237:      row.placement_role_code,
+1238:      row.assignment_role_code,
+1239:      row.worker_role_code,
+1240:      row.role_name,
+1241:      row.role_label,
+1244:      row.display_role,
+1245:      row.role_display_name
+1249:function aicmPlacementMatchesRole(row, roleCode) {
+1250:    var text = aicmPlacementRoleText(row);
+1252:    if (roleCode === "president") {
+1253:      return text.indexOf("president") >= 0 || text.indexOf("社長") >= 0 || text.indexOf("プレジデント") >= 0;
+1256:    if (roleCode === "manager") {
+1257:      return text.indexOf("manager") >= 0 || text.indexOf("部長") >= 0 || text.indexOf("マネージャ") >= 0;
+1260:    if (roleCode === "leader") {
+1261:      return text.indexOf("leader") >= 0 || text.indexOf("課長") >= 0 || text.indexOf("リーダ") >= 0;
+1264:    if (roleCode === "worker") {
+1265:      return text.indexOf("worker") >= 0 || text.indexOf("従業員") >= 0 || text.indexOf("ワーカー") >= 0;
+1271:function aicmPlacementRobotLabel(row) {
+1272:    if (!row) return "未設定";
+1276:      row.placement_nickname ||
+1277:      row.robot_internal_nickname ||
+1278:      row.aiworker_model_name ||
+1279:      row.aiworker_model_code ||
+1280:      row.robot_name ||
+1281:      row.robot_pool_label ||
+1282:      row.robot_pool_id ||
+1287:function aicmRoleScopeMatches(row, scope) {
+1305:function aicmCurrentRolePlacements(roleCode, scope) {
+1307:    var placements = Array.isArray(ctx.placements) ? ctx.placements : [];
+1309:    return placements.filter(function (row) {
+1310:      return aicmPlacementMatchesRole(row, roleCode) && aicmRoleScopeMatches(row, scope);
+1319:// AICM_INLINE_ROLE_SETTINGS_ATQ_ATT_V1
+1320:// Inline role settings are displayed on add/edit screens.
+1338:// AICM_ROBOT_CATALOG_MULTI_WORKER_ATU_ATX_V1
+1339:// Robot catalog option mapping is intentionally broad because Business robot selector views may evolve.
+1340:// Worker settings support multiple rows. Actual DB write remains confirmation-gated in later phases.
+1342:function aicmRobotCatalogSafe() {
+1347:      candidates.push(ctx.robot_catalog);
+1348:      candidates.push(ctx.robotCatalog);
+1349:      candidates.push(ctx.robots);
+1350:      candidates.push(ctx.robot_pool);
+1351:      candidates.push(ctx.robot_pool_items);
+1352:      candidates.push(ctx.available_robots);
+1353:      candidates.push(ctx.availableRobots);
+1354:      candidates.push(ctx.worker_robot_catalog);
+1355:      candidates.push(ctx.aiworker_catalog);
+1359:      candidates.push(state.robot_catalog);
+1360:      candidates.push(state.robotCatalog);
+1361:      candidates.push(state.robots);
+1362:      candidates.push(state.available_robots);
+1363:      candidates.push(state.context && state.context.robot_catalog);
+1364:      candidates.push(state.ctx && state.ctx.robot_catalog);
+1365:      candidates.push(state.data && state.data.robot_catalog);
+1375:function aicmRobotValue(row) {
+1379:      row.robot_pool_id ||
+1380:      row.business_robot_pool_id ||
+1381:      row.aicm_robot_pool_id ||
+1382:      row.worker_pool_id ||
+1383:      row.placement_robot_pool_id ||
+1384:      row.aiworker_model_id ||
+1385:      row.aiworker_model_code ||
+1388:      row.robot_id ||
+1395:function aicmRobotRoleText(row) {
+1398:    var recommended = row.recommended_role_codes;
+1415:      row.role_code,
+1416:      row.placement_role_code,
+1417:      row.assignment_role_code,
+1418:      row.eligible_role_code,
+1419:      row.available_role_code,
+1421:      row.role_name,
+1422:      row.role_label,
+1425:      row.role_display_name,
+1428:      row.aiworker_model_code,
+1429:      row.aiworker_model_name,
+1435:      row.aiworker_series_code,
+1437:      row.robot_type_code,
+1438:      row.robot_type_label
+1442:function aicmRobotMatchesInlineRole(row, roleCode) {
+1443:    var text = aicmRobotRoleText(row);
+1447:    if (roleCode === "president") {
+1448:      return text.indexOf("president") >= 0 || text.indexOf("社長") >= 0 || text.indexOf("プレジデント") >= 0 || text.indexOf("r5p") >= 0;
+1451:    if (roleCode === "manager") {
+1452:      return text.indexOf("manager") >= 0 || text.indexOf("部長") >= 0 || text.indexOf("マネージャ") >= 0 || text.indexOf("r5") >= 0;
+1455:    if (roleCode === "leader") {
+1456:      return text.indexOf("leader") >= 0 || text.indexOf("課長") >= 0 || text.indexOf("リーダ") >= 0 || text.indexOf("r4") >= 0;
+1459:    if (roleCode === "worker") {
+1460:      return text.indexOf("worker") >= 0 || text.indexOf("従業員") >= 0 || text.indexOf("ワーカー") >= 0 || text.indexOf("r3") >= 0;
+1467:function aicmRobotOptionLabel(row) {
+1468:    if (!row) return "未設定";
+1474:      row.placement_nickname ||
+1475:      row.robot_internal_nickname ||
+1476:      row.aiworker_model_name ||
+1478:      row.robot_name ||
+1479:      row.robot_pool_label ||
+1480:      row.aiworker_model_code ||
+1482:      row.robot_pool_id ||
+1483:      row.robot_id ||
+1488:    var code = row.aiworker_model_code || row.model_code || "";
+1505:// AICM_EXPAND_ROBOT_CANDIDATES_ATY_AUB_V1
+1507:// AICM_RECOMMENDED_ONLY_ROBOT_COMBOS_AUK_AUN_V1
+1508:function aicmInlineRobotRows(roleCode) {
+1509:    var all = aicmRobotCatalogSafe().filter(function (row) {
+1510:      return aicmRobotValue(row);
+1514:      return aicmRobotMatchesInlineRole(row, roleCode);
+1521:      var key = aicmRobotValue(row);
+1532:function aicmInlineRobotOptions(roleCode) {
+1533:    var rows = aicmInlineRobotRows(roleCode);
+1536:      return '<option value="">未設定</option><option value="" disabled>候補がありません</option>';
+1540:      '<option value="">未設定</option>'
+1542:      return '<option value="' + escapeHtml(aicmRobotValue(row)) + '">' + escapeHtml(aicmRobotOptionLabel(row)) + '</option>';
+1546:function aicmWorkerSlotCount() {
+1549:    var n = Number(state.inlineWorkerSlotCount || 3);
+1552:    state.inlineWorkerSlotCount = n;
+1557:function renderAicmWorkerInlineRows(fieldPrefix) {
+1558:    var count = aicmWorkerSlotCount();
+1559:    var safePrefix = fieldPrefix || "worker";
+1564:        '<div class="aicm-worker-inline-row">',
+1565:        '  <label>従業員設定ロボット ' + String(i + 1) + '<select id="aicm-role-' + escapeHtml(safePrefix) + '-robot-' + String(i) + '" data-inline-role-code="worker" data-worker-slot-index="' + String(i) + '">',
+1566:        aicmInlineRobotOptions("worker"),
+1568:        '  <label>社内通称<input id="aicm-role-' + escapeHtml(safePrefix) + '-nickname-' + String(i) + '" type="text" placeholder="例: ウルフ@従業員' + String(i + 1) + '"></label>',
+1576:function renderAicmInlineRoleSetting(roleCode, title, subtitle, fieldPrefix) {
+1577:    var safePrefix = fieldPrefix || roleCode;
+1579:    if (roleCode === "worker") {
+1581:        '<section class="aicm-core-card aicm-inline-role-setting-card" data-inline-role="' + escapeHtml(roleCode) + '">',
+1585:        renderAicmWorkerInlineRows(safePrefix),
+1586:        '  <button type="button" data-core-action="inline-worker-slot-add">従業員行を追加</button>',
+1587:        '  <p class="aicm-core-empty">従業員は複数設定できます。保存時は確認画面を通して登録します。</p>',
+1593:      '<section class="aicm-core-card aicm-inline-role-setting-card" data-inline-role="' + escapeHtml(roleCode) + '">',
+1597:      '  <label>' + escapeHtml(title) + 'ロボット<select id="aicm-role-' + escapeHtml(safePrefix) + '-robot" data-inline-role-code="' + escapeHtml(roleCode) + '">',
+1598:      aicmInlineRobotOptions(roleCode),
+1600:      '  <label>社内通称<input id="aicm-role-' + escapeHtml(safePrefix) + '-nickname" type="text" placeholder="例: ウルフ@' + escapeHtml(title.replace("設定", "")) + '"></label>',
+1606:function renderAicmRoleSettingCard(roleCode, title, subtitle, scope) {
+1607:    var prefix = roleCode;
+1609:    if (scope && scope.sectionId) prefix = roleCode + "-section";
+1610:    else if (scope && scope.departmentId) prefix = roleCode + "-department";
+1611:    else if (scope && scope.companyId) prefix = roleCode + "-company";
+1613:    return renderAicmInlineRoleSetting(roleCode, title, subtitle, prefix);
+1617:  function aicmInjectInlineRoleSettingsForAddScreens(html) {
+1623:      extra = renderAicmInlineRoleSetting("president", "社長設定", "AI企業全体の方針を受けるPresidentを設定します。", "president-company-new");
+1627:      extra = renderAicmInlineRoleSetting("manager", "部長設定", "この部門を統括するManagerを設定します。", "manager-department-new");
+1632:        renderAicmInlineRoleSetting("leader", "課長設定", "この課を統括するLeaderを設定します。", "leader-section-new"),
+1633:        renderAicmInlineRoleSetting("worker", "従業員設定", "この課に配置するWorkerを設定します。", "worker-section-new")
+1638:    if (html.indexOf("aicm-inline-role-setting-card") >= 0) return html;
+1726:function aicmAvdRoleSelect(id, roleCode) {
+1728:      '<label>' + escapeHtml(roleCode.label) + 'ロボット',
+1730:      aicmInlineRobotOptions(roleCode.code),
+1733:      '<label>' + escapeHtml(roleCode.label) + '社内通称',
+1734:      '<input id="' + escapeHtml(id + "-nickname") + '" type="text" placeholder="例: ' + escapeHtml(roleCode.placeholder) + '">',
+1739:function aicmAvdWorkerRows() {
+1740:    if (typeof renderAicmWorkerInlineRows === "function") {
+1741:      return renderAicmWorkerInlineRows();
+1745:      '<div class="aicm-inline-worker-row" data-worker-slot-index="0">',
+1746:      '<label>従業員ロボット<select id="aicm-inline-worker-0-robot">' + aicmInlineRobotOptions("worker") + '</select></label>',
+1747:      '<label>従業員社内通称<input id="aicm-inline-worker-0-nickname" type="text" placeholder="例: 作業担当A"></label>',
+1752:function aicmAvdRoleSummaryRows(prefix) {
+1755:    function push(label, robotId, nicknameId) {
+1756:      var robot = aicmAvdTextById(robotId);
+1758:      rows.push([label + "ロボット", robot || "未設定"]);
+1759:      rows.push([label + "社内通称", nickname || "未設定"]);
+1763:      push("社長", "aicm-company-president-robot", "aicm-company-president-robot-nickname");
+1767:      push("部長", "aicm-department-manager-robot", "aicm-department-manager-robot-nickname");
+1771:      push("課長", "aicm-section-leader-robot", "aicm-section-leader-robot-nickname");
+1773:      var workerRows = [];
+1777:        var robotEl = document.getElementById("aicm-inline-worker-" + index + "-robot");
+1778:        var nickEl = document.getElementById("aicm-inline-worker-" + index + "-nickname");
+1780:        if (!robotEl && !nickEl) break;
+1782:        workerRows.push({
+1783:          robot_pool_id: robotEl ? String(robotEl.value || "") : "",
+1790:      rows.push(["従業員設定", workerRows.length ? JSON.stringify(workerRows) : "未設定"]);
+1866:      '  <p class="aicm-eyebrow">社長設定</p>',
+1867:      '  <h2>社長ロボット</h2>',
+1868:      aicmAvdRoleSelect("aicm-company-president-robot", { code: "president", label: "社長", placeholder: "社長" }),
+1899:        '    <p>AI企業を選択すると、部門・課・Worker配置の概要を確認できます。</p>',
+1912:    var placements = Array.isArray(ctx.placements) ? ctx.placements.filter(function (row) {
+1924:      '    <div class="aicm-company-overview-stat"><span>Worker配置</span><strong>' + String(placements.length) + '件</strong></div>',
+1938:      '  <p>まずAI企業を作成すると、部門・課・Worker配置を登録できます。</p>',
+1958:      '  <button type="button" data-core-action="go" data-screen="placement-new">Worker配置</button>',
+1996:          department.purpose ? '<p>' + escapeHtml(department.purpose) + '</p>' : '<p class="aicm-core-empty">目的未設定</p>',
+2061:  function renderPlacementNew() {
+2066:    var robots = state.context.robotCatalog;
+2069:      '<form data-core-form="placement-create" class="aicm-core-card">',
+2072:      '  <label>配置先</label>',
+2074:      '    <option value="company">会社 / President</option>',
+2075:      '    <option value="department">部門 / Manager</option>',
+2076:      '    <option value="section">課 / Leader / Worker</option>',
+2078:      '  <label>Role</label>',
+2079:      '  <select name="roleCode">',
+2080:      '    <option value="President">President</option>',
+2081:      '    <option value="Manager">Manager</option>',
+2082:      '    <option value="Leader">Leader</option>',
+2083:      '    <option value="Worker">Worker</option>',
+2092:      '  <label>Robot</label>',
+2093:      '  <select name="robotPoolId">',
+2094:      robots.map(function (robot) {
+2095:        return '<option value="' + escapeHtml(robot.robot_pool_id || "") + '" data-model="' + escapeHtml(robot.aiworker_model_code || "") + '">' + escapeHtml(robot.selector_label || robot.display_name || robot.aiworker_model_code) + '</option>';
+2100:      '  <button type="submit">Worker配置を作成</button>',
+2115:        '<p class="aicm-core-empty">編集/削除は未設定。作成系の確認後に実装します。</p>'
+2175:          '    <div><dt>担当</dt><dd>' + escapeHtml(row.responsible_role_code || "-") + '</dd></div>',
+2234:      '    <label>担当役割<select id="aicm-ledger-role">',
+2235:      '      <option value="Manager">Manager</option>',
+2236:      '      <option value="Leader">Leader</option>',
+2237:      '      <option value="Worker">Worker</option>',
+2238:      '      <option value="President">President</option>',
+2296:      responsible_role_code: valueOf("aicm-ledger-role") || "Manager",
+2350:      "responsible_role_code",
+2371:        "Leader",
+2386:      "以下のCSVカラムで、AICompanyManagerの部門別タスク台帳に取り込む行を作成してください。",
+2397:      "- responsible_role_code は Manager / Leader / Worker / President のいずれか",
+2562:          responsible_role_code: row.responsible_role_code || "Manager",
+2638:      "以下のCSVカラムで、AICompanyManagerの部門別タスク台帳に取り込むManager大項目行を作成してください。",
+2642:      "department_name,section_name,major_item_name,major_item_description,assigned_leader_label,priority_code,due_date,note",
+2647:      "- major_item_name はManagerがLeaderへ渡す大項目名",
+2649:      "- assigned_leader_label は未定なら空欄",
+2655:      "department_name,section_name,major_item_name,major_item_description,assigned_leader_label,priority_code,due_date,note",
+2672:      downloadTextFile("aicm_manager_major_csv_prompt.txt", text, "text/plain;charset=utf-8");
+2771:      var result = await aicmPmlwPostJson("/api/aicm/v2/manager-major/import-csv", {
+2994:      assigned_to_leader: "Leader割当済",
+2995:      leader_decomposing: "Leader分解中",
+3017:        '  <strong>Manager大項目はまだありません</strong>',
+3018:        '  <p>President方針またはユーザー依頼からManagerが大項目を作ると、ここに表示されます。</p>',
+3032:      '        <th>Leader</th>',
+3047:          '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+3073:      '  <p class="aicm-selected-note">President方針やユーザー依頼を、Managerが大項目として整理し、部門・課・Leaderへ引き渡すための台帳です。</p>',
+3077:      '  <p class="aicm-eyebrow">Manager大項目</p>',
+3226:      var summary = row.delivery_summary_text || "要約未設定";
+3286:// AICM_DEPT_SECTION_EDIT_FORM_WORKER_ROUTE_ASW_ASZ_V1
+3332:      '  <p class="aicm-eyebrow">部長設定</p>',
+3333:      '  <h2>部長ロボット</h2>',
+3334:      aicmAvdRoleSelect("aicm-department-manager-robot", { code: "manager", label: "部長", placeholder: "部長" }),
+3397:      '  <p class="aicm-eyebrow">課長設定</p>',
+
+---- save/confirm refs ----
+510:// AICM_ORG_UPDATE_UI_ARU_ARX_V1
+511:// Company / Department / Section update UI.
+645:  function renderCompanyUpdateForm(company) {
+666:      '    <button type="button" data-core-action="company-update-save">変更を保存</button>',
+673:  function renderDepartmentUpdatePicker(company, rows) {
+695:          '<article class="aicm-org-update-row">',
+700:          '  <button type="button" data-core-action="department-update-select" data-department-id="' + escapeHtml(row.aicm_user_company_department_id || '') + '">変更</button>',
+708:  function renderDepartmentUpdateForm(department) {
+722:      '    <button type="button" data-core-action="department-update-save">変更を保存</button>',
+723:      '    <button type="button" data-core-action="department-update-clear">一覧へ戻る</button>',
+729:  function renderSectionUpdatePicker(company, rows) {
+752:          '<article class="aicm-org-update-row">',
+757:          '  <button type="button" data-core-action="section-update-select" data-section-id="' + escapeHtml(row.aicm_user_company_section_id || '') + '">変更</button>',
+765:  function renderSectionUpdateForm(section) {
+779:      '    <button type="button" data-core-action="section-update-save">変更を保存</button>',
+780:      '    <button type="button" data-core-action="section-update-clear">一覧へ戻る</button>',
+786:  function renderAicmCompanyUpdateScreen() {
+787:    return renderShell(renderCompanyUpdateForm(aicmOrgSelectedCompany()));
+790:  function renderAicmDepartmentUpdateScreen() {
+795:    return renderShell(selected ? renderDepartmentUpdateForm(selected) : renderDepartmentUpdatePicker(company, rows));
+798:  function renderAicmSectionUpdateScreen() {
+803:    return renderShell(selected ? renderSectionUpdateForm(selected) : renderSectionUpdatePicker(company, rows));
+806:// AICM_DB_WRITE_CONFIRMATION_REQUIRED_ARY_ASB_V1
+807:// DB write operations must pass through a visible confirmation screen before POST.
+809:function aicmOrgUpdateLabel(kind) {
+816:  function aicmOrgUpdateBodyRows(body) {
+829:        '<div class="aicm-confirm-row">',
+838:function renderAicmOrgUpdateConfirmation(payload) {
+843:      '  <p class="aicm-eyebrow">確認画面</p>',
+844:      '  <h2>' + escapeHtml(payload.title || "変更内容の確認") + '</h2>',
+845:      '  <p class="aicm-selected-note">この操作はDBへ保存されます。内容を確認してから確定してください。</p>',
+851:      '    <button type="button" data-core-action="org-update-confirm-execute">確定して保存</button>',
+852:      '    <button type="button" data-core-action="org-update-confirm-cancel">戻る</button>',
+859:  function aicmOrgShowUpdateConfirm(payload) {
+860:    state.pendingOrgUpdate = payload || null;
+863:      setMessage("error", "確認画面を表示できません。");
+867:    root.innerHTML = renderAicmOrgUpdateConfirmation(payload || {});
+870:  async function executeAicmOrgUpdateConfirm() {
+871:    var payload = state.pendingOrgUpdate || null;
+874:      setMessage("error", "確認対象がありません。");
+880:      state.pendingOrgUpdate = null;
+885:      setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
+888:      setMessage("error", error && error.message ? error.message : "保存に失敗しました。");
+892:  function cancelAicmOrgUpdateConfirm() {
+893:    var payload = state.pendingOrgUpdate || {};
+894:    state.pendingOrgUpdate = null;
+905:function saveCompanyUpdateFromForm() {
+928:    aicmAvdShowDbConfirm({
+929:      kind: "company-update",
+931:      endpoint: "/api/aicm/v2/company/update",
+938:function saveDepartmentUpdateFromForm() {
+963:    aicmAvdShowDbConfirm({
+964:      kind: "department-update",
+966:      endpoint: "/api/aicm/v2/department/update",
+973:function saveSectionUpdateFromForm() {
+1000:    aicmAvdShowDbConfirm({
+1001:      kind: "section-update",
+1003:      endpoint: "/api/aicm/v2/section/update",
+1016:// Company update uses this dedicated screen renderer.
+1021:// DB write confirmation remains required before POST.
+1231:// Actual DB writes must go through confirmation screen in a later API-connected phase.
+1321:// This phase is UI-only. DB write remains confirmation-gated in later phases.
+1340:// Worker settings support multiple rows. Actual DB write remains confirmation-gated in later phases.
+1587:        '  <p class="aicm-core-empty">従業員は複数設定できます。保存時は確認画面を通して登録します。</p>',
+1601:      '  <p class="aicm-core-empty">保存時は確認画面を通して登録します。</p>',
+1796:function aicmAvdShowDbConfirm(payload) {
+1798:      setMessage("error", "確認画面を表示できません。");
+1802:    if (typeof aicmOrgShowUpdateConfirm === "function") {
+1803:      aicmOrgShowUpdateConfirm(payload);
+1808:      state.pendingOrgUpdate = payload;
+1814:    root.innerHTML = renderAicmOrgUpdateConfirmation(payload);
+1824:      '  <p class="aicm-eyebrow">保存内容</p>',
+1825:      '  <h2>確認対象</h2>',
+1873:      '    <button type="button" data-core-action="company-update-save">変更を保存</button>',
+1899:        '    <p>AI企業を選択すると、部門・課・Worker配置の概要を確認できます。</p>',
+2025:      '  <button type="submit">AI企業を作成</button>',
+2040:      '  <button type="submit">部門を作成</button>',
+2056:      '  <button type="submit">課を作成</button>',
+2100:      '  <button type="submit">Worker配置を作成</button>',
+2115:        '<p class="aicm-core-empty">編集/削除は未設定。作成系の確認後に実装します。</p>'
+2891:      setMessage("ok", "CSVを確認しました。");
+2894:      setMessage("error", error && error.message ? error.message : "CSV確認に失敗しました。");
+2903:      setMessage("ok", "CSV入力例を確認しました。");
+3273:      '  <h2>納品サマリー確認</h2>',
+3275:      '  <p class="aicm-selected-note">人間レビューは、設計書・実装・例外対応の納品時サマリーだけを確認します。AIレビューは内部工程で通常通り実施されます。</p>',
+3339:      '    <button type="button" data-core-action="department-update-save">変更を保存</button>',
+3413:      '    <button type="button" data-core-action="section-update-save">変更を保存</button>',
+3457:        state.screen === "company-update"
+3495:  function submitForm(form) {
+3599:    if (action === "department-update-select") {
+3606:    if (action === "department-update-clear") {
+3612:    if (action === "section-update-select") {
+3619:    if (action === "section-update-clear") {
+3625:    if (action === "company-update-save") {
+3626:      saveCompanyUpdateFromForm();
+3630:    if (action === "department-update-save") {
+3631:      saveDepartmentUpdateFromForm();
+3635:    if (action === "section-update-save") {
+3636:      saveSectionUpdateFromForm();
+3640:    if (action === "org-update-confirm-execute") {
+3641:      executeAicmOrgUpdateConfirm();
+3645:    if (action === "org-update-confirm-cancel") {
+3646:      cancelAicmOrgUpdateConfirm();
+3672:    if (action === "section-worker-update-open") {
+3706:          nextScreenForMessageClear === "company-update" ||
+3740:  function handleRootSubmit(event) {
+3745:    submitForm(form);
+3850:      ".aicm-org-update-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px;border:1px solid #e5e7eb;border-radius:16px;background:#f8fafc;margin-top:10px}",
+3851:      ".aicm-org-update-row p{margin:4px 0 0;color:#64748b}",
+3853:      ".aicm-confirm-card{display:grid;gap:14px}",
+3854:      ".aicm-confirm-list{display:grid;gap:10px}",
+3855:      ".aicm-confirm-row{padding:12px;border:1px solid #e5e7eb;border-radius:14px;background:#f8fafc}",
+3856:      ".aicm-confirm-row p{margin:4px 0 0;color:#334155;white-space:pre-wrap}",
+3887:    root.addEventListener("submit", handleRootSubmit);
+
+---- likely role field payload refs ----
+1338:// AICM_ROBOT_CATALOG_MULTI_WORKER_ATU_ATX_V1
+1354:      candidates.push(ctx.worker_robot_catalog);
+1565:        '  <label>従業員設定ロボット ' + String(i + 1) + '<select id="aicm-role-' + escapeHtml(safePrefix) + '-robot-' + String(i) + '" data-inline-role-code="worker" data-worker-slot-index="' + String(i) + '">',
+1566:        aicmInlineRobotOptions("worker"),
+1746:      '<label>従業員ロボット<select id="aicm-inline-worker-0-robot">' + aicmInlineRobotOptions("worker") + '</select></label>',
+1763:      push("社長", "aicm-company-president-robot", "aicm-company-president-robot-nickname");
+1767:      push("部長", "aicm-department-manager-robot", "aicm-department-manager-robot-nickname");
+1771:      push("課長", "aicm-section-leader-robot", "aicm-section-leader-robot-nickname");
+1777:        var robotEl = document.getElementById("aicm-inline-worker-" + index + "-robot");
+1868:      aicmAvdRoleSelect("aicm-company-president-robot", { code: "president", label: "社長", placeholder: "社長" }),
+2095:        return '<option value="' + escapeHtml(robot.robot_pool_id || "") + '" data-model="' + escapeHtml(robot.aiworker_model_code || "") + '">' + escapeHtml(robot.selector_label || robot.display_name || robot.aiworker_model_code) + '</option>';
+3334:      aicmAvdRoleSelect("aicm-department-manager-robot", { code: "manager", label: "部長", placeholder: "部長" }),
+3399:      aicmAvdRoleSelect("aicm-section-leader-robot", { code: "leader", label: "課長", placeholder: "課長" }),
+3539:        aiworkerModelCode: selectedRobot ? selectedRobot.getAttribute("data-model") || "" : "",

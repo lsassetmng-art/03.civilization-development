@@ -1,0 +1,136 @@
+      setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+      render();
+    }
+  }
+// AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+
+
+// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_START
+  function aicmIsPendingManagerMajorRowR8V6(row) {
+    if (!row || typeof row !== "object") return false;
+
+    var handoff = String(row.handoff_status_code || "").toLowerCase();
+    var decomposition = String(row.decomposition_status_code || "").toLowerCase();
+    var deleted = String(row.deleted_flag || row.is_deleted || "").toLowerCase();
+    var archived = String(row.archived_flag || row.is_archived || "").toLowerCase();
+
+    if (deleted === "true" || deleted === "1") return false;
+    if (archived === "true" || archived === "1") return false;
+
+    if (
+      handoff === "archived" ||
+      handoff === "deleted" ||
+      handoff === "cancelled" ||
+      handoff === "canceled" ||
+      handoff === "sent" ||
+      handoff === "handed_off" ||
+      handoff === "completed" ||
+      handoff === "done"
+    ) {
+      return false;
+    }
+
+    if (
+      decomposition === "completed" ||
+      decomposition === "complete" ||
+      decomposition === "done"
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_END
+
+
+  function aicmRenderManagerMajorRows(rows) {
+    var sourceRows = Array.isArray(rows) ? rows : [];
+    var pendingRows = sourceRows.filter(function (row) {
+      return aicmIsPendingManagerMajorRowR8V6(row);
+    });
+
+    var confirmCard = aicmRenderMajorItemDeleteConfirmCardR8P();
+
+    if (!pendingRows.length) {
+      return [
+        confirmCard,
+        '<div class="aicm-core-empty">',
+        '  <strong>登録済み大項目はまだありません</strong>',
+        '  <p>CSV取り込み後、未実行/未引き継ぎのManager大項目だけが表示されます。</p>',
+        '</div>'
+      ].join("");
+    }
+
+    var pageSize = aicmMajorItemPageSizeR8O();
+    var totalRows = pendingRows.length;
+    var totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+    var page = aicmMajorItemCurrentPageR8O(totalRows);
+    var start = (page - 1) * pageSize;
+    var pageRows = pendingRows.slice(start, start + pageSize);
+
+    var pager = [
+      '<div class="aicm-dashboard-action-row">',
+      '  <button type="button" data-core-action="pmlw-major-page-prev"' + (page <= 1 ? ' disabled' : '') + '>前ページ</button>',
+      '  <span class="aicm-selected-note">ページ ' + escapeHtml(String(page)) + ' / ' + escapeHtml(String(totalPages)) + '　表示 ' + escapeHtml(String(start + 1)) + '-' + escapeHtml(String(start + pageRows.length)) + ' / ' + escapeHtml(String(totalRows)) + '件</span>',
+      '  <button type="button" data-core-action="pmlw-major-page-next"' + (page >= totalPages ? ' disabled' : '') + '>次ページ</button>',
+      '</div>'
+    ].join("");
+
+    var cards = pageRows.map(function (row, index) {
+      var majorId = aicmAxuR1MajorId(row);
+      var summary = aicmMajorItemSummaryR8O(row);
+      var displayNo = start + index + 1;
+
+      return [
+        '<article class="aicm-core-card aicm-major-item-row">',
+        '  <p class="aicm-eyebrow">Manager大項目 #' + escapeHtml(String(displayNo)) + '</p>',
+        '  <h3>' + escapeHtml(summary.title) + '</h3>',
+        summary.description ? '  <p class="aicm-selected-note">' + escapeHtml(summary.description) + '</p>' : '',
+        '  <dl class="aicm-core-detail-list">',
+        '    <dt>課長/Leader</dt><dd>' + escapeHtml(summary.leader) + '</dd>',
+        '    <dt>優先度</dt><dd>' + escapeHtml(summary.priority) + '</dd>',
+        '    <dt>期限</dt><dd>' + escapeHtml(summary.due) + '</dd>',
+        '    <dt>状態</dt><dd>' + escapeHtml(summary.status) + '</dd>',
+        '  </dl>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="pmlw-major-leader-handoff" data-major-id="' + escapeHtml(majorId) + '">課長へ送る</button>',
+        '    <button type="button" data-core-action="pmlw-major-delete-open" data-major-id="' + escapeHtml(majorId) + '">削除</button>',
+        '  </div>',
+        '</article>'
+      ].join("");
+    }).join("");
+
+    return [
+      confirmCard,
+      pager,
+      '<div class="aicm-manager-major-list">',
+      cards,
+      '</div>',
+      pager
+    ].join("");
+  }
+  
+// AICM_R8_NAV_TASK_LEDGER_V3_CLEAN_HELPER_START
+  
+// AICM_R8_NAV_TASK_LEDGER_SAFE_RENDER_V4_START
+  function aicmRenderTaskLedgerSafeR8V4(sourceLabel) {
+    state.screen = "task-ledger";
+
+    try {
+      if (!root) return;
+
+      var html = renderTaskLedgerPlaceholder();
+      root.innerHTML = html;
+
+      return true;
+    } catch (error) {
+      var message = error && error.message ? error.message : String(error || "unknown error");
+      var stack = error && error.stack ? String(error.stack) : "";
+
+      if (typeof console !== "undefined" && console && console.error) {
+        console.error("AICM task-ledger render failed", {
+          sourceLabel: sourceLabel || "",
+          message: message,
+          stack: stack
+        });
+      }

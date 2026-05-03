@@ -1,0 +1,386 @@
+============================================================
+AXG scan
+============================================================
+
+---- AXG marker ----
+1119-      ["企業名", body.company_name],
+1120-      ["事業領域", body.business_domain || "未設定"],
+1121-      ["状態", body.company_status]
+1122-    ].concat(aicmAvdRoleSummaryRows("company"));
+1123-
+1124-    aicmAvdShowDbConfirm({
+1125-      kind: "company-update",
+1126-      title: "企業変更",
+1127-      endpoint: "/api/aicm/v2/company/update",
+1128-      body: body,
+1129:      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1130-      rolePlacements: aicmAxcCompanyRolePlacements({
+1131-        aicm_user_company_id: body.aicm_user_company_id
+1132-      }),
+1133-      summary_rows: rows
+1134-    });
+1135-  }
+1136-
+1137-
+1138-function saveDepartmentUpdateFromForm() {
+1139-    var departmentId = aicmAvdTextById("aicm-department-edit-id");
+--
+1158-      ["部門名", body.department_name],
+1159-      ["目的", body.purpose || "未設定"],
+1160-      ["状態", body.department_status]
+1161-    ].concat(aicmAvdRoleSummaryRows("department"));
+1162-
+1163-    aicmAvdShowDbConfirm({
+1164-      kind: "department-update",
+1165-      title: "部門変更",
+1166-      endpoint: "/api/aicm/v2/department/update",
+1167-      body: body,
+1168:      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1169-      rolePlacements: aicmAxcDepartmentRolePlacements({
+1170-        aicm_user_company_department_id: body.aicm_user_company_department_id
+1171-      }),
+1172-      summary_rows: rows
+1173-    });
+1174-  }
+1175-
+1176-
+1177-function saveSectionUpdateFromForm() {
+1178-    var sectionId = aicmAvdTextById("aicm-section-edit-id");
+--
+1199-      ["課名", body.section_name],
+1200-      ["目的", body.purpose || "未設定"],
+1201-      ["状態", body.section_status]
+1202-    ].concat(aicmAvdRoleSummaryRows("section"));
+1203-
+1204-    aicmAvdShowDbConfirm({
+1205-      kind: "section-update",
+1206-      title: "課変更",
+1207-      endpoint: "/api/aicm/v2/section/update",
+1208-      body: body,
+1209:      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1210-      rolePlacements: aicmAxcSectionRolePlacements({
+1211-        aicm_user_company_section_id: body.aicm_user_company_section_id,
+1212-        aicm_user_company_department_id: body.aicm_user_company_department_id || (
+1213-          typeof aicmOrgSectionById === "function" && body.aicm_user_company_section_id
+1214-            ? ((aicmOrgSectionById(body.aicm_user_company_section_id) || {}).aicm_user_company_department_id || "")
+1215-            : ""
+1216-        )
+1217-      }),
+1218-      summary_rows: rows
+1219-    });
+
+---- save company update ----
+1066-      target_level_code: "section",
+1067-      target_id: section.aicm_user_company_section_id,
+1068-      aicm_user_company_department_id: section.aicm_user_company_department_id,
+1069-      aicm_user_company_section_id: section.aicm_user_company_section_id,
+1070-      robot_pool_id: worker ? worker.robot_pool_id : "",
+1071-      aiworker_model_code: worker ? worker.aiworker_model_code : "",
+1072-      internal_nickname: nickEl ? String(nickEl.value || "").trim() : ""
+1073-    });
+1074-    if (workerRow) rows.push(workerRow);
+1075-
+1076-    index += 1;
+1077-  }
+1078-
+1079-  return rows;
+1080-}
+1081-
+1082-async function aicmAxcSyncRolePlacementsForPayload(payload) {
+1083-  var rows = payload && Array.isArray(payload.rolePlacements) ? payload.rolePlacements : [];
+1084-  if (!rows.length) return { result: "ok", skipped: true };
+1085-
+1086-  var body = payload.body || {};
+1087-  var companyId = body.aicm_user_company_id || "";
+1088-  if (!companyId && state && state.selectedCompanyId) companyId = state.selectedCompanyId;
+1089-
+1090-  return requestJson("/api/aicm/v2/placement/sync-role-settings", {
+1091-    method: "POST",
+1092-    body: JSON.stringify({
+1093-      owner_civilization_id: ownerId(),
+1094-      aicm_user_company_id: companyId,
+1095-      role_placements: rows
+1096-    })
+1097-  });
+1098-}
+1099-
+1100-
+1101:function saveCompanyUpdateFromForm() {
+1102-    var companyId = aicmAvdTextById("aicm-company-edit-id");
+1103-
+1104-    if (!companyId) {
+1105-      setMessage("error", "変更対象の企業が見つかりません。");
+1106-      return;
+1107-    }
+1108-
+1109-    var body = {
+1110-      owner_civilization_id: aicmAvdOwnerId(),
+1111-      aicm_user_company_id: companyId,
+1112-      company_name: aicmAvdTextById("aicm-company-edit-name"),
+1113-      business_domain: aicmAvdTextById("aicm-company-edit-domain"),
+1114-      company_status: aicmAvdTextById("aicm-company-edit-status") || "active"
+1115-    };
+1116-
+1117-    var rows = [
+1118-      ["操作", "企業変更"],
+1119-      ["企業名", body.company_name],
+1120-      ["事業領域", body.business_domain || "未設定"],
+1121-      ["状態", body.company_status]
+1122-    ].concat(aicmAvdRoleSummaryRows("company"));
+1123-
+1124-    aicmAvdShowDbConfirm({
+1125-      kind: "company-update",
+1126-      title: "企業変更",
+1127-      endpoint: "/api/aicm/v2/company/update",
+1128-      body: body,
+1129-      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1130-      rolePlacements: aicmAxcCompanyRolePlacements({
+1131-        aicm_user_company_id: body.aicm_user_company_id
+1132-      }),
+1133-      summary_rows: rows
+1134-    });
+1135-  }
+1136-
+
+---- save department update ----
+1103-
+1104-    if (!companyId) {
+1105-      setMessage("error", "変更対象の企業が見つかりません。");
+1106-      return;
+1107-    }
+1108-
+1109-    var body = {
+1110-      owner_civilization_id: aicmAvdOwnerId(),
+1111-      aicm_user_company_id: companyId,
+1112-      company_name: aicmAvdTextById("aicm-company-edit-name"),
+1113-      business_domain: aicmAvdTextById("aicm-company-edit-domain"),
+1114-      company_status: aicmAvdTextById("aicm-company-edit-status") || "active"
+1115-    };
+1116-
+1117-    var rows = [
+1118-      ["操作", "企業変更"],
+1119-      ["企業名", body.company_name],
+1120-      ["事業領域", body.business_domain || "未設定"],
+1121-      ["状態", body.company_status]
+1122-    ].concat(aicmAvdRoleSummaryRows("company"));
+1123-
+1124-    aicmAvdShowDbConfirm({
+1125-      kind: "company-update",
+1126-      title: "企業変更",
+1127-      endpoint: "/api/aicm/v2/company/update",
+1128-      body: body,
+1129-      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1130-      rolePlacements: aicmAxcCompanyRolePlacements({
+1131-        aicm_user_company_id: body.aicm_user_company_id
+1132-      }),
+1133-      summary_rows: rows
+1134-    });
+1135-  }
+1136-
+1137-
+1138:function saveDepartmentUpdateFromForm() {
+1139-    var departmentId = aicmAvdTextById("aicm-department-edit-id");
+1140-    var companyId = aicmAvdTextById("aicm-department-edit-company-id");
+1141-
+1142-    if (!departmentId || !companyId) {
+1143-      setMessage("error", "変更対象の部門が見つかりません。");
+1144-      return;
+1145-    }
+1146-
+1147-    var body = {
+1148-      owner_civilization_id: aicmAvdOwnerId(),
+1149-      aicm_user_company_id: companyId,
+1150-      aicm_user_company_department_id: departmentId,
+1151-      department_name: aicmAvdTextById("aicm-department-edit-name"),
+1152-      purpose: aicmAvdTextById("aicm-department-edit-purpose"),
+1153-      department_status: aicmAvdTextById("aicm-department-edit-status") || "active"
+1154-    };
+1155-
+1156-    var rows = [
+1157-      ["操作", "部門変更"],
+1158-      ["部門名", body.department_name],
+1159-      ["目的", body.purpose || "未設定"],
+1160-      ["状態", body.department_status]
+1161-    ].concat(aicmAvdRoleSummaryRows("department"));
+1162-
+1163-    aicmAvdShowDbConfirm({
+1164-      kind: "department-update",
+1165-      title: "部門変更",
+1166-      endpoint: "/api/aicm/v2/department/update",
+1167-      body: body,
+1168-      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1169-      rolePlacements: aicmAxcDepartmentRolePlacements({
+1170-        aicm_user_company_department_id: body.aicm_user_company_department_id
+1171-      }),
+1172-      summary_rows: rows
+1173-    });
+
+---- save section update ----
+1132-      }),
+1133-      summary_rows: rows
+1134-    });
+1135-  }
+1136-
+1137-
+1138-function saveDepartmentUpdateFromForm() {
+1139-    var departmentId = aicmAvdTextById("aicm-department-edit-id");
+1140-    var companyId = aicmAvdTextById("aicm-department-edit-company-id");
+1141-
+1142-    if (!departmentId || !companyId) {
+1143-      setMessage("error", "変更対象の部門が見つかりません。");
+1144-      return;
+1145-    }
+1146-
+1147-    var body = {
+1148-      owner_civilization_id: aicmAvdOwnerId(),
+1149-      aicm_user_company_id: companyId,
+1150-      aicm_user_company_department_id: departmentId,
+1151-      department_name: aicmAvdTextById("aicm-department-edit-name"),
+1152-      purpose: aicmAvdTextById("aicm-department-edit-purpose"),
+1153-      department_status: aicmAvdTextById("aicm-department-edit-status") || "active"
+1154-    };
+1155-
+1156-    var rows = [
+1157-      ["操作", "部門変更"],
+1158-      ["部門名", body.department_name],
+1159-      ["目的", body.purpose || "未設定"],
+1160-      ["状態", body.department_status]
+1161-    ].concat(aicmAvdRoleSummaryRows("department"));
+1162-
+1163-    aicmAvdShowDbConfirm({
+1164-      kind: "department-update",
+1165-      title: "部門変更",
+1166-      endpoint: "/api/aicm/v2/department/update",
+1167-      body: body,
+1168-      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1169-      rolePlacements: aicmAxcDepartmentRolePlacements({
+1170-        aicm_user_company_department_id: body.aicm_user_company_department_id
+1171-      }),
+1172-      summary_rows: rows
+1173-    });
+1174-  }
+1175-
+1176-
+1177:function saveSectionUpdateFromForm() {
+1178-    var sectionId = aicmAvdTextById("aicm-section-edit-id");
+1179-    var companyId = aicmAvdTextById("aicm-section-edit-company-id");
+1180-    var departmentId = aicmAvdTextById("aicm-section-edit-department-id");
+1181-
+1182-    if (!sectionId || !companyId || !departmentId) {
+1183-      setMessage("error", "変更対象の課が見つかりません。");
+1184-      return;
+1185-    }
+1186-
+1187-    var body = {
+1188-      owner_civilization_id: aicmAvdOwnerId(),
+1189-      aicm_user_company_id: companyId,
+1190-      aicm_user_company_department_id: departmentId,
+1191-      aicm_user_company_section_id: sectionId,
+1192-      section_name: aicmAvdTextById("aicm-section-edit-name"),
+1193-      purpose: aicmAvdTextById("aicm-section-edit-purpose"),
+1194-      section_status: aicmAvdTextById("aicm-section-edit-status") || "active"
+1195-    };
+1196-
+1197-    var rows = [
+1198-      ["操作", "課変更"],
+1199-      ["課名", body.section_name],
+1200-      ["目的", body.purpose || "未設定"],
+1201-      ["状態", body.section_status]
+1202-    ].concat(aicmAvdRoleSummaryRows("section"));
+1203-
+1204-    aicmAvdShowDbConfirm({
+1205-      kind: "section-update",
+1206-      title: "課変更",
+1207-      endpoint: "/api/aicm/v2/section/update",
+1208-      body: body,
+1209-      // AICM_ROLEPLACEMENT_SCOPE_FIX_AXG_V1
+1210-      rolePlacements: aicmAxcSectionRolePlacements({
+1211-        aicm_user_company_section_id: body.aicm_user_company_section_id,
+1212-        aicm_user_company_department_id: body.aicm_user_company_department_id || (
+1213-          typeof aicmOrgSectionById === "function" && body.aicm_user_company_section_id
+1214-            ? ((aicmOrgSectionById(body.aicm_user_company_section_id) || {}).aicm_user_company_department_id || "")
+1215-            : ""
+1216-        )
+1217-      }),
+1218-      summary_rows: rows
+1219-    });
+1220-  }
+1221-
+1222-
+
+---- stale old scope refs ----
+999:function aicmAxcCompanyRolePlacements(company) {
+1013:function aicmAxcDepartmentRolePlacements(department) {
+1028:function aicmAxcSectionRolePlacements(section) {
+
+---- click target fix status ----
+692-      '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || '') + '</strong></p>',
+693-      rows.map(function (row) {
+694-        return [
+695-          '<article class="aicm-org-update-row">',
+696-          '  <div>',
+697-          '    <strong>' + escapeHtml(row.department_name || '部門') + '</strong>',
+698-          '    <p>' + escapeHtml(row.purpose || '') + '</p>',
+699-          '  </div>',
+700:          '  <button type="button" data-core-action="department-update-select" data-department-id="' + escapeHtml(row.aicm_user_company_department_id || '') + '">変更</button>',
+701-          '</article>'
+702-        ].join("");
+703-      }).join(""),
+704-      '</section>'
+705-    ].join("");
+706-  }
+707-
+708-  function renderDepartmentUpdateForm(department) {
+--
+3810-      return;
+3811-    }
+3812-
+3813-    if (action === "human-review-return") {
+3814-      returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+3815-      return;
+3816-    }
+3817-
+3818:    if (action === "department-update-select") {
+3819-      state.editingDepartmentId = (typeof target !== "undefined" && target && target.getAttribute) ? target.getAttribute("data-department-id") : "";
+3820-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+3821-      if (typeof render === "function") render();
+3822-      return;
+3823-    }
+3824-
+3825-    if (action === "department-update-clear") {
+3826-      state.editingDepartmentId = "";
+749-      rows.map(function (row) {
+750-        var dept = aicmOrgDepartmentById(row.aicm_user_company_department_id) || {};
+751-        return [
+752-          '<article class="aicm-org-update-row">',
+753-          '  <div>',
+754-          '    <strong>' + escapeHtml(row.section_name || '課') + '</strong>',
+755-          '    <p>' + escapeHtml(dept.department_name || '') + (row.purpose ? ' / ' + escapeHtml(row.purpose || '') : '') + '</p>',
+756-          '  </div>',
+757:          '  <button type="button" data-core-action="section-update-select" data-section-id="' + escapeHtml(row.aicm_user_company_section_id || '') + '">変更</button>',
+758-          '</article>'
+759-        ].join("");
+760-      }).join(""),
+761-      '</section>'
+762-    ].join("");
+763-  }
+764-
+765-  function renderSectionUpdateForm(section) {
+--
+3823-    }
+3824-
+3825-    if (action === "department-update-clear") {
+3826-      state.editingDepartmentId = "";
+3827-      if (typeof render === "function") render();
+3828-      return;
+3829-    }
+3830-
+3831:    if (action === "section-update-select") {
+3832-      state.editingSectionId = (typeof target !== "undefined" && target && target.getAttribute) ? target.getAttribute("data-section-id") : "";
+3833-      if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+3834-      if (typeof render === "function") render();
+3835-      return;
+3836-    }
+3837-
+3838-    if (action === "section-update-clear") {
+3839-      state.editingSectionId = "";

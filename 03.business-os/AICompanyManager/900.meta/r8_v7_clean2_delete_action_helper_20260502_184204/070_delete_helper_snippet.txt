@@ -1,0 +1,104 @@
+    if (action === "reload") {
+      loadContext();
+      return;
+    }
+  }
+
+  
+// AICM_R8_V7_CLEAN2_DELETE_ACTION_HELPER_HELPER_START
+  function aicmResolveMajorDeleteActionTargetR8V7C2(ev, btn) {
+    if (typeof aicmActionTargetSafe === "function") {
+      var safeTarget = aicmActionTargetSafe(ev, btn);
+      if (safeTarget && safeTarget.getAttribute) return safeTarget;
+    }
+
+    if (btn && btn.getAttribute) return btn;
+
+    if (ev && ev.target) {
+      if (ev.target.closest) {
+        var closest = ev.target.closest("[data-core-action]");
+        if (closest && closest.getAttribute) return closest;
+      }
+
+      if (ev.target.getAttribute) return ev.target;
+    }
+
+    return null;
+  }
+
+  function aicmOpenMajorDeleteConfirmFromActionR8V7C2(ev, btn) {
+    var deleteTarget = aicmResolveMajorDeleteActionTargetR8V7C2(ev, btn);
+
+    if (!deleteTarget || !deleteTarget.getAttribute) {
+      setMessage("error", "削除対象のボタンを特定できません。");
+      render();
+      return;
+    }
+
+    if (typeof aicmOpenMajorItemDeleteConfirmR8P !== "function") {
+      setMessage("error", "削除確認処理が見つかりません。");
+      render();
+      return;
+    }
+
+    aicmOpenMajorItemDeleteConfirmR8P(deleteTarget);
+  }
+
+  function aicmCancelMajorDeleteConfirmFromActionR8V7C2() {
+    if (typeof aicmCancelMajorItemDeleteConfirmR8P === "function") {
+      aicmCancelMajorItemDeleteConfirmR8P();
+      return;
+    }
+
+    if (state) {
+      state.managerMajorDeleteConfirm = null;
+      state.screen = "task-ledger";
+    }
+
+    setMessage("ok", "削除をキャンセルしました。");
+    render();
+  }
+
+  function aicmExecuteMajorDeleteConfirmFromActionR8V7C2() {
+    if (typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") {
+      aicmExecuteMajorItemDeleteConfirmR8P();
+      return;
+    }
+
+    setMessage("error", "削除確定処理が見つかりません。");
+    render();
+  }
+
+  function aicmMoveMajorItemPageFromActionR8V7C2(delta) {
+    if (typeof aicmMajorItemSetPageR8O === "function") {
+      aicmMajorItemSetPageR8O(delta);
+      return;
+    }
+
+    var current = Number(state.managerMajorPage || 1);
+    if (!Number.isFinite(current) || current < 1) current = 1;
+    state.managerMajorPage = Math.max(1, current + Number(delta || 0));
+    render();
+  }
+// AICM_R8_V7_CLEAN2_DELETE_ACTION_HELPER_HELPER_END
+
+function handleRootChange(event) {
+    var field = event.target;
+    var fileKind = field.getAttribute("data-core-file") || "";
+    if (fileKind === "task-ledger-csv") {
+      aicmCsvReadSelectedFile(field);
+      return;
+    }
+
+    var fieldName = field.getAttribute("data-core-field") || "";
+
+    if (fieldName === "selectedCompanyId") {
+      setSelectedCompany(field.value);
+      render();
+      return;
+    }
+
+    if (fieldName === "selectedDepartmentId") {
+      setSelectedDepartment(field.value);
+      render();
+    }

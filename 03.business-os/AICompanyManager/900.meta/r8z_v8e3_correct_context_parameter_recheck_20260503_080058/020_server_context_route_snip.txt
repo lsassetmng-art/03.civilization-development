@@ -1,0 +1,1141 @@
+---- server context route ----
+226-      section_name: aicmPmlwOptionalText(row.section_name),
+227-      major_item_name: majorName,
+228-      major_item_description: aicmPmlwOptionalText(row.major_item_description || row.description || row.task_name || row.note),
+229-      assigned_leader_label: aicmPmlwOptionalText(row.assigned_leader_label || row.leader_label || row.responsible_role_code),
+230-      priority_code: aicmPmlwPriority(row.priority_code),
+231-      due_date: aicmPmlwOptionalText(row.due_date),
+232-      note: aicmPmlwOptionalText(row.note)
+233-    };
+234-  }).filter((row) => row.major_item_name.length > 0);
+235-}
+236-
+237-function createPresidentPolicy(body) {
+238:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+239-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+240-  const title = requiredText(body.policy_title || body.title, "policy_title");
+241-  const text = requiredText(body.policy_text || body.president_policy_instruction_text || body.description, "policy_text");
+242-
+243-  const sql = [
+244-    "WITH inserted AS (",
+245-    "  INSERT INTO business.aicm_president_policy (",
+246:    "    owner_civilization_id, aicm_user_company_id, source_route_code, policy_title, policy_text,",
+247-    "    president_robot_label, requested_by_text, company_common_rules_snapshot,",
+248-    "    policy_status_code, priority_code, due_date,",
+249-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+250-    "  ) VALUES (",
+251-    "    " + sqlLiteral(owner) + "::uuid,",
+252-    "    " + sqlLiteral(companyId) + "::uuid,",
+253-    "    " + sqlLiteral(body.source_route_code || "user_to_president") + ",",
+254-    "    " + sqlLiteral(title) + ",",
+255-    "    " + sqlLiteral(text) + ",",
+256-    "    " + aicmPmlwTextSql(body.president_robot_label) + ",",
+257-    "    " + aicmPmlwTextSql(body.requested_by_text || "user") + ",",
+258-    "    " + aicmPmlwTextSql(body.company_common_rules_snapshot) + ",",
+--
+270-    "SELECT jsonb_build_object(",
+271-    "  'result', 'ok',",
+272-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+273-    "  'president_policy', to_jsonb(inserted)",
+274-    ")::text",
+275-    "FROM inserted;"
+276-  ].join("\n");
+277-
+278-  return runPsqlJson(sql);
+279-}
+280-
+281-function createManagerMajorItem(body) {
+282:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+283-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+284-  const majorName = requiredText(body.major_item_name || body.deliverable_name || body.task_name, "major_item_name");
+285-
+286-  const sql = [
+287-    "WITH inserted AS (",
+288-    "  INSERT INTO business.aicm_manager_major_work_item (",
+289:    "    owner_civilization_id, aicm_user_company_id, aicm_president_policy_id,",
+290-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+291-    "    major_item_name, major_item_description, source_route_code,",
+292-    "    manager_robot_label, assigned_leader_label,",
+293-    "    decomposition_status_code, handoff_status_code, priority_code, due_date,",
+294-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+295-    "  ) VALUES (",
+296-    "    " + sqlLiteral(owner) + "::uuid,",
+297-    "    " + sqlLiteral(companyId) + "::uuid,",
+298-    "    " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id) + ",",
+299-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+300-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+301-    "    " + sqlLiteral(majorName) + ",",
+--
+318-    "SELECT jsonb_build_object(",
+319-    "  'result', 'ok',",
+320-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+321-    "  'manager_major_item', to_jsonb(inserted)",
+322-    ")::text",
+323-    "FROM inserted;"
+324-  ].join("\n");
+325-
+326-  return runPsqlJson(sql);
+327-}
+328-
+329-function updateManagerMajorItem(body) {
+330:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+331-  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+332-  const updates = [];
+333-
+334-  if (body.major_item_name !== undefined) updates.push("major_item_name = " + sqlLiteral(String(body.major_item_name || "").trim()));
+335-  if (body.major_item_description !== undefined) updates.push("major_item_description = " + aicmPmlwTextSql(body.major_item_description));
+336-  if (body.aicm_president_policy_id !== undefined) updates.push("aicm_president_policy_id = " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id));
+337-  if (body.aicm_user_company_department_id !== undefined) updates.push("aicm_user_company_department_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id));
+338-  if (body.aicm_user_company_section_id !== undefined) updates.push("aicm_user_company_section_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id));
+339-  if (body.manager_robot_label !== undefined) updates.push("manager_robot_label = " + aicmPmlwTextSql(body.manager_robot_label));
+340-  if (body.assigned_leader_label !== undefined) updates.push("assigned_leader_label = " + aicmPmlwTextSql(body.assigned_leader_label));
+341-  if (body.decomposition_status_code !== undefined) updates.push("decomposition_status_code = " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)));
+342-  if (body.handoff_status_code !== undefined) updates.push("handoff_status_code = " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)));
+--
+346-  if (body.supplemental_materials_text !== undefined) updates.push("supplemental_materials_text = " + aicmPmlwTextSql(body.supplemental_materials_text));
+347-  if (body.applicable_rules_text !== undefined) updates.push("applicable_rules_text = " + aicmPmlwTextSql(body.applicable_rules_text));
+348-  if (body.note !== undefined) updates.push("note = " + aicmPmlwTextSql(body.note));
+349-  if (body.handoff_link !== undefined) updates.push("handoff_link = " + aicmPmlwTextSql(body.handoff_link));
+350-
+351-  updates.push("updated_at = now()");
+352-
+353-  const sql = [
+354-    "WITH updated AS (",
+355-    "  UPDATE business.aicm_manager_major_work_item",
+356-    "  SET " + updates.join(", "),
+357-    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+358:    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+359-    "  RETURNING *",
+360-    ")",
+361-    "SELECT jsonb_build_object(",
+362-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+363-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+364-    "  'manager_major_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+365-    ")::text;"
+366-  ].join("\n");
+367-
+368-  return runPsqlJson(sql);
+369-}
+370-
+371-function archiveManagerMajorItem(body) {
+372:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+373-  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+374-
+375-  const sql = [
+376-    "WITH archived AS (",
+377-    "  UPDATE business.aicm_manager_major_work_item",
+378-    "  SET decomposition_status_code = 'archived',",
+379-    "      handoff_status_code = 'archived',",
+380-    "      updated_at = now()",
+381-    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+382:    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+383-    "  RETURNING *",
+384-    ")",
+385-    "SELECT jsonb_build_object(",
+386-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM archived) THEN 'ok' ELSE 'not_found' END,",
+387-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+388-    "  'manager_major_item', COALESCE((SELECT to_jsonb(archived) FROM archived), '{}'::jsonb)",
+389-    ")::text;"
+390-  ].join("\n");
+391-
+392-  return runPsqlJson(sql);
+393-}
+394-
+395-function importManagerMajorItemsCsv(body) {
+396:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+397-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+398-  const rows = aicmPmlwCsvRows(body);
+399-
+400-  if (rows.length === 0) {
+401-    return { result: "ok", api_identifier: SERVER_MARK, inserted_count: 0, manager_major_items: [] };
+402-  }
+403-
+404-  const values = rows.map((row, index) => [
+405-    "(",
+406-    index,
+407-    ", " + sqlLiteral(owner) + "::uuid",
+408-    ", " + sqlLiteral(companyId) + "::uuid",
+409-    ", " + sqlLiteral(row.department_name),
+410-    ", " + sqlLiteral(row.section_name),
+411-    ", " + sqlLiteral(row.major_item_name),
+412-    ", " + sqlLiteral(row.major_item_description),
+413-    ", " + sqlLiteral(row.assigned_leader_label),
+414-    ", " + sqlLiteral(row.priority_code),
+415-    ", " + aicmPmlwOptionalDateSql(row.due_date),
+416-    ", " + sqlLiteral(row.note),
+417-    ")"
+418-  ].join("")).join(",\n    ");
+419-
+420-  const sql = [
+421:    "WITH input_rows(row_order, owner_civilization_id, aicm_user_company_id, department_name, section_name, major_item_name, major_item_description, assigned_leader_label, priority_code, due_date, note) AS (",
+422-    "  VALUES",
+423-    "    " + values,
+424-    "), resolved AS (",
+425-    "  SELECT i.*, (",
+426-    "    SELECT d.aicm_user_company_department_id",
+427-    "    FROM business.aicm_user_company_department d",
+428:    "    WHERE d.owner_civilization_id = i.owner_civilization_id",
+429-    "      AND d.aicm_user_company_id = i.aicm_user_company_id",
+430-    "      AND d.department_status = 'active'",
+431-    "      AND (i.department_name = '' OR d.department_name = i.department_name)",
+432-    "    ORDER BY CASE WHEN d.department_name = i.department_name THEN 0 ELSE 1 END, d.display_order, d.created_at",
+433-    "    LIMIT 1",
+434-    "  ) AS department_id",
+435-    "  FROM input_rows i",
+436-    "), resolved_section AS (",
+437-    "  SELECT r.*, (",
+438-    "    SELECT s.aicm_user_company_section_id",
+439-    "    FROM business.aicm_user_company_section s",
+440:    "    WHERE s.owner_civilization_id = r.owner_civilization_id",
+441-    "      AND s.aicm_user_company_id = r.aicm_user_company_id",
+442-    "      AND s.section_status = 'active'",
+443-    "      AND (r.department_id IS NULL OR s.aicm_user_company_department_id = r.department_id)",
+444-    "      AND (r.section_name = '' OR s.section_name = r.section_name)",
+445-    "    ORDER BY CASE WHEN s.section_name = r.section_name THEN 0 ELSE 1 END, s.display_order, s.created_at",
+446-    "    LIMIT 1",
+447-    "  ) AS section_id",
+448-    "  FROM resolved r",
+449-    "), inserted AS (",
+450-    "  INSERT INTO business.aicm_manager_major_work_item (",
+451:    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+452-    "    major_item_name, major_item_description, source_route_code, assigned_leader_label,",
+453-    "    decomposition_status_code, handoff_status_code, priority_code, due_date, note, display_order",
+454-    "  )",
+455:    "  SELECT owner_civilization_id, aicm_user_company_id, department_id, section_id,",
+456-    "         major_item_name, major_item_description, 'csv_import', assigned_leader_label,",
+457-    "         'not_started', 'draft', priority_code, due_date, note, 100 + row_order",
+458-    "  FROM resolved_section",
+459-    "  RETURNING *",
+460-    ")",
+461-    "SELECT jsonb_build_object(",
+462-    "  'result', 'ok',",
+463-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+464-    "  'inserted_count', (SELECT count(*) FROM inserted),",
+465-    "  'manager_major_items', COALESCE((SELECT jsonb_agg(to_jsonb(inserted) ORDER BY display_order, created_at) FROM inserted), '[]'::jsonb)",
+466-    ")::text;"
+467-  ].join("\n");
+--
+507-
+508-function aicmHumanReviewArtifactKind(value) {
+509-  const text = String(value || "design_doc").trim();
+510-  return ["design_doc", "implementation", "exception", "delivery_package", "handoff"].includes(text) ? text : "design_doc";
+511-}
+512-
+513-function aicmHumanReviewPriority(value) {
+514-  const text = String(value || "normal").trim();
+515-  return ["low", "normal", "high", "urgent"].includes(text) ? text : "normal";
+516-}
+517-
+518-function createHumanReviewItem(body) {
+519:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+520-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+521-  const title = requiredText(body.review_title || body.title, "review_title");
+522-
+523-  const sql = [
+524-    "WITH inserted AS (",
+525-    "  INSERT INTO business.aicm_human_review_item (",
+526:    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+527-    "    related_president_policy_id, related_manager_major_work_item_id, related_leader_middle_work_item_id,",
+528-    "    related_deliverable_requirement_id, related_worker_work_unit_id,",
+529-    "    review_kind_code, artifact_kind_code, review_title,",
+530-    "    delivery_summary_text, main_changes_text, ai_review_result_text, unresolved_issues_text, artifact_link,",
+531-    "    responsible_ai_label, requested_by_ai_label, human_review_status_code, priority_code, due_date,",
+532-    "    display_order, metadata_jsonb",
+533-    "  ) VALUES (",
+534-    "    " + sqlLiteral(owner) + "::uuid,",
+535-    "    " + sqlLiteral(companyId) + "::uuid,",
+536-    "    " + aicmHumanReviewOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+537-    "    " + aicmHumanReviewOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+538-    "    " + aicmHumanReviewOptionalUuidSql(body.related_president_policy_id) + ",",
+--
+561-    "SELECT jsonb_build_object(",
+562-    "  'result', 'ok',",
+563-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+564-    "  'human_review_item', to_jsonb(inserted)",
+565-    ")::text",
+566-    "FROM inserted;"
+567-  ].join("\n");
+568-
+569-  return runPsqlJson(sql);
+570-}
+571-
+572-function approveHumanReviewItem(body) {
+573:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+574-  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+575-
+576-  const sql = [
+577-    "WITH updated AS (",
+578-    "  UPDATE business.aicm_human_review_item",
+579-    "  SET human_review_status_code = 'approved',",
+580-    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+581-    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+582-    "      reviewed_at = now(),",
+583-    "      updated_at = now()",
+584-    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+585:    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+586-    "  RETURNING *",
+587-    ")",
+588-    "SELECT jsonb_build_object(",
+589-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+590-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+591-    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+592-    ")::text;"
+593-  ].join("\n");
+594-
+595-  return runPsqlJson(sql);
+596-}
+597-
+598-function returnHumanReviewItem(body) {
+599:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+600-  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+601-
+602-  const sql = [
+603-    "WITH updated AS (",
+604-    "  UPDATE business.aicm_human_review_item",
+605-    "  SET human_review_status_code = 'returned',",
+606-    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+607-    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+608-    "      reviewed_at = now(),",
+609-    "      updated_at = now()",
+610-    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+611:    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+612-    "  RETURNING *",
+613-    ")",
+614-    "SELECT jsonb_build_object(",
+615-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+616-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+617-    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+618-    ")::text;"
+619-  ].join("\n");
+620-
+621-  return runPsqlJson(sql);
+622-}
+623-
+--
+633-}
+634-
+635-function aicmOrgUpdateTextSql(value) {
+636-  return sqlLiteral(String(value || ""));
+637-}
+638-
+639-function aicmOrgUpdateStatus(value, allowed, fallback) {
+640-  const text = String(value || fallback).trim();
+641-  return allowed.includes(text) ? text : fallback;
+642-}
+643-
+644-function updateCompany(body) {
+645:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+646-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+647-  const name = requiredText(body.company_name || body.companyName, "company_name");
+648-
+649-  const sql = [
+650-    "WITH updated AS (",
+651-    "  UPDATE business.aicm_user_company",
+652-    "  SET company_name = " + sqlLiteral(name) + ",",
+653-    "      business_domain = " + aicmOrgUpdateTextSql(body.business_domain || body.businessDomain) + ",",
+654-    "      company_common_rules_text = " + aicmOrgUpdateTextSql(body.company_common_rules_text || body.companyCommonRulesText) + ",",
+655-    "      president_policy_instruction_text = " + aicmOrgUpdateTextSql(body.president_policy_instruction_text || body.presidentPolicyInstructionText) + ",",
+656-    "      updated_at = now()",
+657-    "  WHERE aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+658:    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+659-    "  RETURNING *",
+660-    ")",
+661-    "SELECT jsonb_build_object(",
+662-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+663-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+664-    "  'company', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+665-    ")::text;"
+666-  ].join("\n");
+667-
+668-  return runPsqlJson(sql);
+669-}
+670-
+671-function updateDepartment(body) {
+672:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+673-  const departmentId = requiredUuid(body.aicm_user_company_department_id, "aicm_user_company_department_id");
+674-  const name = requiredText(body.department_name || body.departmentName, "department_name");
+675-  const status = aicmOrgUpdateStatus(body.department_status || body.department_status_code, ["active", "inactive", "archived"], "active");
+676-
+677-  const sql = [
+678-    "WITH updated AS (",
+679-    "  UPDATE business.aicm_user_company_department",
+680-    "  SET department_name = " + sqlLiteral(name) + ",",
+681-    "      purpose = " + aicmOrgUpdateTextSql(body.purpose) + ",",
+682-    "      department_status = " + sqlLiteral(status) + ",",
+683-    "      updated_at = now()",
+684-    "  WHERE aicm_user_company_department_id = " + sqlLiteral(departmentId) + "::uuid",
+685:    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+686-    "  RETURNING *",
+687-    ")",
+688-    "SELECT jsonb_build_object(",
+689-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+690-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+691-    "  'department', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+692-    ")::text;"
+693-  ].join("\n");
+694-
+695-  return runPsqlJson(sql);
+696-}
+697-
+698-function updateSection(body) {
+699:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+700-  const sectionId = requiredUuid(body.aicm_user_company_section_id, "aicm_user_company_section_id");
+701-  const name = requiredText(body.section_name || body.sectionName, "section_name");
+702-  const status = aicmOrgUpdateStatus(body.section_status || body.section_status_code, ["active", "inactive", "archived"], "active");
+703-
+704-  const sql = [
+705-    "WITH updated AS (",
+706-    "  UPDATE business.aicm_user_company_section",
+707-    "  SET section_name = " + sqlLiteral(name) + ",",
+708-    "      purpose = " + aicmOrgUpdateTextSql(body.purpose) + ",",
+709-    "      section_status = " + sqlLiteral(status) + ",",
+710-    "      updated_at = now()",
+711-    "  WHERE aicm_user_company_section_id = " + sqlLiteral(sectionId) + "::uuid",
+712:    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+713-    "  RETURNING *",
+714-    ")",
+715-    "SELECT jsonb_build_object(",
+716-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+717-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+718-    "  'section', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+719-    ")::text;"
+720-  ].join("\n");
+721-
+722-  return runPsqlJson(sql);
+723-}
+724-
+725-
+726:function getContext(ownerCivilizationId) {
+727:  const owner = requiredUuid(ownerCivilizationId, "owner_civilization_id");
+728-
+729-  const sql = [
+730-    "SELECT jsonb_build_object(",
+731-    "  'result', 'ok',",
+732-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+733:    "  'owner_civilization_id', " + sqlLiteral(owner) + ",",
+734-    "  'companies', (",
+735-    "    SELECT COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.created_at DESC), '[]'::jsonb)",
+736-    "    FROM business.aicm_user_company c",
+737:    "    WHERE c.owner_civilization_id::text = " + sqlLiteral(owner),
+738-    "      AND c.company_status = 'active'",
+739-    "  ),",
+740-    "  'departments', (",
+741-    "    SELECT COALESCE(jsonb_agg(to_jsonb(d) ORDER BY d.display_order, d.created_at), '[]'::jsonb)",
+742-    "    FROM business.aicm_user_company_department d",
+743:    "    WHERE d.owner_civilization_id::text = " + sqlLiteral(owner),
+744-    "      AND d.department_status = 'active'",
+745-    "  ),",
+746-    "  'sections', (",
+747-    "    SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY s.display_order, s.created_at), '[]'::jsonb)",
+748-    "    FROM business.aicm_user_company_section s",
+749:    "    WHERE s.owner_civilization_id::text = " + sqlLiteral(owner),
+750-    "      AND s.section_status = 'active'",
+751-    "  ),",
+752-    "  'placements', (",
+753-    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.created_at DESC), '[]'::jsonb)",
+754-    "    FROM business.vw_aicm_user_company_worker_placement_display p",
+755:    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+756-    "      AND p.status_code = 'active'",
+757-    "  ),",
+758-    "  'task_ledger', (",
+759-    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.display_order, t.created_at DESC), '[]'::jsonb)",
+760-    "    FROM business.vw_aicm_user_company_department_task_ledger_display t",
+761:    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+762-    "      AND t.task_status_code <> 'archived'",
+763-    "  ),",
+764-    // AICM_PMLW_GETCONTEXT_SQL_EXTENSION_AQP_AQS_V1
+765-    "  'pmlw_president_policies', (",
+766-    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.display_order ASC, p.updated_at DESC, p.created_at DESC), '[]'::jsonb)",
+767-    "    FROM business.vw_aicm_pmlw_president_policy_display p",
+768:    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+769-    "  ),",
+770-    "  'pmlw_major_items', (",
+771-    "    SELECT COALESCE(jsonb_agg(to_jsonb(m) ORDER BY m.display_order ASC, m.updated_at DESC, m.created_at DESC), '[]'::jsonb)",
+772-    "    FROM business.vw_aicm_pmlw_major_work_display m",
+773:    "    WHERE m.owner_civilization_id::text = " + sqlLiteral(owner),
+774-    "  ),",
+775-    "  'pmlw_middle_items', (",
+776-    "    SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY l.display_order ASC, l.updated_at DESC, l.created_at DESC), '[]'::jsonb)",
+777-    "    FROM business.vw_aicm_pmlw_leader_middle_display l",
+778:    "    WHERE l.owner_civilization_id::text = " + sqlLiteral(owner),
+779-    "  ),",
+780-    "  'pmlw_deliverable_requirements', (",
+781-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.display_order ASC, r.updated_at DESC, r.created_at DESC), '[]'::jsonb)",
+782-    "    FROM business.vw_aicm_pmlw_deliverable_requirement_display r",
+783:    "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+784-    "  ),",
+785-    "  'pmlw_worker_work_units', (",
+786-    "    SELECT COALESCE(jsonb_agg(to_jsonb(w) ORDER BY w.display_order ASC, w.updated_at DESC, w.created_at DESC), '[]'::jsonb)",
+787-    "    FROM business.vw_aicm_pmlw_worker_work_unit_display w",
+788:    "    WHERE w.owner_civilization_id::text = " + sqlLiteral(owner),
+789-    "  ),",
+790-    "  'pmlw_workflow_tree', (",
+791-    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.last_updated_at DESC NULLS LAST), '[]'::jsonb)",
+792-    "    FROM business.vw_aicm_pmlw_workflow_tree t",
+793:    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+794-    "  ),",
+795-    // AICM_HUMAN_REVIEW_QUEUE_ARN_ARQ_V1_CONTEXT
+796-    "  'review_wait_items', (",
+797-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.priority_code DESC, r.requested_at DESC, r.created_at DESC), '[]'::jsonb)",
+798-    "    FROM business.vw_aicm_human_review_wait_display r",
+799:    "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+800-    "  ),",
+801-    "  'robot_catalog', (",
+802-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.aiworker_model_code), '[]'::jsonb)",
+803-    "    FROM business.vw_ai_company_manager_system_robot_selector_options r",
+804-    "  )",
+805-    ")::text;"
+806-  ].join("\n");
+807-
+808-  return runPsqlJson(sql);
+809-}
+810-
+811-function createCompany(body) {
+812:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+813-  const name = requiredText(body.company_name, "company_name");
+814-  const domain = String(body.business_domain || "");
+815-
+816-  const sql = [
+817-    "WITH inserted AS (",
+818-    "  INSERT INTO business.aicm_user_company (",
+819:    "    owner_civilization_id, company_name, business_domain, company_status, selected_flag",
+820-    "  ) VALUES (",
+821-    "    " + sqlLiteral(owner) + "::uuid,",
+822-    "    " + sqlLiteral(name) + ",",
+823-    "    " + sqlLiteral(domain) + ",",
+824-    "    'active',",
+825-    "    true",
+826-    "  )",
+827-    "  RETURNING *",
+828-    ")",
+829-    "SELECT jsonb_build_object(",
+830-    "  'result', 'ok',",
+831-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+832-    "  'company', to_jsonb(inserted)",
+833-    ")::text",
+834-    "FROM inserted;"
+835-  ].join("\n");
+836-
+837-  return runPsqlJson(sql);
+838-}
+839-
+840-function createDepartment(body) {
+841:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+842-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+843-  const name = requiredText(body.department_name, "department_name");
+844-  const purpose = String(body.purpose || "");
+845-
+846-  const sql = [
+847-    "WITH company_ok AS (",
+848-    "  SELECT aicm_user_company_id",
+849-    "  FROM business.aicm_user_company",
+850:    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+851-    "    AND aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+852-    "    AND company_status = 'active'",
+853-    "  LIMIT 1",
+854-    "), inserted AS (",
+855-    "  INSERT INTO business.aicm_user_company_department (",
+856:    "    owner_civilization_id, aicm_user_company_id, department_name, purpose, department_status",
+857-    "  )",
+858-    "  SELECT",
+859-    "    " + sqlLiteral(owner) + "::uuid,",
+860-    "    aicm_user_company_id,",
+861-    "    " + sqlLiteral(name) + ",",
+862-    "    " + sqlLiteral(purpose) + ",",
+863-    "    'active'",
+864-    "  FROM company_ok",
+865-    "  RETURNING *",
+866-    ")",
+867-    "SELECT CASE",
+868-    "  WHEN EXISTS (SELECT 1 FROM inserted) THEN",
+--
+875-    "    jsonb_build_object(",
+876-    "      'result', 'error',",
+877-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+878-    "      'error_message', '先にv2のAI企業を作成・選択してください。旧ローカル会社IDでは部門保存できません。'",
+879-    "    )::text",
+880-    "END;"
+881-  ].join("\n");
+882-
+883-  return runPsqlJson(sql);
+884-}
+885-
+886-function createSection(body) {
+887:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+888-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+889-  const departmentId = requiredUuid(body.aicm_user_company_department_id, "aicm_user_company_department_id");
+890-  const name = requiredText(body.section_name, "section_name");
+891-  const purpose = String(body.purpose || "");
+892-
+893-  const sql = [
+894-    "WITH department_ok AS (",
+895-    "  SELECT aicm_user_company_id, aicm_user_company_department_id",
+896-    "  FROM business.aicm_user_company_department",
+897:    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+898-    "    AND aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+899-    "    AND aicm_user_company_department_id = " + sqlLiteral(departmentId) + "::uuid",
+900-    "    AND department_status = 'active'",
+901-    "  LIMIT 1",
+902-    "), inserted AS (",
+903-    "  INSERT INTO business.aicm_user_company_section (",
+904:    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, section_name, purpose, section_status",
+905-    "  )",
+906-    "  SELECT",
+907-    "    " + sqlLiteral(owner) + "::uuid,",
+908-    "    aicm_user_company_id,",
+909-    "    aicm_user_company_department_id,",
+910-    "    " + sqlLiteral(name) + ",",
+911-    "    " + sqlLiteral(purpose) + ",",
+912-    "    'active'",
+913-    "  FROM department_ok",
+914-    "  RETURNING *",
+915-    ")",
+916-    "SELECT CASE",
+--
+925-    "      'result', 'error',",
+926-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+927-    "      'error_message', '先にv2のAI企業と部門を作成・選択してください。旧ローカルIDでは課保存できません。'",
+928-    "    )::text",
+929-    "END;"
+930-  ].join("\n");
+931-
+932-  return runPsqlJson(sql);
+933-}
+934-
+935-
+936-function createTaskLedger(body) {
+937:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+938-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+939-  const departmentId = requiredUuid(body.aicm_user_company_department_id, "aicm_user_company_department_id");
+940-  const sectionId = String(body.aicm_user_company_section_id || "").trim();
+941-
+942-  const deliverableName = requiredText(body.deliverable_name, "deliverable_name");
+943-  const taskName = requiredText(body.task_name, "task_name");
+944-  const workTypeCode = String(body.work_type_code || "design").trim() || "design";
+945-  const responsibleRoleCode = String(body.responsible_role_code || "Manager").trim() || "Manager";
+946-  const responsibleRobotLabel = String(body.responsible_robot_label || "");
+947-  const taskStatusCode = String(body.task_status_code || "todo").trim() || "todo";
+948-  const priorityCode = String(body.priority_code || "normal").trim() || "normal";
+949-  const dueDate = String(body.due_date || "").trim();
+950-
+951-  const sectionSql = sectionId ? sqlLiteral(sectionId) + "::uuid" : "NULL";
+952-  const dueDateSql = dueDate ? sqlLiteral(dueDate) + "::date" : "NULL";
+953-
+954-  const sql = [
+955-    "WITH department_ok AS (",
+956-    "  SELECT d.aicm_user_company_id, d.aicm_user_company_department_id",
+957-    "  FROM business.aicm_user_company_department d",
+958-    "  JOIN business.aicm_user_company c",
+959-    "    ON c.aicm_user_company_id = d.aicm_user_company_id",
+960:    "  WHERE d.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+961-    "    AND d.aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+962-    "    AND d.aicm_user_company_department_id = " + sqlLiteral(departmentId) + "::uuid",
+963-    "    AND d.department_status = 'active'",
+964-    "    AND c.company_status = 'active'",
+965-    "  LIMIT 1",
+966-    "), inserted AS (",
+967-    "  INSERT INTO business.aicm_user_company_department_task_ledger (",
+968:    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+969-    "    deliverable_name, task_name, work_type_code, responsible_role_code, responsible_robot_label,",
+970-    "    task_status_code, priority_code, due_date,",
+971-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+972-    "  )",
+973-    "  SELECT",
+974-    "    " + sqlLiteral(owner) + "::uuid,",
+975-    "    aicm_user_company_id,",
+976-    "    aicm_user_company_department_id,",
+977-    "    " + sectionSql + ",",
+978-    "    " + sqlLiteral(deliverableName) + ",",
+979-    "    " + sqlLiteral(taskName) + ",",
+980-    "    " + sqlLiteral(workTypeCode) + ",",
+--
+1003-    "      'result', 'error',",
+1004-    "      'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1005-    "      'error_message', '先にv2のAI企業と部門を作成・選択してください。'",
+1006-    "    )::text",
+1007-    "END;"
+1008-  ].join("\n");
+1009-
+1010-  return runPsqlJson(sql);
+1011-}
+1012-
+1013-
+1014-function createPlacement(body) {
+1015:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1016-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1017-  const roleCode = requiredText(body.role_code, "role_code");
+1018-  const modelCode = requiredText(body.aiworker_model_code, "aiworker_model_code");
+1019-
+1020-  const departmentId = String(body.aicm_user_company_department_id || "").trim();
+1021-  const sectionId = String(body.aicm_user_company_section_id || "").trim();
+1022-  const targetLevelCode = requiredText(body.target_level_code || "company", "target_level_code");
+1023-  const targetId = String(body.target_id || "").trim();
+1024-  const robotPoolId = String(body.robot_pool_id || "").trim();
+1025-  const nickname = String(body.internal_nickname || "");
+1026-
+1027-  const departmentSql = departmentId ? sqlLiteral(departmentId) + "::uuid" : "NULL";
+1028-  const sectionSql = sectionId ? sqlLiteral(sectionId) + "::uuid" : "NULL";
+1029-  const targetSql = targetId ? sqlLiteral(targetId) + "::uuid" : "NULL";
+1030-  const robotPoolSql = robotPoolId ? sqlLiteral(robotPoolId) + "::uuid" : "NULL";
+1031-
+1032-  const sql = [
+1033-    "WITH company_ok AS (",
+1034-    "  SELECT aicm_user_company_id",
+1035-    "  FROM business.aicm_user_company",
+1036:    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1037-    "    AND aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1038-    "    AND company_status = 'active'",
+1039-    "  LIMIT 1",
+1040-    "), inserted AS (",
+1041-    "  INSERT INTO business.aicm_user_company_worker_placement (",
+1042:    "    owner_civilization_id, aicm_user_company_id,",
+1043-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1044-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1045-    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1046-    "  )",
+1047-    "  SELECT",
+1048-    "    " + sqlLiteral(owner) + "::uuid,",
+1049-    "    aicm_user_company_id,",
+1050-    "    " + departmentSql + ",",
+1051-    "    " + sectionSql + ",",
+1052-    "    " + sqlLiteral(targetLevelCode) + ",",
+1053-    "    " + targetSql + ",",
+1054-    "    'AICompanyManager',",
+--
+1121-      target_level_code: targetLevelCode,
+1122-      aicm_user_company_department_id: String(row.aicm_user_company_department_id || row.departmentId || "").trim(),
+1123-      aicm_user_company_section_id: String(row.aicm_user_company_section_id || row.sectionId || row.organizationId || "").trim(),
+1124-      target_id: String(row.target_id || row.targetId || "").trim(),
+1125-      robot_pool_id: String(row.robot_pool_id || row.robotPoolId || "").trim(),
+1126-      aiworker_model_code: String(row.aiworker_model_code || row.aiworkerModelCode || "").trim(),
+1127-      internal_nickname: String(row.internal_nickname || row.internalNickname || "").trim()
+1128-    };
+1129-  });
+1130-}
+1131-
+1132-function syncRoleSettings(body) {
+1133:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1134-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1135-  const submittedRows = aicmRoleSyncRows(body);
+1136-
+1137-  const targetKeys = [];
+1138-  const insertRows = [];
+1139-
+1140-  for (const row of submittedRows) {
+1141-    const targetId = row.target_id ||
+1142-      (row.target_level_code === "company" ? companyId : "") ||
+1143-      (row.target_level_code === "department" ? row.aicm_user_company_department_id : "") ||
+1144-      (row.target_level_code === "section" ? row.aicm_user_company_section_id : "");
+1145-
+--
+1200-    ", " + aicmRoleSyncOptionalUuidSql(row.robot_pool_id),
+1201-    ", " + sqlLiteral(row.aiworker_model_code),
+1202-    ", " + sqlLiteral(row.internal_nickname),
+1203-    ")"
+1204-  ].join("")).join(",\n    ") : "";
+1205-
+1206-  const insertCte = insertRows.length ? [
+1207-    "), insert_rows(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id, robot_pool_id, aiworker_model_code, internal_nickname) AS (",
+1208-    "  VALUES",
+1209-    "    " + insertValues,
+1210-    "), inserted AS (",
+1211-    "  INSERT INTO business.aicm_user_company_worker_placement (",
+1212:    "    owner_civilization_id, aicm_user_company_id,",
+1213-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1214-    "    target_level_code, target_id, app_code, role_code, robot_pool_id,",
+1215-    "    aiworker_model_code, internal_nickname, placement_quantity, placement_mode_code, status_code",
+1216-    "  )",
+1217-    "  SELECT",
+1218-    "  -- AICM_ROLE_SYNC_UUID_CAST_AXM_V1",
+1219-    "    " + sqlLiteral(owner) + "::uuid,",
+1220-    "    c.aicm_user_company_id,",
+1221-    "    i.aicm_user_company_department_id::uuid,",
+1222-    "    i.aicm_user_company_section_id::uuid,",
+1223-    "    i.target_level_code,",
+1224-    "    i.target_id,",
+--
+1235-    "  RETURNING *"
+1236-  ].join("\n") : [
+1237-    "), inserted AS (",
+1238-    "  SELECT *",
+1239-    "  FROM business.aicm_user_company_worker_placement",
+1240-    "  WHERE false"
+1241-  ].join("\n");
+1242-
+1243-  const sql = [
+1244-    "WITH company_ok AS (",
+1245-    "  SELECT aicm_user_company_id",
+1246-    "  FROM business.aicm_user_company",
+1247:    "  WHERE owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1248-    "    AND aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1249-    "    AND company_status = 'active'",
+1250-    "  LIMIT 1",
+1251-    "), target_keys(row_order, target_level_code, target_id, role_code, aicm_user_company_department_id, aicm_user_company_section_id) AS (",
+1252-    "  VALUES",
+1253-    "    " + targetValues,
+1254-    "), archived AS (",
+1255-    "  UPDATE business.aicm_user_company_worker_placement p",
+1256-    "  SET status_code = 'archived',",
+1257-    "      updated_at = now(),",
+1258-    "      metadata_jsonb = COALESCE(p.metadata_jsonb, '{}'::jsonb) || jsonb_build_object('archived_by', 'AICompanyManager.role_settings_sync', 'archived_at', now()::text)",
+1259-    "  FROM target_keys k",
+1260:    "  WHERE p.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1261-    "    AND p.aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1262-    "    AND p.app_code = 'AICompanyManager'",
+1263-    "    AND p.status_code = 'active'",
+1264-    "    AND lower(p.target_level_code) = lower(k.target_level_code)",
+1265-    "    AND p.target_id = k.target_id",
+1266-    "    AND lower(p.role_code) = lower(k.role_code)",
+1267-    "  RETURNING p.*",
+1268-    insertCte,
+1269-    ")",
+1270-    "SELECT jsonb_build_object(",
+1271-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM company_ok) THEN 'ok' ELSE 'error' END,",
+1272-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+--
+1375-  return base.replace(/\/+$/, "");
+1376-}
+1377-
+1378-function aicmWorkerRuntimeAuthToken() {
+1379-  const token = aicmWorkerRuntimeText(process.env.PERSONA_AIWORKEROS_AUTH_TOKEN);
+1380-  if (!token) {
+1381-    throw new Error("PERSONA_AIWORKEROS_AUTH_TOKEN is not set");
+1382-  }
+1383-  return token;
+1384-}
+1385-
+1386-function getAicmWorkerRuntimePlacement(body) {
+1387:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1388-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1389-  const placementId = requiredUuid(body.aicm_user_company_worker_placement_id, "aicm_user_company_worker_placement_id");
+1390-
+1391-  const sql = [
+1392-    "WITH placement AS (",
+1393-    "  SELECT",
+1394-    "    p.aicm_user_company_worker_placement_id,",
+1395:    "    p.owner_civilization_id,",
+1396-    "    p.aicm_user_company_id,",
+1397-    "    p.aicm_user_company_department_id,",
+1398-    "    p.aicm_user_company_section_id,",
+1399-    "    p.target_level_code,",
+1400-    "    p.target_id,",
+1401-    "    p.app_code,",
+1402-    "    p.role_code,",
+1403-    "    p.robot_pool_id,",
+1404-    "    p.aiworker_model_code,",
+1405-    "    p.internal_nickname,",
+1406-    "    p.status_code,",
+1407-    "    COALESCE(v.display_label, NULLIF(p.internal_nickname, '') || '@' || p.role_code, p.aiworker_model_code || '@' || p.role_code) AS display_label",
+1408-    "  FROM business.aicm_user_company_worker_placement p",
+1409-    "  LEFT JOIN business.vw_aicm_user_company_worker_placement_display v",
+1410-    "    ON v.aicm_user_company_worker_placement_id = p.aicm_user_company_worker_placement_id",
+1411:    "  WHERE p.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1412-    "    AND p.aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1413-    "    AND p.aicm_user_company_worker_placement_id = " + sqlLiteral(placementId) + "::uuid",
+1414-    "    AND p.app_code = 'AICompanyManager'",
+1415-    "    AND p.status_code = 'active'",
+1416-    "    AND lower(p.role_code) = lower('Worker')",
+1417-    "  LIMIT 1",
+1418-    ")",
+1419-    "SELECT jsonb_build_object(",
+1420-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM placement) THEN 'ok' ELSE 'not_found' END,",
+1421-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+1422-    "  'placement', COALESCE((SELECT to_jsonb(placement) FROM placement), '{}'::jsonb)",
+1423-    ")::text;"
+--
+1640-function aicmR8zAutoVersion(value) {
+1641-  const text = aicmR8zAutoText(value);
+1642-  return text || "r8z_v1";
+1643-}
+1644-
+1645-function aicmR8zAutoLimit(value) {
+1646-  const num = Number(value);
+1647-  if (!Number.isFinite(num) || num < 1) return 1;
+1648-  return Math.min(10, Math.floor(num));
+1649-}
+1650-
+1651-function runLeaderAutoDecomposition(body) {
+1652:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1653-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1654-  const mode = aicmR8zAutoMode(body.mode);
+1655-  const limit = aicmR8zAutoLimit(body.limit);
+1656-  const version = aicmR8zAutoVersion(body.auto_decomposition_version);
+1657-  const sourceAppRef = aicmR8zAutoText(body.source_app_ref) || "AICompanyManager";
+1658-  const majorId = body.aicm_manager_major_work_item_id
+1659-    ? requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id")
+1660-    : "";
+1661-
+1662-  if (mode === "single" && !majorId) {
+1663-    throw new Error("aicm_manager_major_work_item_id is required for single mode");
+1664-  }
+1665-
+1666-  const targetWhere = mode === "single"
+1667-    ? "    AND m.aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid"
+1668-    : "    AND m.aicm_manager_major_work_item_id IS NOT NULL";
+1669-
+1670-  const sql = [
+1671-    "WITH input_request AS (",
+1672-    "  SELECT",
+1673:    "    " + sqlLiteral(owner) + "::uuid AS owner_civilization_id,",
+1674-    "    " + sqlLiteral(companyId) + "::uuid AS aicm_user_company_id,",
+1675-    "    " + sqlLiteral(version) + "::text AS auto_decomposition_version,",
+1676-    "    " + sqlLiteral(sourceAppRef) + "::text AS source_app_ref,",
+1677-    "    " + String(limit) + "::int AS max_count",
+1678-    "), target_major AS (",
+1679-    "  SELECT m.*",
+1680-    "  FROM business.aicm_manager_major_work_item m",
+1681-    "  JOIN input_request r",
+1682:    "    ON r.owner_civilization_id = m.owner_civilization_id",
+1683-    "   AND r.aicm_user_company_id = m.aicm_user_company_id",
+1684-    "  WHERE m.decomposition_status_code = " + sqlLiteral("assigned_to_leader"),
+1685-    "    AND m.handoff_status_code = " + sqlLiteral("handed_off"),
+1686-    targetWhere,
+1687-    "    AND NOT EXISTS (",
+1688-    "      SELECT 1",
+1689-    "      FROM business.aicm_leader_middle_work_item existing",
+1690-    "      WHERE existing.aicm_manager_major_work_item_id = m.aicm_manager_major_work_item_id",
+1691:    "        AND existing.owner_civilization_id = m.owner_civilization_id",
+1692-    "        AND existing.aicm_user_company_id = m.aicm_user_company_id",
+1693-    "        AND existing.breakdown_status_code <> " + sqlLiteral("archived"),
+1694-    "    )",
+1695-    "  ORDER BY m.updated_at, m.display_order, m.created_at",
+1696-    "  LIMIT (SELECT max_count FROM input_request)",
+1697-    "), selected_worker AS (",
+1698-    "  SELECT DISTINCT ON (tm.aicm_manager_major_work_item_id)",
+1699-    "    tm.aicm_manager_major_work_item_id,",
+1700-    "    p.aiworker_model_code,",
+1701-    "    COALESCE(NULLIF(p.internal_nickname, ''), p.aiworker_model_code, " + sqlLiteral("未割当") + ") AS worker_label",
+1702-    "  FROM target_major tm",
+1703-    "  LEFT JOIN business.aicm_user_company_worker_placement p",
+1704:    "    ON p.owner_civilization_id = tm.owner_civilization_id",
+1705-    "   AND p.aicm_user_company_id = tm.aicm_user_company_id",
+1706-    "   AND p.role_code = " + sqlLiteral("Worker"),
+1707-    "   AND p.status_code = " + sqlLiteral("active"),
+1708-    "  ORDER BY",
+1709-    "    tm.aicm_manager_major_work_item_id,",
+1710-    "    CASE",
+1711-    "      WHEN p.aicm_user_company_section_id IS NOT NULL AND p.aicm_user_company_section_id = tm.aicm_user_company_section_id THEN 1",
+1712-    "      WHEN p.aicm_user_company_department_id IS NOT NULL AND p.aicm_user_company_department_id = tm.aicm_user_company_department_id THEN 2",
+1713-    "      WHEN p.target_level_code = " + sqlLiteral("company") + " THEN 3",
+1714-    "      ELSE 9",
+1715-    "    END,",
+1716-    "    p.created_at",
+1717-    "), inserted_middle AS (",
+1718-    "  INSERT INTO business.aicm_leader_middle_work_item (",
+1719:    "    owner_civilization_id, aicm_user_company_id, aicm_manager_major_work_item_id,",
+1720-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+1721-    "    middle_item_name, middle_item_description, leader_robot_label,",
+1722-    "    breakdown_status_code, handoff_status_code, priority_code, due_date,",
+1723-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link, display_order, metadata_jsonb",
+1724-    "  )",
+1725-    "  SELECT",
+1726:    "    tm.owner_civilization_id, tm.aicm_user_company_id, tm.aicm_manager_major_work_item_id,",
+1727-    "    tm.aicm_user_company_department_id, tm.aicm_user_company_section_id,",
+1728-    "    tm.major_item_name, tm.major_item_description,",
+1729-    "    COALESCE(NULLIF(tm.assigned_leader_label, ''), " + sqlLiteral("自動割当") + "),",
+1730-    "    " + sqlLiteral("worker_units_created") + ", " + sqlLiteral("handed_off") + ", tm.priority_code, tm.due_date,",
+1731-    "    tm.reference_files_text, tm.supplemental_materials_text, tm.applicable_rules_text,",
+1732-    "    " + sqlLiteral("R8Z auto-generated from Manager大項目") + ", '', tm.display_order,",
+1733-    "    jsonb_build_object(",
+1734-    "      " + sqlLiteral("auto_decomposition_version") + ", (SELECT auto_decomposition_version FROM input_request),",
+1735-    "      " + sqlLiteral("auto_decomposition_source") + ", " + sqlLiteral("manager_major") + ",",
+1736-    "      " + sqlLiteral("source_app_ref") + ", (SELECT source_app_ref FROM input_request),",
+1737-    "      " + sqlLiteral("source_manager_major_work_item_id") + ", tm.aicm_manager_major_work_item_id::text",
+1738-    "    )",
+1739-    "  FROM target_major tm",
+1740-    "  RETURNING *",
+1741-    "), inserted_requirement AS (",
+1742-    "  INSERT INTO business.aicm_leader_deliverable_requirement (",
+1743:    "    owner_civilization_id, aicm_user_company_id, aicm_leader_middle_work_item_id,",
+1744-    "    deliverable_name, deliverable_type_code, deliverable_description,",
+1745-    "    required_quality_text, acceptance_criteria_text, review_required_flag, requirement_status_code,",
+1746-    "    priority_code, due_date, reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link, display_order, metadata_jsonb",
+1747-    "  )",
+1748-    "  SELECT",
+1749:    "    im.owner_civilization_id, im.aicm_user_company_id, im.aicm_leader_middle_work_item_id,",
+1750-    "    im.middle_item_name || " + sqlLiteral(" 成果物") + ", " + sqlLiteral("operation") + ", im.middle_item_description,",
+1751-    "    " + sqlLiteral("会社共通ルールと該当業務ルールに従い、後続Workerが実行可能な成果物にする") + ",",
+1752-    "    " + sqlLiteral("大項目の目的を満たし、レビュー可能な作業結果が作成されていること") + ",",
+1753-    "    true, " + sqlLiteral("ready_for_worker") + ", im.priority_code, im.due_date,",
+1754-    "    im.reference_files_text, im.supplemental_materials_text, im.applicable_rules_text,",
+1755-    "    " + sqlLiteral("R8Z auto-generated deliverable requirement") + ", '', im.display_order,",
+1756-    "    jsonb_build_object(",
+1757-    "      " + sqlLiteral("auto_decomposition_version") + ", (SELECT auto_decomposition_version FROM input_request),",
+1758-    "      " + sqlLiteral("source_leader_middle_work_item_id") + ", im.aicm_leader_middle_work_item_id::text,",
+1759-    "      " + sqlLiteral("source_manager_major_work_item_id") + ", im.aicm_manager_major_work_item_id::text",
+1760-    "    )",
+1761-    "  FROM inserted_middle im",
+1762-    "  RETURNING *",
+1763-    "), inserted_worker_unit AS (",
+1764-    "  INSERT INTO business.aicm_worker_work_unit (",
+1765:    "    owner_civilization_id, aicm_user_company_id, aicm_leader_middle_work_item_id, aicm_leader_deliverable_requirement_id,",
+1766-    "    work_unit_name, work_unit_description, work_type_code,",
+1767-    "    assigned_worker_label, worker_model_code, work_status_code, review_status_code,",
+1768-    "    priority_code, due_date, input_context_text, expected_output_text, result_summary_text, handoff_link,",
+1769-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, display_order, metadata_jsonb",
+1770-    "  )",
+1771-    "  SELECT",
+1772:    "    im.owner_civilization_id, im.aicm_user_company_id, im.aicm_leader_middle_work_item_id, ir.aicm_leader_deliverable_requirement_id,",
+1773-    "    im.middle_item_name || " + sqlLiteral(" 作業") + ", im.middle_item_description, " + sqlLiteral("operation") + ",",
+1774-    "    COALESCE(sw.worker_label, " + sqlLiteral("未割当") + "), COALESCE(sw.aiworker_model_code, ''), " + sqlLiteral("todo") + ", " + sqlLiteral("required") + ",",
+1775-    "    im.priority_code, im.due_date,",
+1776-    "    " + sqlLiteral("Manager大項目: ") + " || im.middle_item_name || E'\\n' || im.middle_item_description,",
+1777-    "    " + sqlLiteral("指定された大項目について、実行可能な成果物または作業結果を作成する") + ",",
+1778-    "    '', '',",
+1779-    "    im.reference_files_text, im.supplemental_materials_text, im.applicable_rules_text,",
+1780-    "    CASE WHEN sw.aiworker_model_code IS NULL THEN " + sqlLiteral("Worker未割当。配置後に再割当対象。") + " ELSE " + sqlLiteral("R8Z auto-generated worker work unit") + " END,",
+1781-    "    im.display_order,",
+1782-    "    jsonb_build_object(",
+1783-    "      " + sqlLiteral("auto_decomposition_version") + ", (SELECT auto_decomposition_version FROM input_request),",
+1784-    "      " + sqlLiteral("source_leader_middle_work_item_id") + ", im.aicm_leader_middle_work_item_id::text,",
+--
+1795-    "      handoff_status_code = " + sqlLiteral("completed") + ",",
+1796-    "      metadata_jsonb = COALESCE(m.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+1797-    "        " + sqlLiteral("auto_decomposition_version") + ", (SELECT auto_decomposition_version FROM input_request),",
+1798-    "        " + sqlLiteral("auto_decomposition_completed_at") + ", now()::text",
+1799-    "      ),",
+1800-    "      updated_at = now()",
+1801-    "  FROM inserted_middle im",
+1802-    "  WHERE m.aicm_manager_major_work_item_id = im.aicm_manager_major_work_item_id",
+1803-    "  RETURNING m.*",
+1804-    "), skipped_existing AS (",
+1805-    "  SELECT m.aicm_manager_major_work_item_id",
+1806-    "  FROM business.aicm_manager_major_work_item m",
+1807:    "  JOIN input_request r ON r.owner_civilization_id = m.owner_civilization_id AND r.aicm_user_company_id = m.aicm_user_company_id",
+1808-    "  WHERE m.decomposition_status_code = " + sqlLiteral("assigned_to_leader"),
+1809-    "    AND m.handoff_status_code = " + sqlLiteral("handed_off"),
+1810-    targetWhere,
+1811-    "    AND EXISTS (",
+1812-    "      SELECT 1",
+1813-    "      FROM business.aicm_leader_middle_work_item existing",
+1814-    "      WHERE existing.aicm_manager_major_work_item_id = m.aicm_manager_major_work_item_id",
+1815-    "        AND existing.breakdown_status_code <> " + sqlLiteral("archived"),
+1816-    "    )",
+1817-    "), final_items AS (",
+1818-    "  SELECT im.aicm_manager_major_work_item_id, im.aicm_leader_middle_work_item_id, ir.aicm_leader_deliverable_requirement_id, iw.aicm_worker_work_unit_id, " + sqlLiteral("created") + "::text AS status",
+1819-    "  FROM inserted_middle im",
+--
+1850-}
+1851-
+1852-function aicmR8ZIOptionalUuidSql(value) {
+1853-  const text = aicmR8ZIText(value);
+1854-  return text ? sqlLiteral(text) + "::uuid" : "NULL";
+1855-}
+1856-
+1857-function aicmR8ZIJsonSql(value) {
+1858-  return sqlLiteral(JSON.stringify(value || {})) + "::jsonb";
+1859-}
+1860-
+1861-function workerAutoExecutionCandidatesR8ZI(body) {
+1862:  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+1863-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+1864-  const managerMajorId = aicmR8ZIText(body.aicm_manager_major_work_item_id || body.related_manager_major_work_item_id);
+1865-  const workerWorkUnitId = aicmR8ZIText(body.aicm_worker_work_unit_id || body.related_worker_work_unit_id);
+1866-  const limit = Math.max(1, Math.min(20, Number(body.limit || 10)));
+1867-
+1868-  const managerFilter = managerMajorId
+1869-    ? "    AND w.aicm_manager_major_work_item_id = " + sqlLiteral(managerMajorId) + "::uuid"
+1870-    : "";
+1871-
+1872-  const workerFilter = workerWorkUnitId
+1873-    ? "    AND w.aicm_worker_work_unit_id = " + sqlLiteral(workerWorkUnitId) + "::uuid"
+1874-    : "";
+1875-
+1876-  const sql = [
+1877-    "WITH target_units AS (",
+1878-    "  SELECT w.*",
+1879-    "  FROM business.vw_aicm_pmlw_worker_work_unit_display w",
+1880:    "  WHERE w.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+1881-    "    AND w.aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+1882-    "    AND COALESCE(w.work_status_code, '') = 'todo'",
+1883-    "    AND COALESCE(w.worker_model_code, '') <> ''",
+1884-    "    AND COALESCE(w.assigned_worker_label, '') <> ''",
+1885-    managerFilter,
+1886-    workerFilter,
+1887-    "  ORDER BY w.priority_code DESC, w.created_at ASC, w.display_order ASC",
+1888-    "  LIMIT " + String(limit),
+1889-    "), worker_candidates AS (",
+1890-    "  SELECT",
+1891-    "    u.aicm_worker_work_unit_id,",
+1892-    "    p.aicm_user_company_worker_placement_id,",
+1893:    "    p.owner_civilization_id,",
+1894-    "    p.aicm_user_company_id,",
+1895-    "    p.aicm_user_company_department_id,",
+1896-    "    p.aicm_user_company_section_id,",
+1897-    "    p.aiworker_model_code,",
+1898-    "    p.internal_nickname,",
+1899-    "    COALESCE(v.display_label, NULLIF(p.internal_nickname, '') || '@' || p.role_code, p.aiworker_model_code || '@' || p.role_code) AS display_label,",
+1900-    "    CASE",
+1901-    "      WHEN p.aiworker_model_code = u.worker_model_code AND COALESCE(NULLIF(p.internal_nickname, ''), '') = u.assigned_worker_label THEN 100",
+1902-    "      WHEN p.aiworker_model_code = u.worker_model_code THEN 80",
+1903-    "      WHEN COALESCE(NULLIF(p.internal_nickname, ''), '') = u.assigned_worker_label THEN 60",
+1904-    "      ELSE 10",
+1905-    "    END AS match_score",
+1906-    "  FROM target_units u",
+1907-    "  JOIN business.aicm_user_company_worker_placement p",
+1908:    "    ON p.owner_civilization_id = u.owner_civilization_id",
+1909-    "   AND p.aicm_user_company_id = u.aicm_user_company_id",
+1910-    "   AND p.role_code = 'Worker'",
+1911-    "   AND p.status_code = 'active'",
+1912-    "  LEFT JOIN business.vw_aicm_user_company_worker_placement_display v",
+1913-    "    ON v.aicm_user_company_worker_placement_id = p.aicm_user_company_worker_placement_id",
+1914-    "), ranked AS (",
+1915-    "  SELECT *, row_number() OVER (PARTITION BY aicm_worker_work_unit_id ORDER BY match_score DESC, aicm_user_company_worker_placement_id) AS rn",
+1916-    "  FROM worker_candidates",
+1917-    ")",
+1918-    "SELECT COALESCE(jsonb_agg(",
+1919-    "  jsonb_build_object(",
+1920-    "    'worker_work_unit', to_jsonb(u),",
+--
+1946-    unit.expected_output_text,
+1947-    aicmR8ZIText(unit.reference_files_text) ? "参照ファイル: " + aicmR8ZIText(unit.reference_files_text) : "",
+1948-    aicmR8ZIText(unit.supplemental_materials_text) ? "補足資料: " + aicmR8ZIText(unit.supplemental_materials_text) : "",
+1949-    aicmR8ZIText(unit.applicable_rules_text) ? "会社共通ルール/適用ルール: " + aicmR8ZIText(unit.applicable_rules_text) : ""
+1950-  ].map(aicmR8ZIText).filter(Boolean);
+1951-
+1952-  if (!unitId) throw new Error("worker_work_unit_id missing");
+1953-  if (!placementId) throw new Error("worker placement missing for " + unitId);
+1954-  if (!modelCode) throw new Error("model_code missing for " + unitId);
+1955-  if (!instructionParts.length) throw new Error("instruction missing for " + unitId);
+1956-
+1957-  return {
+1958:    owner_civilization_id: aicmR8ZIText(unit.owner_civilization_id),
+1959-    aicm_user_company_id: aicmR8ZIText(unit.aicm_user_company_id),
+1960-    aicm_user_company_department_id: aicmR8ZIText(placement.aicm_user_company_department_id || unit.aicm_user_company_department_id),
+1961-    aicm_user_company_section_id: aicmR8ZIText(placement.aicm_user_company_section_id || unit.aicm_user_company_section_id),
+1962-    aicm_user_company_worker_placement_id: placementId,
+1963-    model_code: modelCode,
+1964-    task_domain_code: aicmR8ZIText(unit.work_type_code) || "business_operation",
+1965-    title,
+1966-    instruction: instructionParts.join("\n\n"),
+1967-    source_request_ref: "aicm_worker_work_unit:" + unitId,
+1968-    source_app_ref: "AICompanyManager",
+1969-    related_worker_work_unit_id: unitId,
+1970-    related_leader_middle_work_item_id: aicmR8ZIText(unit.aicm_leader_middle_work_item_id),
+--
+2153-    if (route === "/api/aicm/v2/organization/update" && req.method === "POST") {
+2154-      const body = await readBody(req);
+2155-      sendJson(res, 200, updateSection(body));
+2156-      return true;
+2157-    }
+2158-
+2159-    if (route === "/api/aicm/v2/section/update" && req.method === "POST") {
+2160-      const body = await readBody(req);
+2161-      sendJson(res, 200, updateSection(body));
+2162-      return true;
+2163-    }
+2164-
+2165:if (route === "/api/aicm/v2/context" && req.method === "GET") {
+2166:      sendJson(res, 200, getContext(url.searchParams.get("owner_civilization_id") || ""));
+2167-      return true;
+2168-    }
+2169-
+2170-    if (route === "/api/aicm/v2/company/create" && req.method === "POST") {
+2171-      sendJson(res, 200, createCompany(await readBody(req)));
+2172-      return true;
+2173-    }
+2174-
+2175-    if (route === "/api/aicm/v2/department/create" && req.method === "POST") {
+2176-      const payload = createDepartment(await readBody(req));
+2177-      sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
+2178-      return true;

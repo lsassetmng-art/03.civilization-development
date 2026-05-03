@@ -1,0 +1,98 @@
+============================================================
+getContext after
+============================================================
+
+============================================================
+getContext excerpt
+============================================================
+   155	      } catch (_) {
+   156	        reject(new Error("Invalid JSON body"));
+   157	      }
+   158	    });
+   159	
+   160	    req.on("error", reject);
+   161	  });
+   162	}
+   163	
+   164	
+   165	function getContext(ownerCivilizationId) {
+   166	  const owner = requiredUuid(ownerCivilizationId, "owner_civilization_id");
+   167	
+   168	  const sql = [
+   169	    "SELECT jsonb_build_object(",
+   170	    "  'result', 'ok',",
+   171	    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+   172	    "  'owner_civilization_id', " + sqlLiteral(owner) + ",",
+   173	    "  'companies', (",
+   174	    "    SELECT COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.created_at DESC), '[]'::jsonb)",
+   175	    "    FROM business.aicm_user_company c",
+   176	    "    WHERE c.owner_civilization_id::text = " + sqlLiteral(owner),
+   177	    "      AND c.company_status = 'active'",
+   178	    "  ),",
+   179	    "  'departments', (",
+   180	    "    SELECT COALESCE(jsonb_agg(to_jsonb(d) ORDER BY d.display_order, d.created_at), '[]'::jsonb)",
+   181	    "    FROM business.aicm_user_company_department d",
+   182	    "    WHERE d.owner_civilization_id::text = " + sqlLiteral(owner),
+   183	    "      AND d.department_status = 'active'",
+   184	    "  ),",
+   185	    "  'sections', (",
+   186	    "    SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY s.display_order, s.created_at), '[]'::jsonb)",
+   187	    "    FROM business.aicm_user_company_section s",
+   188	    "    WHERE s.owner_civilization_id::text = " + sqlLiteral(owner),
+   189	    "      AND s.section_status = 'active'",
+   190	    "  ),",
+   191	    "  'placements', (",
+   192	    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.created_at DESC), '[]'::jsonb)",
+   193	    "    FROM business.vw_aicm_user_company_worker_placement_display p",
+   194	    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+   195	    "      AND p.status_code = 'active'",
+   196	    "  ),",
+   197	    "  'task_ledger', (",
+   198	    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.display_order, t.created_at DESC), '[]'::jsonb)",
+   199	    "    FROM business.vw_aicm_user_company_department_task_ledger_display t",
+   200	    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+   201	    "      AND t.task_status_code <> 'archived'",
+   202	    "  ),",
+   203	    "  'robot_catalog', (",
+   204	    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.aiworker_model_code), '[]'::jsonb)",
+   205	    "    FROM business.vw_ai_company_manager_system_robot_selector_options r",
+   206	    "  )",
+   207	    ")::text;"
+   208	  ].join("\n");
+   209	
+   210	  return runPsqlJson(sql);
+   211	}
+   212	
+   213	function createCompany(body) {
+   214	  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+   215	  const name = requiredText(body.company_name, "company_name");
+   216	  const domain = String(body.business_domain || "");
+   217	
+   218	  const sql = [
+   219	    "WITH inserted AS (",
+   220	    "  INSERT INTO business.aicm_user_company (",
+   221	    "    owner_civilization_id, company_name, business_domain, company_status, selected_flag",
+   222	    "  ) VALUES (",
+   223	    "    " + sqlLiteral(owner) + "::uuid,",
+   224	    "    " + sqlLiteral(name) + ",",
+   225	    "    " + sqlLiteral(domain) + ",",
+   226	    "    'active',",
+   227	    "    true",
+   228	    "  )",
+   229	    "  RETURNING *",
+   230	    ")",
+   231	    "SELECT jsonb_build_object(",
+   232	    "  'result', 'ok',",
+   233	    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+   234	    "  'company', to_jsonb(inserted)",
+   235	    ")::text",
+   236	    "FROM inserted;"
+   237	  ].join("\n");
+   238	
+   239	  return runPsqlJson(sql);
+   240	}
+   241	
+   242	function createDepartment(body) {
+   243	  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+   244	  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+   245	  const name = requiredText(body.department_name, "department_name");

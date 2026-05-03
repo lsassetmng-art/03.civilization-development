@@ -1,0 +1,130 @@
+============================================================
+CONTEXT pattern=function bind[[:space:]]*\(
+============================================================
+FOUND_LINE=1761
+      '<div class="aicm-card"><h2>自動処理ステータス</h2>',
+      '<p>Manager分解: 自動</p>',
+      '<p>Leader割当: 自動</p>',
+      '<p>Worker成果物作成: 自動</p>',
+      '<p>AI自動レビュー: 自動</p>',
+      '<p>人間操作: 最終承認のみ</p>',
+      '</div>',
+      '</section>'
+    ].join(""));
+  }
+
+  function render() {
+    var data = load();
+    var company = currentCompany(data);
+    var html;
+
+    if (app.screen === "dashboard") html = renderDashboard(data, company);
+    else if (app.screen === "company-add") html = renderCompanyAdd();
+    else if (app.screen === "settings") html = renderSettings(data, company);
+    else if (app.screen === "department-detail") html = renderDepartmentDetail(data, company);
+    else if (app.screen === "department-add") html = renderDepartmentAdd();
+    else if (app.screen === "department-edit") html = renderDepartmentEdit(company);
+    else if (app.screen === "department-delete") html = renderDepartmentDelete(company);
+    else if (app.screen === "organization-detail") html = renderOrganizationDetail(data, company);
+    else if (app.screen === "organization-add") html = renderOrganizationAdd(data, company);
+    else if (app.screen === "organization-edit") html = renderOrganizationEdit(data, company);
+    else if (app.screen === "organization-delete") html = renderOrganizationDelete(company);
+    else if (app.screen === "task-ledger") html = renderTaskLedger(company);
+    else if (app.screen === "review") html = renderReview(company);
+    else html = renderDashboard(data, company);
+
+    document.getElementById("aicm-root").innerHTML = html;
+    bind();
+  }
+
+  function bind() {
+    /* AICM_COMPANY_SELECT_OWNS_COMPANY_CODE_AHM_AHP_V1: company-select change immediately stores company code */
+    var companySelect = document.getElementById("company-select");
+    if (companySelect) {
+      companySelect.addEventListener("change", function () {
+        app.selectedCompanyId = companySelect.value || "";
+        app.companyId = app.selectedCompanyId;
+        app.editCompanyId = "";
+      });
+    }
+    document.querySelectorAll("[data-screen]").forEach(function (button) {
+      button.onclick = function () {
+        app.screen = button.getAttribute("data-screen");
+        render();
+      };
+    });
+
+    document.querySelectorAll("[data-action]").forEach(function (button) {
+      button.onclick = function () {
+        handleAction(button.getAttribute("data-action"), button);
+      };
+    });
+  }
+
+  function val(id) {
+    var el = document.getElementById(id);
+    return el ? el.value : "";
+  }
+
+  function handleAction(action, button) {
+    var data = load();
+    var company = currentCompany(data);
+    var dept = currentDepartment(company);
+    var orgInfo;
+
+    if (action === "save-department-manager-v2") {
+      if (dept) {
+        aicmEnsureBusinessRobots(data);
+        dept.manager_robot_id = val("department-manager-robot");
+        dept.manager_robot_nickname = val("department-manager-nickname") || "Manager";
+        dept.manager_robot_assignment_policy = "unlimited_system_use";
+        save(data);
+      }
+      app.screen = "department-detail";
+      render();
+      return;
+    }
+
+    if (action === "save-section-leader-v2") {
+      orgInfo = currentOrganization(company);
+      if (orgInfo && orgInfo.org) {
+        aicmEnsureBusinessRobots(data);
+        orgInfo.org.leader_robot_id = val("section-leader-robot");
+        orgInfo.org.leader_robot_nickname = val("section-leader-nickname") || "Leader";
+        orgInfo.org.leader_robot_assignment_policy = "unlimited_system_use";
+        save(data);
+      }
+      app.screen = "organization-detail";
+      render();
+      return;
+    }
+
+    if (action === "add-section-worker-assignment-v2") {
+      orgInfo = currentOrganization(company);
+      if (orgInfo && orgInfo.org) {
+        var robotId = val("section-worker-robot-select");
+        var robot = aicmFindBusinessRobot(data, robotId);
+        var nickname = val("section-worker-nickname") || (robot ? aicmRobotName(robot) : "Worker");
+
+        if (robotId) {
+          if (!Array.isArray(orgInfo.org.worker_robot_assignments)) orgInfo.org.worker_robot_assignments = [];
+          if (!Array.isArray(orgInfo.org.robot_ids)) orgInfo.org.robot_ids = [];
+
+          orgInfo.org.worker_robot_assignments.push({
+            assignment_id: makeId("worker-assignment"),
+            robot_id: robotId,
+            role: "Worker",
+            nickname: nickname,
+            display_label: nickname + "@Worker",
+            assignment_policy: "unlimited_system_use",
+            source: "business_side_robot_pool_combo_add"
+          });
+
+          if (orgInfo.org.robot_ids.indexOf(robotId) < 0) orgInfo.org.robot_ids.push(robotId);
+          save(data);
+        }
+      }
+      app.screen = "organization-detail";
+      render();
+      return;
+    }
