@@ -2370,10 +2370,6 @@ function aicmAxoClearDraftAfterSuccessfulSave() {
   }
 
 function renderAicmWorkerInlineRows(fieldPrefix) {
-    if (typeof aicmR8zV10f4aIsSectionCreateScreen === "function" && aicmR8zV10f4aIsSectionCreateScreen()) {
-      return ""; // AICM_R8Z_V10F4A_REVIEW_LIST_COMMON_NAV_AND_SECTION_WORKER_SOURCE_GUARD_WORKER_GUARD_CALL
-    }
-
     // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
     var savedRows = typeof aicmAxnCurrentPlacements === "function" ? aicmAxnCurrentPlacements("worker") : [];
     var draft = state.aicmAxoFormDraft || {};
@@ -8367,71 +8363,6 @@ function renderAicmBusinessStartDashboardCard() {
     }
   }
   // AICM_R8Z_V10F2G_SECTION_NEW_ENTRY_STATE_HYGIENE_HELPER_END
-
-
-  // AICM_R8Z_V10F4A_REVIEW_LIST_COMMON_NAV_AND_SECTION_WORKER_SOURCE_GUARD_COMMON_NAV_START
-  function aicmR8zV10f4aText(value) {
-    return String(value === undefined || value === null ? "" : value).trim();
-  }
-
-  function aicmR8zV10f4aIsSectionCreateScreen() {
-    try {
-      if (typeof state !== "undefined" && state && state.screen === "section-new") return true;
-      if (typeof window !== "undefined" && window.state && window.state.screen === "section-new") return true;
-    } catch (_) {}
-    return false;
-  }
-
-  function aicmR8zV10f4aCommonNavHtml() {
-    return [
-      '<section id="aicm-v10f4a-common-screen-nav" class="aicm-core-card" style="border:2px solid #cbd5e1;background:#f8fafc;">',
-      '  <p class="aicm-eyebrow">AI企業運営アプリ</p>',
-      '  <h1>AI企業運営アプリ</h1>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
-      '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳</button>',
-      '  </div>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
-      '  </div>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
-      '  </div>',
-      '</section>'
-    ].join("");
-  }
-
-  function aicmR8zV10f4aInstallReviewListCommonNav() {
-    try {
-      if (typeof window === "undefined") return false;
-      if (typeof window.aicmR8zV7RenderReviewList !== "function") return false;
-      if (window.aicmR8zV7RenderReviewList.__aicmR8zV10f4aWrapped) return true;
-
-      var original = window.aicmR8zV7RenderReviewList;
-      var wrapped = function() {
-        var html = String(original.apply(this, arguments) || "");
-        html = html.replace(/<section id="aicm-v10f3b-review-list-back"[\s\S]*?<\/section>/g, "");
-        html = html.replace(/<section id="aicm-v10f3c-review-list-back-simple"[\s\S]*?<\/section>/g, "");
-        html = html.replace(/<section id="aicm-v10f3d-review-list-back-single"[\s\S]*?<\/section>/g, "");
-        html = html.replace(/<section id="aicm-v10f4a-common-screen-nav"[\s\S]*?<\/section>/g, "");
-        return aicmR8zV10f4aCommonNavHtml() + html;
-      };
-
-      wrapped.__aicmR8zV10f4aWrapped = true;
-      wrapped.__aicmR8zV10f4aOriginal = original;
-      window.aicmR8zV7RenderReviewList = wrapped;
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  (function aicmR8zV10f4aInstallCommonNavBootstrap() {
-    aicmR8zV10f4aInstallReviewListCommonNav();
-    setTimeout(aicmR8zV10f4aInstallReviewListCommonNav, 0);
-    setTimeout(aicmR8zV10f4aInstallReviewListCommonNav, 250);
-  })();
-  // AICM_R8Z_V10F4A_REVIEW_LIST_COMMON_NAV_AND_SECTION_WORKER_SOURCE_GUARD_COMMON_NAV_END
 function render() {
     if (!root) return;
 
@@ -13227,3 +13158,803 @@ if (action === "review-v10f-cancel-confirm") {
 
 
 // AICM_R8Z_V10F3_REVIEW_CONFIRM_BACK_BUTTON_APPLIED
+
+
+  // AICM_R8Z_V10F2H_SECTION_NEW_RUNTIME_VISIBLE_DEBUG_START
+  // Runtime visible debug only. No DB write / no API POST.
+  (function installAicmR8zV10f2hSectionNewRuntimeDebug() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function esc(value) {
+      var s = text(value);
+      if (typeof escapeHtml === "function") return escapeHtml(s);
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function app() {
+      if (typeof state !== "undefined" && state && typeof state === "object") return state;
+      if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
+      return {};
+    }
+
+    function countArray(value) {
+      return Array.isArray(value) ? value.length : -1;
+    }
+
+    function countWorkersFromDom() {
+      try {
+        if (typeof document === "undefined" || !document.body) return -1;
+        var html = String(document.body.innerText || "");
+        var m1 = (html.match(/従業員設定/g) || []).length;
+        var m2 = (html.match(/従業員設定ロボット/g) || []).length;
+        var m3 = (html.match(/従業員行を追加/g) || []).length;
+        return m1 + m2 + m3;
+      } catch (_) {
+        return -2;
+      }
+    }
+
+    function renderDebugHtml() {
+      var s = app();
+      var ctx = s.context && typeof s.context === "object" ? s.context : {};
+      var placements = Array.isArray(s.placements) ? s.placements : (Array.isArray(ctx.placements) ? ctx.placements : []);
+      var selectedSectionId = text(s.selectedSectionId || s.sectionEditId || s.editingSectionId || "");
+      var matchingPlacements = placements.filter(function(row) {
+        var sid = text(row && (row.aicm_section_id || row.section_id || row.sectionId || row.organization_id || row.org_id));
+        return selectedSectionId && sid === selectedSectionId;
+      });
+
+      return [
+        '<section id="aicm-v10f2h-section-new-runtime-debug" class="aicm-core-card" style="border:3px solid #ef4444;background:#fff1f2;">',
+        '  <p class="aicm-eyebrow">V10F2H / 課新規追加 runtime debug</p>',
+        '  <h2>課新規追加の従業員漏れ調査</h2>',
+        '  <dl class="aicm-core-detail-list">',
+        '    <dt>screen</dt><dd>' + esc(s.screen) + '</dd>',
+        '    <dt>selectedSectionId</dt><dd>' + esc(selectedSectionId || '-') + '</dd>',
+        '    <dt>selectedSection</dt><dd>' + esc(s.selectedSection ? 'exists' : 'empty') + '</dd>',
+        '    <dt>currentSection</dt><dd>' + esc(s.currentSection ? 'exists' : 'empty') + '</dd>',
+        '    <dt>context.placements</dt><dd>' + esc(String(countArray(ctx.placements))) + '</dd>',
+        '    <dt>state.placements</dt><dd>' + esc(String(countArray(s.placements))) + '</dd>',
+        '    <dt>matching placements for selectedSectionId</dt><dd>' + esc(String(matchingPlacements.length)) + '</dd>',
+        '    <dt>sectionPlacementDraft</dt><dd>' + esc(String(countArray(s.sectionPlacementDraft))) + '</dd>',
+        '    <dt>workerPlacementDraft</dt><dd>' + esc(String(countArray(s.workerPlacementDraft))) + '</dd>',
+        '    <dt>sectionNewDraft.workerPlacements</dt><dd>' + esc(String(s.sectionNewDraft ? countArray(s.sectionNewDraft.workerPlacements) : -1)) + '</dd>',
+        '    <dt>DOM worker text hits</dt><dd>' + esc(String(countWorkersFromDom())) + '</dd>',
+        '    <dt>V10F2G cleared</dt><dd>' + esc(String(!!s.aicmR8zV10f2gSectionNewStateCleared)) + '</dd>',
+        '  </dl>',
+        '  <p class="aicm-selected-note">このカードの数値を貼れば、次で本修正できます。</p>',
+        '</section>'
+      ].join("");
+    }
+
+    function ensureDebug() {
+      try {
+        var s = app();
+        if (!s || s.screen !== "section-new") return;
+        if (typeof document === "undefined" || !document.body) return;
+
+        var existing = document.getElementById("aicm-v10f2h-section-new-runtime-debug");
+        if (existing) {
+          existing.outerHTML = renderDebugHtml();
+          return;
+        }
+
+        var root = document.querySelector("main") || document.body;
+        var wrap = document.createElement("div");
+        wrap.innerHTML = renderDebugHtml();
+        root.insertBefore(wrap.firstChild, root.firstChild);
+      } catch (error) {
+        if (typeof console !== "undefined" && console && console.warn) {
+          console.warn("AICM V10F2H runtime debug failed", error);
+        }
+      }
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function() {
+        setTimeout(ensureDebug, 120);
+        setTimeout(ensureDebug, 500);
+      }, true);
+    }
+
+    var originalRenderV10F2H = typeof render === "function" ? render : null;
+    if (originalRenderV10F2H && !originalRenderV10F2H.__aicmR8zV10f2hWrapped) {
+      var wrappedRenderV10F2H = function() {
+        var result = originalRenderV10F2H.apply(this, arguments);
+        setTimeout(ensureDebug, 0);
+        setTimeout(ensureDebug, 200);
+        return result;
+      };
+      wrappedRenderV10F2H.__aicmR8zV10f2hWrapped = true;
+      wrappedRenderV10F2H.__aicmR8zV10f2hOriginal = originalRenderV10F2H;
+      render = wrappedRenderV10F2H;
+    }
+
+    setTimeout(ensureDebug, 500);
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10f2hEnsureSectionNewDebug = ensureDebug;
+    }
+  })();
+  // AICM_R8Z_V10F2H_SECTION_NEW_RUNTIME_VISIBLE_DEBUG_END
+
+
+  // AICM_R8Z_V10F3B_REVIEW_LIST_TOP_BACK_BUTTON_START
+  // Review-list screen top back button. UI only. No DB write / no API POST.
+  (function installAicmR8zV10f3bReviewListTopBackButton() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function esc(value) {
+      var s = text(value);
+      if (typeof escapeHtml === "function") return escapeHtml(s);
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function app() {
+      if (typeof state !== "undefined" && state && typeof state === "object") return state;
+      if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
+      return {};
+    }
+
+    function isReviewListScreen() {
+      try {
+        var s = app();
+        if (s && s.screen === "review-list") return true;
+        if (typeof document !== "undefined" && document.body) {
+          var body = String(document.body.innerText || "");
+          if (body.indexOf("レビュー・承認待ち") >= 0 && body.indexOf("レビュー待ち #") >= 0) return true;
+        }
+      } catch (_) {}
+      return false;
+    }
+
+    function backButtonHtml() {
+      return [
+        '<section id="aicm-v10f3b-review-list-back" class="aicm-core-card" style="border:2px solid #94a3b8;background:#f8fafc;">',
+        '  <p class="aicm-eyebrow">V10F3B / レビュー一覧ナビ</p>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-list-back-previous">前の画面へ戻る</button>',
+        '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
+        '  </div>',
+        '</section>'
+      ].join("");
+    }
+
+    function ensureBackButton() {
+      try {
+        if (!isReviewListScreen()) return;
+        if (typeof document === "undefined" || !document.body) return;
+
+        var existing = document.getElementById("aicm-v10f3b-review-list-back");
+        if (existing) return;
+
+        var main = document.querySelector("main") || document.body;
+        var wrap = document.createElement("div");
+        wrap.innerHTML = backButtonHtml();
+
+        var firstCard = main.querySelector(".aicm-core-card") || main.firstChild;
+        if (firstCard && firstCard.parentNode) {
+          firstCard.parentNode.insertBefore(wrap.firstChild, firstCard);
+        } else {
+          main.insertBefore(wrap.firstChild, main.firstChild);
+        }
+      } catch (error) {
+        if (typeof console !== "undefined" && console && console.warn) {
+          console.warn("AICM V10F3B review-list back inject failed", error);
+        }
+      }
+    }
+
+    function goBack() {
+      var s = app();
+      var target = "";
+      try {
+        target = text(s.aicmPreviousScreen || s.previousScreen || s.lastScreen || "");
+      } catch (_) {
+        target = "";
+      }
+
+      if (!target || target === "review-list" || target === "review-detail" || target === "review-confirm") {
+        target = "dashboard";
+      }
+
+      try {
+        s.screen = target;
+        if (typeof render === "function") render();
+      } catch (_) {}
+
+      setTimeout(ensureBackButton, 0);
+    }
+
+    document.addEventListener("click", function(event) {
+      var target = event && event.target;
+      var button = target && target.closest ? target.closest('[data-core-action="review-list-back-previous"]') : null;
+      if (!button) return;
+
+      try { event.preventDefault(); } catch (_) {}
+      try { event.stopPropagation(); } catch (_) {}
+      try { event.stopImmediatePropagation(); } catch (_) {}
+
+      goBack();
+    }, true);
+
+    function wrapReviewRenderer() {
+      try {
+        if (typeof window === "undefined") return false;
+        if (typeof window.aicmR8zV7RenderReviewList !== "function") return false;
+        if (window.aicmR8zV7RenderReviewList.__aicmR8zV10f3bWrapped) return true;
+
+        var original = window.aicmR8zV7RenderReviewList;
+        var wrapped = function() {
+          var html = original.apply(this, arguments);
+          var source = String(html || "");
+          if (source.indexOf("aicm-v10f3b-review-list-back") >= 0) return source;
+          return backButtonHtml() + source;
+        };
+
+        wrapped.__aicmR8zV10f3bWrapped = true;
+        wrapped.__aicmR8zV10f3bOriginal = original;
+        window.aicmR8zV7RenderReviewList = wrapped;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    wrapReviewRenderer();
+    setTimeout(wrapReviewRenderer, 0);
+    setTimeout(wrapReviewRenderer, 200);
+    setTimeout(ensureBackButton, 300);
+
+    document.addEventListener("click", function() {
+      setTimeout(wrapReviewRenderer, 0);
+      setTimeout(ensureBackButton, 180);
+    }, true);
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10f3bEnsureReviewListBack = ensureBackButton;
+    }
+  })();
+  // AICM_R8Z_V10F3B_REVIEW_LIST_TOP_BACK_BUTTON_END
+
+
+  // AICM_R8Z_V10F2I_WORKER_LEAK_ALWAYS_VISIBLE_DEBUG_START
+  // Always-visible worker leak debug when section/worker UI appears. Debug only.
+  (function installAicmR8zV10f2iWorkerLeakAlwaysVisibleDebug() {
+    function text(value) {
+      return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    function esc(value) {
+      var s = text(value);
+      if (typeof escapeHtml === "function") return escapeHtml(s);
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function app() {
+      if (typeof state !== "undefined" && state && typeof state === "object") return state;
+      if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
+      return {};
+    }
+
+    function arr(value) {
+      return Array.isArray(value) ? value : [];
+    }
+
+    function arrCount(value) {
+      return Array.isArray(value) ? value.length : -1;
+    }
+
+    function bodyText() {
+      try {
+        if (typeof document === "undefined" || !document.body) return "";
+        return String(document.body.innerText || "");
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function countText(pattern) {
+      var b = bodyText();
+      var re = new RegExp(pattern, "g");
+      return (b.match(re) || []).length;
+    }
+
+    function shouldShowDebug() {
+      var s = app();
+      var screen = text(s.screen);
+      var b = bodyText();
+
+      if (screen === "section-new" || screen === "section-edit" || screen === "placement-new") return true;
+      if (b.indexOf("従業員設定") >= 0) return true;
+      if (b.indexOf("従業員設定ロボット") >= 0) return true;
+      if (b.indexOf("従業員行を追加") >= 0) return true;
+      if (b.indexOf("課の新規追加") >= 0 || b.indexOf("課新規") >= 0) return true;
+
+      return false;
+    }
+
+    function placementRows() {
+      var s = app();
+      var ctx = s.context && typeof s.context === "object" ? s.context : {};
+      if (Array.isArray(s.placements)) return s.placements;
+      if (Array.isArray(ctx.placements)) return ctx.placements;
+      if (Array.isArray(ctx.organization_placements)) return ctx.organization_placements;
+      if (Array.isArray(ctx.section_placements)) return ctx.section_placements;
+      return [];
+    }
+
+    function matchingPlacementCount(selectedSectionId) {
+      var sidWanted = text(selectedSectionId);
+      if (!sidWanted) return 0;
+
+      return placementRows().filter(function(row) {
+        var sid = text(row && (
+          row.aicm_section_id ||
+          row.section_id ||
+          row.sectionId ||
+          row.organization_id ||
+          row.org_id ||
+          row.aicm_organization_id
+        ));
+        return sid && sid === sidWanted;
+      }).length;
+    }
+
+    function debugHtml() {
+      var s = app();
+      var ctx = s.context && typeof s.context === "object" ? s.context : {};
+      var selectedSectionId = text(
+        s.selectedSectionId ||
+        s.sectionEditId ||
+        s.editingSectionId ||
+        s.placementEditingSectionId ||
+        s.workerPlacementSectionId ||
+        ""
+      );
+
+      return [
+        '<section id="aicm-v10f2i-worker-leak-debug" class="aicm-core-card" style="border:3px solid #dc2626;background:#fff1f2;">',
+        '  <p class="aicm-eyebrow">V10F2I / 従業員漏れ runtime debug</p>',
+        '  <h2>課追加・従業員表示の状態</h2>',
+        '  <dl class="aicm-core-detail-list">',
+        '    <dt>screen</dt><dd>' + esc(s.screen || "-") + '</dd>',
+        '    <dt>selectedCompanyId</dt><dd>' + esc(s.selectedCompanyId || s.selected_company_id || "-") + '</dd>',
+        '    <dt>selectedDepartmentId</dt><dd>' + esc(s.selectedDepartmentId || s.departmentId || "-") + '</dd>',
+        '    <dt>selectedSectionId</dt><dd>' + esc(selectedSectionId || "-") + '</dd>',
+        '    <dt>selectedSection</dt><dd>' + esc(s.selectedSection ? "exists" : "empty") + '</dd>',
+        '    <dt>currentSection</dt><dd>' + esc(s.currentSection ? "exists" : "empty") + '</dd>',
+        '    <dt>editingSectionId</dt><dd>' + esc(s.editingSectionId || "-") + '</dd>',
+        '    <dt>sectionEditId</dt><dd>' + esc(s.sectionEditId || "-") + '</dd>',
+        '    <dt>context.placements</dt><dd>' + esc(String(arrCount(ctx.placements))) + '</dd>',
+        '    <dt>state.placements</dt><dd>' + esc(String(arrCount(s.placements))) + '</dd>',
+        '    <dt>placementRows resolved</dt><dd>' + esc(String(placementRows().length)) + '</dd>',
+        '    <dt>matching placements for selectedSectionId</dt><dd>' + esc(String(matchingPlacementCount(selectedSectionId))) + '</dd>',
+        '    <dt>sectionPlacementDraft</dt><dd>' + esc(String(arrCount(s.sectionPlacementDraft))) + '</dd>',
+        '    <dt>workerPlacementDraft</dt><dd>' + esc(String(arrCount(s.workerPlacementDraft))) + '</dd>',
+        '    <dt>sectionNewDraft.workerPlacements</dt><dd>' + esc(String(s.sectionNewDraft ? arrCount(s.sectionNewDraft.workerPlacements) : -1)) + '</dd>',
+        '    <dt>DOM 従業員設定</dt><dd>' + esc(String(countText("従業員設定"))) + '</dd>',
+        '    <dt>DOM 従業員設定ロボット</dt><dd>' + esc(String(countText("従業員設定ロボット"))) + '</dd>',
+        '    <dt>DOM 従業員行を追加</dt><dd>' + esc(String(countText("従業員行を追加"))) + '</dd>',
+        '    <dt>V10F2G cleared</dt><dd>' + esc(String(!!s.aicmR8zV10f2gSectionNewStateCleared)) + '</dd>',
+        '  </dl>',
+        '  <p class="aicm-selected-note">この赤枠の値を貼ってください。次で本修正します。</p>',
+        '</section>'
+      ].join("");
+    }
+
+    function ensureDebug() {
+      try {
+        if (!shouldShowDebug()) return;
+        if (typeof document === "undefined" || !document.body) return;
+
+        var existing = document.getElementById("aicm-v10f2i-worker-leak-debug");
+        if (existing) {
+          existing.outerHTML = debugHtml();
+          return;
+        }
+
+        var main = document.querySelector("main") || document.body;
+        var wrap = document.createElement("div");
+        wrap.innerHTML = debugHtml();
+
+        var firstCard = main.querySelector(".aicm-core-card") || main.firstChild;
+        if (firstCard && firstCard.parentNode) {
+          firstCard.parentNode.insertBefore(wrap.firstChild, firstCard);
+        } else {
+          main.insertBefore(wrap.firstChild, main.firstChild);
+        }
+      } catch (error) {
+        if (typeof console !== "undefined" && console && console.warn) {
+          console.warn("AICM V10F2I worker leak debug failed", error);
+        }
+      }
+    }
+
+    function scheduleDebug() {
+      setTimeout(ensureDebug, 0);
+      setTimeout(ensureDebug, 150);
+      setTimeout(ensureDebug, 500);
+      setTimeout(ensureDebug, 1000);
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function() {
+        scheduleDebug();
+      }, true);
+    }
+
+    var originalRenderV10F2I = typeof render === "function" ? render : null;
+    if (originalRenderV10F2I && !originalRenderV10F2I.__aicmR8zV10f2iWrapped) {
+      var wrappedRenderV10F2I = function() {
+        var result = originalRenderV10F2I.apply(this, arguments);
+        scheduleDebug();
+        return result;
+      };
+      wrappedRenderV10F2I.__aicmR8zV10f2iWrapped = true;
+      wrappedRenderV10F2I.__aicmR8zV10f2iOriginal = originalRenderV10F2I;
+      render = wrappedRenderV10F2I;
+    }
+
+    scheduleDebug();
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10f2iEnsureWorkerLeakDebug = ensureDebug;
+    }
+  })();
+  // AICM_R8Z_V10F2I_WORKER_LEAK_ALWAYS_VISIBLE_DEBUG_END
+
+
+  // AICM_R8Z_V10F3C_REVIEW_LIST_BACK_SIMPLE_DASHBOARD_START
+  // Override review-list nav: single 「戻る」 button to dashboard. UI only.
+  (function installAicmR8zV10f3cReviewListBackSimple() {
+    function isReviewListScreen() {
+      try {
+        if (typeof state !== "undefined" && state && state.screen === "review-list") return true;
+        if (typeof document !== "undefined" && document.body) {
+          var text = String(document.body.innerText || "");
+          return text.indexOf("レビュー・承認待ち") >= 0 && text.indexOf("レビュー待ち #") >= 0;
+        }
+      } catch (_) {}
+      return false;
+    }
+
+    function navHtml() {
+      return [
+        '<section id="aicm-v10f3c-review-list-back-simple" class="aicm-core-card" style="border:2px solid #94a3b8;background:#f8fafc;">',
+        '  <p class="aicm-eyebrow">V10F3C / レビュー一覧ナビ</p>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="review-list-back-dashboard">戻る</button>',
+        '  </div>',
+        '</section>'
+      ].join("");
+    }
+
+    function removeOldNavs() {
+      try {
+        var old1 = document.getElementById("aicm-v10f3b-review-list-back");
+        if (old1) old1.remove();
+        var old2 = document.getElementById("aicm-v10f3c-review-list-back-simple");
+        if (old2) old2.remove();
+      } catch (_) {}
+    }
+
+    function ensureNav() {
+      try {
+        if (!isReviewListScreen()) return;
+        if (typeof document === "undefined" || !document.body) return;
+
+        removeOldNavs();
+
+        var main = document.querySelector("main") || document.body;
+        var wrap = document.createElement("div");
+        wrap.innerHTML = navHtml();
+
+        var firstCard = main.querySelector(".aicm-core-card") || main.firstChild;
+        if (firstCard && firstCard.parentNode) {
+          firstCard.parentNode.insertBefore(wrap.firstChild, firstCard);
+        } else {
+          main.insertBefore(wrap.firstChild, main.firstChild);
+        }
+      } catch (error) {
+        if (typeof console !== "undefined" && console && console.warn) {
+          console.warn("AICM V10F3C simple back nav failed", error);
+        }
+      }
+    }
+
+    function goDashboard() {
+      try {
+        if (typeof state !== "undefined" && state) {
+          state.screen = "dashboard";
+        } else if (typeof window !== "undefined" && window.state) {
+          window.state.screen = "dashboard";
+        }
+
+        if (typeof render === "function") {
+          render();
+          return;
+        }
+      } catch (_) {}
+
+      try {
+        var url = new URL(String(location.href));
+        url.searchParams.set("screen", "dashboard");
+        location.href = url.toString();
+      } catch (_) {}
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function(event) {
+        var target = event && event.target;
+        var button = target && target.closest ? target.closest('[data-core-action="review-list-back-dashboard"]') : null;
+        if (!button) return;
+
+        try { event.preventDefault(); } catch (_) {}
+        try { event.stopPropagation(); } catch (_) {}
+        try { event.stopImmediatePropagation(); } catch (_) {}
+
+        goDashboard();
+      }, true);
+    }
+
+    function wrapReviewRenderer() {
+      try {
+        if (typeof window === "undefined") return false;
+        if (typeof window.aicmR8zV7RenderReviewList !== "function") return false;
+        if (window.aicmR8zV7RenderReviewList.__aicmR8zV10f3cWrapped) return true;
+
+        var original = window.aicmR8zV7RenderReviewList;
+        var wrapped = function() {
+          var html = original.apply(this, arguments);
+          var source = String(html || "");
+          source = source.replace(/<section id="aicm-v10f3b-review-list-back"[\s\S]*?<\/section>/g, "");
+          if (source.indexOf("aicm-v10f3c-review-list-back-simple") >= 0) return source;
+          return navHtml() + source;
+        };
+
+        wrapped.__aicmR8zV10f3cWrapped = true;
+        wrapped.__aicmR8zV10f3cOriginal = original;
+        window.aicmR8zV7RenderReviewList = wrapped;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    wrapReviewRenderer();
+    setTimeout(wrapReviewRenderer, 0);
+    setTimeout(wrapReviewRenderer, 200);
+    setTimeout(ensureNav, 300);
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function() {
+        setTimeout(wrapReviewRenderer, 0);
+        setTimeout(ensureNav, 180);
+      }, true);
+    }
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10f3cEnsureReviewListBackSimple = ensureNav;
+    }
+  })();
+  // AICM_R8Z_V10F3C_REVIEW_LIST_BACK_SIMPLE_DASHBOARD_END
+
+
+  // AICM_R8Z_V10F2J_WORKER_LEAK_DOM_SOURCE_DEBUG_START
+  // DOM source debug excluding debug cards. Debug only, no DB/API.
+  (function installAicmR8zV10f2jWorkerLeakDomSourceDebug() {
+    function esc(value) {
+      var s = String(value === undefined || value === null ? "" : value).trim();
+      if (typeof escapeHtml === "function") return escapeHtml(s);
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function cloneBodyWithoutDebug() {
+      try {
+        if (typeof document === "undefined" || !document.body) return null;
+        var clone = document.body.cloneNode(true);
+        var debugNodes = clone.querySelectorAll(
+          '#aicm-v10f2h-section-new-runtime-debug,' +
+          '#aicm-v10f2i-worker-leak-debug,' +
+          '#aicm-v10f2j-worker-leak-dom-source-debug,' +
+          '#aicm-v10f3b-review-list-back,' +
+          '#aicm-v10f3c-review-list-back-simple'
+        );
+        debugNodes.forEach(function(node) { node.remove(); });
+        return clone;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function cleanText(value) {
+      return String(value || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 280);
+    }
+
+    function bodyTextNoDebug() {
+      var clone = cloneBodyWithoutDebug();
+      return clone ? String(clone.innerText || "") : "";
+    }
+
+    function countNoDebug(pattern) {
+      var text = bodyTextNoDebug();
+      var re = new RegExp(pattern, "g");
+      return (text.match(re) || []).length;
+    }
+
+    function collectHeadings(clone) {
+      if (!clone) return "-";
+      var nodes = Array.prototype.slice.call(clone.querySelectorAll("h1,h2,h3,.aicm-eyebrow")).slice(0, 18);
+      return nodes.map(function(n, i) {
+        return "#" + (i + 1) + " " + cleanText(n.innerText || n.textContent || "");
+      }).join(" / ") || "-";
+    }
+
+    function collectButtons(clone) {
+      if (!clone) return "-";
+      var nodes = Array.prototype.slice.call(clone.querySelectorAll("button")).slice(0, 24);
+      return nodes.map(function(n, i) {
+        var action = n.getAttribute("data-core-action") || "";
+        var screen = n.getAttribute("data-screen") || "";
+        return "#" + (i + 1) + " " + cleanText(n.innerText || n.textContent || "") +
+          (action ? " action=" + action : "") +
+          (screen ? " screen=" + screen : "");
+      }).join(" / ") || "-";
+    }
+
+    function collectLabels(clone) {
+      if (!clone) return "-";
+      var nodes = Array.prototype.slice.call(clone.querySelectorAll("label,dt")).slice(0, 30);
+      return nodes.map(function(n, i) {
+        return "#" + (i + 1) + " " + cleanText(n.innerText || n.textContent || "");
+      }).join(" / ") || "-";
+    }
+
+    function collectSelects(clone) {
+      if (!clone) return "-";
+      var nodes = Array.prototype.slice.call(clone.querySelectorAll("select")).slice(0, 18);
+      return nodes.map(function(sel, i) {
+        var label = "";
+        try {
+          var parentText = cleanText(sel.parentElement ? sel.parentElement.innerText : "");
+          label = parentText.slice(0, 80);
+        } catch (_) {}
+        var selected = "";
+        try {
+          selected = cleanText(sel.options && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : "");
+        } catch (_) {}
+        return "#" + (i + 1) + " selected=" + selected + " parent=" + label;
+      }).join(" / ") || "-";
+    }
+
+    function collectWorkerNeighborhood(text) {
+      var keywords = ["従業員設定ロボット", "従業員設定", "従業員行を追加", "ASIC Workers", "HD-R3", "MG-NORN", "社内通称"];
+      var out = [];
+      keywords.forEach(function(k) {
+        var idx = text.indexOf(k);
+        if (idx >= 0) {
+          out.push(k + ": " + cleanText(text.slice(Math.max(0, idx - 80), idx + 360)));
+        }
+      });
+      return out.join(" || ") || "-";
+    }
+
+    function shouldShow() {
+      var text = bodyTextNoDebug();
+      if (text.indexOf("課の新規追加") >= 0) return true;
+      if (text.indexOf("課追加") >= 0) return true;
+      if (text.indexOf("従業員設定") >= 0) return true;
+      if (text.indexOf("従業員設定ロボット") >= 0) return true;
+      if (text.indexOf("従業員行を追加") >= 0) return true;
+      return false;
+    }
+
+    function debugHtml() {
+      var clone = cloneBodyWithoutDebug();
+      var text = bodyTextNoDebug();
+
+      return [
+        '<section id="aicm-v10f2j-worker-leak-dom-source-debug" class="aicm-core-card" style="border:3px solid #7c3aed;background:#f5f3ff;">',
+        '  <p class="aicm-eyebrow">V10F2J / DOM SOURCE DEBUG</p>',
+        '  <h2>従業員UIの実DOM発生源</h2>',
+        '  <dl class="aicm-core-detail-list">',
+        '    <dt>DOM no-debug 従業員設定</dt><dd>' + esc(String(countNoDebug("従業員設定"))) + '</dd>',
+        '    <dt>DOM no-debug 従業員設定ロボット</dt><dd>' + esc(String(countNoDebug("従業員設定ロボット"))) + '</dd>',
+        '    <dt>DOM no-debug 従業員行を追加</dt><dd>' + esc(String(countNoDebug("従業員行を追加"))) + '</dd>',
+        '    <dt>headings</dt><dd>' + esc(collectHeadings(clone)) + '</dd>',
+        '    <dt>buttons</dt><dd>' + esc(collectButtons(clone)) + '</dd>',
+        '    <dt>labels/dt</dt><dd>' + esc(collectLabels(clone)) + '</dd>',
+        '    <dt>selects</dt><dd>' + esc(collectSelects(clone)) + '</dd>',
+        '    <dt>worker neighborhood</dt><dd>' + esc(collectWorkerNeighborhood(text)) + '</dd>',
+        '  </dl>',
+        '  <p class="aicm-selected-note">この紫枠の値で、次に本修正します。</p>',
+        '</section>'
+      ].join("");
+    }
+
+    function ensureDebug() {
+      try {
+        if (!shouldShow()) return;
+        if (typeof document === "undefined" || !document.body) return;
+
+        var existing = document.getElementById("aicm-v10f2j-worker-leak-dom-source-debug");
+        if (existing) {
+          existing.outerHTML = debugHtml();
+          return;
+        }
+
+        var main = document.querySelector("main") || document.body;
+        var wrap = document.createElement("div");
+        wrap.innerHTML = debugHtml();
+
+        var firstCard = main.querySelector(".aicm-core-card") || main.firstChild;
+        if (firstCard && firstCard.parentNode) {
+          firstCard.parentNode.insertBefore(wrap.firstChild, firstCard);
+        } else {
+          main.insertBefore(wrap.firstChild, main.firstChild);
+        }
+      } catch (error) {
+        if (typeof console !== "undefined" && console && console.warn) {
+          console.warn("AICM V10F2J DOM source debug failed", error);
+        }
+      }
+    }
+
+    function schedule() {
+      setTimeout(ensureDebug, 0);
+      setTimeout(ensureDebug, 200);
+      setTimeout(ensureDebug, 700);
+      setTimeout(ensureDebug, 1400);
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", schedule, true);
+    }
+
+    var originalRenderV10F2J = typeof render === "function" ? render : null;
+    if (originalRenderV10F2J && !originalRenderV10F2J.__aicmR8zV10f2jWrapped) {
+      var wrappedRenderV10F2J = function() {
+        var result = originalRenderV10F2J.apply(this, arguments);
+        schedule();
+        return result;
+      };
+      wrappedRenderV10F2J.__aicmR8zV10f2jWrapped = true;
+      wrappedRenderV10F2J.__aicmR8zV10f2jOriginal = originalRenderV10F2J;
+      render = wrappedRenderV10F2J;
+    }
+
+    schedule();
+
+    if (typeof window !== "undefined") {
+      window.aicmR8zV10f2jEnsureWorkerLeakDomSourceDebug = ensureDebug;
+    }
+  })();
+  // AICM_R8Z_V10F2J_WORKER_LEAK_DOM_SOURCE_DEBUG_END

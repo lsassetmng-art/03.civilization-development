@@ -1,0 +1,81 @@
+   517: 
+   518:     state.__taskLedgerContextRefreshing = true;
+   519: 
+   520:     Promise.resolve()
+   521:       .then(function () {
+   522:         return loadContext();
+   523:       })
+   524:       .catch(function (error) {
+   525:         state.errorMessage = error && error.message ? error.message : "部門別タスク台帳の最新情報取得に失敗しました。";
+   526:       })
+   527:       .then(function () {
+   528:         state.__taskLedgerContextRefreshing = false;
+   529:         state.screen = "task-ledger";
+   530:         render();
+   531:       });
+   532:   }
+   533: 
+   534:   function pageTitle() {
+   535:     if (state.screen === "company-new") return "AI企業新規追加";
+   536:     if (state.screen === "department-new") return "部門新規追加";
+   537:     if (state.screen === "section-new") return "課新規追加";
+   538:     if (state.screen === "placement-new") return "Worker配置";
+   539:     if (state.screen === "settings") return "AI企業設定";
+   540:     return "AI企業ダッシュボード";
+   541:   }
+   542: 
+   543:   
+   544: // AICM_WORKER_RUNTIME_UI_NAV_AXT_R1_V1
+   545: function renderShell(content) {
+   546:     return [
+   547:       '<div class="aicm-core" data-core-mark="' + CORE_MARK + '">',
+   548:       '  <header class="aicm-core-header">',
+   549:       '    <h1>AI企業運営アプリ</h1>',
+   550:       '  </header>',
+   551:       '  <nav class="aicm-core-tabs" aria-label="AICompanyManager navigation">',
+   552:       '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
+   553:       '    <button type="button" data-core-action="task-ledger-open">部門別タスク台帳</button>',
+   554:       '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
+   555:       '  <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
+   556:       '  </nav>',
+   557:       renderMessages(),
+   558:       '  <main class="aicm-core-main">',
+   559:       content,
+   560:       '  </main>',
+   561:       '</div>'
+   562:     ].join("");
+   563:   }
+   564: 
+   565:   function renderMessages() {
+   566:     var parts = [];
+   567: 
+   568:     if (state.loading) {
+   569:       parts.push('<div class="aicm-core-message">読込中...</div>');
+   570:     }
+   571: 
+   572:     if (state.noticeMessage) {
+   573:       parts.push('<div class="aicm-core-message aicm-core-message-ok">' + escapeHtml(state.noticeMessage) + '</div>');
+   574:     }
+   575: 
+   576:     if (state.errorMessage) {
+   577:       parts.push('<div class="aicm-core-message aicm-core-message-error">' + escapeHtml(state.errorMessage) + '</div>');
+   578:     }
+   579: 
+   580:     return parts.join("");
+   581:   }
+   582: 
+   583:   function renderCompanySelect() {
+   584:     if (state.context.companies.length === 0) {
+   585:       return '<p class="aicm-core-empty">v2会社はまだありません。AI企業新規追加から作成してください。</p>';
+   586:     }
+   587: 
+   588:     return [
+   589:       '<label>AI企業</label>',
+   590:       '<select data-core-field="selectedCompanyId">',
+   591:       state.context.companies.map(function (company) {
+   592:         var selected = company.aicm_user_company_id === state.selectedCompanyId ? " selected" : "";
+   593:         return '<option value="' + escapeHtml(company.aicm_user_company_id) + '"' + selected + '>' + escapeHtml(company.company_name) + '</option>';
+   594:       }).join(""),
+   595:       '</select>'
+   596:     ].join("");
+   597:   }

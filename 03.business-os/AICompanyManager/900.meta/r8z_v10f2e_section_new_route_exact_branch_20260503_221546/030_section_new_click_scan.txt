@@ -1,0 +1,1372 @@
+============================================================
+PATTERN=data-screen="section-new"
+LINE=2855
+------------------------------------------------------------
+  2843:     if (!company) {
+  2844:       return [
+  2845:         '<div class="aicm-action-list">',
+  2846:         '  <button type="button" data-core-action="go" data-screen="company-new">AI企業を作成</button>',
+  2847:         '</div>'
+  2848:       ].join("");
+  2849:     }
+  2850: 
+  2851:     return [
+  2852:       '<div class="aicm-action-list">',
+  2853:       '  <button type="button" data-core-action="go" data-screen="company-new">AI企業新規追加</button>',
+  2854:       '  <button type="button" data-core-action="go" data-screen="department-new">部門追加</button>',
+  2855:       departments.length > 0 ? '  <button type="button" data-core-action="go" data-screen="section-new">課追加</button>' : '  <button type="button" data-core-action="go" data-screen="department-new">先に部門を追加</button>',
+  2856:       '  <button type="button" data-core-action="go" data-screen="placement-new">Worker配置</button>',
+  2857:       '</div>',
+  2858:       '<p class="aicm-core-empty">編集・削除は次工程で追加します。</p>'
+  2859:     ].join("");
+  2860:   }
+  2861: 
+  2862: 
+  2863:   
+  2864: 
+  2865: 
+  2866: function renderTree(departments) {
+  2867:     if (departments.length === 0) {
+  2868:       return [
+  2869:         '<div class="aicm-empty-state">',
+  2870:         '  <strong>部門がまだありません</strong>',
+  2871:         '  <p>選択中のAI企業に部門を追加すると、ここに階層表示されます。</p>',
+  2872:         '  <div class="aicm-dashboard-action-row">',
+  2873:         '    <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2874:         '  </div>',
+  2875:         '</div>'
+  2876:       ].join("");
+  2877:     }
+  2878: 
+  2879:     return [
+  2880:       '<div class="aicm-tree-toolbar">',
+  2881:       '  <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2882:       '  <button type="button" data-core-action="go" data-screen="section-new">課新規追加</button>',
+  2883:       '</div>',
+  2884:       '<div class="aicm-org-tree">',
+  2885:       departments.map(function (department) {
+  2886:         var sections = departmentSections(department.aicm_user_company_department_id);
+  2887:         return [
+============================================================
+PATTERN=data-screen="section-new"
+LINE=2882
+------------------------------------------------------------
+  2870:         '  <strong>部門がまだありません</strong>',
+  2871:         '  <p>選択中のAI企業に部門を追加すると、ここに階層表示されます。</p>',
+  2872:         '  <div class="aicm-dashboard-action-row">',
+  2873:         '    <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2874:         '  </div>',
+  2875:         '</div>'
+  2876:       ].join("");
+  2877:     }
+  2878: 
+  2879:     return [
+  2880:       '<div class="aicm-tree-toolbar">',
+  2881:       '  <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2882:       '  <button type="button" data-core-action="go" data-screen="section-new">課新規追加</button>',
+  2883:       '</div>',
+  2884:       '<div class="aicm-org-tree">',
+  2885:       departments.map(function (department) {
+  2886:         var sections = departmentSections(department.aicm_user_company_department_id);
+  2887:         return [
+  2888:           '<article class="aicm-org-node">',
+  2889:           '  <div class="aicm-org-node-head">',
+  2890:           '    <span class="aicm-node-badge">部門</span>',
+  2891:           '    <strong>' + escapeHtml(department.department_name) + '</strong>',
+  2892:           '    <button type="button" data-core-action="go" data-screen="department-edit">変更</button>',
+  2893:           '  </div>',
+  2894:           department.purpose ? '<p>' + escapeHtml(department.purpose) + '</p>' : '<p class="aicm-core-empty">目的未設定</p>',
+  2895:           sections.length === 0 ? '<div class="aicm-section-empty">課なし</div>' : [
+  2896:             '  <ul class="aicm-section-list">',
+  2897:             sections.map(function (section) {
+  2898:               return [
+  2899:                 '<li>',
+  2900:                 '  <span class="aicm-node-badge aicm-node-badge-section">課</span>',
+  2901:                 '  <strong>' + escapeHtml(section.section_name) + '</strong>',
+  2902:                 '  <button type="button" data-core-action="go" data-screen="section-edit">変更</button>',
+  2903:                 section.purpose ? '<small>' + escapeHtml(section.purpose) + '</small>' : '',
+  2904:                 '</li>'
+  2905:               ].join("");
+  2906:             }).join(""),
+  2907:             '  </ul>'
+  2908:           ].join(""),
+  2909:           '</article>'
+  2910:         ].join("");
+  2911:       }).join(""),
+  2912:       '</div>'
+  2913:     ].join("");
+  2914:   }
+============================================================
+PATTERN=section-new
+LINE=537
+------------------------------------------------------------
+   525:         state.errorMessage = error && error.message ? error.message : "部門別タスク台帳の最新情報取得に失敗しました。";
+   526:       })
+   527:       .then(function () {
+   528:         state.__taskLedgerContextRefreshing = false;
+   529:         state.screen = "task-ledger";
+   530:         render();
+   531:       });
+   532:   }
+   533: 
+   534:   function pageTitle() {
+   535:     if (state.screen === "company-new") return "AI企業新規追加";
+   536:     if (state.screen === "department-new") return "部門新規追加";
+   537:     if (state.screen === "section-new") return "課新規追加";
+   538:     if (state.screen === "placement-new") return "Worker配置";
+   539:     if (state.screen === "settings") return "AI企業設定";
+   540:     return "AI企業ダッシュボード";
+   541:   }
+   542: 
+   543:   
+   544: // AICM_WORKER_RUNTIME_UI_NAV_AXT_R1_V1
+   545: function renderShell(content) {
+   546:     return [
+   547:       '<div class="aicm-core" data-core-mark="' + CORE_MARK + '">',
+   548:       '  <header class="aicm-core-header">',
+   549:       '    <h1>AI企業運営アプリ</h1>',
+   550:       '  </header>',
+   551:       '  <nav class="aicm-core-tabs" aria-label="AICompanyManager navigation">',
+   552:       '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
+   553:       '    <button type="button" data-core-action="task-ledger-open">部門別タスク台帳</button>',
+   554:       '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
+   555:       '  <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
+   556:       '  </nav>',
+   557:       renderMessages(),
+   558:       '  <main class="aicm-core-main">',
+   559:       content,
+   560:       '  </main>',
+   561:       '</div>'
+   562:     ].join("");
+   563:   }
+   564: 
+   565:   function renderMessages() {
+   566:     var parts = [];
+   567: 
+   568:     if (state.loading) {
+   569:       parts.push('<div class="aicm-core-message">読込中...</div>');
+============================================================
+PATTERN=section-new
+LINE=1223
+------------------------------------------------------------
+  1211:     robot_pool_id: leader ? leader.robot_pool_id : "",
+  1212:     aiworker_model_code: leader ? leader.aiworker_model_code : "",
+  1213:     internal_nickname: aicmAxcInputValue("aicm-section-leader-robot-nickname")
+  1214:   });
+  1215:   if (leaderRow) rows.push(leaderRow);
+  1216: 
+  1217:   var index = 0;
+  1218:   while (index < 30) {
+  1219:     var robotEl = aicmAxcFindElement([
+  1220:       "aicm-inline-worker-" + String(index) + "-robot",
+  1221:       "aicm-role-worker-robot-" + String(index),
+  1222:       "aicm-role-worker-section-robot-" + String(index),
+  1223:       "aicm-role-worker-section-new-robot-" + String(index)
+  1224:     ]);
+  1225: 
+  1226:     var nickEl = aicmAxcFindElement([
+  1227:       "aicm-inline-worker-" + String(index) + "-nickname",
+  1228:       "aicm-role-worker-nickname-" + String(index),
+  1229:       "aicm-role-worker-section-nickname-" + String(index),
+  1230:       "aicm-role-worker-section-new-nickname-" + String(index)
+  1231:     ]);
+  1232: 
+  1233:     if (!robotEl && !nickEl) break;
+  1234: 
+  1235:     var worker = aicmAxcSelectedRobotMeta(robotEl);
+  1236:     var workerRow = aicmAxcBuildRolePlacement({
+  1237:       role_code: "Worker",
+  1238:       target_level_code: "section",
+  1239:       target_id: section.aicm_user_company_section_id,
+  1240:       aicm_user_company_department_id: section.aicm_user_company_department_id,
+  1241:       aicm_user_company_section_id: section.aicm_user_company_section_id,
+  1242:       robot_pool_id: worker ? worker.robot_pool_id : "",
+  1243:       aiworker_model_code: worker ? worker.aiworker_model_code : "",
+  1244:       internal_nickname: nickEl ? String(nickEl.value || "").trim() : ""
+  1245:     });
+  1246:     if (workerRow) rows.push(workerRow);
+  1247: 
+  1248:     index += 1;
+  1249:   }
+  1250: 
+  1251:   return rows;
+  1252: }
+  1253: 
+  1254: async function aicmAxcSyncRolePlacementsForPayload(payload) {
+  1255:   // AICM_ROLE_SYNC_REQUEST_BODY_AXH_R1_V1
+============================================================
+PATTERN=section-new
+LINE=1230
+------------------------------------------------------------
+  1218:   while (index < 30) {
+  1219:     var robotEl = aicmAxcFindElement([
+  1220:       "aicm-inline-worker-" + String(index) + "-robot",
+  1221:       "aicm-role-worker-robot-" + String(index),
+  1222:       "aicm-role-worker-section-robot-" + String(index),
+  1223:       "aicm-role-worker-section-new-robot-" + String(index)
+  1224:     ]);
+  1225: 
+  1226:     var nickEl = aicmAxcFindElement([
+  1227:       "aicm-inline-worker-" + String(index) + "-nickname",
+  1228:       "aicm-role-worker-nickname-" + String(index),
+  1229:       "aicm-role-worker-section-nickname-" + String(index),
+  1230:       "aicm-role-worker-section-new-nickname-" + String(index)
+  1231:     ]);
+  1232: 
+  1233:     if (!robotEl && !nickEl) break;
+  1234: 
+  1235:     var worker = aicmAxcSelectedRobotMeta(robotEl);
+  1236:     var workerRow = aicmAxcBuildRolePlacement({
+  1237:       role_code: "Worker",
+  1238:       target_level_code: "section",
+  1239:       target_id: section.aicm_user_company_section_id,
+  1240:       aicm_user_company_department_id: section.aicm_user_company_department_id,
+  1241:       aicm_user_company_section_id: section.aicm_user_company_section_id,
+  1242:       robot_pool_id: worker ? worker.robot_pool_id : "",
+  1243:       aiworker_model_code: worker ? worker.aiworker_model_code : "",
+  1244:       internal_nickname: nickEl ? String(nickEl.value || "").trim() : ""
+  1245:     });
+  1246:     if (workerRow) rows.push(workerRow);
+  1247: 
+  1248:     index += 1;
+  1249:   }
+  1250: 
+  1251:   return rows;
+  1252: }
+  1253: 
+  1254: async function aicmAxcSyncRolePlacementsForPayload(payload) {
+  1255:   // AICM_ROLE_SYNC_REQUEST_BODY_AXH_R1_V1
+  1256:   var rows = payload && Array.isArray(payload.rolePlacements) ? payload.rolePlacements : [];
+  1257: 
+  1258:   if (!rows.length) {
+  1259:     return { result: "ok", skipped: true };
+  1260:   }
+  1261: 
+  1262:   var body = payload.body || {};
+============================================================
+PATTERN=section-new
+LINE=2331
+------------------------------------------------------------
+  2319:       "aicm-section-leader-robot",
+  2320:       "aicm-section-leader-robot-nickname"
+  2321:     ].forEach(aicmAxoCaptureField);
+  2322: 
+  2323:     var workers = [];
+  2324:     var index = 0;
+  2325: 
+  2326:     while (index < 60) {
+  2327:       var robotIds = [
+  2328:         "aicm-inline-worker-" + String(index) + "-robot",
+  2329:         "aicm-role-worker-robot-" + String(index),
+  2330:         "aicm-role-worker-section-robot-" + String(index),
+  2331:         "aicm-role-worker-section-new-robot-" + String(index)
+  2332:       ];
+  2333: 
+  2334:       var nicknameIds = [
+  2335:         "aicm-inline-worker-" + String(index) + "-nickname",
+  2336:         "aicm-role-worker-nickname-" + String(index),
+  2337:         "aicm-role-worker-section-nickname-" + String(index),
+  2338:         "aicm-role-worker-section-new-nickname-" + String(index)
+  2339:       ];
+  2340: 
+  2341:       var robotEl = null;
+  2342:       var nicknameEl = null;
+  2343: 
+  2344:       for (var r = 0; r < robotIds.length; r += 1) {
+  2345:         robotEl = document.getElementById(robotIds[r]);
+  2346:         if (robotEl) break;
+  2347:       }
+  2348: 
+  2349:       for (var n = 0; n < nicknameIds.length; n += 1) {
+  2350:         nicknameEl = document.getElementById(nicknameIds[n]);
+  2351:         if (nicknameEl) break;
+  2352:       }
+  2353: 
+  2354:       if (!robotEl && !nicknameEl) break;
+  2355: 
+  2356:       workers.push({
+  2357:         robot_pool_id: robotEl ? String(robotEl.value || "") : "",
+  2358:         internal_nickname: nicknameEl ? String(nicknameEl.value || "") : ""
+  2359:       });
+  2360: 
+  2361:       index += 1;
+  2362:     }
+  2363: 
+============================================================
+PATTERN=section-new
+LINE=2338
+------------------------------------------------------------
+  2326:     while (index < 60) {
+  2327:       var robotIds = [
+  2328:         "aicm-inline-worker-" + String(index) + "-robot",
+  2329:         "aicm-role-worker-robot-" + String(index),
+  2330:         "aicm-role-worker-section-robot-" + String(index),
+  2331:         "aicm-role-worker-section-new-robot-" + String(index)
+  2332:       ];
+  2333: 
+  2334:       var nicknameIds = [
+  2335:         "aicm-inline-worker-" + String(index) + "-nickname",
+  2336:         "aicm-role-worker-nickname-" + String(index),
+  2337:         "aicm-role-worker-section-nickname-" + String(index),
+  2338:         "aicm-role-worker-section-new-nickname-" + String(index)
+  2339:       ];
+  2340: 
+  2341:       var robotEl = null;
+  2342:       var nicknameEl = null;
+  2343: 
+  2344:       for (var r = 0; r < robotIds.length; r += 1) {
+  2345:         robotEl = document.getElementById(robotIds[r]);
+  2346:         if (robotEl) break;
+  2347:       }
+  2348: 
+  2349:       for (var n = 0; n < nicknameIds.length; n += 1) {
+  2350:         nicknameEl = document.getElementById(nicknameIds[n]);
+  2351:         if (nicknameEl) break;
+  2352:       }
+  2353: 
+  2354:       if (!robotEl && !nicknameEl) break;
+  2355: 
+  2356:       workers.push({
+  2357:         robot_pool_id: robotEl ? String(robotEl.value || "") : "",
+  2358:         internal_nickname: nicknameEl ? String(nicknameEl.value || "") : ""
+  2359:       });
+  2360: 
+  2361:       index += 1;
+  2362:     }
+  2363: 
+  2364:     draft.workers = workers;
+  2365:     return draft;
+  2366:   }
+  2367: 
+  2368: function aicmAxoClearDraftAfterSuccessfulSave() {
+  2369:     state.aicmAxoFormDraft = null;
+  2370:   }
+============================================================
+PATTERN=section-new
+LINE=2464
+------------------------------------------------------------
+  2452:     if (!state || !state.screen || !html) return html;
+  2453: 
+  2454:     var extra = "";
+  2455: 
+  2456:     if (state.screen === "company-new") {
+  2457:       extra = renderAicmInlineRoleSetting("president", "社長設定", "AI企業全体の方針を受けるPresidentを設定します。", "president-company-new");
+  2458:     }
+  2459: 
+  2460:     if (state.screen === "department-new") {
+  2461:       extra = renderAicmInlineRoleSetting("manager", "部長設定", "この部門を統括するManagerを設定します。", "manager-department-new");
+  2462:     }
+  2463: 
+  2464:     if (state.screen === "section-new") {
+  2465:       extra = [
+  2466:         renderAicmInlineRoleSetting("leader", "課長設定", "この課を統括するLeaderを設定します。", "leader-section-new"),
+  2467:         renderAicmInlineRoleSetting("worker", "従業員設定", "この課に配置するWorkerを設定します。", "worker-section-new")
+  2468:       ].join("");
+  2469:     }
+  2470: 
+  2471:     if (!extra) return html;
+  2472:     if (html.indexOf("aicm-inline-role-setting-card") >= 0) return html;
+  2473: 
+  2474:     if (html.indexOf("</main></div>") >= 0) {
+  2475:       return html.replace("</main></div>", extra + "</main></div>");
+  2476:     }
+  2477: 
+  2478:     if (html.indexOf("</main>") >= 0) {
+  2479:       return html.replace("</main>", extra + "</main>");
+  2480:     }
+  2481: 
+  2482:     return html + extra;
+  2483:   }
+  2484: 
+  2485: 
+  2486:   
+  2487: // AICM_EXPLICIT_EDIT_DB_CONNECT_AVA_AVD_REDO_V1
+  2488: function aicmAvdCtx() {
+  2489:     if (typeof ctx !== "undefined" && ctx) return ctx;
+  2490:     if (typeof state !== "undefined" && state && state.context) return state.context;
+  2491:     if (typeof state !== "undefined" && state && state.ctx) return state.ctx;
+  2492:     return {};
+  2493:   }
+  2494: 
+  2495: function aicmAvdArray(value) {
+  2496:     return Array.isArray(value) ? value : [];
+============================================================
+PATTERN=section-new
+LINE=2466
+------------------------------------------------------------
+  2454:     var extra = "";
+  2455: 
+  2456:     if (state.screen === "company-new") {
+  2457:       extra = renderAicmInlineRoleSetting("president", "社長設定", "AI企業全体の方針を受けるPresidentを設定します。", "president-company-new");
+  2458:     }
+  2459: 
+  2460:     if (state.screen === "department-new") {
+  2461:       extra = renderAicmInlineRoleSetting("manager", "部長設定", "この部門を統括するManagerを設定します。", "manager-department-new");
+  2462:     }
+  2463: 
+  2464:     if (state.screen === "section-new") {
+  2465:       extra = [
+  2466:         renderAicmInlineRoleSetting("leader", "課長設定", "この課を統括するLeaderを設定します。", "leader-section-new"),
+  2467:         renderAicmInlineRoleSetting("worker", "従業員設定", "この課に配置するWorkerを設定します。", "worker-section-new")
+  2468:       ].join("");
+  2469:     }
+  2470: 
+  2471:     if (!extra) return html;
+  2472:     if (html.indexOf("aicm-inline-role-setting-card") >= 0) return html;
+  2473: 
+  2474:     if (html.indexOf("</main></div>") >= 0) {
+  2475:       return html.replace("</main></div>", extra + "</main></div>");
+  2476:     }
+  2477: 
+  2478:     if (html.indexOf("</main>") >= 0) {
+  2479:       return html.replace("</main>", extra + "</main>");
+  2480:     }
+  2481: 
+  2482:     return html + extra;
+  2483:   }
+  2484: 
+  2485: 
+  2486:   
+  2487: // AICM_EXPLICIT_EDIT_DB_CONNECT_AVA_AVD_REDO_V1
+  2488: function aicmAvdCtx() {
+  2489:     if (typeof ctx !== "undefined" && ctx) return ctx;
+  2490:     if (typeof state !== "undefined" && state && state.context) return state.context;
+  2491:     if (typeof state !== "undefined" && state && state.ctx) return state.ctx;
+  2492:     return {};
+  2493:   }
+  2494: 
+  2495: function aicmAvdArray(value) {
+  2496:     return Array.isArray(value) ? value : [];
+  2497:   }
+  2498: 
+============================================================
+PATTERN=section-new
+LINE=2467
+------------------------------------------------------------
+  2455: 
+  2456:     if (state.screen === "company-new") {
+  2457:       extra = renderAicmInlineRoleSetting("president", "社長設定", "AI企業全体の方針を受けるPresidentを設定します。", "president-company-new");
+  2458:     }
+  2459: 
+  2460:     if (state.screen === "department-new") {
+  2461:       extra = renderAicmInlineRoleSetting("manager", "部長設定", "この部門を統括するManagerを設定します。", "manager-department-new");
+  2462:     }
+  2463: 
+  2464:     if (state.screen === "section-new") {
+  2465:       extra = [
+  2466:         renderAicmInlineRoleSetting("leader", "課長設定", "この課を統括するLeaderを設定します。", "leader-section-new"),
+  2467:         renderAicmInlineRoleSetting("worker", "従業員設定", "この課に配置するWorkerを設定します。", "worker-section-new")
+  2468:       ].join("");
+  2469:     }
+  2470: 
+  2471:     if (!extra) return html;
+  2472:     if (html.indexOf("aicm-inline-role-setting-card") >= 0) return html;
+  2473: 
+  2474:     if (html.indexOf("</main></div>") >= 0) {
+  2475:       return html.replace("</main></div>", extra + "</main></div>");
+  2476:     }
+  2477: 
+  2478:     if (html.indexOf("</main>") >= 0) {
+  2479:       return html.replace("</main>", extra + "</main>");
+  2480:     }
+  2481: 
+  2482:     return html + extra;
+  2483:   }
+  2484: 
+  2485: 
+  2486:   
+  2487: // AICM_EXPLICIT_EDIT_DB_CONNECT_AVA_AVD_REDO_V1
+  2488: function aicmAvdCtx() {
+  2489:     if (typeof ctx !== "undefined" && ctx) return ctx;
+  2490:     if (typeof state !== "undefined" && state && state.context) return state.context;
+  2491:     if (typeof state !== "undefined" && state && state.ctx) return state.ctx;
+  2492:     return {};
+  2493:   }
+  2494: 
+  2495: function aicmAvdArray(value) {
+  2496:     return Array.isArray(value) ? value : [];
+  2497:   }
+  2498: 
+  2499: function aicmAvdOwnerId() {
+============================================================
+PATTERN=section-new
+LINE=2662
+------------------------------------------------------------
+  2650: 
+  2651:     if (prefix === "section") {
+  2652:       push("課長", "aicm-section-leader-robot", "aicm-section-leader-robot-nickname");
+  2653: 
+  2654:       var workerRows = [];
+  2655:       var index = 0;
+  2656: 
+  2657:       while (index < 30) {
+  2658:         var robotEl = findByIds([
+  2659:           "aicm-inline-worker-" + String(index) + "-robot",
+  2660:           "aicm-role-worker-robot-" + String(index),
+  2661:           "aicm-role-worker-section-robot-" + String(index),
+  2662:           "aicm-role-worker-section-new-robot-" + String(index)
+  2663:         ]);
+  2664: 
+  2665:         var nickEl = findByIds([
+  2666:           "aicm-inline-worker-" + String(index) + "-nickname",
+  2667:           "aicm-role-worker-nickname-" + String(index),
+  2668:           "aicm-role-worker-section-nickname-" + String(index),
+  2669:           "aicm-role-worker-section-new-nickname-" + String(index)
+  2670:         ]);
+  2671: 
+  2672:         if (!robotEl && !nickEl) break;
+  2673: 
+  2674:         var robotLabel = selectedLabelFromElement(robotEl);
+  2675:         var nickname = nickEl ? String(nickEl.value || "").trim() : "";
+  2676: 
+  2677:         if (robotLabel || nickname) {
+  2678:           workerRows.push((robotLabel || "未設定") + (nickname ? " / " + nickname : ""));
+  2679:         }
+  2680: 
+  2681:         index += 1;
+  2682:       }
+  2683: 
+  2684:       rows.push(["従業員設定", workerRows.length ? workerRows.join("\n") : "未設定"]);
+  2685:     }
+  2686: 
+  2687:     return rows;
+  2688:   }
+  2689: 
+  2690: function aicmAvdShowDbConfirm(payload) {
+  2691:     if (!payload || !payload.endpoint || !payload.body) {
+  2692:       setMessage("error", "確認画面を表示できません。");
+  2693:       return;
+  2694:     }
+============================================================
+PATTERN=section-new
+LINE=2669
+------------------------------------------------------------
+  2657:       while (index < 30) {
+  2658:         var robotEl = findByIds([
+  2659:           "aicm-inline-worker-" + String(index) + "-robot",
+  2660:           "aicm-role-worker-robot-" + String(index),
+  2661:           "aicm-role-worker-section-robot-" + String(index),
+  2662:           "aicm-role-worker-section-new-robot-" + String(index)
+  2663:         ]);
+  2664: 
+  2665:         var nickEl = findByIds([
+  2666:           "aicm-inline-worker-" + String(index) + "-nickname",
+  2667:           "aicm-role-worker-nickname-" + String(index),
+  2668:           "aicm-role-worker-section-nickname-" + String(index),
+  2669:           "aicm-role-worker-section-new-nickname-" + String(index)
+  2670:         ]);
+  2671: 
+  2672:         if (!robotEl && !nickEl) break;
+  2673: 
+  2674:         var robotLabel = selectedLabelFromElement(robotEl);
+  2675:         var nickname = nickEl ? String(nickEl.value || "").trim() : "";
+  2676: 
+  2677:         if (robotLabel || nickname) {
+  2678:           workerRows.push((robotLabel || "未設定") + (nickname ? " / " + nickname : ""));
+  2679:         }
+  2680: 
+  2681:         index += 1;
+  2682:       }
+  2683: 
+  2684:       rows.push(["従業員設定", workerRows.length ? workerRows.join("\n") : "未設定"]);
+  2685:     }
+  2686: 
+  2687:     return rows;
+  2688:   }
+  2689: 
+  2690: function aicmAvdShowDbConfirm(payload) {
+  2691:     if (!payload || !payload.endpoint || !payload.body) {
+  2692:       setMessage("error", "確認画面を表示できません。");
+  2693:       return;
+  2694:     }
+  2695: 
+  2696:     if (typeof aicmOrgShowUpdateConfirm === "function") {
+  2697:       aicmOrgShowUpdateConfirm(payload);
+  2698:       return;
+  2699:     }
+  2700: 
+  2701:     if (typeof state !== "undefined") {
+============================================================
+PATTERN=section-new
+LINE=2855
+------------------------------------------------------------
+  2843:     if (!company) {
+  2844:       return [
+  2845:         '<div class="aicm-action-list">',
+  2846:         '  <button type="button" data-core-action="go" data-screen="company-new">AI企業を作成</button>',
+  2847:         '</div>'
+  2848:       ].join("");
+  2849:     }
+  2850: 
+  2851:     return [
+  2852:       '<div class="aicm-action-list">',
+  2853:       '  <button type="button" data-core-action="go" data-screen="company-new">AI企業新規追加</button>',
+  2854:       '  <button type="button" data-core-action="go" data-screen="department-new">部門追加</button>',
+  2855:       departments.length > 0 ? '  <button type="button" data-core-action="go" data-screen="section-new">課追加</button>' : '  <button type="button" data-core-action="go" data-screen="department-new">先に部門を追加</button>',
+  2856:       '  <button type="button" data-core-action="go" data-screen="placement-new">Worker配置</button>',
+  2857:       '</div>',
+  2858:       '<p class="aicm-core-empty">編集・削除は次工程で追加します。</p>'
+  2859:     ].join("");
+  2860:   }
+  2861: 
+  2862: 
+  2863:   
+  2864: 
+  2865: 
+  2866: function renderTree(departments) {
+  2867:     if (departments.length === 0) {
+  2868:       return [
+  2869:         '<div class="aicm-empty-state">',
+  2870:         '  <strong>部門がまだありません</strong>',
+  2871:         '  <p>選択中のAI企業に部門を追加すると、ここに階層表示されます。</p>',
+  2872:         '  <div class="aicm-dashboard-action-row">',
+  2873:         '    <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2874:         '  </div>',
+  2875:         '</div>'
+  2876:       ].join("");
+  2877:     }
+  2878: 
+  2879:     return [
+  2880:       '<div class="aicm-tree-toolbar">',
+  2881:       '  <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2882:       '  <button type="button" data-core-action="go" data-screen="section-new">課新規追加</button>',
+  2883:       '</div>',
+  2884:       '<div class="aicm-org-tree">',
+  2885:       departments.map(function (department) {
+  2886:         var sections = departmentSections(department.aicm_user_company_department_id);
+  2887:         return [
+============================================================
+PATTERN=section-new
+LINE=2882
+------------------------------------------------------------
+  2870:         '  <strong>部門がまだありません</strong>',
+  2871:         '  <p>選択中のAI企業に部門を追加すると、ここに階層表示されます。</p>',
+  2872:         '  <div class="aicm-dashboard-action-row">',
+  2873:         '    <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2874:         '  </div>',
+  2875:         '</div>'
+  2876:       ].join("");
+  2877:     }
+  2878: 
+  2879:     return [
+  2880:       '<div class="aicm-tree-toolbar">',
+  2881:       '  <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2882:       '  <button type="button" data-core-action="go" data-screen="section-new">課新規追加</button>',
+  2883:       '</div>',
+  2884:       '<div class="aicm-org-tree">',
+  2885:       departments.map(function (department) {
+  2886:         var sections = departmentSections(department.aicm_user_company_department_id);
+  2887:         return [
+  2888:           '<article class="aicm-org-node">',
+  2889:           '  <div class="aicm-org-node-head">',
+  2890:           '    <span class="aicm-node-badge">部門</span>',
+  2891:           '    <strong>' + escapeHtml(department.department_name) + '</strong>',
+  2892:           '    <button type="button" data-core-action="go" data-screen="department-edit">変更</button>',
+  2893:           '  </div>',
+  2894:           department.purpose ? '<p>' + escapeHtml(department.purpose) + '</p>' : '<p class="aicm-core-empty">目的未設定</p>',
+  2895:           sections.length === 0 ? '<div class="aicm-section-empty">課なし</div>' : [
+  2896:             '  <ul class="aicm-section-list">',
+  2897:             sections.map(function (section) {
+  2898:               return [
+  2899:                 '<li>',
+  2900:                 '  <span class="aicm-node-badge aicm-node-badge-section">課</span>',
+  2901:                 '  <strong>' + escapeHtml(section.section_name) + '</strong>',
+  2902:                 '  <button type="button" data-core-action="go" data-screen="section-edit">変更</button>',
+  2903:                 section.purpose ? '<small>' + escapeHtml(section.purpose) + '</small>' : '',
+  2904:                 '</li>'
+  2905:               ].join("");
+  2906:             }).join(""),
+  2907:             '  </ul>'
+  2908:           ].join(""),
+  2909:           '</article>'
+  2910:         ].join("");
+  2911:       }).join(""),
+  2912:       '</div>'
+  2913:     ].join("");
+  2914:   }
+============================================================
+PATTERN=section-new
+LINE=8327
+------------------------------------------------------------
+  8315:     ].join("");
+  8316:   }
+  8317: 
+  8318: function render() {
+  8319:     if (!root) return;
+  8320: 
+  8321:     var html = "";
+  8322: 
+  8323:     if (state.screen === "company-new") {
+  8324:       html = renderCompanyNew();
+  8325:     } else if (state.screen === "department-new") {
+  8326:       html = renderDepartmentNew();
+  8327:     } else if (state.screen === "section-new") {
+  8328:       html = renderSectionNew();
+  8329:     } else if (state.screen === "placement-new") {
+  8330:       html = renderPlacementNew();
+  8331:     } else if (state.screen === "worker-runtime-confirm") {
+  8332:       // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+  8333:       html = renderWorkerRuntimeConfirm();
+  8334:     } else if (state.screen === "worker-runtime-request") {
+  8335:       html = renderWorkerRuntimeRequest();
+  8336:     } else if (state.screen === "settings") {
+  8337:       html = renderSettings();
+  8338:     } else if (state.screen === "department-edit") {
+  8339:       html = renderDepartmentEditPlaceholder();
+  8340:     } else if (state.screen === "section-edit") {
+  8341:       html = renderSectionEditPlaceholder();
+  8342:     } else if (state.screen === "ai-business-start") {
+  8343:       html = renderAicmBusinessStartScreen();
+  8344:     } else if (state.screen === "task-ledger") {
+  8345:       html = renderTaskLedgerPlaceholder();
+  8346:     } else if (state.screen === "review-list") {
+  8347:       html = (typeof window !== "undefined" && typeof window.aicmR8zV7RenderReviewList === "function" ? window.aicmR8zV7RenderReviewList(state) : renderReviewListPlaceholder()); // AICM_R8Z_V7_ROUTE_BRIDGE_CALL
+  8348:     } else {
+  8349:       html = renderDashboard();
+  8350:     }
+  8351: 
+  8352:     
+  8353:     // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+  8354:     if (
+  8355:       state &&
+  8356:       (
+  8357:         state.screen === "company-edit" ||
+  8358:         state.screen === "company-change" ||
+  8359:         state.screen === "company-update"
+============================================================
+PATTERN=renderSectionNew
+LINE=2943
+------------------------------------------------------------
+  2931:       renderCompanySelect(),
+  2932:       '</section>',
+  2933:       '<form data-core-form="department-create" class="aicm-core-card">',
+  2934:       '  <label>部門名</label>',
+  2935:       '  <input name="departmentName" autocomplete="off" required>',
+  2936:       '  <label>目的</label>',
+  2937:       '  <textarea name="purpose" rows="3"></textarea>',
+  2938:       '  <button type="submit">部門を作成</button>',
+  2939:       '</form>'
+  2940:     ].join(""));
+  2941:   }
+  2942: 
+  2943:   function renderSectionNew() {
+  2944:     return renderShell([
+  2945:       '<section class="aicm-core-card">',
+  2946:       renderCompanySelect(),
+  2947:       renderDepartmentSelect(),
+  2948:       '</section>',
+  2949:       '<form data-core-form="section-create" class="aicm-core-card">',
+  2950:       '  <label>課名</label>',
+  2951:       '  <input name="sectionName" autocomplete="off" required>',
+  2952:       '  <label>目的</label>',
+  2953:       '  <textarea name="purpose" rows="3"></textarea>',
+  2954:       '  <button type="submit">課を作成</button>',
+  2955:       '</form>'
+  2956:     ].join(""));
+  2957:   }
+  2958: 
+  2959:   function renderPlacementNew() {
+  2960:     var company = selectedCompany();
+  2961:     var departments = company ? companyDepartments(company.aicm_user_company_id) : [];
+  2962:     var selectedDept = selectedDepartment();
+  2963:     var sections = selectedDept ? departmentSections(selectedDept.aicm_user_company_department_id) : [];
+  2964:     var robots = state.context.robotCatalog;
+  2965: 
+  2966:     return renderShell([
+  2967:       '<form data-core-form="placement-create" class="aicm-core-card">',
+  2968:       renderCompanySelect(),
+  2969:       renderDepartmentSelect(),
+  2970:       '  <label>配置先</label>',
+  2971:       '  <select name="targetLevelCode">',
+  2972:       '    <option value="company">会社 / President</option>',
+  2973:       '    <option value="department">部門 / Manager</option>',
+  2974:       '    <option value="section">課 / Leader / Worker</option>',
+  2975:       '  </select>',
+============================================================
+PATTERN=renderSectionNew
+LINE=8328
+------------------------------------------------------------
+  8316:   }
+  8317: 
+  8318: function render() {
+  8319:     if (!root) return;
+  8320: 
+  8321:     var html = "";
+  8322: 
+  8323:     if (state.screen === "company-new") {
+  8324:       html = renderCompanyNew();
+  8325:     } else if (state.screen === "department-new") {
+  8326:       html = renderDepartmentNew();
+  8327:     } else if (state.screen === "section-new") {
+  8328:       html = renderSectionNew();
+  8329:     } else if (state.screen === "placement-new") {
+  8330:       html = renderPlacementNew();
+  8331:     } else if (state.screen === "worker-runtime-confirm") {
+  8332:       // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+  8333:       html = renderWorkerRuntimeConfirm();
+  8334:     } else if (state.screen === "worker-runtime-request") {
+  8335:       html = renderWorkerRuntimeRequest();
+  8336:     } else if (state.screen === "settings") {
+  8337:       html = renderSettings();
+  8338:     } else if (state.screen === "department-edit") {
+  8339:       html = renderDepartmentEditPlaceholder();
+  8340:     } else if (state.screen === "section-edit") {
+  8341:       html = renderSectionEditPlaceholder();
+  8342:     } else if (state.screen === "ai-business-start") {
+  8343:       html = renderAicmBusinessStartScreen();
+  8344:     } else if (state.screen === "task-ledger") {
+  8345:       html = renderTaskLedgerPlaceholder();
+  8346:     } else if (state.screen === "review-list") {
+  8347:       html = (typeof window !== "undefined" && typeof window.aicmR8zV7RenderReviewList === "function" ? window.aicmR8zV7RenderReviewList(state) : renderReviewListPlaceholder()); // AICM_R8Z_V7_ROUTE_BRIDGE_CALL
+  8348:     } else {
+  8349:       html = renderDashboard();
+  8350:     }
+  8351: 
+  8352:     
+  8353:     // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+  8354:     if (
+  8355:       state &&
+  8356:       (
+  8357:         state.screen === "company-edit" ||
+  8358:         state.screen === "company-change" ||
+  8359:         state.screen === "company-update"
+  8360:       )
+============================================================
+PATTERN=renderSectionEditPlaceholder
+LINE=7592
+------------------------------------------------------------
+  7580:       '</section>'
+  7581:     ].join(""));
+  7582:   }
+  7583: 
+  7584: 
+  7585:   
+  7586: 
+  7587: 
+  7588: 
+  7589: 
+  7590: 
+  7591: 
+  7592: function renderSectionEditPlaceholder() {
+  7593:     var company = aicmAvdCurrentCompany();
+  7594:     var department = aicmAvdCurrentDepartment(company && company.aicm_user_company_id);
+  7595:     var section = aicmAvdCurrentSection(company && company.aicm_user_company_id, department && department.aicm_user_company_department_id);
+  7596: 
+  7597:     if (!company) {
+  7598:       return renderShell([
+  7599:         '<section class="aicm-core-card">',
+  7600:         '  <p class="aicm-eyebrow">課変更</p>',
+  7601:         '  <h2>AI企業を選択してください</h2>',
+  7602:         '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="go" data-screen="dashboard">戻る</button></div>',
+  7603:         '</section>'
+  7604:       ].join(""));
+  7605:     }
+  7606: 
+  7607:     if (!department || !section) {
+  7608:       return renderShell([
+  7609:         '<section class="aicm-core-card">',
+  7610:         '  <p class="aicm-eyebrow">課変更</p>',
+  7611:         '  <h2>課がありません</h2>',
+  7612:         '  <p class="aicm-core-empty">先に部門と課を追加してください。</p>',
+  7613:         '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="go" data-screen="dashboard">戻る</button></div>',
+  7614:         '</section>'
+  7615:       ].join(""));
+  7616:     }
+  7617: 
+  7618:     return renderShell([
+  7619:       '<section class="aicm-core-card">',
+  7620:       '  <p class="aicm-eyebrow">課変更</p>',
+  7621:       '  <h2>課情報を変更</h2>',
+  7622:       '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || "") + '</strong></p>',
+  7623:       '  <p class="aicm-selected-note">所属部門: <strong>' + escapeHtml(department.department_name || "") + '</strong></p>',
+  7624:       '  <input id="aicm-section-edit-id" type="hidden" value="' + escapeHtml(section.aicm_user_company_section_id || "") + '">',
+============================================================
+PATTERN=renderSectionEditPlaceholder
+LINE=8341
+------------------------------------------------------------
+  8329:     } else if (state.screen === "placement-new") {
+  8330:       html = renderPlacementNew();
+  8331:     } else if (state.screen === "worker-runtime-confirm") {
+  8332:       // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+  8333:       html = renderWorkerRuntimeConfirm();
+  8334:     } else if (state.screen === "worker-runtime-request") {
+  8335:       html = renderWorkerRuntimeRequest();
+  8336:     } else if (state.screen === "settings") {
+  8337:       html = renderSettings();
+  8338:     } else if (state.screen === "department-edit") {
+  8339:       html = renderDepartmentEditPlaceholder();
+  8340:     } else if (state.screen === "section-edit") {
+  8341:       html = renderSectionEditPlaceholder();
+  8342:     } else if (state.screen === "ai-business-start") {
+  8343:       html = renderAicmBusinessStartScreen();
+  8344:     } else if (state.screen === "task-ledger") {
+  8345:       html = renderTaskLedgerPlaceholder();
+  8346:     } else if (state.screen === "review-list") {
+  8347:       html = (typeof window !== "undefined" && typeof window.aicmR8zV7RenderReviewList === "function" ? window.aicmR8zV7RenderReviewList(state) : renderReviewListPlaceholder()); // AICM_R8Z_V7_ROUTE_BRIDGE_CALL
+  8348:     } else {
+  8349:       html = renderDashboard();
+  8350:     }
+  8351: 
+  8352:     
+  8353:     // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+  8354:     if (
+  8355:       state &&
+  8356:       (
+  8357:         state.screen === "company-edit" ||
+  8358:         state.screen === "company-change" ||
+  8359:         state.screen === "company-update"
+  8360:       )
+  8361:     ) {
+  8362:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8363:       html = renderCompanyEditPlaceholder();
+  8364:     }
+  8365: 
+  8366: 
+  8367:     // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+  8368:     if (state && state.screen === "company-edit") {
+  8369:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8370:       html = renderCompanyEditPlaceholder();
+  8371:     }
+  8372: 
+  8373:     if (state && state.screen === "department-edit") {
+============================================================
+PATTERN=renderSectionEditPlaceholder
+LINE=8380
+------------------------------------------------------------
+  8368:     if (state && state.screen === "company-edit") {
+  8369:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8370:       html = renderCompanyEditPlaceholder();
+  8371:     }
+  8372: 
+  8373:     if (state && state.screen === "department-edit") {
+  8374:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8375:       html = renderDepartmentEditPlaceholder();
+  8376:     }
+  8377: 
+  8378:     if (state && state.screen === "section-edit") {
+  8379:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8380:       html = renderSectionEditPlaceholder();
+  8381:     }
+  8382: 
+  8383: 
+  8384:     // AICM_INLINE_ROLE_ADD_SCREEN_INJECTION_ATQ_ATT
+  8385:     if (typeof aicmInjectInlineRoleSettingsForAddScreens === "function") {
+  8386:       html = aicmInjectInlineRoleSettingsForAddScreens(html);
+  8387:     }
+  8388: 
+  8389: root.innerHTML = html;
+  8390:   }
+  8391: 
+  8392:   function fieldValue(form, name) {
+  8393:     var field = form.elements[name];
+  8394:     return field && typeof field.value === "string" ? field.value.trim() : "";
+  8395:   }
+  8396: 
+  8397:   function submitForm(form) {
+  8398:     var formName = form.getAttribute("data-core-form") || "";
+  8399:     state.errorMessage = "";
+  8400:     state.noticeMessage = "";
+  8401: 
+  8402:     var task;
+  8403: 
+  8404:     if (formName === "company-create") {
+  8405:       task = createCompany({
+  8406:         companyName: fieldValue(form, "companyName"),
+  8407:         businessDomain: fieldValue(form, "businessDomain")
+  8408:       });
+  8409:     } else if (formName === "department-create") {
+  8410:       task = createDepartment({
+  8411:         departmentName: fieldValue(form, "departmentName"),
+  8412:         purpose: fieldValue(form, "purpose")
+============================================================
+PATTERN=renderSectionEdit
+LINE=7592
+------------------------------------------------------------
+  7580:       '</section>'
+  7581:     ].join(""));
+  7582:   }
+  7583: 
+  7584: 
+  7585:   
+  7586: 
+  7587: 
+  7588: 
+  7589: 
+  7590: 
+  7591: 
+  7592: function renderSectionEditPlaceholder() {
+  7593:     var company = aicmAvdCurrentCompany();
+  7594:     var department = aicmAvdCurrentDepartment(company && company.aicm_user_company_id);
+  7595:     var section = aicmAvdCurrentSection(company && company.aicm_user_company_id, department && department.aicm_user_company_department_id);
+  7596: 
+  7597:     if (!company) {
+  7598:       return renderShell([
+  7599:         '<section class="aicm-core-card">',
+  7600:         '  <p class="aicm-eyebrow">課変更</p>',
+  7601:         '  <h2>AI企業を選択してください</h2>',
+  7602:         '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="go" data-screen="dashboard">戻る</button></div>',
+  7603:         '</section>'
+  7604:       ].join(""));
+  7605:     }
+  7606: 
+  7607:     if (!department || !section) {
+  7608:       return renderShell([
+  7609:         '<section class="aicm-core-card">',
+  7610:         '  <p class="aicm-eyebrow">課変更</p>',
+  7611:         '  <h2>課がありません</h2>',
+  7612:         '  <p class="aicm-core-empty">先に部門と課を追加してください。</p>',
+  7613:         '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="go" data-screen="dashboard">戻る</button></div>',
+  7614:         '</section>'
+  7615:       ].join(""));
+  7616:     }
+  7617: 
+  7618:     return renderShell([
+  7619:       '<section class="aicm-core-card">',
+  7620:       '  <p class="aicm-eyebrow">課変更</p>',
+  7621:       '  <h2>課情報を変更</h2>',
+  7622:       '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || "") + '</strong></p>',
+  7623:       '  <p class="aicm-selected-note">所属部門: <strong>' + escapeHtml(department.department_name || "") + '</strong></p>',
+  7624:       '  <input id="aicm-section-edit-id" type="hidden" value="' + escapeHtml(section.aicm_user_company_section_id || "") + '">',
+============================================================
+PATTERN=renderSectionEdit
+LINE=8341
+------------------------------------------------------------
+  8329:     } else if (state.screen === "placement-new") {
+  8330:       html = renderPlacementNew();
+  8331:     } else if (state.screen === "worker-runtime-confirm") {
+  8332:       // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+  8333:       html = renderWorkerRuntimeConfirm();
+  8334:     } else if (state.screen === "worker-runtime-request") {
+  8335:       html = renderWorkerRuntimeRequest();
+  8336:     } else if (state.screen === "settings") {
+  8337:       html = renderSettings();
+  8338:     } else if (state.screen === "department-edit") {
+  8339:       html = renderDepartmentEditPlaceholder();
+  8340:     } else if (state.screen === "section-edit") {
+  8341:       html = renderSectionEditPlaceholder();
+  8342:     } else if (state.screen === "ai-business-start") {
+  8343:       html = renderAicmBusinessStartScreen();
+  8344:     } else if (state.screen === "task-ledger") {
+  8345:       html = renderTaskLedgerPlaceholder();
+  8346:     } else if (state.screen === "review-list") {
+  8347:       html = (typeof window !== "undefined" && typeof window.aicmR8zV7RenderReviewList === "function" ? window.aicmR8zV7RenderReviewList(state) : renderReviewListPlaceholder()); // AICM_R8Z_V7_ROUTE_BRIDGE_CALL
+  8348:     } else {
+  8349:       html = renderDashboard();
+  8350:     }
+  8351: 
+  8352:     
+  8353:     // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+  8354:     if (
+  8355:       state &&
+  8356:       (
+  8357:         state.screen === "company-edit" ||
+  8358:         state.screen === "company-change" ||
+  8359:         state.screen === "company-update"
+  8360:       )
+  8361:     ) {
+  8362:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8363:       html = renderCompanyEditPlaceholder();
+  8364:     }
+  8365: 
+  8366: 
+  8367:     // AICM_EDIT_SCREEN_RENDER_OVERRIDE_ATE_ATH
+  8368:     if (state && state.screen === "company-edit") {
+  8369:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8370:       html = renderCompanyEditPlaceholder();
+  8371:     }
+  8372: 
+  8373:     if (state && state.screen === "department-edit") {
+============================================================
+PATTERN=renderSectionEdit
+LINE=8380
+------------------------------------------------------------
+  8368:     if (state && state.screen === "company-edit") {
+  8369:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8370:       html = renderCompanyEditPlaceholder();
+  8371:     }
+  8372: 
+  8373:     if (state && state.screen === "department-edit") {
+  8374:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8375:       html = renderDepartmentEditPlaceholder();
+  8376:     }
+  8377: 
+  8378:     if (state && state.screen === "section-edit") {
+  8379:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+  8380:       html = renderSectionEditPlaceholder();
+  8381:     }
+  8382: 
+  8383: 
+  8384:     // AICM_INLINE_ROLE_ADD_SCREEN_INJECTION_ATQ_ATT
+  8385:     if (typeof aicmInjectInlineRoleSettingsForAddScreens === "function") {
+  8386:       html = aicmInjectInlineRoleSettingsForAddScreens(html);
+  8387:     }
+  8388: 
+  8389: root.innerHTML = html;
+  8390:   }
+  8391: 
+  8392:   function fieldValue(form, name) {
+  8393:     var field = form.elements[name];
+  8394:     return field && typeof field.value === "string" ? field.value.trim() : "";
+  8395:   }
+  8396: 
+  8397:   function submitForm(form) {
+  8398:     var formName = form.getAttribute("data-core-form") || "";
+  8399:     state.errorMessage = "";
+  8400:     state.noticeMessage = "";
+  8401: 
+  8402:     var task;
+  8403: 
+  8404:     if (formName === "company-create") {
+  8405:       task = createCompany({
+  8406:         companyName: fieldValue(form, "companyName"),
+  8407:         businessDomain: fieldValue(form, "businessDomain")
+  8408:       });
+  8409:     } else if (formName === "department-create") {
+  8410:       task = createDepartment({
+  8411:         departmentName: fieldValue(form, "departmentName"),
+  8412:         purpose: fieldValue(form, "purpose")
+============================================================
+PATTERN=renderPlacementNew
+LINE=2959
+------------------------------------------------------------
+  2947:       renderDepartmentSelect(),
+  2948:       '</section>',
+  2949:       '<form data-core-form="section-create" class="aicm-core-card">',
+  2950:       '  <label>課名</label>',
+  2951:       '  <input name="sectionName" autocomplete="off" required>',
+  2952:       '  <label>目的</label>',
+  2953:       '  <textarea name="purpose" rows="3"></textarea>',
+  2954:       '  <button type="submit">課を作成</button>',
+  2955:       '</form>'
+  2956:     ].join(""));
+  2957:   }
+  2958: 
+  2959:   function renderPlacementNew() {
+  2960:     var company = selectedCompany();
+  2961:     var departments = company ? companyDepartments(company.aicm_user_company_id) : [];
+  2962:     var selectedDept = selectedDepartment();
+  2963:     var sections = selectedDept ? departmentSections(selectedDept.aicm_user_company_department_id) : [];
+  2964:     var robots = state.context.robotCatalog;
+  2965: 
+  2966:     return renderShell([
+  2967:       '<form data-core-form="placement-create" class="aicm-core-card">',
+  2968:       renderCompanySelect(),
+  2969:       renderDepartmentSelect(),
+  2970:       '  <label>配置先</label>',
+  2971:       '  <select name="targetLevelCode">',
+  2972:       '    <option value="company">会社 / President</option>',
+  2973:       '    <option value="department">部門 / Manager</option>',
+  2974:       '    <option value="section">課 / Leader / Worker</option>',
+  2975:       '  </select>',
+  2976:       '  <label>Role</label>',
+  2977:       '  <select name="roleCode">',
+  2978:       '    <option value="President">President</option>',
+  2979:       '    <option value="Manager">Manager</option>',
+  2980:       '    <option value="Leader">Leader</option>',
+  2981:       '    <option value="Worker">Worker</option>',
+  2982:       '  </select>',
+  2983:       '  <label>課</label>',
+  2984:       '  <select name="sectionId">',
+  2985:       '    <option value="">未選択</option>',
+  2986:       sections.map(function (section) {
+  2987:         return '<option value="' + escapeHtml(section.aicm_user_company_section_id) + '">' + escapeHtml(section.section_name) + '</option>';
+  2988:       }).join(""),
+  2989:       '  </select>',
+  2990:       '  <label>Robot</label>',
+  2991:       '  <select name="robotPoolId">',
+============================================================
+PATTERN=renderPlacementNew
+LINE=8330
+------------------------------------------------------------
+  8318: function render() {
+  8319:     if (!root) return;
+  8320: 
+  8321:     var html = "";
+  8322: 
+  8323:     if (state.screen === "company-new") {
+  8324:       html = renderCompanyNew();
+  8325:     } else if (state.screen === "department-new") {
+  8326:       html = renderDepartmentNew();
+  8327:     } else if (state.screen === "section-new") {
+  8328:       html = renderSectionNew();
+  8329:     } else if (state.screen === "placement-new") {
+  8330:       html = renderPlacementNew();
+  8331:     } else if (state.screen === "worker-runtime-confirm") {
+  8332:       // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+  8333:       html = renderWorkerRuntimeConfirm();
+  8334:     } else if (state.screen === "worker-runtime-request") {
+  8335:       html = renderWorkerRuntimeRequest();
+  8336:     } else if (state.screen === "settings") {
+  8337:       html = renderSettings();
+  8338:     } else if (state.screen === "department-edit") {
+  8339:       html = renderDepartmentEditPlaceholder();
+  8340:     } else if (state.screen === "section-edit") {
+  8341:       html = renderSectionEditPlaceholder();
+  8342:     } else if (state.screen === "ai-business-start") {
+  8343:       html = renderAicmBusinessStartScreen();
+  8344:     } else if (state.screen === "task-ledger") {
+  8345:       html = renderTaskLedgerPlaceholder();
+  8346:     } else if (state.screen === "review-list") {
+  8347:       html = (typeof window !== "undefined" && typeof window.aicmR8zV7RenderReviewList === "function" ? window.aicmR8zV7RenderReviewList(state) : renderReviewListPlaceholder()); // AICM_R8Z_V7_ROUTE_BRIDGE_CALL
+  8348:     } else {
+  8349:       html = renderDashboard();
+  8350:     }
+  8351: 
+  8352:     
+  8353:     // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+  8354:     if (
+  8355:       state &&
+  8356:       (
+  8357:         state.screen === "company-edit" ||
+  8358:         state.screen === "company-change" ||
+  8359:         state.screen === "company-update"
+  8360:       )
+  8361:     ) {
+  8362:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+============================================================
+PATTERN=placement-new
+LINE=538
+------------------------------------------------------------
+   526:       })
+   527:       .then(function () {
+   528:         state.__taskLedgerContextRefreshing = false;
+   529:         state.screen = "task-ledger";
+   530:         render();
+   531:       });
+   532:   }
+   533: 
+   534:   function pageTitle() {
+   535:     if (state.screen === "company-new") return "AI企業新規追加";
+   536:     if (state.screen === "department-new") return "部門新規追加";
+   537:     if (state.screen === "section-new") return "課新規追加";
+   538:     if (state.screen === "placement-new") return "Worker配置";
+   539:     if (state.screen === "settings") return "AI企業設定";
+   540:     return "AI企業ダッシュボード";
+   541:   }
+   542: 
+   543:   
+   544: // AICM_WORKER_RUNTIME_UI_NAV_AXT_R1_V1
+   545: function renderShell(content) {
+   546:     return [
+   547:       '<div class="aicm-core" data-core-mark="' + CORE_MARK + '">',
+   548:       '  <header class="aicm-core-header">',
+   549:       '    <h1>AI企業運営アプリ</h1>',
+   550:       '  </header>',
+   551:       '  <nav class="aicm-core-tabs" aria-label="AICompanyManager navigation">',
+   552:       '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
+   553:       '    <button type="button" data-core-action="task-ledger-open">部門別タスク台帳</button>',
+   554:       '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
+   555:       '  <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
+   556:       '  </nav>',
+   557:       renderMessages(),
+   558:       '  <main class="aicm-core-main">',
+   559:       content,
+   560:       '  </main>',
+   561:       '</div>'
+   562:     ].join("");
+   563:   }
+   564: 
+   565:   function renderMessages() {
+   566:     var parts = [];
+   567: 
+   568:     if (state.loading) {
+   569:       parts.push('<div class="aicm-core-message">読込中...</div>');
+   570:     }
+============================================================
+PATTERN=placement-new
+LINE=2856
+------------------------------------------------------------
+  2844:       return [
+  2845:         '<div class="aicm-action-list">',
+  2846:         '  <button type="button" data-core-action="go" data-screen="company-new">AI企業を作成</button>',
+  2847:         '</div>'
+  2848:       ].join("");
+  2849:     }
+  2850: 
+  2851:     return [
+  2852:       '<div class="aicm-action-list">',
+  2853:       '  <button type="button" data-core-action="go" data-screen="company-new">AI企業新規追加</button>',
+  2854:       '  <button type="button" data-core-action="go" data-screen="department-new">部門追加</button>',
+  2855:       departments.length > 0 ? '  <button type="button" data-core-action="go" data-screen="section-new">課追加</button>' : '  <button type="button" data-core-action="go" data-screen="department-new">先に部門を追加</button>',
+  2856:       '  <button type="button" data-core-action="go" data-screen="placement-new">Worker配置</button>',
+  2857:       '</div>',
+  2858:       '<p class="aicm-core-empty">編集・削除は次工程で追加します。</p>'
+  2859:     ].join("");
+  2860:   }
+  2861: 
+  2862: 
+  2863:   
+  2864: 
+  2865: 
+  2866: function renderTree(departments) {
+  2867:     if (departments.length === 0) {
+  2868:       return [
+  2869:         '<div class="aicm-empty-state">',
+  2870:         '  <strong>部門がまだありません</strong>',
+  2871:         '  <p>選択中のAI企業に部門を追加すると、ここに階層表示されます。</p>',
+  2872:         '  <div class="aicm-dashboard-action-row">',
+  2873:         '    <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2874:         '  </div>',
+  2875:         '</div>'
+  2876:       ].join("");
+  2877:     }
+  2878: 
+  2879:     return [
+  2880:       '<div class="aicm-tree-toolbar">',
+  2881:       '  <button type="button" data-core-action="go" data-screen="department-new">部門新規追加</button>',
+  2882:       '  <button type="button" data-core-action="go" data-screen="section-new">課新規追加</button>',
+  2883:       '</div>',
+  2884:       '<div class="aicm-org-tree">',
+  2885:       departments.map(function (department) {
+  2886:         var sections = departmentSections(department.aicm_user_company_department_id);
+  2887:         return [
+  2888:           '<article class="aicm-org-node">',
+============================================================
+PATTERN=placement-new
+LINE=8329
+------------------------------------------------------------
+  8317: 
+  8318: function render() {
+  8319:     if (!root) return;
+  8320: 
+  8321:     var html = "";
+  8322: 
+  8323:     if (state.screen === "company-new") {
+  8324:       html = renderCompanyNew();
+  8325:     } else if (state.screen === "department-new") {
+  8326:       html = renderDepartmentNew();
+  8327:     } else if (state.screen === "section-new") {
+  8328:       html = renderSectionNew();
+  8329:     } else if (state.screen === "placement-new") {
+  8330:       html = renderPlacementNew();
+  8331:     } else if (state.screen === "worker-runtime-confirm") {
+  8332:       // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+  8333:       html = renderWorkerRuntimeConfirm();
+  8334:     } else if (state.screen === "worker-runtime-request") {
+  8335:       html = renderWorkerRuntimeRequest();
+  8336:     } else if (state.screen === "settings") {
+  8337:       html = renderSettings();
+  8338:     } else if (state.screen === "department-edit") {
+  8339:       html = renderDepartmentEditPlaceholder();
+  8340:     } else if (state.screen === "section-edit") {
+  8341:       html = renderSectionEditPlaceholder();
+  8342:     } else if (state.screen === "ai-business-start") {
+  8343:       html = renderAicmBusinessStartScreen();
+  8344:     } else if (state.screen === "task-ledger") {
+  8345:       html = renderTaskLedgerPlaceholder();
+  8346:     } else if (state.screen === "review-list") {
+  8347:       html = (typeof window !== "undefined" && typeof window.aicmR8zV7RenderReviewList === "function" ? window.aicmR8zV7RenderReviewList(state) : renderReviewListPlaceholder()); // AICM_R8Z_V7_ROUTE_BRIDGE_CALL
+  8348:     } else {
+  8349:       html = renderDashboard();
+  8350:     }
+  8351: 
+  8352:     
+  8353:     // AICM_COMPANY_EDIT_RENDER_ROUTE_ASS_ASV
+  8354:     if (
+  8355:       state &&
+  8356:       (
+  8357:         state.screen === "company-edit" ||
+  8358:         state.screen === "company-change" ||
+  8359:         state.screen === "company-update"
+  8360:       )
+  8361:     ) {

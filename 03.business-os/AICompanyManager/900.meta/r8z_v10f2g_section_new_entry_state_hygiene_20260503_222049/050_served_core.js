@@ -2370,10 +2370,6 @@ function aicmAxoClearDraftAfterSuccessfulSave() {
   }
 
 function renderAicmWorkerInlineRows(fieldPrefix) {
-    if (typeof aicmR8zV10f4aIsSectionCreateScreen === "function" && aicmR8zV10f4aIsSectionCreateScreen()) {
-      return ""; // AICM_R8Z_V10F4A_REVIEW_LIST_COMMON_NAV_AND_SECTION_WORKER_SOURCE_GUARD_WORKER_GUARD_CALL
-    }
-
     // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
     var savedRows = typeof aicmAxnCurrentPlacements === "function" ? aicmAxnCurrentPlacements("worker") : [];
     var draft = state.aicmAxoFormDraft || {};
@@ -8367,71 +8363,6 @@ function renderAicmBusinessStartDashboardCard() {
     }
   }
   // AICM_R8Z_V10F2G_SECTION_NEW_ENTRY_STATE_HYGIENE_HELPER_END
-
-
-  // AICM_R8Z_V10F4A_REVIEW_LIST_COMMON_NAV_AND_SECTION_WORKER_SOURCE_GUARD_COMMON_NAV_START
-  function aicmR8zV10f4aText(value) {
-    return String(value === undefined || value === null ? "" : value).trim();
-  }
-
-  function aicmR8zV10f4aIsSectionCreateScreen() {
-    try {
-      if (typeof state !== "undefined" && state && state.screen === "section-new") return true;
-      if (typeof window !== "undefined" && window.state && window.state.screen === "section-new") return true;
-    } catch (_) {}
-    return false;
-  }
-
-  function aicmR8zV10f4aCommonNavHtml() {
-    return [
-      '<section id="aicm-v10f4a-common-screen-nav" class="aicm-core-card" style="border:2px solid #cbd5e1;background:#f8fafc;">',
-      '  <p class="aicm-eyebrow">AI企業運営アプリ</p>',
-      '  <h1>AI企業運営アプリ</h1>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
-      '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳</button>',
-      '  </div>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
-      '  </div>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
-      '  </div>',
-      '</section>'
-    ].join("");
-  }
-
-  function aicmR8zV10f4aInstallReviewListCommonNav() {
-    try {
-      if (typeof window === "undefined") return false;
-      if (typeof window.aicmR8zV7RenderReviewList !== "function") return false;
-      if (window.aicmR8zV7RenderReviewList.__aicmR8zV10f4aWrapped) return true;
-
-      var original = window.aicmR8zV7RenderReviewList;
-      var wrapped = function() {
-        var html = String(original.apply(this, arguments) || "");
-        html = html.replace(/<section id="aicm-v10f3b-review-list-back"[\s\S]*?<\/section>/g, "");
-        html = html.replace(/<section id="aicm-v10f3c-review-list-back-simple"[\s\S]*?<\/section>/g, "");
-        html = html.replace(/<section id="aicm-v10f3d-review-list-back-single"[\s\S]*?<\/section>/g, "");
-        html = html.replace(/<section id="aicm-v10f4a-common-screen-nav"[\s\S]*?<\/section>/g, "");
-        return aicmR8zV10f4aCommonNavHtml() + html;
-      };
-
-      wrapped.__aicmR8zV10f4aWrapped = true;
-      wrapped.__aicmR8zV10f4aOriginal = original;
-      window.aicmR8zV7RenderReviewList = wrapped;
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  (function aicmR8zV10f4aInstallCommonNavBootstrap() {
-    aicmR8zV10f4aInstallReviewListCommonNav();
-    setTimeout(aicmR8zV10f4aInstallReviewListCommonNav, 0);
-    setTimeout(aicmR8zV10f4aInstallReviewListCommonNav, 250);
-  })();
-  // AICM_R8Z_V10F4A_REVIEW_LIST_COMMON_NAV_AND_SECTION_WORKER_SOURCE_GUARD_COMMON_NAV_END
 function render() {
     if (!root) return;
 
@@ -12823,25 +12754,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         action === "review-v10f-preview-return"
       ) mode = "return";
 
-      
-      if (action === "review-v10f-back-list") {
-        if (event) {
-          try { event.preventDefault(); } catch (_) {}
-          try { event.stopPropagation(); } catch (_) {}
-          try { event.stopImmediatePropagation(); } catch (_) {}
-        }
-
-        removeExistingConfirm();
-        try {
-          var s = app();
-          s.screen = "review-list";
-          if (typeof render === "function") render();
-        } catch (_) {}
-        visibleDebug("back to review-list / id=" + id);
-        return true;
-      }
-
-if (action === "review-v10f-cancel-confirm") {
+      if (action === "review-v10f-cancel-confirm") {
         if (event) {
           try { event.preventDefault(); } catch (_) {}
           try { event.stopPropagation(); } catch (_) {}
@@ -13225,5 +13138,3 @@ if (action === "review-v10f-cancel-confirm") {
 
 // AICM_R8Z_V7_REVIEW_LIST_ROUTE_BRIDGE_END
 
-
-// AICM_R8Z_V10F3_REVIEW_CONFIRM_BACK_BUTTON_APPLIED
