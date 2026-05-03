@@ -169,3 +169,136 @@ SERVER_APPROVE_ROUTE_COUNT=1
 ============================================================
 6. git add / commit / push
 ============================================================
+[main 6931a1d] AICompanyManager: V10GC3J review return execution success
+ 18 files changed, 2202 insertions(+)
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3i_approve_success_20260504_065612/050_git_commit.out
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3i_approve_success_20260504_065612/060_git_push.out
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3i_approve_success_20260504_065612/070_git_status_after.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/000_GIT_CHECKPOINT_AFTER_V10GC3J_RETURN_SUCCESS_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/010_db_readonly_status.tsv
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/020_git_status_before.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/030_git_diff_stat.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/040_git_add.out
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v10gc3j2_return_click_server_isolate_20260504_065933/000_R8Z_V10GC3J2_RETURN_CLICK_SERVER_ISOLATE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v10gc3j2_return_click_server_isolate_20260504_065933/010_db_pending_target_readonly.tsv
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v10gc3j2_return_click_server_isolate_20260504_065933/020_server_log_return_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v10gc3j2_return_click_server_isolate_20260504_065933/030_core_return_execute_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v10gc3j2_return_click_server_isolate_20260504_065933/040_server_return_route_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v10gc3j2_return_click_server_isolate_20260504_065933/050_classification.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v10gc3j_return_result_readonly_check_20260504_065735/000_R8Z_V10GC3J_RETURN_RESULT_READONLY_CHECK_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v10gc3j_return_result_readonly_check_20260504_065735/010_db_return_result.tsv
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v10gc3j_return_result_readonly_check_20260504_065735/020_latest_server_log_tail.txt
+To github.com:lsassetmng-art/03.civilization-development.git
+   ae5e770..6931a1d  main -> main
+
+============================================================
+7. git status after
+============================================================
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/civilization-auth/mock-bridge-adapter.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/civilization-auth/mock-session.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/mock-server/admin-store.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/mock-server/auth-mock.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/mock-server/launch-mock.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/os-launch/evaluate-os-entry.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/portal-api/admin-client.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/portal-api/auth-client.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/portal-api/content-client.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/types/bridge.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/types/portal-admin-api.ts
+ M 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/000_GIT_CHECKPOINT_AFTER_V10GC3J_RETURN_SUCCESS_REPORT.md
+?? 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/.backup/20260428_181520_compat_pass_b/
+?? 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/.backup/20260429_051353_compat_pass_c_missing_build_exports/
+?? 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/050_git_commit.out
+?? 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/060_git_push.out
+?? 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/070_git_status_after.txt
+?? 03.business-os/CasualChatWorker/docs/final/20260426_052059_CASUAL_CHAT_WORKER_FINAL_OUTPUT_INDEX.md
+?? 03.business-os/CasualChatWorker/docs/final/20260426_052059_CASUAL_CHAT_WORKER_PHASE_P_CLOSEOUT.md
+?? 03.business-os/CasualChatWorker/docs/final/20260426_055128_CASUAL_CHAT_WORKER_FINAL_ARTIFACT_MANIFEST.md
+?? 03.business-os/CasualChatWorker/docs/final/20260426_055128_CASUAL_CHAT_WORKER_POST_CLOSEOUT_FINAL_QUALITY_GATE.md
+?? 03.business-os/CasualChatWorker/docs/final/20260426_211334_CASUAL_CHAT_WORKER_DB_BACKED_PAYLOAD_ACCEPTANCE_GATE.md
+?? 03.business-os/CasualChatWorker/docs/final/CASUAL_CHAT_WORKER_IMPLEMENTATION_PREPARED_COMPLETION_MARKER.md
+?? 03.business-os/CasualChatWorker/docs/final/LATEST_CASUAL_CHAT_WORKER_FINAL_ARTIFACT_MANIFEST.md
+?? 03.business-os/CasualChatWorker/docs/final/LATEST_CASUAL_CHAT_WORKER_FINAL_OUTPUT_INDEX.md
+?? 03.business-os/CasualChatWorker/docs/final/LATEST_CASUAL_CHAT_WORKER_POST_CLOSEOUT_FINAL_QUALITY_GATE.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_052059_CASUAL_CHAT_WORKER_FINAL_EXPORT_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_055128_CASUAL_CHAT_WORKER_EXPORT_INDEX_FOR_NEXT_CHAT.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_105214_PERSONA_DB_LIVE_ROLLBACK_GATE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_105505_PERSONA_DB_CONTRACT_QUOTE_CONFIRM_ROLLBACK_SMOKE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_110851_PERSONA_DB_CONFIRM_ROLLBACK_SMOKE_FIX_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_200008_PERSONA_DB_CONFIRM_ROLLBACK_SMOKE_SEQUENTIAL_FIX_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_211334_PERSONA_DB_BACKED_PAYLOAD_ACCEPTANCE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_CASUAL_CHAT_WORKER_EXPORT_INDEX_FOR_NEXT_CHAT.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_CASUAL_CHAT_WORKER_FINAL_EXPORT_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_BACKED_PAYLOAD_ACCEPTANCE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_CONFIRM_ROLLBACK_SMOKE_FIX_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_CONFIRM_ROLLBACK_SMOKE_SEQUENTIAL_FIX_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_CONTRACT_QUOTE_CONFIRM_ROLLBACK_SMOKE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_LIVE_ROLLBACK_GATE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_052059_phase_p_closeout_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_055128_post_closeout_final_quality_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_105214_persona_db_live_rollback_gate_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_105505_persona_db_contract_quote_confirm_rollback_smoke_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_110851_persona_db_confirm_rollback_smoke_fix_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_200008_persona_db_confirm_rollback_smoke_sequential_fix_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_211334_persona_db_backed_payload_acceptance_report.md
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_052059_phase_p_closeout_verify.md
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_055128_post_closeout_final_quality_gate/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_105214_persona_db_live_rollback_gate/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_105505_persona_db_contract_quote_confirm_rollback_smoke/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_110851_persona_db_confirm_rollback_smoke_fix_ambiguous/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_200008_persona_db_confirm_rollback_smoke_sequential_fix/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_211334_persona_db_backed_payload_acceptance/
+?? 03.business-os/RobotRentalStore/
+?? 03.business-os/_aiworker/
+?? 03.business-os/_businessos/
+?? 09.CX22073JW/logs/20260428_074430_robot_role_knowledge_registration/
+?? 11.aiworker-os/brain-access-integration/
+?? 11.aiworker-os/brain-data-thickening/
+?? 11.aiworker-os/robot-capability-profile/
+?? 11.aiworker-os/robot-catalog-fix/
+?? 11.aiworker-os/robot-list/
+?? 11.aiworker-os/runtime-brain-context/
+?? 11.aiworker-os/runtime-control-profile/
+?? 11.aiworker-os/runtime-execution-app-api/
+?? 11.aiworker-os/runtime-execution-complete/
+?? 11.aiworker-os/runtime-execution-http-api/
+?? 11.aiworker-os/runtime-execution-request/
+
+============================================================
+8. final
+============================================================
+FINAL_JUDGEMENT=GIT_CHECKPOINT_AFTER_V10GC3J_RETURN_SUCCESS_DONE
+APPROVE_STATUS=approved
+RETURN_STATUS=returned
+PENDING_TABLE_COUNT=0
+PENDING_VIEW_COUNT=0
+APPROVED_TABLE_COUNT=1
+RETURNED_TABLE_COUNT=1
+REMAINING_PENDING_IDS=
+V10GC2B_MARKER_COUNT=0
+V10GC2J_MARKER_COUNT=0
+V10GC3G_MARKER_COUNT=0
+V10GC3I_MARKER_COUNT=2
+DISABLED_NEXT_BUTTON_COUNT=0
+NEXT_STEP_LABEL_COUNT=0
+CANONICAL_ACTION_COUNT=2
+RETURN_ROUTE_COUNT=2
+APPROVE_ROUTE_COUNT=2
+OWNER_ATTR_COUNT=2
+REVIEWER_ATTR_COUNT=2
+SERVER_RETURN_ROUTE_COUNT=1
+SERVER_APPROVE_ROUTE_COUNT=1
+COMMIT_STATUS=COMMITTED
+COMMIT_HASH=6931a1d
+PUSH_RESULT=PUSH_OK
+REPORT=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc3j_return_success_20260504_070034/000_GIT_CHECKPOINT_AFTER_V10GC3J_RETURN_SUCCESS_REPORT.md
+DB_WRITE=NO
+API_POST=NO
+PATCH=NO
+GIT_COMMIT=YES
+GIT_PUSH=YES
+
+NEXT:
+- レビュー・承認待ち一覧の承認/差し戻し実行は完了
+- 次は画面上の pending 0件表示確認
+- その後、不要な一時debug/過去run成果物を残すか整理方針を決める

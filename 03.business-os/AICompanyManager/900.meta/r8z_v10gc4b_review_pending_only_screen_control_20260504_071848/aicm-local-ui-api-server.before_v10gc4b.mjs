@@ -2190,7 +2190,7 @@ if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
     }
 
 if (route === "/api/aicm/v2/context" && req.method === "GET") {
-      sendJson(res, 200, aicmR8zV10gc4bFilterPendingReviewContext(getContext(url.searchParams.get("owner_civilization_id") || "")));
+      sendJson(res, 200, getContext(url.searchParams.get("owner_civilization_id") || ""));
       return true;
     }
 
@@ -2321,60 +2321,3 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, "127.0.0.1", () => {
   console.log("AICompanyManager clean v2 API server candidate listening on http://127.0.0.1:" + PORT);
 });
-
-
-// AICM_R8Z_V10GC4B_REVIEW_PENDING_ONLY_CONTEXT_FILTER_START
-// Review wait context must expose pending items only.
-// This is a presentation/context filter; it does not modify DB state.
-function aicmR8zV10gc4bIsReviewWaitRow(row) {
-  return !!(row && typeof row === "object" && (
-    Object.prototype.hasOwnProperty.call(row, "aicm_human_review_item_id") ||
-    Object.prototype.hasOwnProperty.call(row, "human_review_status_code") ||
-    Object.prototype.hasOwnProperty.call(row, "review_kind_code") ||
-    Object.prototype.hasOwnProperty.call(row, "artifact_kind_code")
-  ));
-}
-
-function aicmR8zV10gc4bReviewStatus(row) {
-  return String(
-    row && (
-      row.human_review_status_code ||
-      row.review_status ||
-      row.status_code ||
-      row.status ||
-      ""
-    ) || ""
-  ).trim();
-}
-
-function aicmR8zV10gc4bFilterReviewWaitArray(rows) {
-  if (!Array.isArray(rows)) return rows;
-
-  var hasReviewRows = rows.some(aicmR8zV10gc4bIsReviewWaitRow);
-  if (!hasReviewRows) return rows;
-
-  return rows.filter(function(row) {
-    return aicmR8zV10gc4bReviewStatus(row) === "pending";
-  });
-}
-
-function aicmR8zV10gc4bFilterPendingReviewContext(value) {
-  if (!value || typeof value !== "object") return value;
-
-  if (Array.isArray(value)) {
-    return aicmR8zV10gc4bFilterReviewWaitArray(value).map(aicmR8zV10gc4bFilterPendingReviewContext);
-  }
-
-  Object.keys(value).forEach(function(key) {
-    var child = value[key];
-
-    if (Array.isArray(child)) {
-      value[key] = aicmR8zV10gc4bFilterReviewWaitArray(child).map(aicmR8zV10gc4bFilterPendingReviewContext);
-    } else if (child && typeof child === "object") {
-      value[key] = aicmR8zV10gc4bFilterPendingReviewContext(child);
-    }
-  });
-
-  return value;
-}
-// AICM_R8Z_V10GC4B_REVIEW_PENDING_ONLY_CONTEXT_FILTER_END

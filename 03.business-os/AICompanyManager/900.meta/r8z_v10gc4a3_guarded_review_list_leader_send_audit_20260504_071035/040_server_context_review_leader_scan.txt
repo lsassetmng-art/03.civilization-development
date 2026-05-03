@@ -1,0 +1,607 @@
+SERVER_REVIEW_VIEW_COUNT=1
+SERVER_REVIEW_PENDING_FILTER_COUNT=
+SERVER_REVIEW_CONTEXT_LINE=798
+SERVER_LEADER_ROUTE_COUNT=36
+SERVER_MANAGER_MAJOR_COUNT=0
+SERVER_LEDGER_COUNT=0
+SERVER_BULK_COUNT=0
+
+---- review view usage ----
+768-    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+769-    "  ),",
+770-    "  'pmlw_major_items', (",
+771-    "    SELECT COALESCE(jsonb_agg(to_jsonb(m) ORDER BY m.display_order ASC, m.updated_at DESC, m.created_at DESC), '[]'::jsonb)",
+772-    "    FROM business.vw_aicm_pmlw_major_work_display m",
+773-    "    WHERE m.owner_civilization_id::text = " + sqlLiteral(owner),
+774-    "  ),",
+775-    "  'pmlw_middle_items', (",
+776-    "    SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY l.display_order ASC, l.updated_at DESC, l.created_at DESC), '[]'::jsonb)",
+777-    "    FROM business.vw_aicm_pmlw_leader_middle_display l",
+778-    "    WHERE l.owner_civilization_id::text = " + sqlLiteral(owner),
+779-    "  ),",
+780-    "  'pmlw_deliverable_requirements', (",
+781-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.display_order ASC, r.updated_at DESC, r.created_at DESC), '[]'::jsonb)",
+782-    "    FROM business.vw_aicm_pmlw_deliverable_requirement_display r",
+783-    "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+784-    "  ),",
+785-    "  'pmlw_worker_work_units', (",
+786-    "    SELECT COALESCE(jsonb_agg(to_jsonb(w) ORDER BY w.display_order ASC, w.updated_at DESC, w.created_at DESC), '[]'::jsonb)",
+787-    "    FROM business.vw_aicm_pmlw_worker_work_unit_display w",
+788-    "    WHERE w.owner_civilization_id::text = " + sqlLiteral(owner),
+789-    "  ),",
+790-    "  'pmlw_workflow_tree', (",
+791-    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.last_updated_at DESC NULLS LAST), '[]'::jsonb)",
+792-    "    FROM business.vw_aicm_pmlw_workflow_tree t",
+793-    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+794-    "  ),",
+795-    // AICM_HUMAN_REVIEW_QUEUE_ARN_ARQ_V1_CONTEXT
+796-    "  'review_wait_items', (",
+797-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.priority_code DESC, r.requested_at DESC, r.created_at DESC), '[]'::jsonb)",
+798:    "    FROM business.vw_aicm_human_review_wait_display r",
+799-    "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+800-    "  ),",
+801-    "  'robot_catalog', (",
+802-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.aiworker_model_code), '[]'::jsonb)",
+803-    "    FROM business.vw_ai_company_manager_system_robot_selector_options r",
+804-    "  )",
+805-    ")::text;"
+806-  ].join("\n");
+807-
+808-  return runPsqlJson(sql);
+809-}
+810-
+811-function createCompany(body) {
+812-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+813-  const name = requiredText(body.company_name, "company_name");
+814-  const domain = String(body.business_domain || "");
+815-
+816-  const sql = [
+817-    "WITH inserted AS (",
+818-    "  INSERT INTO business.aicm_user_company (",
+819-    "    owner_civilization_id, company_name, business_domain, company_status, selected_flag",
+820-    "  ) VALUES (",
+821-    "    " + sqlLiteral(owner) + "::uuid,",
+822-    "    " + sqlLiteral(name) + ",",
+823-    "    " + sqlLiteral(domain) + ",",
+824-    "    'active',",
+825-    "    true",
+826-    "  )",
+827-    "  RETURNING *",
+828-    ")",
+829-    "SELECT jsonb_build_object(",
+830-    "  'result', 'ok',",
+831-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+832-    "  'company', to_jsonb(inserted)",
+833-    ")::text",
+834-    "FROM inserted;"
+835-  ].join("\n");
+836-
+837-  return runPsqlJson(sql);
+838-}
+839-
+840-function createDepartment(body) {
+841-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+842-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+843-  const name = requiredText(body.department_name, "department_name");
+
+---- leader / ledger / manager-major usage ----
+175-  return sqlLiteral(String(value || ""));
+176-}
+177-
+178-function aicmPmlwOptionalUuidSql(value) {
+179-  const text = String(value || "").trim();
+180-  return text ? sqlLiteral(text) + "::uuid" : "NULL";
+181-}
+182-
+183-function aicmPmlwOptionalDateSql(value) {
+184-  // AICM_AXU_CSV_R5H_DUE_DATE_HELPER_REPAIR_V1
+185-  const text = String(value == null ? "" : value).trim();
+186-
+187-  if (!text) {
+188-    return "NULL::date";
+189-  }
+190-
+191-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+192-    throw new Error("due_date は YYYY-MM-DD または空欄にしてください: " + text);
+193-  }
+194-
+195-  return sqlLiteral(text) + "::date";
+196-}
+197-
+198-function aicmPmlwPriority(value) {
+199-  const text = String(value || "normal").trim();
+200-  return ["low", "normal", "high", "urgent"].includes(text) ? text : "normal";
+201-}
+202-
+203-function aicmPmlwMajorStatus(value) {
+204-  const text = String(value || "not_started").trim();
+205:  return ["not_started", "assigned_to_leader", "leader_decomposing", "decomposed", "returned", "archived"].includes(text) ? text : "not_started";
+206-}
+207-
+208-function aicmPmlwHandoffStatus(value) {
+209-  const text = String(value || "draft").trim();
+210-  return ["draft", "ready_handoff", "handed_off", "accepted", "completed", "archived"].includes(text) ? text : "draft";
+211-}
+212-
+213-function aicmPmlwCsvRows(body) {
+214-  const rows = Array.isArray(body.rows) ? body.rows : [];
+215-  return rows.slice(0, 300).map((row) => {
+216-    const majorName = aicmPmlwOptionalText(
+217-      row.major_item_name ||
+218-      row.major_name ||
+219-      row.deliverable_name ||
+220-      row.task_name ||
+221-      row.title
+222-    );
+223-
+224-    return {
+225-      department_name: aicmPmlwOptionalText(row.department_name),
+226-      section_name: aicmPmlwOptionalText(row.section_name),
+227-      major_item_name: majorName,
+228-      major_item_description: aicmPmlwOptionalText(row.major_item_description || row.description || row.task_name || row.note),
+229:      assigned_leader_label: aicmPmlwOptionalText(row.assigned_leader_label || row.leader_label || row.responsible_role_code),
+230-      priority_code: aicmPmlwPriority(row.priority_code),
+231-      due_date: aicmPmlwOptionalText(row.due_date),
+232-      note: aicmPmlwOptionalText(row.note)
+233-    };
+234-  }).filter((row) => row.major_item_name.length > 0);
+235-}
+236-
+237-function createPresidentPolicy(body) {
+238-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+239-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+240-  const title = requiredText(body.policy_title || body.title, "policy_title");
+241-  const text = requiredText(body.policy_text || body.president_policy_instruction_text || body.description, "policy_text");
+242-
+243-  const sql = [
+244-    "WITH inserted AS (",
+245-    "  INSERT INTO business.aicm_president_policy (",
+246-    "    owner_civilization_id, aicm_user_company_id, source_route_code, policy_title, policy_text,",
+247-    "    president_robot_label, requested_by_text, company_common_rules_snapshot,",
+248-    "    policy_status_code, priority_code, due_date,",
+249-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+250-    "  ) VALUES (",
+251-    "    " + sqlLiteral(owner) + "::uuid,",
+252-    "    " + sqlLiteral(companyId) + "::uuid,",
+253-    "    " + sqlLiteral(body.source_route_code || "user_to_president") + ",",
+254-    "    " + sqlLiteral(title) + ",",
+255-    "    " + sqlLiteral(text) + ",",
+256-    "    " + aicmPmlwTextSql(body.president_robot_label) + ",",
+257-    "    " + aicmPmlwTextSql(body.requested_by_text || "user") + ",",
+258-    "    " + aicmPmlwTextSql(body.company_common_rules_snapshot) + ",",
+259-    "    " + sqlLiteral(body.policy_status_code || "submitted") + ",",
+260-    "    " + sqlLiteral(aicmPmlwPriority(body.priority_code)) + ",",
+261-    "    " + aicmPmlwOptionalDateSql(body.due_date) + ",",
+262-    "    " + aicmPmlwTextSql(body.reference_files_text) + ",",
+263-    "    " + aicmPmlwTextSql(body.supplemental_materials_text) + ",",
+264-    "    " + aicmPmlwTextSql(body.applicable_rules_text) + ",",
+265-    "    " + aicmPmlwTextSql(body.note) + ",",
+266-    "    " + aicmPmlwTextSql(body.handoff_link),
+267-    "  )",
+268-    "  RETURNING *",
+269-    ")",
+270-    "SELECT jsonb_build_object(",
+271-    "  'result', 'ok',",
+272-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+273-    "  'president_policy', to_jsonb(inserted)",
+274-    ")::text",
+275-    "FROM inserted;"
+276-  ].join("\n");
+277-
+278-  return runPsqlJson(sql);
+279-}
+280-
+281-function createManagerMajorItem(body) {
+282-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+283-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+284-  const majorName = requiredText(body.major_item_name || body.deliverable_name || body.task_name, "major_item_name");
+285-
+286-  const sql = [
+287-    "WITH inserted AS (",
+288:    "  INSERT INTO business.aicm_manager_major_work_item (",
+289-    "    owner_civilization_id, aicm_user_company_id, aicm_president_policy_id,",
+290-    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+291-    "    major_item_name, major_item_description, source_route_code,",
+292:    "    manager_robot_label, assigned_leader_label,",
+293-    "    decomposition_status_code, handoff_status_code, priority_code, due_date,",
+294-    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+295-    "  ) VALUES (",
+296-    "    " + sqlLiteral(owner) + "::uuid,",
+297-    "    " + sqlLiteral(companyId) + "::uuid,",
+298-    "    " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id) + ",",
+299-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+300-    "    " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+301-    "    " + sqlLiteral(majorName) + ",",
+302-    "    " + aicmPmlwTextSql(body.major_item_description || body.description || body.note) + ",",
+303-    "    " + sqlLiteral(body.source_route_code || "manual") + ",",
+304-    "    " + aicmPmlwTextSql(body.manager_robot_label) + ",",
+305:    "    " + aicmPmlwTextSql(body.assigned_leader_label) + ",",
+306-    "    " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)) + ",",
+307-    "    " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)) + ",",
+308-    "    " + sqlLiteral(aicmPmlwPriority(body.priority_code)) + ",",
+309-    "    " + aicmPmlwOptionalDateSql(body.due_date) + ",",
+310-    "    " + aicmPmlwTextSql(body.reference_files_text) + ",",
+311-    "    " + aicmPmlwTextSql(body.supplemental_materials_text) + ",",
+312-    "    " + aicmPmlwTextSql(body.applicable_rules_text) + ",",
+313-    "    " + aicmPmlwTextSql(body.note) + ",",
+314-    "    " + aicmPmlwTextSql(body.handoff_link),
+315-    "  )",
+316-    "  RETURNING *",
+317-    ")",
+318-    "SELECT jsonb_build_object(",
+319-    "  'result', 'ok',",
+320-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+321:    "  'manager_major_item', to_jsonb(inserted)",
+322-    ")::text",
+323-    "FROM inserted;"
+324-  ].join("\n");
+325-
+326-  return runPsqlJson(sql);
+327-}
+328-
+329-function updateManagerMajorItem(body) {
+330-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+331:  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+332-  const updates = [];
+333-
+334-  if (body.major_item_name !== undefined) updates.push("major_item_name = " + sqlLiteral(String(body.major_item_name || "").trim()));
+335-  if (body.major_item_description !== undefined) updates.push("major_item_description = " + aicmPmlwTextSql(body.major_item_description));
+336-  if (body.aicm_president_policy_id !== undefined) updates.push("aicm_president_policy_id = " + aicmPmlwOptionalUuidSql(body.aicm_president_policy_id));
+337-  if (body.aicm_user_company_department_id !== undefined) updates.push("aicm_user_company_department_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_department_id));
+338-  if (body.aicm_user_company_section_id !== undefined) updates.push("aicm_user_company_section_id = " + aicmPmlwOptionalUuidSql(body.aicm_user_company_section_id));
+339-  if (body.manager_robot_label !== undefined) updates.push("manager_robot_label = " + aicmPmlwTextSql(body.manager_robot_label));
+340:  if (body.assigned_leader_label !== undefined) updates.push("assigned_leader_label = " + aicmPmlwTextSql(body.assigned_leader_label));
+341-  if (body.decomposition_status_code !== undefined) updates.push("decomposition_status_code = " + sqlLiteral(aicmPmlwMajorStatus(body.decomposition_status_code)));
+342-  if (body.handoff_status_code !== undefined) updates.push("handoff_status_code = " + sqlLiteral(aicmPmlwHandoffStatus(body.handoff_status_code)));
+343-  if (body.priority_code !== undefined) updates.push("priority_code = " + sqlLiteral(aicmPmlwPriority(body.priority_code)));
+344-  if (body.due_date !== undefined) updates.push("due_date = " + aicmPmlwOptionalDateSql(body.due_date));
+345-  if (body.reference_files_text !== undefined) updates.push("reference_files_text = " + aicmPmlwTextSql(body.reference_files_text));
+346-  if (body.supplemental_materials_text !== undefined) updates.push("supplemental_materials_text = " + aicmPmlwTextSql(body.supplemental_materials_text));
+347-  if (body.applicable_rules_text !== undefined) updates.push("applicable_rules_text = " + aicmPmlwTextSql(body.applicable_rules_text));
+348-  if (body.note !== undefined) updates.push("note = " + aicmPmlwTextSql(body.note));
+349-  if (body.handoff_link !== undefined) updates.push("handoff_link = " + aicmPmlwTextSql(body.handoff_link));
+350-
+351-  updates.push("updated_at = now()");
+352-
+353-  const sql = [
+354-    "WITH updated AS (",
+355:    "  UPDATE business.aicm_manager_major_work_item",
+356-    "  SET " + updates.join(", "),
+357:    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+358-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+359-    "  RETURNING *",
+360-    ")",
+361-    "SELECT jsonb_build_object(",
+362-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+363-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+364:    "  'manager_major_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+365-    ")::text;"
+366-  ].join("\n");
+367-
+368-  return runPsqlJson(sql);
+369-}
+370-
+371-function archiveManagerMajorItem(body) {
+372-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+373:  const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
+374-
+375-  const sql = [
+376-    "WITH archived AS (",
+377:    "  UPDATE business.aicm_manager_major_work_item",
+378-    "  SET decomposition_status_code = 'archived',",
+379-    "      handoff_status_code = 'archived',",
+380-    "      updated_at = now()",
+381:    "  WHERE aicm_manager_major_work_item_id = " + sqlLiteral(majorId) + "::uuid",
+382-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+383-    "  RETURNING *",
+384-    ")",
+385-    "SELECT jsonb_build_object(",
+386-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM archived) THEN 'ok' ELSE 'not_found' END,",
+387-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+388:    "  'manager_major_item', COALESCE((SELECT to_jsonb(archived) FROM archived), '{}'::jsonb)",
+389-    ")::text;"
+390-  ].join("\n");
+391-
+392-  return runPsqlJson(sql);
+393-}
+394-
+395-function importManagerMajorItemsCsv(body) {
+396-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+397-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+398-  const rows = aicmPmlwCsvRows(body);
+399-
+400-  if (rows.length === 0) {
+401:    return { result: "ok", api_identifier: SERVER_MARK, inserted_count: 0, manager_major_items: [] };
+402-  }
+403-
+404-  const values = rows.map((row, index) => [
+405-    "(",
+406-    index,
+407-    ", " + sqlLiteral(owner) + "::uuid",
+408-    ", " + sqlLiteral(companyId) + "::uuid",
+409-    ", " + sqlLiteral(row.department_name),
+410-    ", " + sqlLiteral(row.section_name),
+411-    ", " + sqlLiteral(row.major_item_name),
+412-    ", " + sqlLiteral(row.major_item_description),
+413:    ", " + sqlLiteral(row.assigned_leader_label),
+414-    ", " + sqlLiteral(row.priority_code),
+415-    ", " + aicmPmlwOptionalDateSql(row.due_date),
+416-    ", " + sqlLiteral(row.note),
+417-    ")"
+418-  ].join("")).join(",\n    ");
+419-
+420-  const sql = [
+421:    "WITH input_rows(row_order, owner_civilization_id, aicm_user_company_id, department_name, section_name, major_item_name, major_item_description, assigned_leader_label, priority_code, due_date, note) AS (",
+422-    "  VALUES",
+423-    "    " + values,
+424-    "), resolved AS (",
+425-    "  SELECT i.*, (",
+426-    "    SELECT d.aicm_user_company_department_id",
+427-    "    FROM business.aicm_user_company_department d",
+428-    "    WHERE d.owner_civilization_id = i.owner_civilization_id",
+429-    "      AND d.aicm_user_company_id = i.aicm_user_company_id",
+430-    "      AND d.department_status = 'active'",
+431-    "      AND (i.department_name = '' OR d.department_name = i.department_name)",
+432-    "    ORDER BY CASE WHEN d.department_name = i.department_name THEN 0 ELSE 1 END, d.display_order, d.created_at",
+433-    "    LIMIT 1",
+434-    "  ) AS department_id",
+435-    "  FROM input_rows i",
+436-    "), resolved_section AS (",
+437-    "  SELECT r.*, (",
+438-    "    SELECT s.aicm_user_company_section_id",
+439-    "    FROM business.aicm_user_company_section s",
+440-    "    WHERE s.owner_civilization_id = r.owner_civilization_id",
+441-    "      AND s.aicm_user_company_id = r.aicm_user_company_id",
+442-    "      AND s.section_status = 'active'",
+443-    "      AND (r.department_id IS NULL OR s.aicm_user_company_department_id = r.department_id)",
+444-    "      AND (r.section_name = '' OR s.section_name = r.section_name)",
+445-    "    ORDER BY CASE WHEN s.section_name = r.section_name THEN 0 ELSE 1 END, s.display_order, s.created_at",
+446-    "    LIMIT 1",
+447-    "  ) AS section_id",
+448-    "  FROM resolved r",
+449-    "), inserted AS (",
+450:    "  INSERT INTO business.aicm_manager_major_work_item (",
+451-    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+452:    "    major_item_name, major_item_description, source_route_code, assigned_leader_label,",
+453-    "    decomposition_status_code, handoff_status_code, priority_code, due_date, note, display_order",
+454-    "  )",
+455-    "  SELECT owner_civilization_id, aicm_user_company_id, department_id, section_id,",
+456:    "         major_item_name, major_item_description, 'csv_import', assigned_leader_label,",
+457-    "         'not_started', 'draft', priority_code, due_date, note, 100 + row_order",
+458-    "  FROM resolved_section",
+459-    "  RETURNING *",
+460-    ")",
+461-    "SELECT jsonb_build_object(",
+462-    "  'result', 'ok',",
+463-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+464-    "  'inserted_count', (SELECT count(*) FROM inserted),",
+465:    "  'manager_major_items', COALESCE((SELECT jsonb_agg(to_jsonb(inserted) ORDER BY display_order, created_at) FROM inserted), '[]'::jsonb)",
+466-    ")::text;"
+467-  ].join("\n");
+468-
+469-  return runPsqlJson(sql);
+470-}
+471-
+472-
+473-
+474-// AICM_HUMAN_REVIEW_QUEUE_ARN_ARQ_V1
+475-// Human review queue functions.
+476-// Human review is limited to delivery summaries and exception summaries.
+477-// AI review remains internal; only ai_review_result_text summary is shown.
+478-
+479-function aicmHumanReviewOptionalText(value) {
+480-  return String(value || "").trim();
+481-}
+482-
+483-function aicmHumanReviewTextSql(value) {
+484-  return sqlLiteral(String(value || ""));
+485-}
+486-
+487-function aicmHumanReviewOptionalUuidSql(value) {
+488-  const text = String(value || "").trim();
+489-  return text ? sqlLiteral(text) + "::uuid" : "NULL";
+490-}
+491-
+492-function aicmHumanReviewOptionalDateSql(value) {
+493-  const text = String(value || "").trim();
+494-  return /^\\d{4}-\\d{2}-\\d{2}$/.test(text) ? sqlLiteral(text) + "::date" : "NULL";
+495-}
+496-
+497-function aicmHumanReviewKind(value) {
+498-  const text = String(value || "delivery_summary").trim();
+499-  return [
+500-    "design_delivery_summary",
+501-    "implementation_delivery_summary",
+502-    "exception_review",
+503-    "final_delivery_summary",
+504-    "delivery_summary"
+505-  ].includes(text) ? text : "delivery_summary";
+506-}
+507-
+508-function aicmHumanReviewArtifactKind(value) {
+509-  const text = String(value || "design_doc").trim();
+510-  return ["design_doc", "implementation", "exception", "delivery_package", "handoff"].includes(text) ? text : "design_doc";
+511-}
+512-
+513-function aicmHumanReviewPriority(value) {
+514-  const text = String(value || "normal").trim();
+515-  return ["low", "normal", "high", "urgent"].includes(text) ? text : "normal";
+516-}
+517-
+518-function createHumanReviewItem(body) {
+519-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+520-  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+521-  const title = requiredText(body.review_title || body.title, "review_title");
+522-
+523-  const sql = [
+524-    "WITH inserted AS (",
+525-    "  INSERT INTO business.aicm_human_review_item (",
+526-    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+527:    "    related_president_policy_id, related_manager_major_work_item_id, related_leader_middle_work_item_id,",
+528:    "    related_deliverable_requirement_id, related_worker_work_unit_id,",
+529-    "    review_kind_code, artifact_kind_code, review_title,",
+530-    "    delivery_summary_text, main_changes_text, ai_review_result_text, unresolved_issues_text, artifact_link,",
+531-    "    responsible_ai_label, requested_by_ai_label, human_review_status_code, priority_code, due_date,",
+532-    "    display_order, metadata_jsonb",
+533-    "  ) VALUES (",
+534-    "    " + sqlLiteral(owner) + "::uuid,",
+535-    "    " + sqlLiteral(companyId) + "::uuid,",
+536-    "    " + aicmHumanReviewOptionalUuidSql(body.aicm_user_company_department_id) + ",",
+537-    "    " + aicmHumanReviewOptionalUuidSql(body.aicm_user_company_section_id) + ",",
+538-    "    " + aicmHumanReviewOptionalUuidSql(body.related_president_policy_id) + ",",
+539:    "    " + aicmHumanReviewOptionalUuidSql(body.related_manager_major_work_item_id) + ",",
+540:    "    " + aicmHumanReviewOptionalUuidSql(body.related_leader_middle_work_item_id) + ",",
+541-    "    " + aicmHumanReviewOptionalUuidSql(body.related_deliverable_requirement_id) + ",",
+542:    "    " + aicmHumanReviewOptionalUuidSql(body.related_worker_work_unit_id) + ",",
+543-    "    " + sqlLiteral(aicmHumanReviewKind(body.review_kind_code)) + ",",
+544-    "    " + sqlLiteral(aicmHumanReviewArtifactKind(body.artifact_kind_code)) + ",",
+545-    "    " + sqlLiteral(title) + ",",
+546-    "    " + aicmHumanReviewTextSql(body.delivery_summary_text) + ",",
+547-    "    " + aicmHumanReviewTextSql(body.main_changes_text) + ",",
+548-    "    " + aicmHumanReviewTextSql(body.ai_review_result_text) + ",",
+549-    "    " + aicmHumanReviewTextSql(body.unresolved_issues_text) + ",",
+550-    "    " + aicmHumanReviewTextSql(body.artifact_link) + ",",
+551-    "    " + aicmHumanReviewTextSql(body.responsible_ai_label) + ",",
+552-    "    " + aicmHumanReviewTextSql(body.requested_by_ai_label) + ",",
+553-    "    'pending',",
+554-    "    " + sqlLiteral(aicmHumanReviewPriority(body.priority_code)) + ",",
+555-    "    " + aicmHumanReviewOptionalDateSql(body.due_date) + ",",
+556-    "    COALESCE(NULLIF(" + sqlLiteral(String(body.display_order || "")) + ", '')::integer, 100),",
+557-    "    '{}'::jsonb",
+558-    "  )",
+559-    "  RETURNING *",
+560-    ")",
+561-    "SELECT jsonb_build_object(",
+562-    "  'result', 'ok',",
+563-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+564-    "  'human_review_item', to_jsonb(inserted)",
+565-    ")::text",
+566-    "FROM inserted;"
+567-  ].join("\n");
+568-
+569-  return runPsqlJson(sql);
+570-}
+571-
+572-function approveHumanReviewItem(body) {
+573-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+574-  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+575-
+576-  const sql = [
+577-    "WITH updated AS (",
+578-    "  UPDATE business.aicm_human_review_item",
+579-    "  SET human_review_status_code = 'approved',",
+580-    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+581-    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+582-    "      reviewed_at = now(),",
+583-    "      updated_at = now()",
+584-    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+585-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+586-    "  RETURNING *",
+587-    ")",
+588-    "SELECT jsonb_build_object(",
+589-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+590-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+591-    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+592-    ")::text;"
+593-  ].join("\n");
+594-
+595-  return runPsqlJson(sql);
+596-}
+597-
+598-function returnHumanReviewItem(body) {
+599-  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+600-  const reviewId = requiredUuid(body.aicm_human_review_item_id, "aicm_human_review_item_id");
+601-
+602-  const sql = [
+603-    "WITH updated AS (",
+604-    "  UPDATE business.aicm_human_review_item",
+605-    "  SET human_review_status_code = 'returned',",
+606-    "      human_reviewer_label = " + aicmHumanReviewTextSql(body.human_reviewer_label || "user") + ",",
+607-    "      human_review_note = " + aicmHumanReviewTextSql(body.human_review_note) + ",",
+608-    "      reviewed_at = now(),",
+609-    "      updated_at = now()",
+610-    "  WHERE aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid",
+611-    "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+612-    "  RETURNING *",
+613-    ")",
+614-    "SELECT jsonb_build_object(",
+615-    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_found' END,",
+616-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+617-    "  'human_review_item', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+618-    ")::text;"
+619-  ].join("\n");
+620-
+621-  return runPsqlJson(sql);
+622-}
+--
+728-
+729-  const sql = [
+730-    "SELECT jsonb_build_object(",
+731-    "  'result', 'ok',",
+732-    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+733-    "  'owner_civilization_id', " + sqlLiteral(owner) + ",",
+734-    "  'companies', (",
+735-    "    SELECT COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.created_at DESC), '[]'::jsonb)",
+736-    "    FROM business.aicm_user_company c",
+737-    "    WHERE c.owner_civilization_id::text = " + sqlLiteral(owner),
+738-    "      AND c.company_status = 'active'",
+739-    "  ),",
+740-    "  'departments', (",
+741-    "    SELECT COALESCE(jsonb_agg(to_jsonb(d) ORDER BY d.display_order, d.created_at), '[]'::jsonb)",
+742-    "    FROM business.aicm_user_company_department d",
+743-    "    WHERE d.owner_civilization_id::text = " + sqlLiteral(owner),
+744-    "      AND d.department_status = 'active'",
+745-    "  ),",
+746-    "  'sections', (",
+747-    "    SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY s.display_order, s.created_at), '[]'::jsonb)",
+748-    "    FROM business.aicm_user_company_section s",
+749-    "    WHERE s.owner_civilization_id::text = " + sqlLiteral(owner),
+750-    "      AND s.section_status = 'active'",
+751-    "  ),",
+752-    "  'placements', (",
+753-    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.created_at DESC), '[]'::jsonb)",
+754-    "    FROM business.vw_aicm_user_company_worker_placement_display p",
+755-    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+756-    "      AND p.status_code = 'active'",
+757-    "  ),",
+758:    "  'task_ledger', (",
+759-    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.display_order, t.created_at DESC), '[]'::jsonb)",
+760:    "    FROM business.vw_aicm_user_company_department_task_ledger_display t",
+761-    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+762-    "      AND t.task_status_code <> 'archived'",
+763-    "  ),",
+764-    // AICM_PMLW_GETCONTEXT_SQL_EXTENSION_AQP_AQS_V1
+765-    "  'pmlw_president_policies', (",
+766-    "    SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.display_order ASC, p.updated_at DESC, p.created_at DESC), '[]'::jsonb)",
+767-    "    FROM business.vw_aicm_pmlw_president_policy_display p",
+768-    "    WHERE p.owner_civilization_id::text = " + sqlLiteral(owner),
+769-    "  ),",
+770-    "  'pmlw_major_items', (",
+771-    "    SELECT COALESCE(jsonb_agg(to_jsonb(m) ORDER BY m.display_order ASC, m.updated_at DESC, m.created_at DESC), '[]'::jsonb)",
+772-    "    FROM business.vw_aicm_pmlw_major_work_display m",
+773-    "    WHERE m.owner_civilization_id::text = " + sqlLiteral(owner),
+774-    "  ),",
+775-    "  'pmlw_middle_items', (",
+776-    "    SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY l.display_order ASC, l.updated_at DESC, l.created_at DESC), '[]'::jsonb)",
+777:    "    FROM business.vw_aicm_pmlw_leader_middle_display l",
+778-    "    WHERE l.owner_civilization_id::text = " + sqlLiteral(owner),
+779-    "  ),",
+780-    "  'pmlw_deliverable_requirements', (",
+781-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.display_order ASC, r.updated_at DESC, r.created_at DESC), '[]'::jsonb)",
+782-    "    FROM business.vw_aicm_pmlw_deliverable_requirement_display r",
+783-    "    WHERE r.owner_civilization_id::text = " + sqlLiteral(owner),
+784-    "  ),",
+785:    "  'pmlw_worker_work_units', (",
+786-    "    SELECT COALESCE(jsonb_agg(to_jsonb(w) ORDER BY w.display_order ASC, w.updated_at DESC, w.created_at DESC), '[]'::jsonb)",
+787:    "    FROM business.vw_aicm_pmlw_worker_work_unit_display w",
+788-    "    WHERE w.owner_civilization_id::text = " + sqlLiteral(owner),
+789-    "  ),",
+790-    "  'pmlw_workflow_tree', (",
+791-    "    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.last_updated_at DESC NULLS LAST), '[]'::jsonb)",
+792-    "    FROM business.vw_aicm_pmlw_workflow_tree t",
+793-    "    WHERE t.owner_civilization_id::text = " + sqlLiteral(owner),
+794-    "  ),",
+795-    // AICM_HUMAN_REVIEW_QUEUE_ARN_ARQ_V1_CONTEXT
+796-    "  'review_wait_items', (",
+797-    "    SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY r.priority_code DESC, r.requested_at DESC, r.created_at DESC), '[]'::jsonb)",
+798-    "    FROM business.vw_aicm_human_review_wait_display r",

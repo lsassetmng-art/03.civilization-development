@@ -9804,7 +9804,7 @@ function injectMinimalCss() {
       ".aicm-core input,.aicm-core select,.aicm-core textarea{width:100%;box-sizing:border-box;border:1px solid #cfd6e4;border-radius:14px;padding:12px;font-size:16px;background:#fff}",
       ".aicm-core-message{border-radius:14px;padding:12px 14px;margin:12px 0;background:#f3f4f6}",
       ".aicm-core-message-ok{background:#ecfdf5;color:#047857}",
-      ".aicm-core-message-error{background:#ffffff;color:#b91c1c}",
+      ".aicm-core-message-error{background:#fef2f2;color:#b91c1c}",
       ".aicm-core-empty{color:#6b7280;margin:8px 0}",
       ".aicm-dashboard-grid{display:grid;gap:16px}",
       ".aicm-dashboard-main-grid{grid-template-columns:minmax(0,1fr)}",
@@ -11371,11 +11371,11 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
             rows.map(v10cRenderRow).join("")
           ].join("")
         : [
-            '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
+            '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
             '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
             '  <h2>レビュー・承認待ち: 0件</h2>',
             '  <p class="aicm-selected-note">' + v10cEsc(debug) + '</p>',
-            '  <p class="aicm-core-message aicm-core-message-error">context APIからレビュー・承認待ちはありませんでした。</p>',
+            '  <p class="aicm-core-message aicm-core-message-error">context APIからレビュー待ちを取得できませんでした。</p>',
             '  <div class="aicm-dashboard-action-row">',
             '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
             '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳へ</button>',
@@ -11792,7 +11792,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         r.length
           ? r.map(function(row, index) { return renderListRow(row, index, currentId); }).join("")
           : [
-              '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
+              '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
               '  <h3>レビュー・承認待ちはありません</h3>',
               '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
               '</section>'
@@ -12253,8 +12253,8 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         r.length
           ? r.map(function(row, index) { return renderListRow(appState, row, index, currentId); }).join("")
           : [
-              '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
-              '  <h3>レビュー・承認待ちはありません</h3>',
+              '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
+              '  <h3>レビュー待ちが取得できません</h3>',
               '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
               '</section>'
             ].join("")
@@ -13553,15 +13553,3 @@ if (typeof window !== "undefined") {
 // Empty review list state normalized.
 // pending=0 is not a fetch failure.
 // AICM_R8Z_V10GC4C_REVIEW_EMPTY_STATE_FIX_END
-
-
-// AICM_R8Z_V10GC4D_REMAINING_REVIEW_EMPTY_BAD_TEXT_CLEANUP_START
-// Remaining old empty-state wording removed.
-// pending=0 is a valid empty state, not a fetch failure.
-// AICM_R8Z_V10GC4D_REMAINING_REVIEW_EMPTY_BAD_TEXT_CLEANUP_END
-
-
-// AICM_R8Z_V10GC4E_REVIEW_EMPTY_RED_BORDER_CLEANUP_START
-// pending=0 review empty-state card should not look like an error.
-// Red border cleanup is limited to the empty review-state window.
-// AICM_R8Z_V10GC4E_REVIEW_EMPTY_RED_BORDER_CLEANUP_END

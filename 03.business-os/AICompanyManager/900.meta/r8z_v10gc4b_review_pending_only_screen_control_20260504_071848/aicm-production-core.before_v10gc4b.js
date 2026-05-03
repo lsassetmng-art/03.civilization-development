@@ -9804,7 +9804,7 @@ function injectMinimalCss() {
       ".aicm-core input,.aicm-core select,.aicm-core textarea{width:100%;box-sizing:border-box;border:1px solid #cfd6e4;border-radius:14px;padding:12px;font-size:16px;background:#fff}",
       ".aicm-core-message{border-radius:14px;padding:12px 14px;margin:12px 0;background:#f3f4f6}",
       ".aicm-core-message-ok{background:#ecfdf5;color:#047857}",
-      ".aicm-core-message-error{background:#ffffff;color:#b91c1c}",
+      ".aicm-core-message-error{background:#fef2f2;color:#b91c1c}",
       ".aicm-core-empty{color:#6b7280;margin:8px 0}",
       ".aicm-dashboard-grid{display:grid;gap:16px}",
       ".aicm-dashboard-main-grid{grid-template-columns:minmax(0,1fr)}",
@@ -11371,11 +11371,11 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
             rows.map(v10cRenderRow).join("")
           ].join("")
         : [
-            '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
+            '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
             '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
             '  <h2>レビュー・承認待ち: 0件</h2>',
             '  <p class="aicm-selected-note">' + v10cEsc(debug) + '</p>',
-            '  <p class="aicm-core-message aicm-core-message-error">context APIからレビュー・承認待ちはありませんでした。</p>',
+            '  <p class="aicm-core-message aicm-core-message-error">context APIからレビュー待ちを取得できませんでした。</p>',
             '  <div class="aicm-dashboard-action-row">',
             '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
             '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳へ</button>',
@@ -11792,8 +11792,8 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         r.length
           ? r.map(function(row, index) { return renderListRow(row, index, currentId); }).join("")
           : [
-              '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
-              '  <h3>レビュー・承認待ちはありません</h3>',
+              '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
+              '  <h3>レビュー待ちが取得できません</h3>',
               '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
               '</section>'
             ].join("")
@@ -12253,8 +12253,8 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         r.length
           ? r.map(function(row, index) { return renderListRow(appState, row, index, currentId); }).join("")
           : [
-              '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
-              '  <h3>レビュー・承認待ちはありません</h3>',
+              '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
+              '  <h3>レビュー待ちが取得できません</h3>',
               '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
               '</section>'
             ].join("")
@@ -13356,15 +13356,6 @@ async function aicmR8zV10gc3iRefreshReviewList(reviewId) {
   try {
     if (typeof render === "function") render();
   } catch (_) {}
-
-
-  // AICM_R8Z_V10GC4B_REVIEW_PENDING_ONLY_SCREEN_CONTROL_CALL
-  try {
-    if (typeof aicmR8zV10gc4bAfterReviewDecisionSuccess === "function") {
-      aicmR8zV10gc4bAfterReviewDecisionSuccess();
-    }
-  } catch (_) {}
-
 }
 
 async function aicmR8zV10gc3iExecuteReviewDecision(button) {
@@ -13422,146 +13413,3 @@ if (typeof window !== "undefined") {
   window.aicmR8zV10gc3iExecuteReviewDecision = aicmR8zV10gc3iExecuteReviewDecision;
 }
 // AICM_R8Z_V10GC3I_RENDERCONFIRM_DIRECT_BUTTON_CANON_END
-
-
-// AICM_R8Z_V10GC4B_REVIEW_PENDING_ONLY_SCREEN_CONTROL_START
-// Review list screen-control guard.
-// Shows pending review items only and clears stale confirm/detail/metadata state after review decisions.
-function aicmR8zV10gc4bText(value) {
-  return String(value === undefined || value === null ? "" : value).trim();
-}
-
-function aicmR8zV10gc4bApp() {
-  if (typeof state !== "undefined" && state && typeof state === "object") return state;
-  if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
-  return {};
-}
-
-function aicmR8zV10gc4bIsReviewRow(row) {
-  return !!(row && typeof row === "object" && (
-    Object.prototype.hasOwnProperty.call(row, "aicm_human_review_item_id") ||
-    Object.prototype.hasOwnProperty.call(row, "human_review_status_code") ||
-    Object.prototype.hasOwnProperty.call(row, "review_kind_code") ||
-    Object.prototype.hasOwnProperty.call(row, "artifact_kind_code")
-  ));
-}
-
-function aicmR8zV10gc4bStatus(row) {
-  return aicmR8zV10gc4bText(row && (
-    row.human_review_status_code ||
-    row.review_status ||
-    row.status_code ||
-    row.status ||
-    ""
-  ));
-}
-
-function aicmR8zV10gc4bFilterReviewRows(rows) {
-  if (!Array.isArray(rows)) return rows;
-
-  var hasReviewRows = rows.some(aicmR8zV10gc4bIsReviewRow);
-  if (!hasReviewRows) return rows;
-
-  return rows.filter(function(row) {
-    return aicmR8zV10gc4bStatus(row) === "pending";
-  });
-}
-
-function aicmR8zV10gc4bFilterObjectReviewRows(obj) {
-  if (!obj || typeof obj !== "object") return obj;
-
-  Object.keys(obj).forEach(function(key) {
-    var value = obj[key];
-
-    if (Array.isArray(value)) {
-      obj[key] = aicmR8zV10gc4bFilterReviewRows(value);
-    } else if (value && typeof value === "object") {
-      aicmR8zV10gc4bFilterObjectReviewRows(value);
-    }
-  });
-
-  return obj;
-}
-
-function aicmR8zV10gc4bClearReviewConfirmAndDetailState() {
-  var app = aicmR8zV10gc4bApp();
-
-  try {
-    app.aicmR8zV10fReviewConfirm = null;
-    app.reviewDecisionConfirm = null;
-    app.reviewConfirm = null;
-    app.aicmReviewConfirm = null;
-    app.selectedReview = null;
-    app.reviewDetail = null;
-    app.selectedReviewDetail = null;
-    app.reviewMetadata = null;
-    app.reviewArtifactDetail = null;
-    app.aicmReviewArtifactDetail = null;
-  } catch (_) {}
-}
-
-function aicmR8zV10gc4bScrubReviewListState() {
-  var app = aicmR8zV10gc4bApp();
-
-  try {
-    aicmR8zV10gc4bFilterObjectReviewRows(app);
-
-    if (app.context && typeof app.context === "object") {
-      aicmR8zV10gc4bFilterObjectReviewRows(app.context);
-    }
-  } catch (_) {}
-
-  return app;
-}
-
-function aicmR8zV10gc4bAfterReviewDecisionSuccess() {
-  var app = aicmR8zV10gc4bScrubReviewListState();
-
-  try {
-    app.screen = "review-list";
-  } catch (_) {}
-
-  aicmR8zV10gc4bClearReviewConfirmAndDetailState();
-
-  try {
-    if (typeof window !== "undefined" && window.scrollTo) {
-      window.scrollTo(0, 0);
-    }
-  } catch (_) {}
-}
-
-function aicmR8zV10gc4bInstallOneShotScrub() {
-  try {
-    setTimeout(function() {
-      try {
-        aicmR8zV10gc4bScrubReviewListState();
-        if (typeof render === "function") render();
-      } catch (_) {}
-    }, 0);
-  } catch (_) {}
-}
-
-if (typeof window !== "undefined") {
-  window.aicmR8zV10gc4bScrubReviewListState = aicmR8zV10gc4bScrubReviewListState;
-  window.aicmR8zV10gc4bAfterReviewDecisionSuccess = aicmR8zV10gc4bAfterReviewDecisionSuccess;
-  aicmR8zV10gc4bInstallOneShotScrub();
-}
-// AICM_R8Z_V10GC4B_REVIEW_PENDING_ONLY_SCREEN_CONTROL_END
-
-
-// AICM_R8Z_V10GC4C_REVIEW_EMPTY_STATE_FIX_START
-// Empty review list state normalized.
-// pending=0 is not a fetch failure.
-// AICM_R8Z_V10GC4C_REVIEW_EMPTY_STATE_FIX_END
-
-
-// AICM_R8Z_V10GC4D_REMAINING_REVIEW_EMPTY_BAD_TEXT_CLEANUP_START
-// Remaining old empty-state wording removed.
-// pending=0 is a valid empty state, not a fetch failure.
-// AICM_R8Z_V10GC4D_REMAINING_REVIEW_EMPTY_BAD_TEXT_CLEANUP_END
-
-
-// AICM_R8Z_V10GC4E_REVIEW_EMPTY_RED_BORDER_CLEANUP_START
-// pending=0 review empty-state card should not look like an error.
-// Red border cleanup is limited to the empty review-state window.
-// AICM_R8Z_V10GC4E_REVIEW_EMPTY_RED_BORDER_CLEANUP_END

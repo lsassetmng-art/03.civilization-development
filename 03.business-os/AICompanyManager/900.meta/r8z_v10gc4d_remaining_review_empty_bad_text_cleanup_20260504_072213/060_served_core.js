@@ -11371,7 +11371,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
             rows.map(v10cRenderRow).join("")
           ].join("")
         : [
-            '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
+            '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
             '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
             '  <h2>レビュー・承認待ち: 0件</h2>',
             '  <p class="aicm-selected-note">' + v10cEsc(debug) + '</p>',
@@ -11792,7 +11792,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         r.length
           ? r.map(function(row, index) { return renderListRow(row, index, currentId); }).join("")
           : [
-              '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
+              '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
               '  <h3>レビュー・承認待ちはありません</h3>',
               '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
               '</section>'
@@ -12253,7 +12253,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         r.length
           ? r.map(function(row, index) { return renderListRow(appState, row, index, currentId); }).join("")
           : [
-              '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
+              '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
               '  <h3>レビュー・承認待ちはありません</h3>',
               '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
               '</section>'
@@ -13559,9 +13559,3 @@ if (typeof window !== "undefined") {
 // Remaining old empty-state wording removed.
 // pending=0 is a valid empty state, not a fetch failure.
 // AICM_R8Z_V10GC4D_REMAINING_REVIEW_EMPTY_BAD_TEXT_CLEANUP_END
-
-
-// AICM_R8Z_V10GC4E_REVIEW_EMPTY_RED_BORDER_CLEANUP_START
-// pending=0 review empty-state card should not look like an error.
-// Red border cleanup is limited to the empty review-state window.
-// AICM_R8Z_V10GC4E_REVIEW_EMPTY_RED_BORDER_CLEANUP_END
