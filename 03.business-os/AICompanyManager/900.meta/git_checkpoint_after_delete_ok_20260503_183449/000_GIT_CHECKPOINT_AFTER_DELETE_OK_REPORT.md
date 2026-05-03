@@ -144,3 +144,419 @@ STATUS_BEFORE=/data/data/com.termux/files/home/03.civilization-development/03.bu
 ============================================================
 4. git add / commit / push
 ============================================================
+STATUS_AFTER=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/020_status_after.txt
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/civilization-auth/mock-bridge-adapter.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/civilization-auth/mock-session.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/mock-server/admin-store.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/mock-server/auth-mock.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/mock-server/launch-mock.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/os-launch/evaluate-os-entry.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/portal-api/admin-client.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/portal-api/auth-client.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/services/portal-api/content-client.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/types/bridge.ts
+ M 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/types/portal-admin-api.ts
+A  03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/000_GIT_CHECKPOINT_AFTER_DELETE_OK_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/010_status_before.txt
+A  03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/030_diff_name_status.txt
+A  03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/040_verify.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/000_R8Z_V9E2_LOCAL_RENDER_STATIC_GATE_CORRECTION_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/020_static_verify.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/030_node_check_core.out
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/031_node_check_core.err
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/032_node_check_server.out
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/033_node_check_server.err
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/040_context.json
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/041_context_parse.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/050_context_script.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/060_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/070_core_v9e2_snip.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/aicm-production-core.before_r8z_v9e2.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/r8z_v9e2_patch_comment_gate.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/server.pid
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/000_R8Z_V9E_REVIEW_LIST_LOCAL_RENDER_ONLY_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/020_node_check_core.out
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/021_node_check_core.err
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/022_node_check_server.out
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/023_node_check_server.err
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/030_static_verify.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/040_context.json
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/041_context_parse.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/050_context_script.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/060_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/070_core_v9e_snip.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/aicm-production-core.before_r8z_v9e.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/r8z_v9e_patch_local_render.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/server.pid
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/000_R8Z_V9F2_LEADER_HANDOFF_EXACT_CALL_PATH_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/010_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/011_root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/020_exact_call_path_extract.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/030_classification.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/extract_call_path.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/000_R8Z_V9F3_RESTORE_LEADER_HANDOFF_OPEN_CONFIRM_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/020_static_verify.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/030_core_v9f3_snip.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/040_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/aicm-production-core.before_r8z_v9f3.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/r8z_v9f3_patch_open_confirm.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/server.pid
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4_restore_leader_handoff_confirm_card_20260503_112355/000_R8Z_V9F4_RESTORE_LEADER_HANDOFF_CONFIRM_CARD_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4_restore_leader_handoff_confirm_card_20260503_112355/aicm-production-core.before_r8z_v9f4.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4_restore_leader_handoff_confirm_card_20260503_112355/r8z_v9f4_patch_confirm_card.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/000_R8Z_V9F4B_CONFIRM_CARD_POST_RENDER_WRAPPER_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/020_static_verify.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/030_core_v9f4b_snip.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/040_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/aicm-production-core.before_r8z_v9f4b.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/r8z_v9f4b_patch.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/server.pid
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/000_R8Z_V9F5_LEADER_HANDOFF_EXECUTE_PATH_ISOLATE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/010_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/011_root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/020_execute_path_extract.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/030_classification.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/040_server_route_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/extract_execute_path.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/000_R8Z_V9F5B_EXECUTE_AND_DELETE_PATH_ISOLATE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/010_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/011_root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/020_execute_delete_path_extract.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/030_classification.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/040_server_route_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/extract_execute_delete_path.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/000_R8Z_V9F6_RESTORE_LEADER_HANDOFF_EXECUTE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/020_static_verify.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/030_core_v9f6_snip.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/040_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/aicm-production-core.before_r8z_v9f6.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/r8z_v9f6_patch_execute.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/server.pid
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/000_R8Z_V9F_LEADER_HANDOFF_CONFIRM_REGRESSION_ISOLATE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/010_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/011_root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/020_git_status.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/030_action_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/031_confirm_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/032_handler_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/033_render_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/034_v9_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/040_classification.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/000_R8Z_V9F_LEADER_HANDOFF_CONFIRM_REGRESSION_ISOLATE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/010_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/011_root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/020_git_status.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/030_action_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/031_confirm_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/032_handler_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/033_render_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/034_v9_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/040_classification.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/000_R8Z_V9G0_DELETE_EXECUTE_ROLLBACK_PRECHECK_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/010_delete_rollback_precheck.out
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/011_delete_rollback_precheck.err
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/020_core_delete_execute_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/030_server_delete_route_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/040_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/root_after_restart.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/server.pid
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/000_R8Z_V9G1B_UI_VISIBLE_DELETE_TARGET_INVENTORY_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/010_ui_visible_delete_target_inventory.tsv
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/011_ui_visible_delete_target_inventory.err
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/020_context.json
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/021_context_summary.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/000_R8Z_V9G2_VIEW_TARGET_DELETE_ROLLBACK_PRECHECK_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/010_view_target_delete_rollback.out
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/011_view_target_delete_rollback.err
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/020_core_delete_execute_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/030_server_delete_route_scan.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g3_delete_view_base_id_mapping_20260503_175437/000_R8Z_V9G3_DELETE_VIEW_BASE_ID_MAPPING_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g3_delete_view_base_id_mapping_20260503_175437/010_delete_view_base_id_mapping.tsv
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g3_delete_view_base_id_mapping_20260503_175437/011_delete_view_base_id_mapping.err
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g4_robust_delete_rollback_precheck_20260503_175708/000_R8Z_V9G4_ROBUST_DELETE_ROLLBACK_PRECHECK_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g4_robust_delete_rollback_precheck_20260503_175708/010_robust_delete_rollback.tsv
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g4_robust_delete_rollback_precheck_20260503_175708/011_robust_delete_rollback.err
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g4_robust_delete_rollback_precheck_20260503_175708/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/000_R8Z_V9G5_RESTORE_DELETE_CONFIRM_EXECUTE_BRIDGE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/020_static_verify.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/030_core_v9g5_snip.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/040_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/aicm-production-core.before_r8z_v9g5.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/r8z_v9g5_patch.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/server.pid
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/000_R8Z_V9G6_DELETE_ROOT_CAUSE_TIMELINE_ISOLATE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/020_current_delete_analysis.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/030_backup_delete_timeline.tsv
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/040_current_delete_snips.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/050_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/051_root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/060_git_info.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/analyze_delete_path.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g7_delete_execute_inner_cause_isolate_20260503_180508/000_R8Z_V9G7_DELETE_EXECUTE_INNER_CAUSE_ISOLATE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g7_delete_execute_inner_cause_isolate_20260503_180508/020_delete_execute_inner_extract.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g7_delete_execute_inner_cause_isolate_20260503_180508/030_delete_execute_backup_compare.tsv
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g7_delete_execute_inner_cause_isolate_20260503_180508/extract_delete_execute.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8_delete_execute_fallback_primary_20260503_180612/000_R8Z_V9G8_DELETE_EXECUTE_FALLBACK_PRIMARY_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8_delete_execute_fallback_primary_20260503_180612/aicm-production-core.before_r8z_v9g8.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8_delete_execute_fallback_primary_20260503_180612/r8z_v9g8_patch.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8_status_salvage_20260503_180737/000_R8Z_V9G8_STATUS_SALVAGE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8_status_salvage_20260503_180737/020_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8_status_salvage_20260503_180737/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/000_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE_REPORT.md
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/020_static_verify.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/030_core_v9g8b_snip.txt
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/040_served_core.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/aicm-production-core.before_r8z_v9g8b.js
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/r8z_v9g8b_patch.cjs
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/root.html
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/server.pid
+A  03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/verify_v9g8b.cjs
+M  03.business-os/AICompanyManager/assets/js/aicm-production-core.js
+?? 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/.backup/20260428_181520_compat_pass_b/
+?? 01.civilization-os/08.civilization-portal-site/civilization-portal-site-web/.backup/20260429_051353_compat_pass_c_missing_build_exports/
+?? 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/020_status_after.txt
+?? 03.business-os/CasualChatWorker/docs/final/20260426_052059_CASUAL_CHAT_WORKER_FINAL_OUTPUT_INDEX.md
+?? 03.business-os/CasualChatWorker/docs/final/20260426_052059_CASUAL_CHAT_WORKER_PHASE_P_CLOSEOUT.md
+?? 03.business-os/CasualChatWorker/docs/final/20260426_055128_CASUAL_CHAT_WORKER_FINAL_ARTIFACT_MANIFEST.md
+?? 03.business-os/CasualChatWorker/docs/final/20260426_055128_CASUAL_CHAT_WORKER_POST_CLOSEOUT_FINAL_QUALITY_GATE.md
+?? 03.business-os/CasualChatWorker/docs/final/20260426_211334_CASUAL_CHAT_WORKER_DB_BACKED_PAYLOAD_ACCEPTANCE_GATE.md
+?? 03.business-os/CasualChatWorker/docs/final/CASUAL_CHAT_WORKER_IMPLEMENTATION_PREPARED_COMPLETION_MARKER.md
+?? 03.business-os/CasualChatWorker/docs/final/LATEST_CASUAL_CHAT_WORKER_FINAL_ARTIFACT_MANIFEST.md
+?? 03.business-os/CasualChatWorker/docs/final/LATEST_CASUAL_CHAT_WORKER_FINAL_OUTPUT_INDEX.md
+?? 03.business-os/CasualChatWorker/docs/final/LATEST_CASUAL_CHAT_WORKER_POST_CLOSEOUT_FINAL_QUALITY_GATE.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_052059_CASUAL_CHAT_WORKER_FINAL_EXPORT_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_055128_CASUAL_CHAT_WORKER_EXPORT_INDEX_FOR_NEXT_CHAT.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_105214_PERSONA_DB_LIVE_ROLLBACK_GATE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_105505_PERSONA_DB_CONTRACT_QUOTE_CONFIRM_ROLLBACK_SMOKE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_110851_PERSONA_DB_CONFIRM_ROLLBACK_SMOKE_FIX_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_200008_PERSONA_DB_CONFIRM_ROLLBACK_SMOKE_SEQUENTIAL_FIX_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/20260426_211334_PERSONA_DB_BACKED_PAYLOAD_ACCEPTANCE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_CASUAL_CHAT_WORKER_EXPORT_INDEX_FOR_NEXT_CHAT.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_CASUAL_CHAT_WORKER_FINAL_EXPORT_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_BACKED_PAYLOAD_ACCEPTANCE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_CONFIRM_ROLLBACK_SMOKE_FIX_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_CONFIRM_ROLLBACK_SMOKE_SEQUENTIAL_FIX_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_CONTRACT_QUOTE_CONFIRM_ROLLBACK_SMOKE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/handoff/LATEST_PERSONA_DB_LIVE_ROLLBACK_GATE_HANDOFF.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_052059_phase_p_closeout_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_055128_post_closeout_final_quality_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_105214_persona_db_live_rollback_gate_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_105505_persona_db_contract_quote_confirm_rollback_smoke_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_110851_persona_db_confirm_rollback_smoke_fix_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_200008_persona_db_confirm_rollback_smoke_sequential_fix_report.md
+?? 03.business-os/CasualChatWorker/docs/meta/20260426_211334_persona_db_backed_payload_acceptance_report.md
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_052059_phase_p_closeout_verify.md
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_055128_post_closeout_final_quality_gate/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_105214_persona_db_live_rollback_gate/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_105505_persona_db_contract_quote_confirm_rollback_smoke/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_110851_persona_db_confirm_rollback_smoke_fix_ambiguous/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_200008_persona_db_confirm_rollback_smoke_sequential_fix/
+?? 03.business-os/CasualChatWorker/docs/verification/20260426_211334_persona_db_backed_payload_acceptance/
+?? 03.business-os/RobotRentalStore/
+?? 03.business-os/_aiworker/
+?? 03.business-os/_businessos/
+?? 09.CX22073JW/logs/20260428_074430_robot_role_knowledge_registration/
+?? 11.aiworker-os/brain-access-integration/
+?? 11.aiworker-os/brain-data-thickening/
+?? 11.aiworker-os/robot-capability-profile/
+?? 11.aiworker-os/robot-catalog-fix/
+?? 11.aiworker-os/robot-list/
+?? 11.aiworker-os/runtime-brain-context/
+?? 11.aiworker-os/runtime-control-profile/
+?? 11.aiworker-os/runtime-execution-app-api/
+?? 11.aiworker-os/runtime-execution-complete/
+?? 11.aiworker-os/runtime-execution-http-api/
+?? 11.aiworker-os/runtime-execution-request/
+[main 9f7d2dc] checkpoint: AICompanyManager delete confirm execute ok 20260503_183449
+ 163 files changed, 292450 insertions(+), 8 deletions(-)
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/000_GIT_CHECKPOINT_AFTER_DELETE_OK_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/010_status_before.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/030_diff_name_status.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/040_verify.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/000_R8Z_V9E2_LOCAL_RENDER_STATIC_GATE_CORRECTION_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/020_static_verify.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/030_node_check_core.out
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/031_node_check_core.err
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/032_node_check_server.out
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/033_node_check_server.err
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/040_context.json
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/041_context_parse.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/050_context_script.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/060_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/070_core_v9e2_snip.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/aicm-production-core.before_r8z_v9e2.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/r8z_v9e2_patch_comment_gate.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e2_local_render_static_gate_correction_20260503_111317/server.pid
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/000_R8Z_V9E_REVIEW_LIST_LOCAL_RENDER_ONLY_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/020_node_check_core.out
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/021_node_check_core.err
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/022_node_check_server.out
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/023_node_check_server.err
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/030_static_verify.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/040_context.json
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/041_context_parse.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/050_context_script.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/060_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/070_core_v9e_snip.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/aicm-production-core.before_r8z_v9e.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/r8z_v9e_patch_local_render.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9e_review_list_local_render_only_20260503_111204/server.pid
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/000_R8Z_V9F2_LEADER_HANDOFF_EXACT_CALL_PATH_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/010_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/011_root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/020_exact_call_path_extract.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/030_classification.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f2_leader_handoff_exact_call_path_20260503_111818/extract_call_path.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/000_R8Z_V9F3_RESTORE_LEADER_HANDOFF_OPEN_CONFIRM_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/020_static_verify.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/030_core_v9f3_snip.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/040_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/aicm-production-core.before_r8z_v9f3.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/r8z_v9f3_patch_open_confirm.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f3_restore_leader_handoff_open_confirm_20260503_111930/server.pid
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4_restore_leader_handoff_confirm_card_20260503_112355/000_R8Z_V9F4_RESTORE_LEADER_HANDOFF_CONFIRM_CARD_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4_restore_leader_handoff_confirm_card_20260503_112355/aicm-production-core.before_r8z_v9f4.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4_restore_leader_handoff_confirm_card_20260503_112355/r8z_v9f4_patch_confirm_card.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/000_R8Z_V9F4B_CONFIRM_CARD_POST_RENDER_WRAPPER_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/020_static_verify.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/030_core_v9f4b_snip.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/040_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/aicm-production-core.before_r8z_v9f4b.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/r8z_v9f4b_patch.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f4b_confirm_card_post_render_wrapper_20260503_112534/server.pid
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/000_R8Z_V9F5_LEADER_HANDOFF_EXECUTE_PATH_ISOLATE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/010_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/011_root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/020_execute_path_extract.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/030_classification.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/040_server_route_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5_leader_handoff_execute_path_isolate_20260503_112738/extract_execute_path.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/000_R8Z_V9F5B_EXECUTE_AND_DELETE_PATH_ISOLATE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/010_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/011_root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/020_execute_delete_path_extract.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/030_classification.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/040_server_route_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f5b_execute_and_delete_path_isolate_20260503_112818/extract_execute_delete_path.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/000_R8Z_V9F6_RESTORE_LEADER_HANDOFF_EXECUTE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/020_static_verify.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/030_core_v9f6_snip.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/040_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/aicm-production-core.before_r8z_v9f6.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/r8z_v9f6_patch_execute.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f6_restore_leader_handoff_execute_20260503_172408/server.pid
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/000_R8Z_V9F_LEADER_HANDOFF_CONFIRM_REGRESSION_ISOLATE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/010_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/011_root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/020_git_status.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/030_action_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/031_confirm_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/032_handler_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/033_render_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/034_v9_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111600/040_classification.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/000_R8Z_V9F_LEADER_HANDOFF_CONFIRM_REGRESSION_ISOLATE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/010_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/011_root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/020_git_status.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/030_action_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/031_confirm_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/032_handler_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/033_render_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/034_v9_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9f_leader_handoff_confirm_regression_isolate_20260503_111714/040_classification.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/000_R8Z_V9G0_DELETE_EXECUTE_ROLLBACK_PRECHECK_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/010_delete_rollback_precheck.out
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/011_delete_rollback_precheck.err
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/020_core_delete_execute_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/030_server_delete_route_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/040_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/root_after_restart.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g0_delete_execute_rollback_precheck_20260503_174101/server.pid
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/000_R8Z_V9G1B_UI_VISIBLE_DELETE_TARGET_INVENTORY_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/010_ui_visible_delete_target_inventory.tsv
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/011_ui_visible_delete_target_inventory.err
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/020_context.json
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g1b_ui_visible_delete_target_inventory_20260503_174312/021_context_summary.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/000_R8Z_V9G2_VIEW_TARGET_DELETE_ROLLBACK_PRECHECK_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/010_view_target_delete_rollback.out
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/011_view_target_delete_rollback.err
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/020_core_delete_execute_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/030_server_delete_route_scan.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g2_view_target_delete_rollback_precheck_20260503_174540/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g3_delete_view_base_id_mapping_20260503_175437/000_R8Z_V9G3_DELETE_VIEW_BASE_ID_MAPPING_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g3_delete_view_base_id_mapping_20260503_175437/010_delete_view_base_id_mapping.tsv
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g3_delete_view_base_id_mapping_20260503_175437/011_delete_view_base_id_mapping.err
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g4_robust_delete_rollback_precheck_20260503_175708/000_R8Z_V9G4_ROBUST_DELETE_ROLLBACK_PRECHECK_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g4_robust_delete_rollback_precheck_20260503_175708/010_robust_delete_rollback.tsv
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g4_robust_delete_rollback_precheck_20260503_175708/011_robust_delete_rollback.err
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g4_robust_delete_rollback_precheck_20260503_175708/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/000_R8Z_V9G5_RESTORE_DELETE_CONFIRM_EXECUTE_BRIDGE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/020_static_verify.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/030_core_v9g5_snip.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/040_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/aicm-production-core.before_r8z_v9g5.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/r8z_v9g5_patch.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g5_restore_delete_confirm_execute_bridge_20260503_180001/server.pid
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/000_R8Z_V9G6_DELETE_ROOT_CAUSE_TIMELINE_ISOLATE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/020_current_delete_analysis.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/030_backup_delete_timeline.tsv
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/040_current_delete_snips.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/050_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/051_root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/060_git_info.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g6_delete_root_cause_timeline_isolate_20260503_180247/analyze_delete_path.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g7_delete_execute_inner_cause_isolate_20260503_180508/000_R8Z_V9G7_DELETE_EXECUTE_INNER_CAUSE_ISOLATE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g7_delete_execute_inner_cause_isolate_20260503_180508/020_delete_execute_inner_extract.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g7_delete_execute_inner_cause_isolate_20260503_180508/030_delete_execute_backup_compare.tsv
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g7_delete_execute_inner_cause_isolate_20260503_180508/extract_delete_execute.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8_delete_execute_fallback_primary_20260503_180612/000_R8Z_V9G8_DELETE_EXECUTE_FALLBACK_PRIMARY_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8_delete_execute_fallback_primary_20260503_180612/aicm-production-core.before_r8z_v9g8.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8_delete_execute_fallback_primary_20260503_180612/r8z_v9g8_patch.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8_status_salvage_20260503_180737/000_R8Z_V9G8_STATUS_SALVAGE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8_status_salvage_20260503_180737/020_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8_status_salvage_20260503_180737/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/000_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE_REPORT.md
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/020_static_verify.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/030_core_v9g8b_snip.txt
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/040_served_core.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/aicm-production-core.before_r8z_v9g8b.js
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/r8z_v9g8b_patch.cjs
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/root.html
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/server.pid
+ create mode 100644 03.business-os/AICompanyManager/900.meta/r8z_v9g8b_delete_execute_legacy_guard_disable_20260503_180921/verify_v9g8b.cjs
+To github.com:lsassetmng-art/03.civilization-development.git
+   ce87a09..9f7d2dc  main -> main
+
+============================================================
+5. final
+============================================================
+COMMIT_STATUS=COMMITTED
+COMMIT_HASH=9f7d2dc
+PUSH_RESULT=PUSH_OK
+V9G8B_MARKER_COUNT=3
+V9G5_OLD1_DISABLED_GUARD=1
+V9G5_OLD2_DISABLED_GUARD=1
+V9G5_MANAGER_UPDATE_COUNT=5
+REPORT=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/000_GIT_CHECKPOINT_AFTER_DELETE_OK_REPORT.md
+STATUS_BEFORE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/010_status_before.txt
+STATUS_AFTER=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/020_status_after.txt
+DIFF_NAME=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/030_diff_name_status.txt
+GIT_LOG=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/900.meta/git_checkpoint_after_delete_ok_20260503_183449/050_git_log.txt
+DB_WRITE=NO
+API_POST=NO
+PATCH=NO
+FINAL_JUDGEMENT=GIT_CHECKPOINT_AFTER_DELETE_OK_DONE
