@@ -8609,236 +8609,123 @@ function aicmR8zV9g5MajorId(payload, btn) {
   );
 }
 
-// AICM_R8Z_V10L_C2G_B_R1_SIMPLE_DELETE_YES_POST_START
-async function aicmR8zV9g5ExecuteDeleteConfirm() {
-  var endpoint = "/api/aicm/v2/manager-major/update";
+async function aicmR8zV9g5ExecuteDeleteConfirm(btn) {
+  // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: V9G5 owns confirmed delete via manager-major/update fallback.
+  var payload = aicmR8zV9g5DeleteConfirmState();
 
-  function c2gBState() {
-    try {
-      if (typeof state !== "undefined" && state) return state;
-    } catch (e) {}
-    try {
-      if (typeof window !== "undefined") return window.AICM_STATE || window.aicmState || window.state || {};
-    } catch (e2) {}
-    return {};
+  if (!payload) {
+    if (typeof setMessage === "function") setMessage("error", "削除確認情報が見つかりません。もう一度削除を押してください。");
+    if (typeof render === "function") render();
+    return;
   }
 
-  function c2gBSetMessage(kind, text) {
-    if (typeof setMessage === "function") {
-      setMessage(kind, text);
-      return;
-    }
-    try { console.log(kind + ": " + text); } catch (e) {}
-  }
+  var majorId = aicmR8zV9g5MajorId(payload, btn);
+  var owner = aicmR8zV9g5OwnerId(payload);
 
-  function c2gBParseJsonLoose(text) {
-    if (!text) return null;
-    var s = String(text);
-    var first = s.indexOf("{");
-    var last = s.lastIndexOf("}");
-    if (first < 0 || last <= first) return null;
-    try { return JSON.parse(s.slice(first, last + 1)); } catch (e) { return null; }
-  }
-
-  function c2gBReadPayloadFromDom() {
-    try {
-      if (typeof document === "undefined") return null;
-      var nodes = Array.prototype.slice.call(document.querySelectorAll("textarea, pre, code, details, [data-payload-preview], [data-aicm-payload-preview]"));
-      for (var i = 0; i < nodes.length; i += 1) {
-        var t = nodes[i] && (nodes[i].value || nodes[i].innerText || nodes[i].textContent || "");
-        if (!t || String(t).indexOf("{") < 0) continue;
-        var parsed = c2gBParseJsonLoose(t);
-        if (parsed && typeof parsed === "object") return parsed;
-      }
-    } catch (e) {}
-    return null;
-  }
-
-  function c2gBReadPayloadFromState() {
-    var s = c2gBState();
-    var candidates = [
-      s.r8zV9g5DeletePayload,
-      s.r8zV9g5DeleteConfirmPayload,
-      s.r8zMgrMajorCardDeletePayload,
-      s.r8zMgrMajorCardConfirmPayload,
-      s.r8zMgrMajorCardPostBody,
-      s.pendingPostBody,
-      s.confirmPostBody,
-      s.currentConfirmPayload
-    ];
-    for (var i = 0; i < candidates.length; i += 1) {
-      var c = candidates[i];
-      if (c && typeof c === "object") return JSON.parse(JSON.stringify(c));
-      if (typeof c === "string") {
-        var parsed = c2gBParseJsonLoose(c);
-        if (parsed) return parsed;
-      }
-    }
-    return null;
-  }
-
-  function c2gBPushId(out, v) {
-    if (v == null) return;
-    var s = String(v).trim();
-    if (!s) return;
-    if (out.indexOf(s) < 0) out.push(s);
-  }
-
-  function c2gBCollectIdsFromPayload(obj) {
-    var out = [];
-    if (!obj || typeof obj !== "object") return out;
-    var keys = [
-      "manager_major_item_id",
-      "manager_major_item_ids",
-      "major_item_id",
-      "major_item_ids",
-      "aicm_manager_major_item_id",
-      "aicm_manager_major_item_ids",
-      "target_manager_major_item_id",
-      "target_manager_major_item_ids",
-      "selected_manager_major_item_ids",
-      "selectedMajorItemIds",
-      "target_ids",
-      "selected_ids",
-      "ids"
-    ];
-    for (var i = 0; i < keys.length; i += 1) {
-      var v = obj[keys[i]];
-      if (Array.isArray(v)) {
-        for (var j = 0; j < v.length; j += 1) c2gBPushId(out, v[j]);
-      } else {
-        c2gBPushId(out, v);
-      }
-    }
-    return out;
-  }
-
-  function c2gBCollectIdsFromState() {
-    var s = c2gBState();
-    var out = [];
-    var roots = [
-      s.r8zMgrMajorCardSelectedMajorItemIds,
-      s.selectedManagerMajorItemIds,
-      s.selectedMajorItemIds,
-      s.r8zMgrMajorCardDeleteTargetIds,
-      s.r8zMgrMajorCardTargetIds,
-      s.r8zMgrMajorCardSelectedRows,
-      s.selectedManagerMajorRows,
-      s.selectedMajorRows,
-      s.r8zMgrMajorCardDeleteTargets,
-      s.r8zMgrMajorCardConfirmTargets
-    ];
-
-    function scan(v) {
-      if (!v) return;
-      if (Array.isArray(v)) {
-        for (var i = 0; i < v.length; i += 1) scan(v[i]);
-        return;
-      }
-      if (typeof v === "string" || typeof v === "number") {
-        c2gBPushId(out, v);
-        return;
-      }
-      if (typeof v === "object") {
-        var idKeys = ["manager_major_item_id", "major_item_id", "aicm_manager_major_item_id", "id", "managerMajorItemId", "majorItemId"];
-        for (var k = 0; k < idKeys.length; k += 1) {
-          if (v[idKeys[k]]) c2gBPushId(out, v[idKeys[k]]);
-        }
-      }
-    }
-
-    for (var r = 0; r < roots.length; r += 1) scan(roots[r]);
-    return out;
-  }
-
-  function c2gBNormalizeDeletePayload(basePayload, ids) {
-    var p = basePayload && typeof basePayload === "object" ? JSON.parse(JSON.stringify(basePayload)) : {};
-    var uniqueIds = [];
-    for (var i = 0; i < ids.length; i += 1) c2gBPushId(uniqueIds, ids[i]);
-
-    p.action = p.action || "delete";
-    p.action_code = p.action_code || "delete";
-    p.operation = p.operation || "delete";
-    p.operation_code = p.operation_code || "delete";
-    p.delete_flag = true;
-    p.deleted_flag = true;
-    p.is_deleted = true;
-    p.active_flag = false;
-    p.confirmed_flag = true;
-    p.confirm_source = "aicm_r8z_v10l_c2g_b_r1_simple_delete_yes";
-
-    p.manager_major_item_ids = uniqueIds;
-    p.major_item_ids = uniqueIds;
-    p.target_manager_major_item_ids = uniqueIds;
-    p.selected_manager_major_item_ids = uniqueIds;
-    p.ids = uniqueIds;
-
-    if (uniqueIds.length === 1) {
-      p.manager_major_item_id = uniqueIds[0];
-      p.major_item_id = uniqueIds[0];
-      p.target_manager_major_item_id = uniqueIds[0];
-      p.id = p.id || uniqueIds[0];
-    }
-
-    delete p.department_required;
-    delete p.section_required;
-    delete p.leader_required;
-    return p;
+  if (!majorId) {
+    if (typeof setMessage === "function") setMessage("error", "削除対象のManager大項目IDを特定できません。");
+    if (typeof render === "function") render();
+    return;
   }
 
   try {
-    var payload = c2gBReadPayloadFromDom() || c2gBReadPayloadFromState() || {};
-    var ids = c2gBCollectIdsFromPayload(payload);
-    if (!ids.length) ids = c2gBCollectIdsFromState();
+    if (typeof setMessage === "function") setMessage("info", "削除を実行しています。");
 
-    if (!ids.length) {
-      c2gBSetMessage("error", "削除対象の大項目IDを取得できません。台帳で削除対象を選択してから再実行してください。");
-      return;
-    }
-
-    payload = c2gBNormalizeDeletePayload(payload, ids);
-
-    c2gBSetMessage("info", "削除を実行します。対象件数: " + ids.length);
-
-    var response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    var text = await response.text();
-    var data = null;
-    try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
-
-    if (!response.ok || (data && data.ok === false)) {
-      var reason = data && (data.reason || data.message || data.error) ? (data.reason || data.message || data.error) : text;
-      c2gBSetMessage("error", "削除APIが失敗しました: " + (reason || response.status));
-      return;
-    }
-
-    c2gBSetMessage("ok", "削除しました。対象件数: " + ids.length);
-
-    try {
-      var s = c2gBState();
-      s.screen = "task-ledger";
-      s.r8zMgrMajorCardConfirm = null;
-      s.r8zMgrMajorCardConfirmPayload = null;
-    } catch (e2) {}
-
-    try {
-      if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
-        aicmRenderTaskLedgerSafeR8V4("c2g_b_r1_simple_delete_done");
-      } else if (typeof aicmR8zMgrMajorCardRerender === "function") {
-        aicmR8zMgrMajorCardRerender("c2g_b_r1_simple_delete_done");
-      } else if (typeof location !== "undefined" && location.reload) {
-        setTimeout(function() { location.reload(); }, 800);
+    if (false && typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") { // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: skip old1
+      try {
+        await aicmExecuteMajorItemDeleteConfirmR8P();
+        return;
+      } catch (existingError1) {
+        if (typeof console !== "undefined" && console.warn) console.warn("existing delete execute R8P failed; fallback follows", existingError1);
       }
-    } catch (e3) {}
-  } catch (err) {
-    c2gBSetMessage("error", "削除処理でエラー: " + (err && err.message ? err.message : String(err)));
+    }
+
+    if (false && typeof aicmExecuteManagerMajorDeleteConfirmR8P === "function") { // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: skip old2
+      try {
+        await aicmExecuteManagerMajorDeleteConfirmR8P();
+        return;
+      } catch (existingError2) {
+        if (typeof console !== "undefined" && console.warn) console.warn("existing manager delete execute R8P failed; fallback follows", existingError2);
+      }
+    }
+
+    var postBody = {
+      owner_civilization_id: owner,
+      aicm_manager_major_work_item_id: majorId,
+      decomposition_status_code: "archived",
+      handoff_status_code: "archived",
+      note: aicmR8zV9g5Text(
+        (payload.body && payload.body.note) ||
+        (payload.row && payload.row.note) ||
+        ""
+      )
+    };
+
+    var result = null;
+
+    if (typeof requestJson === "function") {
+      result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+    } else {
+      var response = await fetch("/api/aicm/v2/manager-major/update", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(postBody)
+      });
+
+      var json = null;
+      try { json = await response.json(); } catch (_) { json = null; }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(
+          json && (json.error_message || json.message || json.error)
+            ? (json.error_message || json.message || json.error)
+            : "削除更新に失敗しました。"
+        );
+      }
+
+      result = json || {};
+    }
+
+    state.managerMajorDeleteConfirm = null;
+    state.screen = "task-ledger";
+
+    try {
+      if (typeof aicmReloadTaskLedgerContext === "function") {
+        await aicmReloadTaskLedgerContext();
+      } else if (typeof refreshContext === "function") {
+        await refreshContext();
+      } else if (typeof loadContext === "function") {
+        await loadContext();
+      } else {
+        var responseReload = await fetch("/api/aicm/v2/context?owner_civilization_id=" + encodeURIComponent(owner) + "&v=r8z_v9g5_" + Date.now());
+        var contextJson = await responseReload.json();
+        if (contextJson && contextJson.result === "ok") state.context = contextJson;
+      }
+    } catch (reloadError) {
+      if (typeof console !== "undefined" && console.warn) console.warn("delete context reload skipped", reloadError);
+    }
+
+    if (typeof setMessage === "function") setMessage("ok", "Manager大項目を削除しました。");
+
+    if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+      aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_done");
+    } else if (typeof render === "function") {
+      render();
+    }
+
+    return result || {};
+  } catch (error) {
+    if (typeof setMessage === "function") {
+      setMessage("error", error && error.message ? error.message : "削除に失敗しました。");
+    }
+    if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+      aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_error");
+    } else if (typeof render === "function") {
+      render();
+    }
+    throw error;
   }
 }
-// AICM_R8Z_V10L_C2G_B_R1_SIMPLE_DELETE_YES_POST_END
 
 function aicmR8zV9g5CancelDeleteConfirm() {
   if (state) state.managerMajorDeleteConfirm = null;
