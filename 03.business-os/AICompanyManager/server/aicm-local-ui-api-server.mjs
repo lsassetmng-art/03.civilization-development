@@ -2002,6 +2002,155 @@ function markWorkerUnitAutoExecutionStartedR8ZI(unitId, runtimePayload) {
   return runPsqlJson(sql);
 }
 
+
+/* AICM_V10L_C2G_B6R7_WORKER_REVIEW_CREATE_HELPER_START */
+function aicmB6r7Text(value) {
+  if (value === null || typeof value === "undefined") return "";
+  return String(value).trim();
+}
+
+function aicmB6r7Json(value) {
+  try {
+    return JSON.stringify(value && typeof value === "object" ? value : {});
+  } catch (_) {
+    return "{}";
+  }
+}
+
+function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
+  const unit = requiredUuid(unitId, "aicm_worker_work_unit_id");
+  const safeDetail = detail && typeof detail === "object" ? detail : {};
+  const aiworkerResponse = safeDetail.aiworker_response && typeof safeDetail.aiworker_response === "object"
+    ? safeDetail.aiworker_response
+    : {};
+  const runtimeRequest = safeDetail.runtime_request && typeof safeDetail.runtime_request === "object"
+    ? safeDetail.runtime_request
+    : {};
+
+  const responseSummary = aicmB6r7Text(
+    aiworkerResponse.result_summary_text ||
+    aiworkerResponse.delivery_summary_text ||
+    aiworkerResponse.summary ||
+    aiworkerResponse.message ||
+    runtimeRequest.result_summary_text ||
+    runtimeRequest.summary ||
+    ""
+  );
+
+  const aiReviewText = aicmB6r7Text(
+    aiworkerResponse.ai_review_result_text ||
+    aiworkerResponse.review_summary ||
+    "AIレビュー: Worker自動実行結果を確認済み。"
+  );
+
+  const detailJson = aicmB6r7Json(safeDetail);
+
+  const sql = [
+    "WITH target AS (",
+    "  SELECT",
+    "    w.*,",
+    "    l.aicm_manager_major_work_item_id,",
+    "    l.aicm_user_company_department_id,",
+    "    l.aicm_user_company_section_id,",
+    "    r.review_required_flag,",
+    "    r.deliverable_name,",
+    "    m.aicm_president_policy_id,",
+    "    m.major_item_name,",
+    "    m.major_item_description",
+    "  FROM business.aicm_worker_work_unit w",
+    "  JOIN business.aicm_leader_middle_work_item l",
+    "    ON l.aicm_leader_middle_work_item_id = w.aicm_leader_middle_work_item_id",
+    "  LEFT JOIN business.aicm_leader_deliverable_requirement r",
+    "    ON r.aicm_leader_deliverable_requirement_id = w.aicm_leader_deliverable_requirement_id",
+    "  LEFT JOIN business.aicm_manager_major_work_item m",
+    "    ON m.aicm_manager_major_work_item_id = l.aicm_manager_major_work_item_id",
+    "  WHERE w.aicm_worker_work_unit_id = " + sqlLiteral(unit) + "::uuid",
+    "  LIMIT 1",
+    "), summary_value AS (",
+    "  SELECT",
+    "    COALESCE(",
+    "      NULLIF(" + sqlLiteral(responseSummary) + ", ''),",
+    "      " + sqlLiteral("AIWorkerOS成果物回収: ") + " || COALESCE(NULLIF(t.work_unit_name, ''), " + sqlLiteral("Worker作業") + ") ||",
+    "      " + sqlLiteral(" / ") + " || COALESCE(NULLIF(t.work_unit_description, ''), NULLIF(t.expected_output_text, ''), NULLIF(t.major_item_description, ''), " + sqlLiteral("指定された作業結果を作成する") + ")",
+    "    ) AS delivery_summary_text",
+    "  FROM target t",
+    "), updated_worker AS (",
+    "  UPDATE business.aicm_worker_work_unit w",
+    "  SET work_status_code = " + sqlLiteral("review_waiting") + ",",
+    "      review_status_code = " + sqlLiteral("waiting") + ",",
+    "      result_summary_text = (SELECT delivery_summary_text FROM summary_value),",
+    "      metadata_jsonb = COALESCE(w.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+    "        " + sqlLiteral("worker_auto_execution_source") + ", " + sqlLiteral("worker-auto-execution/run") + ",",
+    "        " + sqlLiteral("worker_auto_execution_completed_at") + ", now()::text,",
+    "        " + sqlLiteral("worker_auto_execution_result") + ", " + sqlLiteral(detailJson) + "::jsonb",
+    "      ),",
+    "      updated_at = now()",
+    "  WHERE w.aicm_worker_work_unit_id = " + sqlLiteral(unit) + "::uuid",
+    "  RETURNING *",
+    "), inserted_review AS (",
+    "  INSERT INTO business.aicm_human_review_item (",
+    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+    "    related_president_policy_id, related_manager_major_work_item_id, related_leader_middle_work_item_id,",
+    "    related_deliverable_requirement_id, related_worker_work_unit_id,",
+    "    review_kind_code, artifact_kind_code, review_title,",
+    "    delivery_summary_text, main_changes_text, ai_review_result_text, unresolved_issues_text, artifact_link,",
+    "    responsible_ai_label, requested_by_ai_label, human_review_status_code, priority_code, due_date,",
+    "    display_order, metadata_jsonb",
+    "  )",
+    "  SELECT",
+    "    t.owner_civilization_id,",
+    "    t.aicm_user_company_id,",
+    "    t.aicm_user_company_department_id,",
+    "    t.aicm_user_company_section_id,",
+    "    t.aicm_president_policy_id,",
+    "    t.aicm_manager_major_work_item_id,",
+    "    t.aicm_leader_middle_work_item_id,",
+    "    t.aicm_leader_deliverable_requirement_id,",
+    "    t.aicm_worker_work_unit_id,",
+    "    " + sqlLiteral("delivery_summary") + ",",
+    "    " + sqlLiteral("delivery_package") + ",",
+    "    " + sqlLiteral("納品サマリー確認: ") + " || COALESCE(NULLIF(t.work_unit_name, ''), " + sqlLiteral("Worker作業") + "),",
+    "    (SELECT delivery_summary_text FROM summary_value),",
+    "    '',",
+    "    " + sqlLiteral(aiReviewText) + ",",
+    "    '',",
+    "    COALESCE(NULLIF(t.handoff_link, ''), ''),",
+    "    COALESCE(NULLIF(t.assigned_worker_label, ''), " + sqlLiteral("AIWorker") + "),",
+    "    " + sqlLiteral("AICompanyManager") + ",",
+    "    " + sqlLiteral("pending") + ",",
+    "    COALESCE(NULLIF(t.priority_code, ''), " + sqlLiteral("normal") + "),",
+    "    t.due_date,",
+    "    COALESCE(t.display_order, 100),",
+    "    jsonb_build_object(",
+    "      " + sqlLiteral("source") + ", " + sqlLiteral("worker-auto-execution/run") + ",",
+    "      " + sqlLiteral("source_worker_work_unit_id") + ", t.aicm_worker_work_unit_id::text,",
+    "      " + sqlLiteral("source_manager_major_work_item_id") + ", t.aicm_manager_major_work_item_id::text",
+    "    )",
+    "  FROM target t",
+    "  WHERE COALESCE(t.review_required_flag, true) = true",
+    "    AND EXISTS (SELECT 1 FROM updated_worker)",
+    "    AND NOT EXISTS (",
+    "      SELECT 1",
+    "      FROM business.aicm_human_review_item h",
+    "      WHERE h.related_worker_work_unit_id = t.aicm_worker_work_unit_id",
+    "        AND COALESCE(h.human_review_status_code, '') <> " + sqlLiteral("archived"),
+    "    )",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', 'ok',",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'updated_worker_count', (SELECT count(*) FROM updated_worker),",
+    "  'created_human_review_count', (SELECT count(*) FROM inserted_review),",
+    "  'updated_worker', COALESCE((SELECT to_jsonb(updated_worker) FROM updated_worker LIMIT 1), '{}'::jsonb),",
+    "  'human_review_item', COALESCE((SELECT to_jsonb(inserted_review) FROM inserted_review LIMIT 1), '{}'::jsonb)",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+/* AICM_V10L_C2G_B6R7_WORKER_REVIEW_CREATE_HELPER_END */
+
 async function runWorkerAutoExecutionR8ZI(body) {
   const dryRun = body && body.dry_run === true;
   const pairs = workerAutoExecutionCandidatesR8ZI(body || {});
@@ -2038,12 +2187,20 @@ async function runWorkerAutoExecutionR8ZI(body) {
         aiworker_response: runtimeResult.aiworker_response || {}
       });
 
+      const reviewResult = completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, {
+        result: runtimeResult.result,
+        request_body: requestBody,
+        runtime_request: runtimeResult.runtime_request || {},
+        aiworker_response: runtimeResult.aiworker_response || {}
+      });
+
       executed.push({
         aicm_worker_work_unit_id: unitId,
         result: "ok",
         request_body: requestBody,
         runtime_result: runtimeResult,
-        mark_result: markResult
+        mark_result: markResult,
+        review_result: reviewResult
       });
     } catch (error) {
       failed.push({
