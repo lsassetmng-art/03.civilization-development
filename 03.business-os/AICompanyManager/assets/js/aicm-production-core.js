@@ -6275,6 +6275,201 @@ await aicmReloadTaskLedgerContext();
       ? '<details class="aicm-selected-note" style="margin-top:12px;"><summary>payload preview（POST未実行）</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(payloads, null, 2)) + '</pre></details>'
       : "";
 
+  // AICM_R8Z_MGR_MAJOR_CARD_C2F_B3_EXACT_ANCHOR_PRE_POST_GATE_START
+  // Pre-POST validation gate inserted by exact line anchor before the first return-array.
+  // This block does not enable POST and does not call fetch.
+  // Missing state returns a locked panel. Complete state falls through to the existing renderer.
+  try {
+    function aicmC2fB3Text(value) {
+      if (value === null || typeof value === "undefined") return "";
+      return String(value).trim();
+    }
+
+    function aicmC2fB3Escape(value) {
+      return aicmC2fB3Text(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function aicmC2fB3Get(obj, keys) {
+      if (!obj || typeof obj !== "object") return "";
+      for (var aicmC2fB3I = 0; aicmC2fB3I < keys.length; aicmC2fB3I += 1) {
+        var aicmC2fB3Key = keys[aicmC2fB3I];
+        var aicmC2fB3Value = obj[aicmC2fB3Key];
+        if (aicmC2fB3Value !== null && typeof aicmC2fB3Value !== "undefined" && String(aicmC2fB3Value).trim() !== "") {
+          return String(aicmC2fB3Value).trim();
+        }
+      }
+      return "";
+    }
+
+    function aicmC2fB3StableRowId(row, fallbackIndex) {
+      return aicmC2fB3Get(row, [
+        "manager_major_item_id",
+        "managerMajorItemId",
+        "pmlw_major_item_id",
+        "major_item_id",
+        "majorItemId",
+        "id",
+        "uuid"
+      ]) || "";
+    }
+
+    function aicmC2fB3RowTitle(row, fallbackId, fallbackIndex) {
+      return aicmC2fB3Get(row, [
+        "major_item_name",
+        "manager_major_item_name",
+        "title",
+        "name",
+        "task_name"
+      ]) || fallbackId || ("対象大項目" + String(fallbackIndex + 1));
+    }
+
+    var aicmC2fB3SelectedRows = [];
+    if (typeof aicmR8zMgrMajorCardSelectedRows === "function") {
+      try {
+        aicmC2fB3SelectedRows = aicmR8zMgrMajorCardSelectedRows() || [];
+      } catch (_) {
+        aicmC2fB3SelectedRows = [];
+      }
+    }
+
+    var aicmC2fB3SelectionState = null;
+    if (typeof aicmR8zMgrMajorCardSelectionState === "function") {
+      try {
+        aicmC2fB3SelectionState = aicmR8zMgrMajorCardSelectionState();
+      } catch (_) {
+        aicmC2fB3SelectionState = null;
+      }
+    }
+
+    var aicmC2fB3GlobalState = typeof state !== "undefined" && state ? state : {};
+    var aicmC2fB3FallbackSelection =
+      aicmC2fB3GlobalState.r8zMgrMajorCardSelection && typeof aicmC2fB3GlobalState.r8zMgrMajorCardSelection === "object"
+        ? aicmC2fB3GlobalState.r8zMgrMajorCardSelection
+        : {};
+
+    var aicmC2fB3Route =
+      (aicmC2fB3SelectionState && aicmC2fB3SelectionState.handoffBatchRoute) ||
+      aicmC2fB3FallbackSelection.handoffBatchRoute ||
+      {};
+
+    var aicmC2fB3Missing = [];
+    var aicmC2fB3Ids = [];
+    var aicmC2fB3Titles = [];
+
+    if (!Array.isArray(aicmC2fB3SelectedRows) || aicmC2fB3SelectedRows.length < 1) {
+      aicmC2fB3Missing.push("対象大項目が選択されていません");
+    }
+
+    for (var aicmC2fB3RowIndex = 0; aicmC2fB3RowIndex < aicmC2fB3SelectedRows.length; aicmC2fB3RowIndex += 1) {
+      var aicmC2fB3Row = aicmC2fB3SelectedRows[aicmC2fB3RowIndex] || {};
+      var aicmC2fB3Id = aicmC2fB3StableRowId(aicmC2fB3Row, aicmC2fB3RowIndex);
+      var aicmC2fB3Title = aicmC2fB3RowTitle(aicmC2fB3Row, aicmC2fB3Id, aicmC2fB3RowIndex);
+      if (!aicmC2fB3Id) {
+        aicmC2fB3Missing.push("対象大項目IDが安定していません: " + aicmC2fB3Title);
+      } else {
+        aicmC2fB3Ids.push(aicmC2fB3Id);
+      }
+      aicmC2fB3Titles.push(aicmC2fB3Title);
+    }
+
+    var aicmC2fB3RouteApplied =
+      aicmC2fB3Route.applied === true ||
+      aicmC2fB3Route.applied_flag === true ||
+      aicmC2fB3Text(aicmC2fB3Route.appliedLabel || aicmC2fB3Route.applied_label) === "適用済み";
+
+    var aicmC2fB3DepartmentLabel = aicmC2fB3Text(
+      aicmC2fB3Route.departmentLabel ||
+      aicmC2fB3Route.department_label ||
+      aicmC2fB3Route.departmentName ||
+      aicmC2fB3Route.department_name
+    );
+
+    var aicmC2fB3SectionLabel = aicmC2fB3Text(
+      aicmC2fB3Route.sectionLabel ||
+      aicmC2fB3Route.section_label ||
+      aicmC2fB3Route.sectionName ||
+      aicmC2fB3Route.section_name
+    );
+
+    var aicmC2fB3LeaderLabel = aicmC2fB3Text(
+      aicmC2fB3Route.leaderLabel ||
+      aicmC2fB3Route.leader_label ||
+      aicmC2fB3Route.assigned_leader_label
+    );
+
+    var aicmC2fB3LeaderPlacementId = aicmC2fB3Text(
+      aicmC2fB3Route.leaderPlacementId ||
+      aicmC2fB3Route.leader_placement_id ||
+      aicmC2fB3Route.assigned_leader_placement_id
+    );
+
+    if (!aicmC2fB3RouteApplied) aicmC2fB3Missing.push("課・部門・Leaderの引き渡し先が未適用です");
+    if (!aicmC2fB3DepartmentLabel) aicmC2fB3Missing.push("部門が未設定です");
+    if (!aicmC2fB3SectionLabel) aicmC2fB3Missing.push("課が未設定です");
+    if (!aicmC2fB3LeaderLabel) aicmC2fB3Missing.push("Leaderが未設定です");
+    if (!aicmC2fB3LeaderPlacementId) aicmC2fB3Missing.push("Leader配置IDが未設定です");
+
+    var aicmC2fB3PayloadPreview = {
+      selected_manager_major_item_ids: aicmC2fB3Ids,
+      selected_titles: aicmC2fB3Titles,
+      route: {
+        department_label: aicmC2fB3DepartmentLabel,
+        section_label: aicmC2fB3SectionLabel,
+        leader_label: aicmC2fB3LeaderLabel,
+        leader_placement_id: aicmC2fB3LeaderPlacementId
+      },
+      api_post: "LOCKED_BY_C2F_B3_PRE_POST_GATE",
+      db_write: "NO"
+    };
+
+    if (aicmC2fB3Missing.length > 0) {
+      return [
+        '<section class="aicm-core-card aicm-r8z-c2f-b3-prepost-gate">',
+        '<div class="aicm-core-section-title">課長へ送る前の実行前チェック</div>',
+        '<p class="aicm-core-muted">不足項目があるため、POST実行はロックされています。</p>',
+        '<div class="aicm-core-alert aicm-core-alert-warning">',
+        '<strong>実行前チェックNG</strong>',
+        '<ul>',
+        aicmC2fB3Missing.map(function (item) {
+          return '<li>' + aicmC2fB3Escape(item) + '</li>';
+        }).join(''),
+        '</ul>',
+        '</div>',
+        '<dl class="aicm-core-dl">',
+        '<dt>部門</dt><dd>' + aicmC2fB3Escape(aicmC2fB3DepartmentLabel || '-') + '</dd>',
+        '<dt>課</dt><dd>' + aicmC2fB3Escape(aicmC2fB3SectionLabel || '-') + '</dd>',
+        '<dt>Leader</dt><dd>' + aicmC2fB3Escape(aicmC2fB3LeaderLabel || '-') + '</dd>',
+        '<dt>対象大項目数</dt><dd>' + String(Array.isArray(aicmC2fB3SelectedRows) ? aicmC2fB3SelectedRows.length : 0) + '</dd>',
+        '</dl>',
+        '<details class="aicm-core-details">',
+        '<summary>payload preview（POST未実行）</summary>',
+        '<pre>' + aicmC2fB3Escape(JSON.stringify(aicmC2fB3PayloadPreview, null, 2)) + '</pre>',
+        '</details>',
+        '<div class="aicm-core-actions">',
+        '<button type="button" class="aicm-core-btn" data-core-action="r8z-mgr-major-card-close-handoff-confirm">戻る</button>',
+        '</div>',
+        '</section>'
+      ].join('');
+    }
+  } catch (aicmC2fB3Error) {
+    return [
+      '<section class="aicm-core-card aicm-r8z-c2f-b3-prepost-gate-error">',
+      '<div class="aicm-core-section-title">課長へ送る前の実行前チェック</div>',
+      '<p class="aicm-core-alert aicm-core-alert-warning">確認状態を読み取れないため、POST実行はロックされています。</p>',
+      '<pre>' + String(aicmC2fB3Error && aicmC2fB3Error.message ? aicmC2fB3Error.message : aicmC2fB3Error) + '</pre>',
+      '<div class="aicm-core-actions">',
+      '<button type="button" class="aicm-core-btn" data-core-action="r8z-mgr-major-card-close-handoff-confirm">戻る</button>',
+      '</div>',
+      '</section>'
+    ].join('');
+  }
+  // AICM_R8Z_MGR_MAJOR_CARD_C2F_B3_EXACT_ANCHOR_PRE_POST_GATE_END
+
     return [
       '<div class="aicm-core-card" data-r8z-mgr-major-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
       '  <p class="aicm-eyebrow">確認</p>',
