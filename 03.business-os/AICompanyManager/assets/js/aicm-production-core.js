@@ -4112,15 +4112,115 @@ function aicmAxuR1ShowLeaderHandoffConfirm(payload) {
 
 function aicmAxuR1OpenLeaderHandoffConfirm(button) {
     try {
-      var majorId = button && button.getAttribute ? button.getAttribute("data-pmlw-major-id") : "";
-      var row = aicmAxuR1FindMajorById(majorId);
+      // AICM_V10L_C2G_B2_SIMPLE_MULTI_HANDOFF_OPEN_START
+      var ids = [];
 
-      if (!row) {
+      function pushId(v) {
+        var s = String(v === undefined || v === null ? "" : v).trim();
+        if (s && ids.indexOf(s) < 0) ids.push(s);
+      }
+
+      function idFromElement(el) {
+        if (!el || !el.getAttribute) return "";
+        var attrs = [
+          "data-pmlw-major-id",
+          "data-major-id",
+          "data-manager-major-id",
+          "data-aicm-manager-major-work-item-id",
+          "data-manager-major-work-item-id",
+          "value"
+        ];
+        for (var i = 0; i < attrs.length; i += 1) {
+          var v = el.getAttribute(attrs[i]);
+          if (v) return String(v).trim();
+        }
+        return "";
+      }
+
+      function pushFromElement(el) {
+        if (!el) return;
+        pushId(idFromElement(el));
+        if (el.closest) {
+          pushId(idFromElement(el.closest("[data-pmlw-major-id]")));
+          pushId(idFromElement(el.closest("[data-major-id]")));
+          pushId(idFromElement(el.closest("[data-manager-major-id]")));
+          pushId(idFromElement(el.closest("[data-aicm-manager-major-work-item-id]")));
+        }
+      }
+
+      try {
+        var keys = [
+          "r8zMgrMajorCardSelectedMajorItemIds",
+          "r8zMgrMajorCardSelectedIds",
+          "selectedManagerMajorItemIds",
+          "selectedMajorItemIds",
+          "managerMajorSelectedIds"
+        ];
+        for (var k = 0; k < keys.length; k += 1) {
+          var v = state && state[keys[k]];
+          if (Array.isArray(v)) {
+            for (var ai = 0; ai < v.length; ai += 1) pushId(v[ai]);
+          } else if (v && typeof v === "object") {
+            Object.keys(v).forEach(function (key) {
+              if (v[key]) pushId(key);
+            });
+          }
+        }
+      } catch (_) {}
+
+      try {
+        if (typeof document !== "undefined" && document.querySelectorAll) {
+          var checked = document.querySelectorAll(
+            'input[data-core-action="r8z-mgr-major-card-toggle"]:checked,' +
+            'input[data-major-id]:checked,' +
+            'input[data-manager-major-id]:checked,' +
+            '[data-core-action="r8z-mgr-major-card-toggle"][aria-pressed="true"],' +
+            '[data-core-action="r8z-mgr-major-card-toggle"][data-selected="true"]'
+          );
+          for (var ci = 0; ci < checked.length; ci += 1) pushFromElement(checked[ci]);
+        }
+      } catch (_) {}
+
+      if (!ids.length) pushFromElement(button);
+
+      if (!ids.length) {
+        throw new Error("Manager大項目IDを特定できません。");
+      }
+
+      var items = [];
+      for (var ii = 0; ii < ids.length; ii += 1) {
+        var row = aicmAxuR1FindMajorById(ids[ii]);
+        if (!row) continue;
+        var summary = aicmMajorItemSummaryR8O(row);
+        items.push({
+          id: ids[ii],
+          row: row,
+          title: summary.title,
+          description: summary.description,
+          leader: summary.leader,
+          due: summary.due,
+          priority: summary.priority,
+          status: summary.status
+        });
+      }
+
+      if (!items.length) {
         throw new Error("Manager大項目を特定できません。");
       }
 
-      var payload = aicmAxuR1BuildLeaderHandoffPayload(row);
+      var payload = aicmAxuR1BuildLeaderHandoffPayload(items[0].row);
+      payload.ids = items.map(function (item) { return item.id; });
+      payload.items = items;
+      payload.count = items.length;
+      payload.majorId = items[0].id;
+
+      if (items.length > 1) {
+        payload.title = items[0].title + " ほか" + String(items.length - 1) + "件";
+        payload.description = "複数のManager大項目を同じ引き渡し先へ送ります。";
+      }
+
       aicmAxuR1ShowLeaderHandoffConfirm(payload);
+      // AICM_V10L_C2G_B2_SIMPLE_MULTI_HANDOFF_OPEN_END
     } catch (error) {
       setMessage("error", error && error.message ? error.message : "課長への引渡し確認を表示できません。");
       if (typeof render === "function") render();
@@ -4729,6 +4829,8 @@ function aicmGetManagerMajorRowsForSelectedCompany(companyId) {
       '<section id="aicm-manager-major-leader-handoff-confirm" class="aicm-core-card" style="border:2px solid #2563eb;">',
       '  <p class="aicm-eyebrow">課長へ送る確認</p>',
       '  <h2>このManager大項目を課長/Leaderへ送りますか？</h2>',
+      // AICM_V10L_C2G_B2_SIMPLE_MULTI_HANDOFF_COUNT_RENDER
+      payload.ids && payload.ids.length > 1 ? '  <p class="aicm-selected-note">対象: ' + escapeHtml(String(payload.ids.length)) + '件</p>' : '',
       '  <p class="aicm-selected-note">確定するとDBへ保存されます。ステータスを assigned_to_leader / handed_off に更新し、その後Leader中項目/成果物要件/Worker作業単位を自動作成します。</p>',
       '  <dl class="aicm-core-detail-list">',
       '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
@@ -4771,6 +4873,86 @@ function aicmGetManagerMajorRowsForSelectedCompany(companyId) {
       render();
       return;
     }
+
+    // AICM_V10L_C2G_B2_SIMPLE_MULTI_HANDOFF_EXECUTE_START
+    var aicmC2gHandoffIds = [];
+    if (payload && Array.isArray(payload.ids)) {
+      for (var aicmC2gHi = 0; aicmC2gHi < payload.ids.length; aicmC2gHi += 1) {
+        var aicmC2gHv = String(payload.ids[aicmC2gHi] || "").trim();
+        if (aicmC2gHv && aicmC2gHandoffIds.indexOf(aicmC2gHv) < 0) aicmC2gHandoffIds.push(aicmC2gHv);
+      }
+    }
+    if (!aicmC2gHandoffIds.length && payload.majorId) aicmC2gHandoffIds.push(String(payload.majorId).trim());
+
+    if (aicmC2gHandoffIds.length > 1) {
+      var aicmC2gHandoffOk = 0;
+      var aicmC2gHandoffNg = [];
+
+      for (var aicmC2gHj = 0; aicmC2gHj < aicmC2gHandoffIds.length; aicmC2gHj += 1) {
+        var aicmC2gMajorId = aicmC2gHandoffIds[aicmC2gHj];
+
+        try {
+          var body = {
+            owner_civilization_id: ownerCivilizationId,
+            aicm_manager_major_work_item_id: aicmC2gMajorId,
+            decomposition_status_code: "assigned_to_leader",
+            handoff_status_code: "handed_off"
+          };
+
+          if (payload.leaderRaw) {
+            body.assigned_leader_label = payload.leaderRaw;
+          }
+
+          var response = await fetch("/api/aicm/v2/manager-major/update", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json"
+            },
+            body: JSON.stringify(body)
+          });
+
+          var rawText = await response.text();
+          var json = null;
+          try {
+            json = rawText ? JSON.parse(rawText) : null;
+          } catch (_) {
+            json = null;
+          }
+
+          if (!response.ok || (json && json.result && json.result !== "ok")) {
+            throw new Error(aicmLeaderHandoffApiErrorTextR8S(response, json, rawText));
+          }
+
+          if (typeof aicmRunLeaderAutoDecompositionAfterHandoffR8ZB === "function") {
+            await aicmRunLeaderAutoDecompositionAfterHandoffR8ZB(aicmC2gMajorId);
+          }
+          if (typeof aicmRunWorkerAutoExecutionAfterDecompositionR8ZI === "function") {
+            await aicmRunWorkerAutoExecutionAfterDecompositionR8ZI(aicmC2gMajorId);
+          }
+
+          aicmC2gHandoffOk += 1;
+        } catch (aicmC2gErr) {
+          aicmC2gHandoffNg.push(aicmC2gMajorId + ": " + (aicmC2gErr && aicmC2gErr.message ? aicmC2gErr.message : "失敗"));
+        }
+      }
+
+      state.managerMajorLeaderHandoffConfirm = null;
+      state.screen = "task-ledger";
+
+      if (aicmC2gHandoffNg.length) {
+        setMessage("error", "課長へ送る: " + String(aicmC2gHandoffOk) + "件成功 / " + String(aicmC2gHandoffNg.length) + "件失敗");
+      } else {
+        setMessage("ok", String(aicmC2gHandoffOk) + "件を課長へ送りました。");
+      }
+
+      if (typeof aicmReloadTaskLedgerContext === "function") {
+        await aicmReloadTaskLedgerContext();
+      } else {
+        render();
+      }
+      return;
+    }
+    // AICM_V10L_C2G_B2_SIMPLE_MULTI_HANDOFF_EXECUTE_END
 
     var ownerCivilizationId = aicmLeaderHandoffOwnerIdR8S(payload);
     if (!ownerCivilizationId) {
@@ -4927,6 +5109,8 @@ await aicmReloadTaskLedgerContext();
       '<section class="aicm-core-card" style="border:2px solid #f97316;">',
       '  <p class="aicm-eyebrow">削除確認</p>',
       '  <h2>登録済み大項目を削除しますか？</h2>',
+      // AICM_V10L_C2G_B2_SIMPLE_MULTI_DELETE_COUNT_RENDER
+      payload.ids && payload.ids.length > 1 ? '  <p class="aicm-selected-note">対象: ' + escapeHtml(String(payload.ids.length)) + '件</p>' : '',
       '  <p class="aicm-selected-note">この操作は確認後にDBへ保存されます。物理DELETEではなく、既存APIで削除済み扱いにします。</p>',
       '  <dl class="aicm-core-detail-list">',
       '    <dt>大項目</dt><dd>' + escapeHtml(payload.title || "") + '</dd>',
@@ -4945,27 +5129,119 @@ await aicmReloadTaskLedgerContext();
 
   function aicmOpenMajorItemDeleteConfirmR8P(button) {
     try {
-      var majorId = button && button.getAttribute ? button.getAttribute("data-major-id") : "";
-      if (!majorId) throw new Error("Manager大項目IDを特定できません。");
+      // AICM_V10L_C2G_B2_SIMPLE_MULTI_DELETE_OPEN_START
+      var ids = [];
 
-      var row = aicmAxuR1FindMajorById(majorId);
-      if (!row) throw new Error("Manager大項目を特定できません。");
+      function pushId(v) {
+        var s = String(v === undefined || v === null ? "" : v).trim();
+        if (s && ids.indexOf(s) < 0) ids.push(s);
+      }
 
-      var summary = aicmMajorItemSummaryR8O(row);
+      function idFromElement(el) {
+        if (!el || !el.getAttribute) return "";
+        var attrs = [
+          "data-major-id",
+          "data-manager-major-id",
+          "data-pmlw-major-id",
+          "data-aicm-manager-major-work-item-id",
+          "data-manager-major-work-item-id",
+          "value"
+        ];
+        for (var i = 0; i < attrs.length; i += 1) {
+          var v = el.getAttribute(attrs[i]);
+          if (v) return String(v).trim();
+        }
+        return "";
+      }
+
+      function pushFromElement(el) {
+        if (!el) return;
+        pushId(idFromElement(el));
+        if (el.closest) {
+          pushId(idFromElement(el.closest("[data-major-id]")));
+          pushId(idFromElement(el.closest("[data-manager-major-id]")));
+          pushId(idFromElement(el.closest("[data-pmlw-major-id]")));
+          pushId(idFromElement(el.closest("[data-aicm-manager-major-work-item-id]")));
+        }
+      }
+
+      try {
+        var keys = [
+          "r8zMgrMajorCardSelectedMajorItemIds",
+          "r8zMgrMajorCardSelectedIds",
+          "selectedManagerMajorItemIds",
+          "selectedMajorItemIds",
+          "managerMajorSelectedIds"
+        ];
+        for (var k = 0; k < keys.length; k += 1) {
+          var v = state && state[keys[k]];
+          if (Array.isArray(v)) {
+            for (var ai = 0; ai < v.length; ai += 1) pushId(v[ai]);
+          } else if (v && typeof v === "object") {
+            Object.keys(v).forEach(function (key) {
+              if (v[key]) pushId(key);
+            });
+          }
+        }
+      } catch (_) {}
+
+      try {
+        if (typeof document !== "undefined" && document.querySelectorAll) {
+          var checked = document.querySelectorAll(
+            'input[data-core-action="r8z-mgr-major-card-toggle"]:checked,' +
+            'input[data-major-id]:checked,' +
+            'input[data-manager-major-id]:checked,' +
+            '[data-core-action="r8z-mgr-major-card-toggle"][aria-pressed="true"],' +
+            '[data-core-action="r8z-mgr-major-card-toggle"][data-selected="true"]'
+          );
+          for (var ci = 0; ci < checked.length; ci += 1) pushFromElement(checked[ci]);
+        }
+      } catch (_) {}
+
+      if (!ids.length) pushFromElement(button);
+
+      if (!ids.length) {
+        throw new Error("Manager大項目IDを特定できません。");
+      }
+
+      var items = [];
+      for (var ii = 0; ii < ids.length; ii += 1) {
+        var row = aicmAxuR1FindMajorById(ids[ii]);
+        if (!row) continue;
+        var summary = aicmMajorItemSummaryR8O(row);
+        items.push({
+          id: ids[ii],
+          row: row,
+          title: summary.title,
+          description: summary.description,
+          leader: summary.leader,
+          due: summary.due,
+          priority: summary.priority,
+          status: summary.status
+        });
+      }
+
+      if (!items.length) {
+        throw new Error("Manager大項目を特定できません。");
+      }
 
       state.managerMajorDeleteConfirm = {
-        majorId: majorId,
-        title: summary.title,
-        description: summary.description,
-        leader: summary.leader,
-        due: summary.due,
-        priority: summary.priority,
-        status: summary.status
+        majorId: items[0].id,
+        ids: items.map(function (item) { return item.id; }),
+        items: items,
+        count: items.length,
+        title: items.length > 1 ? items[0].title + " ほか" + String(items.length - 1) + "件" : items[0].title,
+        description: items.length > 1 ? "複数のManager大項目を削除済み扱いにします。" : items[0].description,
+        leader: items[0].leader,
+        due: items[0].due,
+        priority: items[0].priority,
+        status: items[0].status
       };
 
       state.screen = "task-ledger";
       setMessage("ok", "削除確認を表示しました。内容を確認してから確定してください。");
       render();
+      // AICM_V10L_C2G_B2_SIMPLE_MULTI_DELETE_OPEN_END
     } catch (error) {
       setMessage("error", error && error.message ? error.message : "削除確認を表示できません。");
       render();
@@ -6196,6 +6472,7 @@ await aicmReloadTaskLedgerContext();
   
   
   function aicmR8zMgrMajorCardRenderConfirm() {
+    // AICM_V10L_C2G_B5R1_MIN_ROUTE_PICKER_GUARD: route picker is handoff only; delete confirm must not show it.
     var bag = aicmR8zMgrMajorCardState();
     var confirm = bag.confirm || null;
 
@@ -6228,7 +6505,7 @@ await aicmReloadTaskLedgerContext();
       : (confirm.route || {});
 
     var routePickerHtml = typeof aicmR8zC2cRenderRoutePicker === "function"
-      ? aicmR8zC2cRenderRoutePicker()
+      ? ((confirm && confirm.kind === "leader-handoff" && typeof aicmR8zC2cRenderRoutePicker === "function") ? aicmR8zC2cRenderRoutePicker() : "")
       : "";
 
 
@@ -6275,7 +6552,7 @@ await aicmReloadTaskLedgerContext();
       ? '<details class="aicm-selected-note" style="margin-top:12px;"><summary>payload preview（POST未実行）</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(payloads, null, 2)) + '</pre></details>'
       : "";
 
-    return [
+    var aicmB5r2ConfirmHtml = [
       '<div class="aicm-core-card" data-r8z-mgr-major-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
       '  <p class="aicm-eyebrow">確認</p>',
       '  <h3>' + escapeHtml(confirm.title || "確認") + '</h3>',
@@ -6295,6 +6572,43 @@ await aicmReloadTaskLedgerContext();
       '  <p class="aicm-selected-note">この確認画面ではDB更新/API POSTは実行しません。</p>',
       '</div>'
     ].join("");
+
+    // AICM_V10L_C2G_B5R2_DELETE_CONFIRM_UI_CLEANUP_START
+    if (confirm && confirm.kind === "delete") {
+      try {
+        if (typeof document !== "undefined" && document.createElement) {
+          var aicmB5r2Root = document.createElement("div");
+          aicmB5r2Root.innerHTML = aicmB5r2ConfirmHtml;
+
+          Array.prototype.slice.call(aicmB5r2Root.querySelectorAll("*")).forEach(function (node) {
+            var text = String(node && node.textContent || "");
+            if (text.indexOf("一括引き渡し先") >= 0 || text.indexOf("引き渡し先 一括選択") >= 0) {
+              var removeTarget = node.closest ? node.closest(".aicm-core-card, [data-r8z-mgr-major-card-route-picker]") : node;
+              if (removeTarget && removeTarget.parentNode) removeTarget.parentNode.removeChild(removeTarget);
+            }
+          });
+
+          Array.prototype.slice.call(aicmB5r2Root.querySelectorAll("p, div, section, article")).forEach(function (node) {
+            var text = String(node && node.textContent || "").trim();
+            if (
+              text.indexOf("実行前チェックOK") >= 0 ||
+              text.indexOf("この確認画面ではDB更新/API POST") >= 0 ||
+              text.indexOf("API POST解放前に佐藤") >= 0
+            ) {
+              if (node.parentNode) node.parentNode.removeChild(node);
+            }
+          });
+
+          aicmB5r2ConfirmHtml = aicmB5r2Root.innerHTML;
+        }
+      } catch (_) {
+        aicmB5r2ConfirmHtml = String(aicmB5r2ConfirmHtml || "")
+          .replace(/<[^>]*>[^<]*(実行前チェックOK|API POST解放前に佐藤|この確認画面ではDB更新\/API POST)[\s\S]*?<\/[^>]+>/g, "");
+      }
+    }
+    // AICM_V10L_C2G_B5R2_DELETE_CONFIRM_UI_CLEANUP_END
+
+    return aicmB5r2ConfirmHtml;
   }
 
 
@@ -6994,31 +7308,151 @@ await aicmReloadTaskLedgerContext();
       }
 
 if (action === "r8z-mgr-major-card-confirm-yes") {
-        // AICM_R8Z_MGR_MAJOR_CARD_C2B_PAYLOAD_VALIDATION_CONFIRM_YES_VALIDATION_GUARD
+        // AICM_V10L_C2G_B5R1_MIN_CONFIRM_YES_POST_START
         if (bag.confirm && Array.isArray(bag.confirm.errors) && bag.confirm.errors.length) {
           if (typeof setMessage === "function") {
             setMessage("error", "実行前チェックが未解決のため、Yesは実行できません。");
           }
-          aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_blocked_c2b");
+          aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_blocked_b5r1");
           return;
         }
 
-        var kind = bag.confirm && bag.confirm.kind ? bag.confirm.kind : "";
-        var count = bag.confirm && Array.isArray(bag.confirm.items) ? bag.confirm.items.length : 0;
+        var confirm = bag.confirm || null;
 
-        bag.confirm = null;
-
-        if (typeof setMessage === "function") {
-          setMessage(
-            "ok",
-            (kind === "delete" ? "削除" : "課長へ送る") +
-            "のYesを受け付けました。ただしこの確認画面ではDB更新/API POSTは実行していません。対象件数: " +
-            String(count)
-          );
+        if (!confirm) {
+          if (typeof setMessage === "function") setMessage("error", "確認情報が見つかりません。");
+          aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_missing_b5r1");
+          return;
         }
 
-        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_no_write");
+        void (async function aicmV10lC2gB5r1ConfirmYesPost() {
+          try {
+            var kind = String(confirm.kind || "");
+            var items = Array.isArray(confirm.items) ? confirm.items : [];
+            var payloads = Array.isArray(confirm.payloads) ? confirm.payloads : [];
+
+            if (!items.length) {
+              if (typeof setMessage === "function") setMessage("error", "対象の大項目がありません。");
+              aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_empty_b5r1");
+              return;
+            }
+
+            if (typeof setMessage === "function") {
+              setMessage("info", (kind === "delete" ? "削除" : "課長へ送る") + "を実行しています。対象件数: " + String(items.length));
+            }
+
+            var ok = 0;
+            var ng = [];
+
+            for (var i = 0; i < items.length; i += 1) {
+              var item = items[i] || {};
+              var payload = payloads[i] && typeof payloads[i] === "object"
+                ? payloads[i]
+                : (item.payload && typeof item.payload === "object" ? item.payload : {});
+
+              var body = {};
+              Object.keys(payload).forEach(function (key) {
+                body[key] = payload[key];
+              });
+
+              if (!body.owner_civilization_id) {
+                body.owner_civilization_id =
+                  item.owner_civilization_id ||
+                  item.ownerCivilizationId ||
+                  (item.row && (item.row.owner_civilization_id || item.row.ownerCivilizationId)) ||
+                  "";
+              }
+
+              if (!body.owner_civilization_id && typeof aicmR8zC2bOwnerId === "function") {
+                try {
+                  body.owner_civilization_id = aicmR8zC2bOwnerId(item.row || item);
+                } catch (_) {}
+              }
+
+              if (!body.aicm_manager_major_work_item_id) {
+                body.aicm_manager_major_work_item_id =
+                  item.id ||
+                  item.majorId ||
+                  item.major_item_id ||
+                  item.aicm_manager_major_work_item_id ||
+                  item.manager_major_work_item_id ||
+                  (item.row && (
+                    item.row.aicm_manager_major_work_item_id ||
+                    item.row.manager_major_work_item_id ||
+                    item.row.major_item_id ||
+                    item.row.id
+                  )) ||
+                  "";
+              }
+
+              if (kind === "delete") {
+                body.decomposition_status_code = "archived";
+                body.handoff_status_code = "archived";
+              } else {
+                body.decomposition_status_code = body.decomposition_status_code || "assigned_to_leader";
+                body.handoff_status_code = body.handoff_status_code || "handed_off";
+              }
+
+              try {
+                if (!body.owner_civilization_id) throw new Error("owner_civilization_idがありません。");
+                if (!body.aicm_manager_major_work_item_id) throw new Error("Manager大項目IDがありません。");
+
+                var response = await fetch("/api/aicm/v2/manager-major/update", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify(body)
+                });
+
+                var rawText = await response.text();
+                var json = null;
+
+                try {
+                  json = rawText ? JSON.parse(rawText) : null;
+                } catch (_) {
+                  json = null;
+                }
+
+                if (!response.ok || (json && json.result && json.result !== "ok")) {
+                  throw new Error(
+                    json && (json.error_message || json.message || json.error)
+                      ? (json.error_message || json.message || json.error)
+                      : rawText || "POSTに失敗しました。"
+                  );
+                }
+
+                ok += 1;
+              } catch (oneErr) {
+                ng.push((item.title || body.aicm_manager_major_work_item_id || "対象") + ": " + (oneErr && oneErr.message ? oneErr.message : "失敗"));
+              }
+            }
+
+            bag.confirm = null;
+
+            if (ng.length) {
+              if (typeof setMessage === "function") {
+                setMessage("error", (kind === "delete" ? "削除" : "課長へ送る") + ": " + String(ok) + "件成功 / " + String(ng.length) + "件失敗");
+              }
+            } else {
+              if (typeof setMessage === "function") {
+                setMessage("ok", String(ok) + "件を" + (kind === "delete" ? "削除済み扱いにしました。" : "課長へ送りました。"));
+              }
+            }
+
+            if (typeof aicmReloadTaskLedgerContext === "function") {
+              await aicmReloadTaskLedgerContext();
+            } else {
+              aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_post_done_b5r1");
+            }
+          } catch (error) {
+            if (typeof setMessage === "function") {
+              setMessage("error", error && error.message ? error.message : "確認Yesの実行に失敗しました。");
+            }
+            aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_post_error_b5r1");
+          }
+        }());
+
         return;
+        // AICM_V10L_C2G_B5R1_MIN_CONFIRM_YES_POST_END
       }
     } catch (error) {
       try {
@@ -8609,236 +9043,210 @@ function aicmR8zV9g5MajorId(payload, btn) {
   );
 }
 
-// AICM_R8Z_V10L_C2G_B_R1_SIMPLE_DELETE_YES_POST_START
-async function aicmR8zV9g5ExecuteDeleteConfirm() {
-  var endpoint = "/api/aicm/v2/manager-major/update";
+async function aicmR8zV9g5ExecuteDeleteConfirm(btn) {
+  // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: V9G5 owns confirmed delete via manager-major/update fallback.
+  var payload = aicmR8zV9g5DeleteConfirmState();
 
-  function c2gBState() {
-    try {
-      if (typeof state !== "undefined" && state) return state;
-    } catch (e) {}
-    try {
-      if (typeof window !== "undefined") return window.AICM_STATE || window.aicmState || window.state || {};
-    } catch (e2) {}
-    return {};
+  if (!payload) {
+    if (typeof setMessage === "function") setMessage("error", "削除確認情報が見つかりません。もう一度削除を押してください。");
+    if (typeof render === "function") render();
+    return;
   }
 
-  function c2gBSetMessage(kind, text) {
-    if (typeof setMessage === "function") {
-      setMessage(kind, text);
-      return;
+  var majorId = aicmR8zV9g5MajorId(payload, btn);
+  var owner = aicmR8zV9g5OwnerId(payload);
+
+  if (!majorId) {
+    if (typeof setMessage === "function") setMessage("error", "削除対象のManager大項目IDを特定できません。");
+    if (typeof render === "function") render();
+    return;
+  }
+
+  // AICM_V10L_C2G_B2_SIMPLE_MULTI_DELETE_EXECUTE_START
+  var aicmC2gDeleteIds = [];
+  if (payload && Array.isArray(payload.ids)) {
+    for (var aicmC2gDi = 0; aicmC2gDi < payload.ids.length; aicmC2gDi += 1) {
+      var aicmC2gDv = String(payload.ids[aicmC2gDi] || "").trim();
+      if (aicmC2gDv && aicmC2gDeleteIds.indexOf(aicmC2gDv) < 0) aicmC2gDeleteIds.push(aicmC2gDv);
     }
-    try { console.log(kind + ": " + text); } catch (e) {}
   }
+  if (!aicmC2gDeleteIds.length && majorId) aicmC2gDeleteIds.push(String(majorId).trim());
 
-  function c2gBParseJsonLoose(text) {
-    if (!text) return null;
-    var s = String(text);
-    var first = s.indexOf("{");
-    var last = s.lastIndexOf("}");
-    if (first < 0 || last <= first) return null;
-    try { return JSON.parse(s.slice(first, last + 1)); } catch (e) { return null; }
-  }
+  if (aicmC2gDeleteIds.length > 1) {
+    var aicmC2gDeleteOk = 0;
+    var aicmC2gDeleteNg = [];
 
-  function c2gBReadPayloadFromDom() {
     try {
-      if (typeof document === "undefined") return null;
-      var nodes = Array.prototype.slice.call(document.querySelectorAll("textarea, pre, code, details, [data-payload-preview], [data-aicm-payload-preview]"));
-      for (var i = 0; i < nodes.length; i += 1) {
-        var t = nodes[i] && (nodes[i].value || nodes[i].innerText || nodes[i].textContent || "");
-        if (!t || String(t).indexOf("{") < 0) continue;
-        var parsed = c2gBParseJsonLoose(t);
-        if (parsed && typeof parsed === "object") return parsed;
-      }
-    } catch (e) {}
-    return null;
-  }
+      if (typeof setMessage === "function") setMessage("info", "複数件削除を実行しています。");
 
-  function c2gBReadPayloadFromState() {
-    var s = c2gBState();
-    var candidates = [
-      s.r8zV9g5DeletePayload,
-      s.r8zV9g5DeleteConfirmPayload,
-      s.r8zMgrMajorCardDeletePayload,
-      s.r8zMgrMajorCardConfirmPayload,
-      s.r8zMgrMajorCardPostBody,
-      s.pendingPostBody,
-      s.confirmPostBody,
-      s.currentConfirmPayload
-    ];
-    for (var i = 0; i < candidates.length; i += 1) {
-      var c = candidates[i];
-      if (c && typeof c === "object") return JSON.parse(JSON.stringify(c));
-      if (typeof c === "string") {
-        var parsed = c2gBParseJsonLoose(c);
-        if (parsed) return parsed;
-      }
-    }
-    return null;
-  }
+      for (var aicmC2gDj = 0; aicmC2gDj < aicmC2gDeleteIds.length; aicmC2gDj += 1) {
+        var aicmC2gDeleteId = aicmC2gDeleteIds[aicmC2gDj];
 
-  function c2gBPushId(out, v) {
-    if (v == null) return;
-    var s = String(v).trim();
-    if (!s) return;
-    if (out.indexOf(s) < 0) out.push(s);
-  }
+        try {
+          var postBody = {
+            owner_civilization_id: owner,
+            aicm_manager_major_work_item_id: aicmC2gDeleteId,
+            decomposition_status_code: "archived",
+            handoff_status_code: "archived",
+            note: aicmR8zV9g5Text(
+              (payload.body && payload.body.note) ||
+              (payload.row && payload.row.note) ||
+              ""
+            )
+          };
 
-  function c2gBCollectIdsFromPayload(obj) {
-    var out = [];
-    if (!obj || typeof obj !== "object") return out;
-    var keys = [
-      "manager_major_item_id",
-      "manager_major_item_ids",
-      "major_item_id",
-      "major_item_ids",
-      "aicm_manager_major_item_id",
-      "aicm_manager_major_item_ids",
-      "target_manager_major_item_id",
-      "target_manager_major_item_ids",
-      "selected_manager_major_item_ids",
-      "selectedMajorItemIds",
-      "target_ids",
-      "selected_ids",
-      "ids"
-    ];
-    for (var i = 0; i < keys.length; i += 1) {
-      var v = obj[keys[i]];
-      if (Array.isArray(v)) {
-        for (var j = 0; j < v.length; j += 1) c2gBPushId(out, v[j]);
-      } else {
-        c2gBPushId(out, v);
-      }
-    }
-    return out;
-  }
+          var result = null;
 
-  function c2gBCollectIdsFromState() {
-    var s = c2gBState();
-    var out = [];
-    var roots = [
-      s.r8zMgrMajorCardSelectedMajorItemIds,
-      s.selectedManagerMajorItemIds,
-      s.selectedMajorItemIds,
-      s.r8zMgrMajorCardDeleteTargetIds,
-      s.r8zMgrMajorCardTargetIds,
-      s.r8zMgrMajorCardSelectedRows,
-      s.selectedManagerMajorRows,
-      s.selectedMajorRows,
-      s.r8zMgrMajorCardDeleteTargets,
-      s.r8zMgrMajorCardConfirmTargets
-    ];
+          if (typeof requestJson === "function") {
+            result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+          } else {
+            var response = await fetch("/api/aicm/v2/manager-major/update", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(postBody)
+            });
 
-    function scan(v) {
-      if (!v) return;
-      if (Array.isArray(v)) {
-        for (var i = 0; i < v.length; i += 1) scan(v[i]);
-        return;
-      }
-      if (typeof v === "string" || typeof v === "number") {
-        c2gBPushId(out, v);
-        return;
-      }
-      if (typeof v === "object") {
-        var idKeys = ["manager_major_item_id", "major_item_id", "aicm_manager_major_item_id", "id", "managerMajorItemId", "majorItemId"];
-        for (var k = 0; k < idKeys.length; k += 1) {
-          if (v[idKeys[k]]) c2gBPushId(out, v[idKeys[k]]);
+            var json = null;
+            try { json = await response.json(); } catch (_) { json = null; }
+
+            if (!response.ok || (json && json.result && json.result !== "ok")) {
+              throw new Error(
+                json && (json.error_message || json.message || json.error)
+                  ? (json.error_message || json.message || json.error)
+                  : "削除更新に失敗しました。"
+              );
+            }
+
+            result = json || {};
+          }
+
+          aicmC2gDeleteOk += 1;
+        } catch (aicmC2gDeleteErr) {
+          aicmC2gDeleteNg.push(aicmC2gDeleteId + ": " + (aicmC2gDeleteErr && aicmC2gDeleteErr.message ? aicmC2gDeleteErr.message : "失敗"));
         }
       }
+
+      state.managerMajorDeleteConfirm = null;
+      state.screen = "task-ledger";
+
+      if (aicmC2gDeleteNg.length) {
+        if (typeof setMessage === "function") setMessage("error", "削除: " + String(aicmC2gDeleteOk) + "件成功 / " + String(aicmC2gDeleteNg.length) + "件失敗");
+      } else {
+        if (typeof setMessage === "function") setMessage("ok", String(aicmC2gDeleteOk) + "件を削除済み扱いにしました。");
+      }
+
+      if (typeof aicmReloadTaskLedgerContext === "function") {
+        await aicmReloadTaskLedgerContext();
+      } else if (typeof render === "function") {
+        render();
+      }
+      return;
+    } catch (aicmC2gOuterDeleteErr) {
+      if (typeof setMessage === "function") setMessage("error", aicmC2gOuterDeleteErr && aicmC2gOuterDeleteErr.message ? aicmC2gOuterDeleteErr.message : "複数件削除に失敗しました。");
+      if (typeof render === "function") render();
+      return;
     }
-
-    for (var r = 0; r < roots.length; r += 1) scan(roots[r]);
-    return out;
   }
-
-  function c2gBNormalizeDeletePayload(basePayload, ids) {
-    var p = basePayload && typeof basePayload === "object" ? JSON.parse(JSON.stringify(basePayload)) : {};
-    var uniqueIds = [];
-    for (var i = 0; i < ids.length; i += 1) c2gBPushId(uniqueIds, ids[i]);
-
-    p.action = p.action || "delete";
-    p.action_code = p.action_code || "delete";
-    p.operation = p.operation || "delete";
-    p.operation_code = p.operation_code || "delete";
-    p.delete_flag = true;
-    p.deleted_flag = true;
-    p.is_deleted = true;
-    p.active_flag = false;
-    p.confirmed_flag = true;
-    p.confirm_source = "aicm_r8z_v10l_c2g_b_r1_simple_delete_yes";
-
-    p.manager_major_item_ids = uniqueIds;
-    p.major_item_ids = uniqueIds;
-    p.target_manager_major_item_ids = uniqueIds;
-    p.selected_manager_major_item_ids = uniqueIds;
-    p.ids = uniqueIds;
-
-    if (uniqueIds.length === 1) {
-      p.manager_major_item_id = uniqueIds[0];
-      p.major_item_id = uniqueIds[0];
-      p.target_manager_major_item_id = uniqueIds[0];
-      p.id = p.id || uniqueIds[0];
-    }
-
-    delete p.department_required;
-    delete p.section_required;
-    delete p.leader_required;
-    return p;
-  }
+  // AICM_V10L_C2G_B2_SIMPLE_MULTI_DELETE_EXECUTE_END
 
   try {
-    var payload = c2gBReadPayloadFromDom() || c2gBReadPayloadFromState() || {};
-    var ids = c2gBCollectIdsFromPayload(payload);
-    if (!ids.length) ids = c2gBCollectIdsFromState();
+    if (typeof setMessage === "function") setMessage("info", "削除を実行しています。");
 
-    if (!ids.length) {
-      c2gBSetMessage("error", "削除対象の大項目IDを取得できません。台帳で削除対象を選択してから再実行してください。");
-      return;
-    }
-
-    payload = c2gBNormalizeDeletePayload(payload, ids);
-
-    c2gBSetMessage("info", "削除を実行します。対象件数: " + ids.length);
-
-    var response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    var text = await response.text();
-    var data = null;
-    try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
-
-    if (!response.ok || (data && data.ok === false)) {
-      var reason = data && (data.reason || data.message || data.error) ? (data.reason || data.message || data.error) : text;
-      c2gBSetMessage("error", "削除APIが失敗しました: " + (reason || response.status));
-      return;
-    }
-
-    c2gBSetMessage("ok", "削除しました。対象件数: " + ids.length);
-
-    try {
-      var s = c2gBState();
-      s.screen = "task-ledger";
-      s.r8zMgrMajorCardConfirm = null;
-      s.r8zMgrMajorCardConfirmPayload = null;
-    } catch (e2) {}
-
-    try {
-      if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
-        aicmRenderTaskLedgerSafeR8V4("c2g_b_r1_simple_delete_done");
-      } else if (typeof aicmR8zMgrMajorCardRerender === "function") {
-        aicmR8zMgrMajorCardRerender("c2g_b_r1_simple_delete_done");
-      } else if (typeof location !== "undefined" && location.reload) {
-        setTimeout(function() { location.reload(); }, 800);
+    if (false && typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") { // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: skip old1
+      try {
+        await aicmExecuteMajorItemDeleteConfirmR8P();
+        return;
+      } catch (existingError1) {
+        if (typeof console !== "undefined" && console.warn) console.warn("existing delete execute R8P failed; fallback follows", existingError1);
       }
-    } catch (e3) {}
-  } catch (err) {
-    c2gBSetMessage("error", "削除処理でエラー: " + (err && err.message ? err.message : String(err)));
+    }
+
+    if (false && typeof aicmExecuteManagerMajorDeleteConfirmR8P === "function") { // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: skip old2
+      try {
+        await aicmExecuteManagerMajorDeleteConfirmR8P();
+        return;
+      } catch (existingError2) {
+        if (typeof console !== "undefined" && console.warn) console.warn("existing manager delete execute R8P failed; fallback follows", existingError2);
+      }
+    }
+
+    var postBody = {
+      owner_civilization_id: owner,
+      aicm_manager_major_work_item_id: majorId,
+      decomposition_status_code: "archived",
+      handoff_status_code: "archived",
+      note: aicmR8zV9g5Text(
+        (payload.body && payload.body.note) ||
+        (payload.row && payload.row.note) ||
+        ""
+      )
+    };
+
+    var result = null;
+
+    if (typeof requestJson === "function") {
+      result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+    } else {
+      var response = await fetch("/api/aicm/v2/manager-major/update", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(postBody)
+      });
+
+      var json = null;
+      try { json = await response.json(); } catch (_) { json = null; }
+
+      if (!response.ok || (json && json.result && json.result !== "ok")) {
+        throw new Error(
+          json && (json.error_message || json.message || json.error)
+            ? (json.error_message || json.message || json.error)
+            : "削除更新に失敗しました。"
+        );
+      }
+
+      result = json || {};
+    }
+
+    state.managerMajorDeleteConfirm = null;
+    state.screen = "task-ledger";
+
+    try {
+      if (typeof aicmReloadTaskLedgerContext === "function") {
+        await aicmReloadTaskLedgerContext();
+      } else if (typeof refreshContext === "function") {
+        await refreshContext();
+      } else if (typeof loadContext === "function") {
+        await loadContext();
+      } else {
+        var responseReload = await fetch("/api/aicm/v2/context?owner_civilization_id=" + encodeURIComponent(owner) + "&v=r8z_v9g5_" + Date.now());
+        var contextJson = await responseReload.json();
+        if (contextJson && contextJson.result === "ok") state.context = contextJson;
+      }
+    } catch (reloadError) {
+      if (typeof console !== "undefined" && console.warn) console.warn("delete context reload skipped", reloadError);
+    }
+
+    if (typeof setMessage === "function") setMessage("ok", "Manager大項目を削除しました。");
+
+    if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+      aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_done");
+    } else if (typeof render === "function") {
+      render();
+    }
+
+    return result || {};
+  } catch (error) {
+    if (typeof setMessage === "function") {
+      setMessage("error", error && error.message ? error.message : "削除に失敗しました。");
+    }
+    if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+      aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_error");
+    } else if (typeof render === "function") {
+      render();
+    }
+    throw error;
   }
 }
-// AICM_R8Z_V10L_C2G_B_R1_SIMPLE_DELETE_YES_POST_END
 
 function aicmR8zV9g5CancelDeleteConfirm() {
   if (state) state.managerMajorDeleteConfirm = null;
