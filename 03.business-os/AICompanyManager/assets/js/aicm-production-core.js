@@ -6530,27 +6530,30 @@ await aicmReloadTaskLedgerContext();
       : [
         ].join("");
 
-    var summaryHtml = [
-      '<div class="aicm-core-card" style="margin:12px 0;">',
-      '<p class="aicm-eyebrow">一括引き渡し先</p>',
-      '<div class="aicm-selected-note">部門: ' + escapeHtml(route.displayDepartment || "-") + '</div>',
-      '<div class="aicm-selected-note">課: ' + escapeHtml(route.displaySection || "-") + '</div>',
-      '<div class="aicm-selected-note">Leader: ' + escapeHtml(route.displayLeader || "-") + '</div>',
-      route.routeApplied ? '<div class="aicm-selected-note">適用済み</div>' : '',
-      '</div>'
-    ].join("");
+    // AICM_V10L_C2G_B5R4P_SECOND_CONFIRM_PINPOINT_SUMMARY
+    var summaryHtml = confirm && confirm.kind === "delete"
+      ? ""
+      : [
+          '<div class="aicm-core-card" style="margin:12px 0;">',
+          '<p class="aicm-eyebrow">一括引き渡し先</p>',
+          '<div class="aicm-selected-note">部門: ' + escapeHtml(route.displayDepartment || "-") + '</div>',
+          '<div class="aicm-selected-note">課: ' + escapeHtml(route.displaySection || "-") + '</div>',
+          '<div class="aicm-selected-note">Leader: ' + escapeHtml(route.displayLeader || "-") + '</div>',
+          route.routeApplied ? '<div class="aicm-selected-note">適用済み</div>' : '',
+          '</div>'
+        ].join("");
 
     var itemHtml = confirm.items.map(function (item) {
       return '<li><strong>' + escapeHtml(item.title || item.id || "Manager大項目") + '</strong></li>';
     }).join("");
 
+    // AICM_V10L_C2G_B5R4P_SECOND_CONFIRM_PINPOINT_ERRORHTML
     var errorHtml = hasErrors
       ? '<div class="aicm-core-card" style="border:1px solid #ef4444;background:#fff7f7;margin:12px 0;"><p class="aicm-eyebrow">実行前チェック</p><ul class="aicm-selected-note">' + errors.map(function (message) { return '<li>' + escapeHtml(message) + '</li>'; }).join("") + '</ul></div>'
-      : '<p class="aicm-selected-note">実行前チェックOK。次工程でAPI POST解放前に佐藤(DB担当)レビューが必要です。</p>';
-
-    var payloadPreviewHtml = payloads.length
-      ? '<details class="aicm-selected-note" style="margin-top:12px;"><summary>payload preview（POST未実行）</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(payloads, null, 2)) + '</pre></details>'
       : "";
+
+    // AICM_V10L_C2G_B5R4P_SECOND_CONFIRM_PINPOINT_PAYLOAD_PREVIEW
+    var payloadPreviewHtml = "";
 
     var aicmB5r2ConfirmHtml = [
       '<div class="aicm-core-card" data-r8z-mgr-major-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
@@ -6569,7 +6572,8 @@ await aicmReloadTaskLedgerContext();
       '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-yes"' + yesDisabled + yesStyle + '>Yes</button>',
       '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-no">No</button>',
       '  </div>',
-      '  <p class="aicm-selected-note">この確認画面ではDB更新/API POSTは実行しません。</p>',
+      // AICM_V10L_C2G_B5R4P_SECOND_CONFIRM_PINPOINT_DRYRUN_NOTE_REMOVED
+      '',
       '</div>'
     ].join("");
 
