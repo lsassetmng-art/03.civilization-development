@@ -1,0 +1,230 @@
+AICompanyManager V10L-C2F-B2 exact confirm render window
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+SERVER_PATCH=NO
+
+DECLARATION_LINE=6198
+WINDOW=6198-6418
+============================================================
+  6198:   function aicmR8zMgrMajorCardRenderConfirm() {
+  6199:     var bag = aicmR8zMgrMajorCardState();
+  6200:     var confirm = bag.confirm || null;
+  6201: 
+  6202:     if (!confirm || !Array.isArray(confirm.items) || !confirm.items.length) {
+  6203:       return "";
+  6204:     }
+  6205: 
+  6206:     var liveValidation = confirm.kind === "leader-handoff" && typeof aicmR8zC2bValidateLeaderHandoffRows === "function"
+  6207:       ? aicmR8zC2bValidateLeaderHandoffRows(aicmR8zMgrMajorCardSelectedRows())
+  6208:       : null;
+  6209: 
+  6210:     if (liveValidation) {
+  6211:       confirm.ok = liveValidation.ok;
+  6212:       confirm.errors = liveValidation.errors || [];
+  6213:       confirm.items = liveValidation.items || confirm.items;
+  6214:       confirm.payloads = liveValidation.payloads || [];
+  6215:       confirm.route = liveValidation.route || {};
+  6216:       confirm.endpoint = liveValidation.endpoint || confirm.endpoint;
+  6217:       bag.confirm = confirm;
+  6218:     }
+  6219: 
+  6220:     var errors = Array.isArray(confirm.errors) ? confirm.errors : [];
+  6221:     var payloads = Array.isArray(confirm.payloads) ? confirm.payloads : [];
+  6222:     var hasErrors = errors.length > 0;
+  6223:     var yesDisabled = hasErrors ? " disabled" : "";
+  6224:     var yesStyle = hasErrors ? ' style="opacity:0.45;cursor:not-allowed;"' : "";
+  6225: 
+  6226:     var route = typeof aicmR8zC2cEffectiveRoute === "function"
+  6227:       ? aicmR8zC2cEffectiveRoute()
+  6228:       : (confirm.route || {});
+  6229: 
+  6230:     var routePickerHtml = typeof aicmR8zC2cRenderRoutePicker === "function"
+  6231:       ? aicmR8zC2cRenderRoutePicker()
+  6232:       : "";
+  6233: 
+  6234: 
+  6235:     var routeApplyDebugData = state && state.r8zMgrMajorCardRouteApplyDebug
+  6236:       ? state.r8zMgrMajorCardRouteApplyDebug
+  6237:       : null;
+  6238: 
+  6239:     var routeApplyDebugHtml = routeApplyDebugData
+  6240:       ? [
+  6241:         ].join("")
+  6242:       : [
+  6243:         ].join("");
+  6244: 
+  6245: 
+  6246:     var handlerEntryDebugData = state && state.r8zMgrMajorCardHandlerEntryDebug
+  6247:       ? state.r8zMgrMajorCardHandlerEntryDebug
+  6248:       : null;
+  6249: 
+  6250:     var handlerEntryDebugHtml = handlerEntryDebugData
+  6251:       ? [
+  6252:         ].join("")
+  6253:       : [
+  6254:         ].join("");
+  6255: 
+  6256:     var summaryHtml = [
+  6257:       '<div class="aicm-core-card" style="margin:12px 0;">',
+  6258:       '<p class="aicm-eyebrow">一括引き渡し先</p>',
+  6259:       '<div class="aicm-selected-note">部門: ' + escapeHtml(route.displayDepartment || "-") + '</div>',
+  6260:       '<div class="aicm-selected-note">課: ' + escapeHtml(route.displaySection || "-") + '</div>',
+  6261:       '<div class="aicm-selected-note">Leader: ' + escapeHtml(route.displayLeader || "-") + '</div>',
+  6262:       route.routeApplied ? '<div class="aicm-selected-note">適用済み</div>' : '',
+  6263:       '</div>'
+  6264:     ].join("");
+  6265: 
+  6266:     var itemHtml = confirm.items.map(function (item) {
+  6267:       return '<li><strong>' + escapeHtml(item.title || item.id || "Manager大項目") + '</strong></li>';
+  6268:     }).join("");
+  6269: 
+  6270:     var errorHtml = hasErrors
+  6271:       ? '<div class="aicm-core-card" style="border:1px solid #ef4444;background:#fff7f7;margin:12px 0;"><p class="aicm-eyebrow">実行前チェック</p><ul class="aicm-selected-note">' + errors.map(function (message) { return '<li>' + escapeHtml(message) + '</li>'; }).join("") + '</ul></div>'
+  6272:       : '<p class="aicm-selected-note">実行前チェックOK。次工程でAPI POST解放前に佐藤(DB担当)レビューが必要です。</p>';
+  6273: 
+  6274:     var payloadPreviewHtml = payloads.length
+  6275:       ? '<details class="aicm-selected-note" style="margin-top:12px;"><summary>payload preview（POST未実行）</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(payloads, null, 2)) + '</pre></details>'
+  6276:       : "";
+  6277: 
+  6278:     return [
+  6279:       '<div class="aicm-core-card" data-r8z-mgr-major-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
+  6280:       '  <p class="aicm-eyebrow">確認</p>',
+  6281:       '  <h3>' + escapeHtml(confirm.title || "確認") + '</h3>',
+  6282:       '  <p class="aicm-selected-note">endpoint: ' + escapeHtml(confirm.endpoint || "/api/aicm/v2/manager-major/update") + '</p>',
+  6283:       routePickerHtml,
+  6284:       routeApplyDebugHtml,
+  6285:       handlerEntryDebugHtml,
+  6286:       summaryHtml,
+  6287:       '  <p class="aicm-eyebrow">対象大項目</p>',
+  6288:       '  <ul class="aicm-selected-note">' + itemHtml + '</ul>',
+  6289:       errorHtml,
+  6290:       payloadPreviewHtml,
+  6291:       '  <div class="aicm-dashboard-action-row">',
+  6292:       '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-yes"' + yesDisabled + yesStyle + '>Yes</button>',
+  6293:       '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-no">No</button>',
+  6294:       '  </div>',
+  6295:       '  <p class="aicm-selected-note">この確認画面ではDB更新/API POSTは実行しません。</p>',
+  6296:       '</div>'
+  6297:     ].join("");
+  6298:   }
+  6299: 
+  6300: 
+  6301:   function aicmR8zMgrMajorCardRenderOperationPanel(rows) {
+  6302:     rows = Array.isArray(rows) ? rows : [];
+  6303: 
+  6304:     var selectedCount = rows.filter(function (row, index) {
+  6305:       return aicmR8zMgrMajorCardIsSelected(aicmR8zMgrMajorCardRowId(row, index));
+  6306:     }).length;
+  6307: 
+  6308:     var eligibleCount = rows.filter(function (row) {
+  6309:       return aicmR8zMgrMajorCardIsSelectable(row);
+  6310:     }).length;
+  6311: 
+  6312:     return [
+  6313:       '<div class="aicm-core-card" data-r8z-mgr-major-operation-panel="1" style="margin:12px 0;">',
+  6314:       '  <p class="aicm-eyebrow">登録済み大項目 操作</p>',
+  6315:       '  <h3>選択操作</h3>',
+  6316:       '  <p class="aicm-selected-note">選択 ' + String(selectedCount) + ' / 未送信 ' + String(eligibleCount) + ' / 全件 ' + String(rows.length) + '</p>',
+  6317:       '  <div class="aicm-dashboard-action-row">',
+  6318:       '    <button type="button" data-core-action="r8z-mgr-major-card-open-handoff-confirm">課長へ送る</button>',
+  6319:       '    <button type="button" data-core-action="r8z-mgr-major-card-open-delete-confirm">削除</button>',
+  6320:       '    <button type="button" data-core-action="r8z-mgr-major-card-select-all">全件選択</button>',
+  6321:       '    <button type="button" data-core-action="r8z-mgr-major-card-clear">解除</button>',
+  6322:       '  </div>',
+  6323:       aicmR8zMgrMajorCardRenderConfirm(),
+  6324:       '</div>'
+  6325:     ].join("");
+  6326:   }
+  6327: 
+  6328:   function aicmR8zMgrMajorCardRerender(sourceLabel) {
+  6329:     if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  6330:       aicmRenderTaskLedgerSafeR8V4(sourceLabel || "r8z_mgr_major_card_selection_clean_v1");
+  6331:       return;
+  6332:     }
+  6333: 
+  6334:     if (typeof render === "function") {
+  6335:       render();
+  6336:     }
+  6337:   }
+  6338: 
+  6339:   
+  6340:   
+  6341:   
+  6342:   
+  6343:   
+  6344:   function aicmR8zMgrMajorCardOpenConfirm(kind) {
+  6345:     var bag = aicmR8zMgrMajorCardState();
+  6346:     var rows = aicmR8zMgrMajorCardSelectedRows();
+  6347: 
+  6348:     if (!rows.length) {
+  6349:       bag.confirm = null;
+  6350:       if (typeof setMessage === "function") {
+  6351:         setMessage("error", "対象の大項目を選択してください。");
+  6352:       }
+  6353:       aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_empty");
+  6354:       return;
+  6355:     }
+  6356: 
+  6357:     var validation = kind === "leader-handoff" && typeof aicmR8zC2bValidateLeaderHandoffRows === "function"
+  6358:       ? aicmR8zC2bValidateLeaderHandoffRows(rows)
+  6359:       : {
+  6360:           ok: true,
+  6361:           errors: [],
+  6362:           items: rows.map(function (row, index) {
+  6363:             return {
+  6364:               id: aicmR8zMgrMajorCardRowId(row, index),
+  6365:               title: aicmR8zMgrMajorCardTitle(row),
+  6366:               route: {},
+  6367:               payload: {}
+  6368:             };
+  6369:           }),
+  6370:           payloads: [],
+  6371:           route: {},
+  6372:           endpoint: ""
+  6373:         };
+  6374: 
+  6375:     bag.confirm = {
+  6376:       kind: kind,
+  6377:       title: kind === "delete" ? "削除確認" : "課長へ送る確認",
+  6378:       endpoint: validation.endpoint || "/api/aicm/v2/manager-major/update",
+  6379:       ok: validation.ok,
+  6380:       errors: validation.errors || [],
+  6381:       items: validation.items || [],
+  6382:       payloads: validation.payloads || [],
+  6383:       route: validation.route || {}
+  6384:     };
+  6385: 
+  6386:     if (typeof setMessage === "function") {
+  6387:       if (validation.ok) {
+  6388:         setMessage("ok", "確認画面を表示しました。");
+  6389:       } else {
+  6390:         setMessage("error", "引き渡し先の課/Leaderを選択してください。");
+  6391:       }
+  6392:     }
+  6393: 
+  6394:     aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_open_c2d2");
+  6395:   }
+  6396: 
+  6397: 
+  6398:   function aicmR8zMgrMajorCardHandleAction(ev, target, action) {
+  6399:       // AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY_START
+  6400:       // Route enrichment when section is applied.
+  6401:       // No DB write. No API POST. No fetch.
+  6402:       try {
+  6403:         var c2d11r1Action = "";
+  6404:         var c2d11r1Event = null;
+  6405:         var c2d11r1Target = null;
+  6406: 
+  6407:         for (var c2d11r1I = 0; c2d11r1I < arguments.length; c2d11r1I += 1) {
+  6408:           var c2d11r1Arg = arguments[c2d11r1I];
+  6409: 
+  6410:           if (!c2d11r1Event && c2d11r1Arg && c2d11r1Arg.preventDefault) c2d11r1Event = c2d11r1Arg;
+  6411:           if (!c2d11r1Action && typeof c2d11r1Arg === "string") c2d11r1Action = String(c2d11r1Arg || "").trim();
+  6412:           if (!c2d11r1Target && c2d11r1Arg && c2d11r1Arg.getAttribute) c2d11r1Target = c2d11r1Arg;
+  6413: 
+  6414:           if (!c2d11r1Target && c2d11r1Arg && c2d11r1Arg.target) {
+  6415:             if (c2d11r1Arg.target.closest) {
+  6416:               c2d11r1Target = c2d11r1Arg.target.closest("[data-core-action]");
+  6417:             } else if (c2d11r1Arg.target.getAttribute) {
+  6418:               c2d11r1Target = c2d11r1Arg.target;
