@@ -6237,6 +6237,27 @@ await aicmReloadTaskLedgerContext();
       ? aicmR8zC2cRenderRoutePicker()
       : "";
 
+
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_RENDER_DEBUG_PANEL_START
+    var routeApplyDebugData = state && state.r8zMgrMajorCardRouteApplyDebug
+      ? state.r8zMgrMajorCardRouteApplyDebug
+      : null;
+
+    var routeApplyDebugHtml = routeApplyDebugData
+      ? [
+          '<details class="aicm-selected-note" open style="margin:12px 0;border:1px dashed #64748b;padding:10px;border-radius:10px;background:#f8fafc;">',
+          '<summary>C2D5R2A 課を適用 debug</summary>',
+          '<pre style="white-space:pre-wrap;max-height:280px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(routeApplyDebugData, null, 2)) + '</pre>',
+          '</details>'
+        ].join("")
+      : [
+          '<details class="aicm-selected-note" style="margin:12px 0;border:1px dashed #cbd5e1;padding:10px;border-radius:10px;">',
+          '<summary>C2D5R2A 課を適用 debug</summary>',
+          '<p>まだ「課を適用」branchは記録されていません。</p>',
+          '</details>'
+        ].join("");
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_RENDER_DEBUG_PANEL_END
+
     var summaryHtml = [
       '<div class="aicm-core-card" style="margin:12px 0;">',
       '<p class="aicm-eyebrow">一括引き渡し先</p>',
@@ -6265,6 +6286,7 @@ await aicmReloadTaskLedgerContext();
       '  <h3>' + escapeHtml(confirm.title || "確認") + '</h3>',
       '  <p class="aicm-selected-note">endpoint: ' + escapeHtml(confirm.endpoint || "/api/aicm/v2/manager-major/update") + '</p>',
       routePickerHtml,
+      routeApplyDebugHtml,
       summaryHtml,
       '  <p class="aicm-eyebrow">対象大項目</p>',
       '  <ul class="aicm-selected-note">' + itemHtml + '</ul>',
@@ -6483,6 +6505,28 @@ await aicmReloadTaskLedgerContext();
 
       // AICM_R8Z_MGR_MAJOR_CARD_C2D2_LEDGER_DEPARTMENT_ROUTE_ACTION_ROUTE
       if (action === "r8z-mgr-major-card-route-apply-section") {
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_BRANCH_ENTER_START
+        var aicmR8zC2d5r2aDebug = {
+          marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY",
+          phase: "branch-enter",
+          at: (new Date()).toISOString(),
+          action: String(action || ""),
+          targetTag: target && target.tagName ? String(target.tagName) : "",
+          targetAction: target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : "",
+          targetId: target && target.id ? String(target.id) : "",
+          targetClass: target && target.className ? String(target.className) : ""
+        };
+
+        try {
+          if (state && typeof state === "object") {
+            state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+          }
+          if (typeof console !== "undefined" && console.info) {
+            console.info("AICM C2D5R2A route apply debug", aicmR8zC2d5r2aDebug);
+          }
+        } catch (_) {}
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_BRANCH_ENTER_END
+
         var routeRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
         var sectionSelect = routeRoot && routeRoot.querySelector
           ? routeRoot.querySelector("[data-r8z-mgr-major-card-route-section-select]")
@@ -6493,6 +6537,29 @@ await aicmReloadTaskLedgerContext();
           : null;
 
         var sectionId = sectionSelect ? String(sectionSelect.value || "").trim() : "";
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_SELECT_READ_START
+        try {
+          aicmR8zC2d5r2aDebug.phase = "after-select-read";
+          aicmR8zC2d5r2aDebug.routeRootFound = !!routeRoot;
+          aicmR8zC2d5r2aDebug.sectionSelectFound = !!sectionSelect;
+          aicmR8zC2d5r2aDebug.optionFound = !!option;
+          aicmR8zC2d5r2aDebug.selectedIndex = sectionSelect ? sectionSelect.selectedIndex : null;
+          aicmR8zC2d5r2aDebug.sectionId = sectionId;
+          aicmR8zC2d5r2aDebug.optionText = option ? String(option.textContent || "").trim() : "";
+          aicmR8zC2d5r2aDebug.optionSectionId = option && option.getAttribute ? String(option.getAttribute("data-section-id") || "") : "";
+          aicmR8zC2d5r2aDebug.optionSectionLabel = option && option.getAttribute ? String(option.getAttribute("data-section-label") || "") : "";
+          aicmR8zC2d5r2aDebug.optionDepartmentId = option && option.getAttribute ? String(option.getAttribute("data-department-id") || "") : "";
+          aicmR8zC2d5r2aDebug.optionDepartmentLabel = option && option.getAttribute ? String(option.getAttribute("data-department-label") || "") : "";
+
+          if (state && typeof state === "object") {
+            state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+          }
+          if (typeof console !== "undefined" && console.info) {
+            console.info("AICM C2D5R2A route apply after select", aicmR8zC2d5r2aDebug);
+          }
+        } catch (_) {}
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_SELECT_READ_END
+
 
         if (!sectionId || !option) {
           if (typeof setMessage === "function") setMessage("error", "課を選択してください。");
@@ -6508,6 +6575,24 @@ await aicmReloadTaskLedgerContext();
         };
 
         var appliedRoute = aicmR8zC2cApplySectionChoice(sectionId, sectionSnapshot);
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_APPLY_START
+        try {
+          aicmR8zC2d5r2aDebug.phase = "after-apply";
+          aicmR8zC2d5r2aDebug.appliedRouteOk = !!appliedRoute;
+          aicmR8zC2d5r2aDebug.appliedRoute = appliedRoute || null;
+          aicmR8zC2d5r2aDebug.choiceAfterApply = typeof aicmR8zC2cChoice === "function" ? aicmR8zC2cChoice() : null;
+          aicmR8zC2d5r2aDebug.stateSelectionAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection : null;
+          aicmR8zC2d5r2aDebug.confirmAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection.confirm || null : null;
+
+          if (state && typeof state === "object") {
+            state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+          }
+          if (typeof console !== "undefined" && console.info) {
+            console.info("AICM C2D5R2A route apply after apply", aicmR8zC2d5r2aDebug);
+          }
+        } catch (_) {}
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_APPLY_END
+
 
         if (!appliedRoute || !appliedRoute.sectionId) {
           if (typeof setMessage === "function") setMessage("error", "選択した課を適用できません。再読み込みしてください。");
