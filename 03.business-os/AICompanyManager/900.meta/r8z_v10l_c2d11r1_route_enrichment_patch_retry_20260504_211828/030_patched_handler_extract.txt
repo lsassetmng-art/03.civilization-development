@@ -1,0 +1,650 @@
+AICompanyManager V10L-C2D11R1 patched handler extract
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=YES
+SERVER_PATCH=NO
+
+FUNCTION=aicmR8zMgrMajorCardHandleAction
+FUNCTION_LINES=6433-7073
+
+function aicmR8zMgrMajorCardHandleAction(ev, target, action) {
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY_START
+      // Route enrichment when section is applied.
+      // No DB write. No API POST. No fetch.
+      try {
+        var c2d11r1Action = "";
+        var c2d11r1Event = null;
+        var c2d11r1Target = null;
+
+        for (var c2d11r1I = 0; c2d11r1I < arguments.length; c2d11r1I += 1) {
+          var c2d11r1Arg = arguments[c2d11r1I];
+
+          if (!c2d11r1Event && c2d11r1Arg && c2d11r1Arg.preventDefault) c2d11r1Event = c2d11r1Arg;
+          if (!c2d11r1Action && typeof c2d11r1Arg === "string") c2d11r1Action = String(c2d11r1Arg || "").trim();
+          if (!c2d11r1Target && c2d11r1Arg && c2d11r1Arg.getAttribute) c2d11r1Target = c2d11r1Arg;
+
+          if (!c2d11r1Target && c2d11r1Arg && c2d11r1Arg.target) {
+            if (c2d11r1Arg.target.closest) {
+              c2d11r1Target = c2d11r1Arg.target.closest("[data-core-action]");
+            } else if (c2d11r1Arg.target.getAttribute) {
+              c2d11r1Target = c2d11r1Arg.target;
+            }
+          }
+        }
+
+        if (!c2d11r1Action && c2d11r1Target && c2d11r1Target.getAttribute) {
+          c2d11r1Action = String(c2d11r1Target.getAttribute("data-core-action") || "").trim();
+        }
+
+        if (c2d11r1Action === "r8z-mgr-major-card-route-apply-section") {
+          if (c2d11r1Event && c2d11r1Event.preventDefault) c2d11r1Event.preventDefault();
+          if (c2d11r1Event && c2d11r1Event.stopPropagation) c2d11r1Event.stopPropagation();
+
+          function c2d11r1Text(v) {
+            if (v === null || typeof v === "undefined") return "";
+            return String(v).trim();
+          }
+
+          function c2d11r1Get(obj, keys) {
+            if (!obj || typeof obj !== "object") return "";
+            for (var gi = 0; gi < keys.length; gi += 1) {
+              var k = keys[gi];
+              if (obj[k] !== null && typeof obj[k] !== "undefined" && String(obj[k]).trim() !== "") {
+                return String(obj[k]).trim();
+              }
+            }
+            return "";
+          }
+
+          function c2d11r1Arr(v) {
+            return Array.isArray(v) ? v : [];
+          }
+
+          function c2d11r1Attr(el, keys) {
+            if (!el || !el.getAttribute) return "";
+            for (var ai = 0; ai < keys.length; ai += 1) {
+              var av = c2d11r1Text(el.getAttribute(keys[ai]));
+              if (av) return av;
+            }
+            return "";
+          }
+
+          var c2d11r1Root = null;
+          if (c2d11r1Target && c2d11r1Target.closest) {
+            c2d11r1Root =
+              c2d11r1Target.closest("[data-r8z-mgr-major-card-route-picker]") ||
+              c2d11r1Target.closest("[data-aicm-route-picker]") ||
+              c2d11r1Target.closest(".aicm-core-card") ||
+              c2d11r1Target.closest("section") ||
+              c2d11r1Target.closest("div");
+          }
+
+          var c2d11r1Select = null;
+          if (c2d11r1Root && c2d11r1Root.querySelector) {
+            c2d11r1Select =
+              c2d11r1Root.querySelector("select[data-r8z-c2d-route-section-select]") ||
+              c2d11r1Root.querySelector("select[data-section-select]") ||
+              c2d11r1Root.querySelector("select");
+          }
+
+          var c2d11r1Option = null;
+          if (c2d11r1Select && c2d11r1Select.options && c2d11r1Select.selectedIndex >= 0) {
+            c2d11r1Option = c2d11r1Select.options[c2d11r1Select.selectedIndex];
+          }
+
+          var c2d11r1Ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+
+          var c2d11r1Rows = [];
+          if (typeof aicmR8zMgrMajorCardSelectedRows === "function") {
+            try {
+              c2d11r1Rows = aicmR8zMgrMajorCardSelectedRows() || [];
+            } catch (_) {
+              c2d11r1Rows = [];
+            }
+          }
+          var c2d11r1Row = c2d11r1Rows.length ? (c2d11r1Rows[0] || {}) : {};
+
+          var sectionId =
+            c2d11r1Attr(c2d11r1Option, ["data-section-id", "data-aicm-section-id", "value"]) ||
+            c2d11r1Text(c2d11r1Select && c2d11r1Select.value) ||
+            c2d11r1Get(c2d11r1Row, ["section_id", "sectionId"]);
+
+          var sectionLabel =
+            c2d11r1Attr(c2d11r1Option, ["data-section-label", "data-section-name", "data-label"]) ||
+            c2d11r1Text(c2d11r1Option && (c2d11r1Option.textContent || c2d11r1Option.innerText)) ||
+            c2d11r1Get(c2d11r1Row, ["section_name", "section_label", "sectionLabel"]);
+
+          var departmentId =
+            c2d11r1Attr(c2d11r1Option, ["data-department-id", "data-aicm-department-id"]) ||
+            c2d11r1Get(c2d11r1Row, ["department_id", "departmentId"]);
+
+          var departmentLabel =
+            c2d11r1Attr(c2d11r1Option, ["data-department-label", "data-department-name"]) ||
+            c2d11r1Get(c2d11r1Row, ["department_name", "department_label", "departmentLabel"]);
+
+          var leaderLabel =
+            c2d11r1Attr(c2d11r1Option, ["data-leader-label", "data-assigned-leader-label", "data-leader-name"]) ||
+            c2d11r1Get(c2d11r1Row, ["assigned_leader_label", "leader_robot_label", "responsible_robot_label", "leaderLabel"]);
+
+          var leaderPlacementId =
+            c2d11r1Attr(c2d11r1Option, ["data-leader-placement-id", "data-placement-id"]) ||
+            c2d11r1Get(c2d11r1Row, ["leader_placement_id", "leaderPlacementId", "assigned_leader_placement_id"]);
+
+          var sections = []
+            .concat(c2d11r1Arr(c2d11r1Ctx.sections))
+            .concat(c2d11r1Arr(c2d11r1Ctx.organizations))
+            .concat(c2d11r1Arr(c2d11r1Ctx.department_sections));
+
+          var matchedSection = null;
+          for (var si = 0; si < sections.length; si += 1) {
+            var s = sections[si] || {};
+            var sid = c2d11r1Get(s, ["aicm_user_company_section_id", "section_id", "organization_id", "id", "sectionId"]);
+            var slabel = c2d11r1Get(s, ["section_name", "organization_name", "name", "section_label", "sectionLabel"]);
+
+            if ((sectionId && sid === sectionId) || (sectionLabel && slabel === sectionLabel)) {
+              matchedSection = s;
+              break;
+            }
+          }
+
+          if (matchedSection) {
+            sectionId = sectionId || c2d11r1Get(matchedSection, ["aicm_user_company_section_id", "section_id", "organization_id", "id", "sectionId"]);
+            sectionLabel = sectionLabel || c2d11r1Get(matchedSection, ["section_name", "organization_name", "name", "section_label", "sectionLabel"]);
+
+            departmentId = departmentId || c2d11r1Get(matchedSection, [
+              "department_id",
+              "parent_department_id",
+              "aicm_user_company_department_id",
+              "departmentId"
+            ]);
+
+            departmentLabel = departmentLabel || c2d11r1Get(matchedSection, [
+              "department_name",
+              "parent_department_name",
+              "department_label",
+              "departmentLabel"
+            ]);
+
+            leaderLabel = leaderLabel || c2d11r1Get(matchedSection, [
+              "assigned_leader_label",
+              "leader_robot_label",
+              "leader_label",
+              "responsible_robot_label",
+              "responsible_role_label",
+              "leaderLabel"
+            ]);
+
+            leaderPlacementId = leaderPlacementId || c2d11r1Get(matchedSection, [
+              "leader_placement_id",
+              "leaderPlacementId",
+              "assigned_leader_placement_id"
+            ]);
+          }
+
+          var departments = []
+            .concat(c2d11r1Arr(c2d11r1Ctx.departments))
+            .concat(c2d11r1Arr(c2d11r1Ctx.departmentList));
+
+          if (departmentId && !departmentLabel) {
+            for (var di = 0; di < departments.length; di += 1) {
+              var d = departments[di] || {};
+              var did = c2d11r1Get(d, ["aicm_user_company_department_id", "department_id", "id", "departmentId"]);
+              if (did === departmentId) {
+                departmentLabel = c2d11r1Get(d, ["department_name", "name", "department_label", "departmentLabel"]);
+                break;
+              }
+            }
+          }
+
+          var placements = []
+            .concat(c2d11r1Arr(c2d11r1Ctx.placements))
+            .concat(c2d11r1Arr(c2d11r1Ctx.robot_placements))
+            .concat(c2d11r1Arr(c2d11r1Ctx.organization_placements));
+
+          if (!leaderLabel || !leaderPlacementId) {
+            for (var pi = 0; pi < placements.length; pi += 1) {
+              var p = placements[pi] || {};
+              var psid = c2d11r1Get(p, ["section_id", "organization_id", "aicm_user_company_section_id", "sectionId"]);
+              var pslabel = c2d11r1Get(p, ["section_name", "organization_name", "section_label", "sectionLabel"]);
+              var role = c2d11r1Get(p, ["role_code", "placement_role_code", "assigned_role_code", "roleCode"]).toLowerCase();
+              var roleLabel = c2d11r1Get(p, ["role_label", "placement_role_label"]);
+
+              var sameSection =
+                (sectionId && psid === sectionId) ||
+                (sectionLabel && pslabel === sectionLabel);
+
+              var isLeader =
+                role === "leader" ||
+                role === "section_leader" ||
+                role === "課長" ||
+                roleLabel.indexOf("Leader") >= 0 ||
+                roleLabel.indexOf("課長") >= 0;
+
+              if (sameSection && isLeader) {
+                leaderLabel = leaderLabel || c2d11r1Get(p, [
+                  "internal_nickname",
+                  "robot_internal_nickname",
+                  "placement_label",
+                  "robot_display_name",
+                  "robot_name",
+                  "display_name",
+                  "name"
+                ]);
+                leaderPlacementId = leaderPlacementId || c2d11r1Get(p, [
+                  "placement_id",
+                  "robot_placement_id",
+                  "aicm_robot_placement_id",
+                  "id"
+                ]);
+                break;
+              }
+            }
+          }
+
+          var selectionState = null;
+          if (typeof aicmR8zMgrMajorCardSelectionState === "function") {
+            try {
+              selectionState = aicmR8zMgrMajorCardSelectionState();
+            } catch (_) {
+              selectionState = null;
+            }
+          }
+
+          if (!selectionState) {
+            if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+              state.r8zMgrMajorCardSelection = {};
+            }
+            selectionState = state.r8zMgrMajorCardSelection;
+          }
+
+          if (!selectionState.handoffBatchRoute || typeof selectionState.handoffBatchRoute !== "object") {
+            selectionState.handoffBatchRoute = {};
+          }
+
+          var route = selectionState.handoffBatchRoute;
+
+          route.applied = true;
+          route.applied_flag = true;
+          route.appliedLabel = "適用済み";
+          route.applied_label = "適用済み";
+
+          route.sectionId = sectionId;
+          route.section_id = sectionId;
+          route.sectionLabel = sectionLabel;
+          route.section_label = sectionLabel;
+          route.sectionName = sectionLabel;
+          route.section_name = sectionLabel;
+
+          route.departmentId = departmentId;
+          route.department_id = departmentId;
+          route.departmentLabel = departmentLabel;
+          route.department_label = departmentLabel;
+          route.departmentName = departmentLabel;
+          route.department_name = departmentLabel;
+
+          route.leaderPlacementId = leaderPlacementId;
+          route.leader_placement_id = leaderPlacementId;
+          route.leaderLabel = leaderLabel;
+          route.leader_label = leaderLabel;
+          route.assigned_leader_label = leaderLabel;
+
+          route.departmentMissing = !departmentLabel;
+          route.leaderMissing = !leaderLabel;
+          route.lastAppliedAt = (new Date()).toISOString();
+
+          state.r8zMgrMajorCardRouteEnrichmentDebug = {
+            marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY",
+            at: route.lastAppliedAt,
+            action: c2d11r1Action,
+            sectionId: sectionId,
+            sectionLabel: sectionLabel,
+            departmentId: departmentId,
+            departmentLabel: departmentLabel,
+            leaderPlacementId: leaderPlacementId,
+            leaderLabel: leaderLabel,
+            matchedSection: !!matchedSection,
+            selectedRows: c2d11r1Rows.length
+          };
+
+          if (typeof setMessage === "function") {
+            if (departmentLabel && leaderLabel) {
+              setMessage("ok", "課・部門・Leaderを一括引き渡し先へ適用しました。");
+            } else if (departmentLabel) {
+              setMessage("ok", "課と部門を一括引き渡し先へ適用しました。Leaderは未設定です。");
+            } else {
+              setMessage("error", "課は適用しましたが、部門情報を特定できません。課設定または台帳行を確認してください。");
+            }
+          }
+
+          if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+            aicmRenderTaskLedgerSafeR8V4("c2d11r1-route-enrichment");
+            return;
+          }
+
+          if (typeof render === "function") {
+            render();
+            return;
+          }
+
+          return;
+        }
+      } catch (c2d11r1Error) {
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("C2D11R1 route enrichment failed", c2d11r1Error);
+        }
+      }
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY_END
+
+
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_ENTRY_START
+      try {
+        var aicmR8zC2d7Args = [];
+        for (var aicmR8zC2d7I = 0; aicmR8zC2d7I < arguments.length; aicmR8zC2d7I += 1) {
+          var aicmR8zC2d7Arg = arguments[aicmR8zC2d7I];
+          var aicmR8zC2d7Item = {
+            index: aicmR8zC2d7I,
+            type: typeof aicmR8zC2d7Arg,
+            stringValue: typeof aicmR8zC2d7Arg === "string" ? String(aicmR8zC2d7Arg) : "",
+            hasTarget: !!(aicmR8zC2d7Arg && aicmR8zC2d7Arg.target),
+            tagName: aicmR8zC2d7Arg && aicmR8zC2d7Arg.tagName ? String(aicmR8zC2d7Arg.tagName) : "",
+            id: aicmR8zC2d7Arg && aicmR8zC2d7Arg.id ? String(aicmR8zC2d7Arg.id) : "",
+            className: aicmR8zC2d7Arg && aicmR8zC2d7Arg.className ? String(aicmR8zC2d7Arg.className) : "",
+            dataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.getAttribute ? String(aicmR8zC2d7Arg.getAttribute("data-core-action") || "") : "",
+            targetDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.getAttribute
+              ? String(aicmR8zC2d7Arg.target.getAttribute("data-core-action") || "")
+              : "",
+            closestDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.closest
+              ? String((aicmR8zC2d7Arg.target.closest("[data-core-action]") || {}).getAttribute ? aicmR8zC2d7Arg.target.closest("[data-core-action]").getAttribute("data-core-action") || "" : "")
+              : ""
+          };
+          aicmR8zC2d7Args.push(aicmR8zC2d7Item);
+        }
+
+        if (state && typeof state === "object") {
+          state.r8zMgrMajorCardHandlerEntryDebug = {
+            marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG",
+            at: (new Date()).toISOString(),
+            phase: "handler-entry",
+            args: aicmR8zC2d7Args,
+            actionVar: typeof action !== "undefined" ? String(action || "") : "__ACTION_VAR_UNDEFINED__",
+            targetVarTag: typeof target !== "undefined" && target && target.tagName ? String(target.tagName) : "",
+            targetVarAction: typeof target !== "undefined" && target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : ""
+          };
+        }
+
+        if (typeof console !== "undefined" && console.info) {
+          console.info("AICM C2D7 handler entry debug", state && state.r8zMgrMajorCardHandlerEntryDebug);
+        }
+      } catch (aicmR8zC2d7Error) {
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("AICM C2D7 handler entry debug failed", aicmR8zC2d7Error);
+        }
+      }
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_ENTRY_END
+
+
+    try {
+      if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+
+      target = target || null;
+
+      if (!target && ev && ev.target && typeof ev.target.closest === "function") {
+        target = ev.target.closest("[data-core-action]");
+      }
+
+      var bag = aicmR8zMgrMajorCardState();
+
+      if (action === "r8z-mgr-major-card-toggle") {
+        var id = "";
+
+        if (target && target.getAttribute) {
+          id = String(target.getAttribute("data-r8z-mgr-major-id") || "").trim();
+        }
+
+        if (!id && target && target.dataset) {
+          id = String(target.dataset.r8zMgrMajorId || "").trim();
+        }
+
+        if (!id) {
+          if (typeof setMessage === "function") setMessage("error", "選択対象の大項目IDを特定できません。");
+          aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_toggle_missing_id");
+          return;
+        }
+
+        if (target && target.checked) {
+          bag.selectedIds[id] = true;
+        } else {
+          delete bag.selectedIds[id];
+        }
+
+        bag.confirm = null;
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_toggle");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-select-all") {
+        bag.selectedIds = {};
+
+        aicmR8zMgrMajorCardAllRows().forEach(function (row, index) {
+          if (!aicmR8zMgrMajorCardIsSelectable(row)) return;
+          var id = aicmR8zMgrMajorCardRowId(row, index);
+          if (id) bag.selectedIds[id] = true;
+        });
+
+        bag.confirm = null;
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "未送信の大項目を全件選択しました。");
+        }
+
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_select_all");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-clear") {
+        bag.selectedIds = {};
+        bag.confirm = null;
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "大項目の選択を解除しました。");
+        }
+
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_clear");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-open-handoff-confirm") {
+        aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-open-delete-confirm") {
+        aicmR8zMgrMajorCardOpenConfirm("delete");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-confirm-no") {
+        bag.confirm = null;
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "操作をキャンセルしました。");
+        }
+
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_no");
+        return;
+      }
+
+      
+
+
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D2_LEDGER_DEPARTMENT_ROUTE_ACTION_ROUTE
+      if (action === "r8z-mgr-major-card-route-apply-section") {
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_BRANCH_ENTER_START
+        var aicmR8zC2d5r2aDebug = {
+          marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY",
+          phase: "branch-enter",
+          at: (new Date()).toISOString(),
+          action: String(action || ""),
+          targetTag: target && target.tagName ? String(target.tagName) : "",
+          targetAction: target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : "",
+          targetId: target && target.id ? String(target.id) : "",
+          targetClass: target && target.className ? String(target.className) : ""
+        };
+
+        try {
+          if (state && typeof state === "object") {
+            state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+          }
+          if (typeof console !== "undefined" && console.info) {
+            console.info("AICM C2D5R2A route apply debug", aicmR8zC2d5r2aDebug);
+          }
+        } catch (_) {}
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_BRANCH_ENTER_END
+
+        var routeRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
+        var sectionSelect = routeRoot && routeRoot.querySelector
+          ? routeRoot.querySelector("[data-r8z-mgr-major-card-route-section-select]")
+          : (typeof document !== "undefined" ? document.getElementById("aicm-r8z-mgr-major-card-route-section-select") : null);
+
+        var option = sectionSelect && sectionSelect.options
+          ? sectionSelect.options[sectionSelect.selectedIndex]
+          : null;
+
+        var sectionId = sectionSelect ? String(sectionSelect.value || "").trim() : "";
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_SELECT_READ_START
+        try {
+          aicmR8zC2d5r2aDebug.phase = "after-select-read";
+          aicmR8zC2d5r2aDebug.routeRootFound = !!routeRoot;
+          aicmR8zC2d5r2aDebug.sectionSelectFound = !!sectionSelect;
+          aicmR8zC2d5r2aDebug.optionFound = !!option;
+          aicmR8zC2d5r2aDebug.selectedIndex = sectionSelect ? sectionSelect.selectedIndex : null;
+          aicmR8zC2d5r2aDebug.sectionId = sectionId;
+          aicmR8zC2d5r2aDebug.optionText = option ? String(option.textContent || "").trim() : "";
+          aicmR8zC2d5r2aDebug.optionSectionId = option && option.getAttribute ? String(option.getAttribute("data-section-id") || "") : "";
+          aicmR8zC2d5r2aDebug.optionSectionLabel = option && option.getAttribute ? String(option.getAttribute("data-section-label") || "") : "";
+          aicmR8zC2d5r2aDebug.optionDepartmentId = option && option.getAttribute ? String(option.getAttribute("data-department-id") || "") : "";
+          aicmR8zC2d5r2aDebug.optionDepartmentLabel = option && option.getAttribute ? String(option.getAttribute("data-department-label") || "") : "";
+
+          if (state && typeof state === "object") {
+            state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+          }
+          if (typeof console !== "undefined" && console.info) {
+            console.info("AICM C2D5R2A route apply after select", aicmR8zC2d5r2aDebug);
+          }
+        } catch (_) {}
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_SELECT_READ_END
+
+
+        if (!sectionId || !option) {
+          if (typeof setMessage === "function") setMessage("error", "課を選択してください。");
+          aicmR8zMgrMajorCardRerender("r8z_c2d2_section_select_empty");
+          return;
+        }
+
+        var sectionSnapshot = {
+          sectionId: String(option.getAttribute("data-section-id") || sectionId || "").trim(),
+          sectionLabel: String(option.getAttribute("data-section-label") || option.textContent || "").trim(),
+          departmentId: String(option.getAttribute("data-department-id") || "").trim(),
+          departmentLabel: String(option.getAttribute("data-department-label") || "").trim()
+        };
+
+        var appliedRoute = aicmR8zC2cApplySectionChoice(sectionId, sectionSnapshot);
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_APPLY_START
+        try {
+          aicmR8zC2d5r2aDebug.phase = "after-apply";
+          aicmR8zC2d5r2aDebug.appliedRouteOk = !!appliedRoute;
+          aicmR8zC2d5r2aDebug.appliedRoute = appliedRoute || null;
+          aicmR8zC2d5r2aDebug.choiceAfterApply = typeof aicmR8zC2cChoice === "function" ? aicmR8zC2cChoice() : null;
+          aicmR8zC2d5r2aDebug.stateSelectionAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection : null;
+          aicmR8zC2d5r2aDebug.confirmAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection.confirm || null : null;
+
+          if (state && typeof state === "object") {
+            state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+          }
+          if (typeof console !== "undefined" && console.info) {
+            console.info("AICM C2D5R2A route apply after apply", aicmR8zC2d5r2aDebug);
+          }
+        } catch (_) {}
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_APPLY_END
+
+
+        if (!appliedRoute || !appliedRoute.sectionId) {
+          if (typeof setMessage === "function") setMessage("error", "選択した課を適用できません。再読み込みしてください。");
+          aicmR8zMgrMajorCardRerender("r8z_c2d2_section_apply_failed");
+          return;
+        }
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "引き渡し先の課を適用しました: " + appliedRoute.sectionLabel);
+        }
+
+        aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-route-apply-leader") {
+        var leaderRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
+        var leaderSelect = leaderRoot && leaderRoot.querySelector
+          ? leaderRoot.querySelector("[data-r8z-mgr-major-card-route-leader-select]")
+          : (typeof document !== "undefined" ? document.getElementById("aicm-r8z-mgr-major-card-route-leader-select") : null);
+
+        var leaderPlacementId = leaderSelect ? String(leaderSelect.value || "").trim() : "";
+
+        if (!leaderPlacementId) {
+          if (typeof setMessage === "function") setMessage("error", "Leaderを選択してください。");
+          aicmR8zMgrMajorCardRerender("r8z_c2d2_leader_select_empty");
+          return;
+        }
+
+        aicmR8zC2cApplyLeaderChoice(leaderPlacementId);
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "Leaderを適用しました。");
+        }
+
+        aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-route-clear") {
+        aicmR8zC2cClearRouteChoice();
+        aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+        return;
+      }
+
+if (action === "r8z-mgr-major-card-confirm-yes") {
+        // AICM_R8Z_MGR_MAJOR_CARD_C2B_PAYLOAD_VALIDATION_CONFIRM_YES_VALIDATION_GUARD
+        if (bag.confirm && Array.isArray(bag.confirm.errors) && bag.confirm.errors.length) {
+          if (typeof setMessage === "function") {
+            setMessage("error", "実行前チェックが未解決のため、Yesは実行できません。");
+          }
+          aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_blocked_c2b");
+          return;
+        }
+
+        var kind = bag.confirm && bag.confirm.kind ? bag.confirm.kind : "";
+        var count = bag.confirm && Array.isArray(bag.confirm.items) ? bag.confirm.items.length : 0;
+
+        bag.confirm = null;
+
+        if (typeof setMessage === "function") {
+          setMessage(
+            "ok",
+            (kind === "delete" ? "削除" : "課長へ送る") +
+            "のYesを受け付けました。ただしこの確認画面ではDB更新/API POSTは実行していません。対象件数: " +
+            String(count)
+          );
+        }
+
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_no_write");
+        return;
+      }
+    } catch (error) {
+      try {
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "大項目選択操作に失敗しました。");
+        }
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_action_error");
+      } catch (_) {}
+    }
+  }
