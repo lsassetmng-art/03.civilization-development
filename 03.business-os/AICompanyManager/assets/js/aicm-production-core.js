@@ -8868,6 +8868,175 @@ async function aicmExecuteLeaderHandoffConfirmR8S() {
     if (typeof requestJson === "function") {
       result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
     } else {
+    // AICM_R8Z_MGR_MAJOR_CARD_C2F_D2_EXECUTE_PAYLOAD_VALIDATION_GATE_START
+    // Execute-path payload validation gate.
+    // Validates the existing postBody variable immediately before the network request.
+    // This phase intentionally keeps API POST locked until explicit approval.
+    try {
+      function aicmC2fD2Text(value) {
+        if (value === null || typeof value === "undefined") return "";
+        return String(value).trim();
+      }
+
+      function aicmC2fD2IsObject(value) {
+        return value !== null && typeof value === "object" && !Array.isArray(value);
+      }
+
+      function aicmC2fD2FindFirst(obj, keys, depth) {
+        if (depth > 6 || obj === null || typeof obj === "undefined") return "";
+        if (Array.isArray(obj)) {
+          for (var aicmC2fD2AI = 0; aicmC2fD2AI < obj.length; aicmC2fD2AI += 1) {
+            var aicmC2fD2AValue = aicmC2fD2FindFirst(obj[aicmC2fD2AI], keys, depth + 1);
+            if (aicmC2fD2AValue) return aicmC2fD2AValue;
+          }
+          return "";
+        }
+        if (!aicmC2fD2IsObject(obj)) return "";
+        for (var aicmC2fD2KI = 0; aicmC2fD2KI < keys.length; aicmC2fD2KI += 1) {
+          var aicmC2fD2Key = keys[aicmC2fD2KI];
+          if (Object.prototype.hasOwnProperty.call(obj, aicmC2fD2Key)) {
+            var aicmC2fD2Direct = aicmC2fD2Text(obj[aicmC2fD2Key]);
+            if (aicmC2fD2Direct) return aicmC2fD2Direct;
+          }
+        }
+        var aicmC2fD2ObjKeys = Object.keys(obj);
+        for (var aicmC2fD2OI = 0; aicmC2fD2OI < aicmC2fD2ObjKeys.length; aicmC2fD2OI += 1) {
+          var aicmC2fD2Nested = aicmC2fD2FindFirst(obj[aicmC2fD2ObjKeys[aicmC2fD2OI]], keys, depth + 1);
+          if (aicmC2fD2Nested) return aicmC2fD2Nested;
+        }
+        return "";
+      }
+
+      function aicmC2fD2FindArray(obj, keys, depth) {
+        if (depth > 6 || obj === null || typeof obj === "undefined") return [];
+        if (Array.isArray(obj)) {
+          return obj;
+        }
+        if (!aicmC2fD2IsObject(obj)) return [];
+        for (var aicmC2fD2KI = 0; aicmC2fD2KI < keys.length; aicmC2fD2KI += 1) {
+          var aicmC2fD2Key = keys[aicmC2fD2KI];
+          if (Object.prototype.hasOwnProperty.call(obj, aicmC2fD2Key) && Array.isArray(obj[aicmC2fD2Key])) {
+            return obj[aicmC2fD2Key];
+          }
+        }
+        var aicmC2fD2ObjKeys = Object.keys(obj);
+        for (var aicmC2fD2OI = 0; aicmC2fD2OI < aicmC2fD2ObjKeys.length; aicmC2fD2OI += 1) {
+          var aicmC2fD2NestedArray = aicmC2fD2FindArray(obj[aicmC2fD2ObjKeys[aicmC2fD2OI]], keys, depth + 1);
+          if (aicmC2fD2NestedArray.length) return aicmC2fD2NestedArray;
+        }
+        return [];
+      }
+
+      var aicmC2fD2Payload = postBody || {};
+      var aicmC2fD2Missing = [];
+
+      var aicmC2fD2Ids = aicmC2fD2FindArray(aicmC2fD2Payload, [
+        "selected_manager_major_item_ids",
+        "manager_major_item_ids",
+        "managerMajorItemIds",
+        "selectedIds",
+        "ids"
+      ], 0).filter(function (value) { return aicmC2fD2Text(value); });
+
+      var aicmC2fD2SingleId = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+        "manager_major_item_id",
+        "managerMajorItemId",
+        "pmlw_major_item_id",
+        "major_item_id",
+        "majorItemId",
+        "id",
+        "uuid"
+      ], 0);
+
+      var aicmC2fD2Department = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+        "department_id",
+        "departmentId",
+        "department_label",
+        "departmentLabel",
+        "department_name",
+        "departmentName"
+      ], 0);
+
+      var aicmC2fD2Section = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+        "section_id",
+        "sectionId",
+        "section_label",
+        "sectionLabel",
+        "section_name",
+        "sectionName"
+      ], 0);
+
+      var aicmC2fD2Leader = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+        "leader_label",
+        "leaderLabel",
+        "assigned_leader_label",
+        "leader_name",
+        "leaderName"
+      ], 0);
+
+      var aicmC2fD2LeaderPlacement = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+        "leader_placement_id",
+        "leaderPlacementId",
+        "assigned_leader_placement_id",
+        "placement_id",
+        "placementId"
+      ], 0);
+
+      if (!aicmC2fD2Ids.length && !aicmC2fD2SingleId) aicmC2fD2Missing.push("対象大項目IDがありません");
+      if (!aicmC2fD2Department) aicmC2fD2Missing.push("部門がありません");
+      if (!aicmC2fD2Section) aicmC2fD2Missing.push("課がありません");
+      if (!aicmC2fD2Leader) aicmC2fD2Missing.push("Leaderがありません");
+      if (!aicmC2fD2LeaderPlacement) aicmC2fD2Missing.push("Leader配置IDがありません");
+
+      var aicmC2fD2Summary = {
+        ok: aicmC2fD2Missing.length === 0,
+        missing: aicmC2fD2Missing,
+        selected_count: aicmC2fD2Ids.length || (aicmC2fD2SingleId ? 1 : 0),
+        department: aicmC2fD2Department || "",
+        section: aicmC2fD2Section || "",
+        leader: aicmC2fD2Leader || "",
+        leader_placement_id: aicmC2fD2LeaderPlacement || "",
+        api_post: "LOCKED_BY_C2F_D2_EXECUTE_GATE",
+        db_write: "NO"
+      };
+
+      if (typeof state !== "undefined" && state && typeof state === "object") {
+        state.managerMajorLeaderHandoffConfirm = state.managerMajorLeaderHandoffConfirm || {};
+        state.managerMajorLeaderHandoffConfirm.executeValidation = aicmC2fD2Summary;
+        state.managerMajorLeaderHandoffConfirm.executeLocked = true;
+      }
+
+      if (typeof window !== "undefined" && window && typeof window.alert === "function") {
+        window.alert(
+          aicmC2fD2Missing.length
+            ? "実行前チェックNG: " + aicmC2fD2Missing.join(" / ")
+            : "実行前チェックOK。API POSTはまだ未解放です。"
+        );
+      }
+
+      if (typeof aicmR8zMgrMajorCardRerender === "function") {
+        try {
+          aicmR8zMgrMajorCardRerender("c2f-d2-execute-payload-validation-gate");
+        } catch (_) {}
+      }
+
+      return {
+        ok: false,
+        reason: aicmC2fD2Missing.length ? "C2F_D2_PRE_POST_VALIDATION_NG" : "C2F_D2_API_POST_LOCKED_PENDING_APPROVAL",
+        validation: aicmC2fD2Summary
+      };
+    } catch (aicmC2fD2Error) {
+      if (typeof window !== "undefined" && window && typeof window.alert === "function") {
+        window.alert("実行前チェックでエラーが発生しました。API POSTは実行していません。");
+      }
+      return {
+        ok: false,
+        reason: "C2F_D2_VALIDATION_ERROR_POST_NOT_EXECUTED",
+        message: String(aicmC2fD2Error && aicmC2fD2Error.message ? aicmC2fD2Error.message : aicmC2fD2Error)
+      };
+    }
+    // AICM_R8Z_MGR_MAJOR_CARD_C2F_D2_EXECUTE_PAYLOAD_VALIDATION_GATE_END
+
       var response = await fetch("/api/aicm/v2/manager-major/update", {
         method: "POST",
         headers: { "content-type": "application/json" },
