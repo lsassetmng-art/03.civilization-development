@@ -8416,6 +8416,67 @@ return renderShell([
       .replace(/'/g, "&#039;");
   }
 
+// AICM_R8Z_MGR_MAJOR_CARD_C2E_R2B_SAFE_DEBUG_PANEL_DISPLAY_FILTER_START
+// Formal UI display filter for temporary C2D debug panels.
+// This does not edit function h body.
+// It only filters the returned HTML string.
+// No DB write. No API POST. No fetch.
+var aicmR8zC2eR2bOriginalH = h;
+
+function aicmR8zC2eR2bRemoveBlockContainingLabel(html, label) {
+  var out = String(html == null ? "" : html);
+  var guard = 0;
+
+  while (out.indexOf(label) >= 0 && guard < 50) {
+    guard += 1;
+
+    var labelIndex = out.indexOf(label);
+    var removed = false;
+    var tags = ["details", "section", "article", "div"];
+
+    for (var i = 0; i < tags.length; i += 1) {
+      var tag = tags[i];
+      var openNeedle = "<" + tag;
+      var closeNeedle = "</" + tag + ">";
+      var openIndex = out.lastIndexOf(openNeedle, labelIndex);
+      var closeIndex = out.indexOf(closeNeedle, labelIndex);
+
+      if (openIndex >= 0 && closeIndex >= 0) {
+        var endIndex = closeIndex + closeNeedle.length;
+        var block = out.slice(openIndex, endIndex);
+
+        if (block.indexOf(label) >= 0 && block.length <= 50000) {
+          out = out.slice(0, openIndex) + out.slice(endIndex);
+          removed = true;
+          break;
+        }
+      }
+    }
+
+    if (!removed) {
+      out = out.slice(0, labelIndex) + out.slice(labelIndex + label.length);
+    }
+  }
+
+  return out;
+}
+
+function aicmR8zC2eR2bFilterFormalHtml(html) {
+  if (typeof html !== "string") return html;
+
+  var out = html;
+  out = aicmR8zC2eR2bRemoveBlockContainingLabel(out, "C2D5R2A 課を適用 debug");
+  out = aicmR8zC2eR2bRemoveBlockContainingLabel(out, "C2D7 handler entry debug");
+  return out;
+}
+
+h = function aicmR8zC2eR2bFormalUiHWrapper() {
+  var html = aicmR8zC2eR2bOriginalH.apply(this, arguments);
+  return aicmR8zC2eR2bFilterFormalHtml(html);
+};
+// AICM_R8Z_MGR_MAJOR_CARD_C2E_R2B_SAFE_DEBUG_PANEL_DISPLAY_FILTER_END
+
+
   function aicmR8ZNMetadata(row) {
     var meta = row && (row.metadata_jsonb || row.metadata || row.meta) || {};
     if (typeof meta === "string") {
