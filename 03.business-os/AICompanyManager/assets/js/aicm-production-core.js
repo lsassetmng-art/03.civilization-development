@@ -5426,8 +5426,9 @@ await aicmReloadTaskLedgerContext();
   }
 
   function aicmR8zMgrMajorCardSelectedRows() {
+    // AICM_V10L_C2G_B5R5_STALE_SELECTED_PRUNE_SELECTED_ROWS
     return aicmR8zMgrMajorCardAllRows().filter(function (row, index) {
-      return aicmR8zMgrMajorCardIsSelected(aicmR8zMgrMajorCardRowId(row, index));
+      return aicmR8zMgrMajorCardIsSelectable(row) && aicmR8zMgrMajorCardIsSelected(aicmR8zMgrMajorCardRowId(row, index));
     });
   }
 
@@ -6620,7 +6621,8 @@ await aicmReloadTaskLedgerContext();
     rows = Array.isArray(rows) ? rows : [];
 
     var selectedCount = rows.filter(function (row, index) {
-      return aicmR8zMgrMajorCardIsSelected(aicmR8zMgrMajorCardRowId(row, index));
+      // AICM_V10L_C2G_B5R5_STALE_SELECTED_PRUNE_SELECTED_COUNT
+      return aicmR8zMgrMajorCardIsSelectable(row) && aicmR8zMgrMajorCardIsSelected(aicmR8zMgrMajorCardRowId(row, index));
     }).length;
 
     var eligibleCount = rows.filter(function (row) {
@@ -6662,6 +6664,15 @@ await aicmReloadTaskLedgerContext();
   function aicmR8zMgrMajorCardOpenConfirm(kind) {
     var bag = aicmR8zMgrMajorCardState();
     var rows = aicmR8zMgrMajorCardSelectedRows();
+
+    // AICM_V10L_C2G_B5R5_STALE_SELECTED_PRUNE_OPEN_CONFIRM
+    try {
+      bag.selectedIds = {};
+      rows.forEach(function (row, index) {
+        var id = aicmR8zMgrMajorCardRowId(row, index);
+        if (id) bag.selectedIds[id] = true;
+      });
+    } catch (_) {}
 
     if (!rows.length) {
       bag.confirm = null;
