@@ -8735,6 +8735,78 @@ function aicmInjectLeaderHandoffConfirmCardR8SV9F4B(html) {
 
 (function aicmInstallLeaderHandoffConfirmCardBridgeR8SV9F4B() {
 
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D5R3_ROUTE_ACTION_DISPATCHER_APPLY_FIX_START
+    // Route action gate for manager-major-card handoff picker.
+    // Scope: existing dispatcher only. No DB write. No API POST. No new fetch.
+    try {
+      var aicmR8zC2d5r3Event = null;
+      var aicmR8zC2d5r3Target = null;
+      var aicmR8zC2d5r3Action = "";
+
+      for (var aicmR8zC2d5r3I = 0; aicmR8zC2d5r3I < arguments.length; aicmR8zC2d5r3I += 1) {
+        var aicmR8zC2d5r3Arg = arguments[aicmR8zC2d5r3I];
+
+        if (!aicmR8zC2d5r3Event && aicmR8zC2d5r3Arg && aicmR8zC2d5r3Arg.preventDefault) {
+          aicmR8zC2d5r3Event = aicmR8zC2d5r3Arg;
+        }
+
+        if (!aicmR8zC2d5r3Action && typeof aicmR8zC2d5r3Arg === "string") {
+          aicmR8zC2d5r3Action = String(aicmR8zC2d5r3Arg || "").trim();
+        }
+
+        if (!aicmR8zC2d5r3Target && aicmR8zC2d5r3Arg && aicmR8zC2d5r3Arg.target) {
+          if (aicmR8zC2d5r3Arg.target.closest) {
+            aicmR8zC2d5r3Target = aicmR8zC2d5r3Arg.target.closest("[data-core-action]");
+          } else if (aicmR8zC2d5r3Arg.target.getAttribute) {
+            aicmR8zC2d5r3Target = aicmR8zC2d5r3Arg.target;
+          }
+        }
+
+        if (!aicmR8zC2d5r3Target && aicmR8zC2d5r3Arg && aicmR8zC2d5r3Arg.closest) {
+          aicmR8zC2d5r3Target = aicmR8zC2d5r3Arg.closest("[data-core-action]");
+        }
+
+        if (!aicmR8zC2d5r3Target && aicmR8zC2d5r3Arg && aicmR8zC2d5r3Arg.getAttribute) {
+          aicmR8zC2d5r3Target = aicmR8zC2d5r3Arg;
+        }
+      }
+
+      if (!aicmR8zC2d5r3Action && aicmR8zC2d5r3Target && aicmR8zC2d5r3Target.getAttribute) {
+        aicmR8zC2d5r3Action = String(aicmR8zC2d5r3Target.getAttribute("data-core-action") || "").trim();
+      }
+
+      if (!aicmR8zC2d5r3Action && aicmR8zC2d5r3Target && aicmR8zC2d5r3Target.dataset) {
+        aicmR8zC2d5r3Action = String(aicmR8zC2d5r3Target.dataset.coreAction || "").trim();
+      }
+
+      if (
+        aicmR8zC2d5r3Action &&
+        aicmR8zC2d5r3Action.indexOf("r8z-mgr-major-card-route-") === 0 &&
+        typeof aicmR8zMgrMajorCardHandleAction === "function"
+      ) {
+        if (aicmR8zC2d5r3Event && aicmR8zC2d5r3Event.preventDefault) {
+          aicmR8zC2d5r3Event.preventDefault();
+        }
+        if (aicmR8zC2d5r3Event && aicmR8zC2d5r3Event.stopPropagation) {
+          aicmR8zC2d5r3Event.stopPropagation();
+        }
+
+        aicmR8zMgrMajorCardHandleAction(
+          aicmR8zC2d5r3Event,
+          aicmR8zC2d5r3Target,
+          aicmR8zC2d5r3Action
+        );
+        return;
+      }
+    } catch (aicmR8zC2d5r3Error) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn("C2D5R3 route dispatcher target fix skipped", aicmR8zC2d5r3Error);
+      }
+    }
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D5R3_ROUTE_ACTION_DISPATCHER_APPLY_FIX_END
+
+
+
     // AICM_R8Z_MGR_MAJOR_CARD_C2D5R1_ROUTE_DISPATCHER_NO_NEW_FETCH_START
     // Normalize browser click target for manager-major-card route actions.
     // Scope: existing dispatcher only. No DB write. No API POST. No new fetch.
