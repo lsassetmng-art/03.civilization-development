@@ -1,0 +1,615 @@
+# CX22073JW / AIWorkerOS Brain Full Load Final Review / Push Prep
+
+RUN_TS=20260504_112937
+RUN_DIR=/data/data/com.termux/files/home/03.civilization-development/11.aiworker-os/runtime-brain-context/900.meta/20260504_112937_brain_full_load_final_review_push_prep
+
+## Declaration
+- DB_WRITE=NO
+- FILE_WRITE=YES
+- GIT_PUSH=NO
+- AICM_TOUCH=NO
+- DATABASE_URL=NOT_USED
+- PERSONA_DATABASE_URL=USED_READ_ONLY
+
+## DB read-only final review
+```
+            check_code             | result |                         note
+-----------------------------------+--------+-------------------------------------------------------
+ all_full_load_domains_meet_target | PASS   | All full-load domains meet target_min_unit_count
+ hd_r1c_forbidden_zero             | PASS   | HD-R1C forbidden domains remain denied
+ hd_r2_business_professional_zero  | PASS   | HD-R2 business/professional remains denied
+ runtime_material_view_exists      | PASS   | Runtime material adapter view exists
+ selection_smoke_board_pass        | PASS   | Runtime selector smoke board has no failing cases
+ selector_function_exists          | PASS   | AIWorker runtime selector function exists
+ selector_has_lane05               | PASS   | Selector can return lane05_ fill-up materials
+ selector_has_pack05               | PASS   | Selector can return pack05_ full-load materials
+ selector_has_srcmat               | PASS   | Selector can return srcmat_ source registry materials
+(9 rows)
+
+ section | pass_count | fail_count
+---------+------------+------------
+ SUMMARY |          9 |          0
+(1 row)
+
+```
+
+## Node check
+```
+```
+
+## Lane08 regression smoke rerun
+```
+DETECTED_PORT=8787
+PASS endpoint-ready
+PASS BYD2-003 review: status
+PASS BYD2-003 review: provider
+PASS BYD2-003 review: selector
+PASS BYD2-003 review: selector mode
+PASS BYD2-003 review: materialCount
+PASS BYD2-003 review: material limit
+PASS BYD2-003 review: required domain
+PASS BYD2-003 review: forbidden domains
+PASS BYD2-003 review: prompt marker
+PASS BYD2-003 review: prompt max chars
+PASS BYD2-003 review: srcmat
+PASS BYD2-003 review: lane05
+PASS BYD2-003 review: pack05
+PROBE BYD2-003 review
+  model=BYD2-003 purpose=review
+  materialCount=80 domainCount=4
+  srcmatCount=24 lane05Count=52 pack05Count=4
+  promptChars=22761 promptLines=343
+  domains=civilization_foundation_history,education_learning,exam_learning,history_worldview
+  materialCodes=srcmat_civilization_foundation_history_detail_entry,srcmat_srcobj_civilization_foundation_history_detail_entry,lane05_civilization_foundation_history_002,lane05_civilization_foundation_history_004,pack05_civ_001_full_foundation_memory,lane05_civilization_foundation_history_006,lane05_civilization_foundation_history_008,lane05_civilization_foundation_history_010,lane05_civilization_foundation_history_012,lane05_civilization_foundation_history_014,lane05_civilization_foundation_history_016,lane05_civilization_foundation_history_018,lane05_civilization_foundation_history_020,lane05_civilization_foundation_history_022,lane05_civilization_foundation_history_024,lane05_civilization_foundation_history_026,lane05_civilization_foundation_history_028,lane05_civilization_foundation_history_030,lane05_civilization_foundation_history_032,lane05_civilization_foundation_history_034,srcmat_foundation_knowledge_material,srcmat_srcobj_foundation_knowledge_material,lane05_education_learning_003,lane05_education_learning_006,pack05_edu_001_learning_brain_full_load,lane05_education_learning_009,lane05_education_learning_012,lane05_education_learning_015,lane05_education_learning_018,lane05_education_learning_021,lane05_education_learning_024,lane05_education_learning_027,lane05_education_learning_030,lane05_education_learning_033,srcmat_srcobj_foundation_knowledge_topic,srcmat_srcrow_foundation_knowledge_material_0535260481d98629ae87501e81795f4d,srcmat_srcrow_foundation_knowledge_material_1161ba18e3762cdaad5006ed309a777e,srcmat_srcrow_foundation_knowledge_material_2ae5d2ed22af8fa8d3ab5943918b196a,srcmat_srcrow_foundation_knowledge_material_4fc7f49ca8de68d5a460ee36a2c902bb,srcmat_srcrow_foundation_knowledge_material_537d1213ff4d71d238d3ba5d03b8e149,srcmat_civilization_exam_question_bank,srcmat_srcobj_civilization_exam_question_bank,lane05_exam_learning_002,lane05_exam_learning_004,pack05_exam_001_exam_brain_full_load,lane05_exam_learning_006,lane05_exam_learning_008,lane05_exam_learning_010,lane05_exam_learning_012,lane05_exam_learning_014,lane05_exam_learning_016,lane05_exam_learning_018,lane05_exam_learning_020,lane05_exam_learning_022,lane05_exam_learning_024,srcmat_srcobj_lane03_civilization_exam_question_choice,srcmat_srcobj_lane03_vw_aiemp_qualification_past_question_content,srcmat_srcobj_lane03_vw_aiemp_qualification_past_question_metadata,srcmat_srcobj_lane03_vw_civilization_exam_question_reference_v1,srcmat_srcobj_lane03_vw_robot_model_civilization_exam_reference_v1,srcmat_earth_history_detail_entry,srcmat_srcobj_earth_history_detail_entry,lane05_history_worldview_003,lane05_history_worldview_006,pack05_history_001_full_load_axis,lane05_history_worldview_009,lane05_history_worldview_012,lane05_history_worldview_015,lane05_history_worldview_018,lane05_history_worldview_021,lane05_history_worldview_024,lane05_history_worldview_027,lane05_history_worldview_030,lane05_history_worldview_033,lane05_history_worldview_036,srcmat_srcobj_lane03_earth_history_knowledge_entry,srcmat_srcobj_lane03_history_knowledge_entry,srcmat_srcobj_lane03_streaming_view_history_area,srcmat_srcobj_lane03_v_streaming_view_history_area_latest,srcmat_srcobj_lane03_vw_earth_history_detail_reference_v1
+PASS HD-R5P executive: status
+PASS HD-R5P executive: provider
+PASS HD-R5P executive: selector
+PASS HD-R5P executive: selector mode
+PASS HD-R5P executive: materialCount
+PASS HD-R5P executive: material limit
+PASS HD-R5P executive: required domain
+PASS HD-R5P executive: forbidden domains
+PASS HD-R5P executive: prompt marker
+PASS HD-R5P executive: prompt max chars
+PASS HD-R5P executive: srcmat
+PASS HD-R5P executive: lane05
+PASS HD-R5P executive: pack05
+PROBE HD-R5P executive
+  model=HD-R5P purpose=executive_planning
+  materialCount=60 domainCount=3
+  srcmatCount=6 lane05Count=51 pack05Count=3
+  promptChars=16182 promptLines=261
+  domains=business_operation,civilization_foundation_history,robot_aiworker
+  materialCodes=srcmat_business_operation_reference,srcmat_srcobj_lane03_business_support_knowledge_material,lane05_business_operation_003,lane05_business_operation_006,pack05_biz_001_business_brain_full_load,lane05_business_operation_009,lane05_business_operation_012,lane05_business_operation_015,lane05_business_operation_018,lane05_business_operation_021,lane05_business_operation_024,lane05_business_operation_027,lane05_business_operation_030,lane05_business_operation_033,lane05_business_operation_036,lane05_business_operation_039,lane05_business_operation_042,lane05_business_operation_002,lane05_business_operation_005,lane05_business_operation_008,srcmat_civilization_foundation_history_detail_entry,srcmat_srcobj_civilization_foundation_history_detail_entry,lane05_civilization_foundation_history_002,lane05_civilization_foundation_history_004,pack05_civ_001_full_foundation_memory,lane05_civilization_foundation_history_006,lane05_civilization_foundation_history_008,lane05_civilization_foundation_history_010,lane05_civilization_foundation_history_012,lane05_civilization_foundation_history_014,lane05_civilization_foundation_history_016,lane05_civilization_foundation_history_018,lane05_civilization_foundation_history_020,lane05_civilization_foundation_history_022,lane05_civilization_foundation_history_024,lane05_civilization_foundation_history_026,lane05_civilization_foundation_history_028,lane05_civilization_foundation_history_030,lane05_civilization_foundation_history_032,lane05_civilization_foundation_history_034,srcmat_robot_aiworker_model_reference,srcmat_robot_aiworker_series_reference,lane05_robot_aiworker_003,lane05_robot_aiworker_007,pack05_robot_001_robot_brain_full_load,lane05_robot_aiworker_011,lane05_robot_aiworker_015,lane05_robot_aiworker_019,lane05_robot_aiworker_023,lane05_robot_aiworker_027,lane05_robot_aiworker_031,lane05_robot_aiworker_035,lane05_robot_aiworker_039,lane05_robot_aiworker_043,lane05_robot_aiworker_004,lane05_robot_aiworker_008,lane05_robot_aiworker_012,lane05_robot_aiworker_016,lane05_robot_aiworker_020,lane05_robot_aiworker_024
+PASS HD-R1C smalltalk: status
+PASS HD-R1C smalltalk: provider
+PASS HD-R1C smalltalk: selector
+PASS HD-R1C smalltalk: selector mode
+PASS HD-R1C smalltalk: materialCount
+PASS HD-R1C smalltalk: material limit
+PASS HD-R1C smalltalk: required domain
+PASS HD-R1C smalltalk: forbidden domains
+PASS HD-R1C smalltalk: prompt marker
+PASS HD-R1C smalltalk: prompt max chars
+PASS HD-R1C smalltalk: lane05
+PROBE HD-R1C smalltalk
+  model=HD-R1C purpose=smalltalk
+  materialCount=78 domainCount=4
+  srcmatCount=7 lane05Count=46 pack05Count=6
+  promptChars=17789 promptLines=335
+  domains=culture_region,food_nutrition,hobby_entertainment,season_calendar
+  materialCodes=srcmat_culture_region_light_knowledge,lane05_culture_region_001,lane05_culture_region_004,lane05_culture_region_007,lane05_culture_region_010,lane05_culture_region_013,lane05_culture_region_016,lane05_culture_region_019,lane05_culture_region_022,lane05_culture_region_025,lane05_culture_region_028,pack04_lovers_001_warm_greeting,pack04_lovers_008_no_personal_data_pull,pack03_culture_001_local_food_identity,pack03_culture_002_language_tone_context,pack03_culture_003_regional_calendar,pack03_culture_004_respectful_comparison,culture_001_respectful_region_talk,srcmat_food_smalltalk_knowledge,srcmat_srcobj_lane03_vw_aiemp_utility_meal_planning_context,lane05_food_nutrition_001,lane05_food_nutrition_003,pack05_food_001_food_smalltalk_full_load,lane05_food_nutrition_005,lane05_food_nutrition_007,lane05_food_nutrition_009,lane05_food_nutrition_011,lane05_food_nutrition_013,lane05_food_nutrition_015,lane05_food_nutrition_017,lane05_food_nutrition_019,lane05_food_nutrition_021,lane05_food_nutrition_023,pack05_food_002_food_context_not_instruction,pack04_lovers_002_after_work_care,food_001_low_pressure_food_talk,food_002_energy_balance_basic,food_003_warm_drink_mood,lane05_hobby_entertainment_001,lane05_hobby_entertainment_003,pack05_hobby_001_hobby_full_load,lane05_hobby_entertainment_005,lane05_hobby_entertainment_007,lane05_hobby_entertainment_009,lane05_hobby_entertainment_011,lane05_hobby_entertainment_013,lane05_hobby_entertainment_015,lane05_hobby_entertainment_017,lane05_hobby_entertainment_019,lane05_hobby_entertainment_021,lane05_hobby_entertainment_023,pack05_hobby_002_safe_fandom_talk,pack04_lovers_003_boundaries_in_affection,pack04_lovers_004_tsundere_soft_safe,pack04_lovers_005_kuudere_calm_safe,pack04_lovers_006_yandere_business_safe,pack04_lovers_009_safe_compliment,pack04_megami_002_urd_cool_tone,srcmat_season_smalltalk_knowledge,srcmat_srcobj_lane03_seasonal_event_content_link,lane05_season_calendar_001,lane05_season_calendar_003,pack05_season_001_calendar_full_load,srcmat_srcobj_lane03_seasonal_event_master,srcmat_srcobj_lane03_v_seasonal_active_today,lane05_season_calendar_005,lane05_season_calendar_007,lane05_season_calendar_009,lane05_season_calendar_011,lane05_season_calendar_013,lane05_season_calendar_015,lane05_season_calendar_017,lane05_season_calendar_019,lane05_season_calendar_021,lane05_season_calendar_023,pack05_season_002_transition_support,pack04_lovers_007_mood_repair,pack04_lovers_010_exit_with_care
+PASS HD-R2 risk: status
+PASS HD-R2 risk: provider
+PASS HD-R2 risk: selector
+PASS HD-R2 risk: selector mode
+PASS HD-R2 risk: materialCount
+PASS HD-R2 risk: material limit
+PASS HD-R2 risk: required domain
+PASS HD-R2 risk: forbidden domains
+PASS HD-R2 risk: prompt marker
+PASS HD-R2 risk: prompt max chars
+PASS HD-R2 risk: srcmat
+PASS HD-R2 risk: lane05
+PROBE HD-R2 risk
+  model=HD-R2 purpose=risk_check
+  materialCount=60 domainCount=3
+  srcmatCount=15 lane05Count=42 pack05Count=3
+  promptChars=16707 promptLines=261
+  domains=city_art_game,robot_aiworker,security_crisis
+  materialCodes=srcmat_city_art_game_reference,srcmat_srcobj_lane03_asset_marketplace_listing_projection_area,lane05_city_art_game_003,lane05_city_art_game_006,pack05_city_001_city_art_game_full_load,lane05_city_art_game_009,lane05_city_art_game_012,lane05_city_art_game_015,lane05_city_art_game_018,lane05_city_art_game_021,lane05_city_art_game_024,lane05_city_art_game_027,lane05_city_art_game_030,srcmat_srcobj_lane03_knowledge_article,srcmat_srcobj_lane03_static_art_asset_area,srcmat_srcobj_lane03_staticart_delivery_closeout_run,srcmat_srcobj_lane03_staticart_final_completion_certificate,srcmat_srcobj_lane03_staticart_final_handoff_package,srcmat_srcobj_lane03_staticart_final_handoff_package_item,srcmat_srcobj_lane03_staticart_handoff_export_batch,srcmat_robot_aiworker_model_reference,srcmat_robot_aiworker_series_reference,lane05_robot_aiworker_004,lane05_robot_aiworker_008,pack05_robot_001_robot_brain_full_load,lane05_robot_aiworker_012,lane05_robot_aiworker_016,lane05_robot_aiworker_020,lane05_robot_aiworker_024,lane05_robot_aiworker_028,lane05_robot_aiworker_032,lane05_robot_aiworker_036,lane05_robot_aiworker_040,lane05_robot_aiworker_002,lane05_robot_aiworker_006,lane05_robot_aiworker_010,lane05_robot_aiworker_014,lane05_robot_aiworker_018,lane05_robot_aiworker_022,lane05_robot_aiworker_026,srcmat_security_crisis_reference_safe,srcmat_srcobj_lane03_vw_aiemp_combat_roe_safety_context,lane05_security_crisis_001,lane05_security_crisis_003,pack05_sec_001_security_full_load_safe,srcmat_srcobj_lane03_vw_aiemp_privileged_incident_context,srcmat_srcobj_lane03_vw_robot_role_safety_boundary_v1,lane05_security_crisis_005,lane05_security_crisis_007,lane05_security_crisis_009,lane05_security_crisis_011,lane05_security_crisis_013,lane05_security_crisis_015,lane05_security_crisis_017,lane05_security_crisis_019,lane05_security_crisis_021,lane05_security_crisis_023,lane05_security_crisis_025,lane05_security_crisis_027,lane05_security_crisis_029
+============================================================
+PASS_COUNT=5
+WARN_COUNT=0
+FAIL_COUNT=0
+============================================================
+SERVER_OUTPUT_BEGIN
+AIWorkerOS runtime execution HTTP API listening on http://127.0.0.1:8787
+SERVER_OUTPUT_END
+```
+
+## AICM touch check
+```
+AICM_BASE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager
+START_MARKER=/data/data/com.termux/files/home/03.civilization-development/11.aiworker-os/runtime-brain-context/900.meta/20260504_112937_brain_full_load_final_review_push_prep/000_start_marker
+Files under AICM newer than this review start marker:
+```
+
+## Secret candidate file scan
+```
+Scan target: /data/data/com.termux/files/home/03.civilization-development/11.aiworker-os
+Only file paths are printed, not matching secret values.
+
+/data/data/com.termux/files/home/03.civilization-development/11.aiworker-os/runtime-brain-context/900.meta/20260504_112937_brain_full_load_final_review_push_prep/000_BRAIN_FULL_LOAD_FINAL_REVIEW_PUSH_PREP_REPORT.md
+```
+
+## Git status
+```
+AIWORKER_BASE=/data/data/com.termux/files/home/03.civilization-development/11.aiworker-os
+GIT_ROOT=/data/data/com.termux/files/home/03.civilization-development
+
+---- git status --short for AIWorkerOS ----
+?? 11.aiworker-os/brain-access-integration/
+?? 11.aiworker-os/brain-data-thickening/
+?? 11.aiworker-os/robot-capability-profile/
+?? 11.aiworker-os/robot-catalog-fix/
+?? 11.aiworker-os/robot-list/
+?? 11.aiworker-os/runtime-brain-context/
+?? 11.aiworker-os/runtime-control-profile/
+?? 11.aiworker-os/runtime-execution-app-api/
+?? 11.aiworker-os/runtime-execution-complete/
+?? 11.aiworker-os/runtime-execution-http-api/
+?? 11.aiworker-os/runtime-execution-request/
+
+---- git status --short for AICM ----
+ M 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc4e_review_empty_card_ok_20260504_074021/000_GIT_CHECKPOINT_AFTER_V10GC4E_REVIEW_EMPTY_CARD_OK_REPORT.md
+ M 03.business-os/AICompanyManager/assets/js/aicm-production-core.js
+?? 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc4e_review_empty_card_ok_20260504_074021/050_git_commit.out
+?? 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc4e_review_empty_card_ok_20260504_074021/060_git_push.out
+?? 03.business-os/AICompanyManager/900.meta/git_checkpoint_after_v10gc4e_review_empty_card_ok_20260504_074021/070_git_status_after.txt
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_a2_failed_salvage_and_safe_audit_20260504_074947/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b0_leader_send_payload_idempotency_audit_20260504_075251/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b1_failed_patch_salvage_20260504_075635/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b1_ledger_multi_send_confirm_only_20260504_075455/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b1b_ledger_multi_send_actual_renderer_20260504_075945/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b1c_ledger_multi_send_dom_injector_20260504_080229/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b1d_compact_top_leader_send_panel_20260504_093353/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b1e_minimal_top_buttons_20260504_105917/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b1f_buttons_at_registered_major_top_20260504_110225/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b1h_selected_only_leader_send_controls_20260504_111051/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_b1i_selected_send_delete_unified_controls_20260504_111637/
+?? 03.business-os/AICompanyManager/900.meta/r8z_v10l_c0_root_cause_audit_only_20260504_112525/
+```
+
+## Git diff summary
+```
+---- git diff --stat for AIWorkerOS ----
+
+---- git diff --name-status for AIWorkerOS ----
+
+---- untracked AIWorkerOS files ----
+11.aiworker-os/brain-access-integration/900.meta/20260503_063504_cx_brain_depth_aiworker_effective_access/000_CX_BRAIN_DEPTH_AIWORKER_ACCESS_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_063504_cx_brain_depth_aiworker_effective_access/100_apply_cx_brain_depth_aiworker_access.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_063504_cx_brain_depth_aiworker_effective_access/200_verify_cx_brain_depth_aiworker_access.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064200_brain_access_readonly_smoke/000_BRAIN_ACCESS_READONLY_SMOKE_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_064200_brain_access_readonly_smoke/100_brain_access_readonly_smoke.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064200_brain_access_readonly_smoke/110_brain_access_readonly_smoke.out
+11.aiworker-os/brain-access-integration/900.meta/20260503_064318_brain_registry_seed_repair_business_professional/000_BRAIN_REGISTRY_SEED_REPAIR_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_064318_brain_registry_seed_repair_business_professional/100_apply_brain_registry_seed_repair.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064318_brain_registry_seed_repair_business_professional/200_verify_brain_registry_seed_repair.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064726_brain_access_policy_review_readonly/000_BRAIN_ACCESS_POLICY_REVIEW_READONLY_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_064726_brain_access_policy_review_readonly/100_brain_access_policy_review_readonly.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064726_brain_access_policy_review_readonly/110_brain_access_policy_review_readonly.out
+11.aiworker-os/brain-access-integration/900.meta/20260503_064840_brain_access_policy_cleanup_hd_r2_security_specialist/000_BRAIN_ACCESS_POLICY_CLEANUP_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_064840_brain_access_policy_cleanup_hd_r2_security_specialist/100_apply_brain_access_policy_cleanup.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064840_brain_access_policy_cleanup_hd_r2_security_specialist/200_verify_brain_access_policy_cleanup.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_065848_brain_registry_source_alignment_inventory/000_BRAIN_REGISTRY_SOURCE_ALIGNMENT_INVENTORY_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_065848_brain_registry_source_alignment_inventory/100_source_alignment_inventory.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_065848_brain_registry_source_alignment_inventory/110_source_alignment_inventory.out
+11.aiworker-os/brain-access-integration/900.meta/20260503_065949_brain_registry_source_alignment_patch/000_BRAIN_REGISTRY_SOURCE_ALIGNMENT_PATCH_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_065949_brain_registry_source_alignment_patch/100_apply_source_alignment_patch.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_065949_brain_registry_source_alignment_patch/200_verify_source_alignment_patch.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074730_brain_knowledge_unit_thickening_pack_01/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_01_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074730_brain_knowledge_unit_thickening_pack_01/100_apply_brain_knowledge_unit_thickening_pack_01.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074730_brain_knowledge_unit_thickening_pack_01/200_verify_brain_knowledge_unit_thickening_pack_01.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074923_brain_knowledge_unit_thickening_pack_01_repair/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_01_REPAIR_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074923_brain_knowledge_unit_thickening_pack_01_repair/100_apply_brain_knowledge_unit_thickening_pack_01_REPAIRED.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074923_brain_knowledge_unit_thickening_pack_01_repair/200_verify_brain_knowledge_unit_thickening_pack_01_REPAIRED.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074923_brain_knowledge_unit_thickening_pack_01_repair/patch_sql.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260503_105159_brain_knowledge_unit_thickening_pack_02/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_02_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_105159_brain_knowledge_unit_thickening_pack_02/100_apply_brain_knowledge_unit_thickening_pack_02.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_105159_brain_knowledge_unit_thickening_pack_02/200_verify_brain_knowledge_unit_thickening_pack_02.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_111126_brain_knowledge_unit_thickening_pack_03/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_03_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_111126_brain_knowledge_unit_thickening_pack_03/100_apply_brain_knowledge_unit_thickening_pack_03.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_111126_brain_knowledge_unit_thickening_pack_03/200_verify_brain_knowledge_unit_thickening_pack_03.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_175536_brain_knowledge_unit_thickening_pack_04/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_04_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_175536_brain_knowledge_unit_thickening_pack_04/100_apply_brain_knowledge_unit_thickening_pack_04.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_175536_brain_knowledge_unit_thickening_pack_04/200_verify_brain_knowledge_unit_thickening_pack_04.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_190429_brain_full_load_lane_01/000_BRAIN_FULL_LOAD_LANE_01_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_190429_brain_full_load_lane_01/100_apply_brain_full_load_lane_01.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_190429_brain_full_load_lane_01/200_verify_brain_full_load_lane_01.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_192129_brain_full_load_lane_02_source_ingestion/000_BRAIN_FULL_LOAD_LANE_02_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_192129_brain_full_load_lane_02_source_ingestion/100_apply_brain_full_load_lane_02.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_192129_brain_full_load_lane_02_source_ingestion/200_verify_brain_full_load_lane_02.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_203434_brain_full_load_lane_02_repair_dedup_srcrow/100_apply_brain_full_load_lane_02_REPAIRED_DEDUP_SRCROW.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_203434_brain_full_load_lane_02_repair_dedup_srcrow/200_verify_brain_full_load_lane_02_REPAIRED.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_203434_brain_full_load_lane_02_repair_dedup_srcrow/patch_lane02_srcrow_dedup.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260503_204024_brain_full_load_lane_02_safe_rerun_dedup/000_BRAIN_FULL_LOAD_LANE_02_SAFE_DEDUP_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_204024_brain_full_load_lane_02_safe_rerun_dedup/100_apply_brain_full_load_lane_02_SAFE_DEDUP.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_204024_brain_full_load_lane_02_safe_rerun_dedup/200_verify_brain_full_load_lane_02_SAFE_DEDUP.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_211103_brain_full_load_lane_02_viewfix_compatible/000_BRAIN_FULL_LOAD_LANE_02_VIEWFIX_COMPATIBLE_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_211103_brain_full_load_lane_02_viewfix_compatible/010_patch_coverage_view_compatible.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260503_211103_brain_full_load_lane_02_viewfix_compatible/100_apply_brain_full_load_lane_02_VIEWFIX_COMPATIBLE.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_211103_brain_full_load_lane_02_viewfix_compatible/200_verify_brain_full_load_lane_02_VIEWFIX_COMPATIBLE.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_215135_brain_full_load_lane_03_backlog_mapping/000_BRAIN_FULL_LOAD_LANE_03_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_215135_brain_full_load_lane_03_backlog_mapping/100_apply_brain_full_load_lane_03.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_215135_brain_full_load_lane_03_backlog_mapping/200_verify_brain_full_load_lane_03.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_223022_brain_full_load_lane_04_runtime_source_registry_adapter/000_BRAIN_FULL_LOAD_LANE_04_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_223022_brain_full_load_lane_04_runtime_source_registry_adapter/100_apply_brain_full_load_lane_04.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_223022_brain_full_load_lane_04_runtime_source_registry_adapter/200_verify_brain_full_load_lane_04.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_223022_brain_full_load_lane_04_runtime_source_registry_adapter/300_runtime_source_registry_material_probe.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260503_225854_brain_full_load_lane_05_target_fillup/000_BRAIN_FULL_LOAD_LANE_05_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_225854_brain_full_load_lane_05_target_fillup/100_apply_brain_full_load_lane_05.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_225854_brain_full_load_lane_05_target_fillup/200_verify_brain_full_load_lane_05.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053026_brain_full_load_lane_05_repair_axis_active_flag/000_BRAIN_FULL_LOAD_LANE_05_REPAIR_AXIS_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053026_brain_full_load_lane_05_repair_axis_active_flag/010_patch_axis_active_flag.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053026_brain_full_load_lane_05_repair_axis_active_flag/100_apply_brain_full_load_lane_05_REPAIRED_AXIS.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053026_brain_full_load_lane_05_repair_axis_active_flag/200_verify_brain_full_load_lane_05_REPAIRED_AXIS.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053517_brain_full_load_lane_06_runtime_selection_tuning/000_BRAIN_FULL_LOAD_LANE_06_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053517_brain_full_load_lane_06_runtime_selection_tuning/100_apply_brain_full_load_lane_06.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053517_brain_full_load_lane_06_runtime_selection_tuning/200_verify_brain_full_load_lane_06.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061307_brain_full_load_lane_06_failure_diagnosis/000_BRAIN_FULL_LOAD_LANE_06_FAILURE_DIAGNOSIS_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061307_brain_full_load_lane_06_failure_diagnosis/010_lane06_fail_extract.txt
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061307_brain_full_load_lane_06_failure_diagnosis/100_lane06_failure_diagnosis.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061524_brain_full_load_lane_06_srcmat_priority_repair/000_BRAIN_FULL_LOAD_LANE_06_SRCMAT_PRIORITY_REPAIR_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061524_brain_full_load_lane_06_srcmat_priority_repair/100_apply_lane06_srcmat_priority_repair.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061524_brain_full_load_lane_06_srcmat_priority_repair/200_verify_lane06_srcmat_priority_repair.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062328_brain_full_load_lane_06_srcmat_repair_failure_diagnosis/000_LANE06_SRCMAT_REPAIR_FAILURE_DIAGNOSIS_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062328_brain_full_load_lane_06_srcmat_repair_failure_diagnosis/010_fail_extract.txt
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062328_brain_full_load_lane_06_srcmat_repair_failure_diagnosis/100_lane06_srcmat_repair_failure_diagnosis.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062651_brain_full_load_lane_06_definitive_two_stage_rank_repair/000_BRAIN_FULL_LOAD_LANE_06_DEFINITIVE_REPAIR_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062651_brain_full_load_lane_06_definitive_two_stage_rank_repair/100_apply_lane06_definitive_two_stage_rank_repair.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062651_brain_full_load_lane_06_definitive_two_stage_rank_repair/200_verify_lane06_definitive_two_stage_rank_repair.sql
+11.aiworker-os/robot-capability-profile/900.meta/model_capability_card_20260428_114445/000_model_capability_card_report.txt
+11.aiworker-os/robot-capability-profile/900.meta/model_capability_card_20260428_114445/010_MODEL_CAPABILITY_CARD_SUMMARY.md
+11.aiworker-os/robot-capability-profile/900.meta/robot_capability_profile_20260428_113429/000_robot_capability_profile_report.txt
+11.aiworker-os/robot-capability-profile/900.meta/robot_capability_profile_20260428_113429/010_ROBOT_CAPABILITY_PROFILE_SUMMARY.md
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_battler_migration_20260428_115711/000_hd_r2_battler_migration_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_battler_resume_verify_fix_20260428_115856/000_hd_r2_battler_resume_verify_fix_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_battler_resume_verify_fix_20260428_115856/010_HD_R2_BATTLER_RESUME_VERIFY_FIX_SUMMARY.md
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_fighter_fix_20260428_114848/000_hd_r2_fighter_fix_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_old_bundle_delete_resume_20260428_120252/000_hd_r2_old_bundle_delete_resume_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_old_bundle_delete_resume_20260428_120252/010_HD_R2_OLD_BUNDLE_DELETE_RESUME_SUMMARY.md
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_old_bundle_physical_delete_20260428_120122/000_hd_r2_old_bundle_physical_delete_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/robot_public_registry_restore_after_hd_r2_20260428_120706/000_robot_public_registry_restore_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/robot_public_registry_restore_after_hd_r2_20260428_120706/010_ROBOT_PUBLIC_REGISTRY_RESTORE_SUMMARY.md
+11.aiworker-os/robot-list/900.meta/robot_list_after_hd_r2_battler_20260428_120450/000_robot_list_after_hd_r2_battler_report.txt
+11.aiworker-os/robot-list/900.meta/robot_list_after_hd_r2_battler_20260428_120450/010_ROBOT_LIST_AFTER_HD_R2_BATTLER_SUMMARY.md
+11.aiworker-os/runtime-brain-context/000_INDEX.md
+11.aiworker-os/runtime-brain-context/001_OVERVIEW.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_071003_runtime_brain_context_provider/000_RUNTIME_BRAIN_CONTEXT_PROVIDER_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_071003_runtime_brain_context_provider/030_demo_context.json
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/000_RUNTIME_PROMPT_BUILDER_INTEGRATION_INVENTORY_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/010_aiworker_runtime_tree.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/020_integration_candidates.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/030_prompt_context_grep.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/040_package_inventory.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/050_recommended_patch_plan.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072343_runtime_execution_http_api_brain_context_bridge/000_RUNTIME_EXECUTION_HTTP_API_BRAIN_CONTEXT_BRIDGE_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072343_runtime_execution_http_api_brain_context_bridge/patch-server.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072343_runtime_execution_http_api_brain_context_bridge/server.before_brain_context_bridge.js
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072343_runtime_execution_http_api_brain_context_bridge/smoke-brain-context-endpoint.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072453_brain_context_bridge_smoke_retry_port_autodetect/000_BRAIN_CONTEXT_BRIDGE_SMOKE_RETRY_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072453_brain_context_bridge_smoke_retry_port_autodetect/100_smoke_retry_port_autodetect.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_075051_runtime_brain_context_materials_patch/000_RUNTIME_BRAIN_CONTEXT_MATERIALS_PATCH_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_075051_runtime_brain_context_materials_patch/aiworker-brain-context-provider.before_materials.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_075051_runtime_brain_context_materials_patch/brain-context-bridge.before_materials.js
+11.aiworker-os/runtime-brain-context/900.meta/20260503_075051_runtime_brain_context_materials_patch/smoke-endpoint-materials.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_105640_runtime_material_probe_pack_02/000_RUNTIME_MATERIAL_PROBE_PACK_02_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_105640_runtime_material_probe_pack_02/100_runtime_material_probe_pack_02.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_172650_runtime_material_probe_pack_03/000_RUNTIME_MATERIAL_PROBE_PACK_03_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_172650_runtime_material_probe_pack_03/100_runtime_material_probe_pack_03.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_175921_runtime_material_probe_pack_04/000_RUNTIME_MATERIAL_PROBE_PACK_04_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_175921_runtime_material_probe_pack_04/100_runtime_material_probe_pack_04.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/000_PACK04_FAILURE_DIAGNOSIS_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/001_latest_probe_dir.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/010_fail_extract.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/100_pack04_expected_material_db_readability.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/200_pack04_endpoint_diagnosis.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/000_PACK04_TARGETED_REPAIR_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/100_pack04_targeted_repair.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/200_pack04_targeted_repair_verify.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/300_patch_runtime_material_prompt_limit.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/aiworker-brain-context-provider.before_pack04_repair.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/brain-context-bridge.before_pack04_repair.js
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/000_PACK04_FINAL_REPAIR_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/100_pack04_final_repair.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/200_pack04_final_repair_verify.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/300_patch_prompt_material_limit_50.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/aiworker-brain-context-provider.before_pack04_final_repair.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/brain-context-bridge.before_pack04_final_repair.js
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064025_brain_full_load_lane_07_provider_selector_integration/000_BRAIN_FULL_LOAD_LANE_07_PROVIDER_SELECTOR_INTEGRATION_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064025_brain_full_load_lane_07_provider_selector_integration/020_db_precheck.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064025_brain_full_load_lane_07_provider_selector_integration/050_http_probe_lane07.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064025_brain_full_load_lane_07_provider_selector_integration/aiworker-brain-context-provider.before_lane07.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064605_lane07_http_bridge_selector_repair/000_LANE07_HTTP_BRIDGE_SELECTOR_REPAIR_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064605_lane07_http_bridge_selector_repair/030_http_probe_lane07_bridge_repair.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064605_lane07_http_bridge_selector_repair/brain-context-bridge.before_lane07_repair.js
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064605_lane07_http_bridge_selector_repair/server.snapshot_lane07_repair.js
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064727_lane07_http_probe_esm_retry/000_LANE07_HTTP_PROBE_ESM_RETRY_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064727_lane07_http_probe_esm_retry/030_http_probe_lane07_bridge_repair_ESM.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/000_LANE07_HTTP_500_DIAGNOSIS_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/010_server_bridge_grep.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/020_bridge_exports_grep.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/030_direct_bridge_call_test.cjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/040_http_500_raw_diagnosis.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/042_http_raw_output.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/000_LANE07_RENDER_PROMPT_ALIAS_REPAIR_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/010_patch_render_prompt_alias.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/020_direct_bridge_alias_test.cjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/030_http_probe_render_prompt_alias.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/brain-context-bridge.before_render_prompt_alias.js
+11.aiworker-os/runtime-brain-context/900.meta/20260504_105801_brain_full_load_lane_08_regression_handoff/000_BRAIN_FULL_LOAD_LANE_08_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_112937_brain_full_load_final_review_push_prep/000_BRAIN_FULL_LOAD_FINAL_REVIEW_PUSH_PREP_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_112937_brain_full_load_final_review_push_prep/000_start_marker
+11.aiworker-os/runtime-brain-context/900.meta/20260504_112937_brain_full_load_final_review_push_prep/100_db_readonly_final_review.sql
+11.aiworker-os/runtime-brain-context/bin/aiworker-brain-context-demo.mjs
+11.aiworker-os/runtime-brain-context/docs/010_RUNTIME_BRAIN_CONTEXT_CONTRACT.md
+11.aiworker-os/runtime-brain-context/docs/020_RUNTIME_SELECTOR_PROVIDER_HANDOFF.md
+11.aiworker-os/runtime-brain-context/smoke/smoke-brain-context-provider-materials.mjs
+11.aiworker-os/runtime-brain-context/smoke/smoke-brain-context-provider.mjs
+11.aiworker-os/runtime-brain-context/smoke/smoke-lane08-runtime-selector-regression.mjs
+11.aiworker-os/runtime-brain-context/src/aiworker-brain-context-provider.mjs
+11.aiworker-os/runtime-control-profile/900.meta/runtime_control_profile_20260429_073759/000_runtime_control_profile_report.txt
+11.aiworker-os/runtime-control-profile/900.meta/runtime_control_profile_fix_20260429_074239/000_runtime_control_profile_fix_report.txt
+11.aiworker-os/runtime-control-profile/900.meta/runtime_control_profile_fix_20260429_074239/010_RUNTIME_CONTROL_PROFILE_FIX_SUMMARY.md
+11.aiworker-os/runtime-execution-app-api/900.meta/runtime_execution_app_api_20260429_112604/000_runtime_execution_app_api_report.txt
+11.aiworker-os/runtime-execution-app-api/900.meta/runtime_execution_app_api_20260429_112604/010_RUNTIME_EXECUTION_APP_API_SUMMARY.md
+11.aiworker-os/runtime-execution-complete/900.meta/runtime_execution_complete_20260429_112133/000_runtime_execution_complete_report.txt
+11.aiworker-os/runtime-execution-complete/900.meta/runtime_execution_complete_20260429_112133/010_RUNTIME_EXECUTION_COMPLETE_SUMMARY.md
+11.aiworker-os/runtime-execution-http-api/.env.local
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/000_runtime_execution_http_api_report.txt
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/020_health_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/021_noauth_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/030_api_contract_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/031_endpoint_ready_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/032_persistent_smoke_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/040_post_request_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/041_post_request_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/000_runtime_execution_http_api_fix_report.txt
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/010_RUNTIME_EXECUTION_HTTP_API_FIX_SUMMARY.md
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/020_health_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/021_noauth_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/030_api_contract_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/031_endpoint_ready_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/032_persistent_smoke_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/040_post_request_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/041_post_request_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/050_app_read_payload_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/051_pipeline_board_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/052_delivery_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/090_server_log_tail.txt
+11.aiworker-os/runtime-execution-http-api/brain-context-bridge.js
+11.aiworker-os/runtime-execution-http-api/runtime/server.pid
+11.aiworker-os/runtime-execution-http-api/server.js
+11.aiworker-os/runtime-execution-http-api/start.sh
+11.aiworker-os/runtime-execution-http-api/stop.sh
+11.aiworker-os/runtime-execution-request/900.meta/runtime_execution_request_20260429_075312/000_runtime_execution_request_report.txt
+11.aiworker-os/runtime-execution-request/900.meta/runtime_execution_request_20260429_075312/010_RUNTIME_EXECUTION_REQUEST_SUMMARY.md
+```
+
+## Git changed/untracked names
+```
+11.aiworker-os/brain-access-integration/900.meta/20260503_063504_cx_brain_depth_aiworker_effective_access/000_CX_BRAIN_DEPTH_AIWORKER_ACCESS_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_063504_cx_brain_depth_aiworker_effective_access/100_apply_cx_brain_depth_aiworker_access.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_063504_cx_brain_depth_aiworker_effective_access/200_verify_cx_brain_depth_aiworker_access.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064200_brain_access_readonly_smoke/000_BRAIN_ACCESS_READONLY_SMOKE_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_064200_brain_access_readonly_smoke/100_brain_access_readonly_smoke.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064200_brain_access_readonly_smoke/110_brain_access_readonly_smoke.out
+11.aiworker-os/brain-access-integration/900.meta/20260503_064318_brain_registry_seed_repair_business_professional/000_BRAIN_REGISTRY_SEED_REPAIR_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_064318_brain_registry_seed_repair_business_professional/100_apply_brain_registry_seed_repair.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064318_brain_registry_seed_repair_business_professional/200_verify_brain_registry_seed_repair.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064726_brain_access_policy_review_readonly/000_BRAIN_ACCESS_POLICY_REVIEW_READONLY_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_064726_brain_access_policy_review_readonly/100_brain_access_policy_review_readonly.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064726_brain_access_policy_review_readonly/110_brain_access_policy_review_readonly.out
+11.aiworker-os/brain-access-integration/900.meta/20260503_064840_brain_access_policy_cleanup_hd_r2_security_specialist/000_BRAIN_ACCESS_POLICY_CLEANUP_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_064840_brain_access_policy_cleanup_hd_r2_security_specialist/100_apply_brain_access_policy_cleanup.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_064840_brain_access_policy_cleanup_hd_r2_security_specialist/200_verify_brain_access_policy_cleanup.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_065848_brain_registry_source_alignment_inventory/000_BRAIN_REGISTRY_SOURCE_ALIGNMENT_INVENTORY_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_065848_brain_registry_source_alignment_inventory/100_source_alignment_inventory.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_065848_brain_registry_source_alignment_inventory/110_source_alignment_inventory.out
+11.aiworker-os/brain-access-integration/900.meta/20260503_065949_brain_registry_source_alignment_patch/000_BRAIN_REGISTRY_SOURCE_ALIGNMENT_PATCH_REPORT.md
+11.aiworker-os/brain-access-integration/900.meta/20260503_065949_brain_registry_source_alignment_patch/100_apply_source_alignment_patch.sql
+11.aiworker-os/brain-access-integration/900.meta/20260503_065949_brain_registry_source_alignment_patch/200_verify_source_alignment_patch.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074730_brain_knowledge_unit_thickening_pack_01/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_01_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074730_brain_knowledge_unit_thickening_pack_01/100_apply_brain_knowledge_unit_thickening_pack_01.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074730_brain_knowledge_unit_thickening_pack_01/200_verify_brain_knowledge_unit_thickening_pack_01.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074923_brain_knowledge_unit_thickening_pack_01_repair/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_01_REPAIR_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074923_brain_knowledge_unit_thickening_pack_01_repair/100_apply_brain_knowledge_unit_thickening_pack_01_REPAIRED.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074923_brain_knowledge_unit_thickening_pack_01_repair/200_verify_brain_knowledge_unit_thickening_pack_01_REPAIRED.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_074923_brain_knowledge_unit_thickening_pack_01_repair/patch_sql.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260503_105159_brain_knowledge_unit_thickening_pack_02/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_02_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_105159_brain_knowledge_unit_thickening_pack_02/100_apply_brain_knowledge_unit_thickening_pack_02.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_105159_brain_knowledge_unit_thickening_pack_02/200_verify_brain_knowledge_unit_thickening_pack_02.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_111126_brain_knowledge_unit_thickening_pack_03/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_03_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_111126_brain_knowledge_unit_thickening_pack_03/100_apply_brain_knowledge_unit_thickening_pack_03.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_111126_brain_knowledge_unit_thickening_pack_03/200_verify_brain_knowledge_unit_thickening_pack_03.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_175536_brain_knowledge_unit_thickening_pack_04/000_BRAIN_KNOWLEDGE_UNIT_THICKENING_PACK_04_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_175536_brain_knowledge_unit_thickening_pack_04/100_apply_brain_knowledge_unit_thickening_pack_04.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_175536_brain_knowledge_unit_thickening_pack_04/200_verify_brain_knowledge_unit_thickening_pack_04.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_190429_brain_full_load_lane_01/000_BRAIN_FULL_LOAD_LANE_01_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_190429_brain_full_load_lane_01/100_apply_brain_full_load_lane_01.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_190429_brain_full_load_lane_01/200_verify_brain_full_load_lane_01.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_192129_brain_full_load_lane_02_source_ingestion/000_BRAIN_FULL_LOAD_LANE_02_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_192129_brain_full_load_lane_02_source_ingestion/100_apply_brain_full_load_lane_02.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_192129_brain_full_load_lane_02_source_ingestion/200_verify_brain_full_load_lane_02.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_203434_brain_full_load_lane_02_repair_dedup_srcrow/100_apply_brain_full_load_lane_02_REPAIRED_DEDUP_SRCROW.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_203434_brain_full_load_lane_02_repair_dedup_srcrow/200_verify_brain_full_load_lane_02_REPAIRED.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_203434_brain_full_load_lane_02_repair_dedup_srcrow/patch_lane02_srcrow_dedup.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260503_204024_brain_full_load_lane_02_safe_rerun_dedup/000_BRAIN_FULL_LOAD_LANE_02_SAFE_DEDUP_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_204024_brain_full_load_lane_02_safe_rerun_dedup/100_apply_brain_full_load_lane_02_SAFE_DEDUP.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_204024_brain_full_load_lane_02_safe_rerun_dedup/200_verify_brain_full_load_lane_02_SAFE_DEDUP.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_211103_brain_full_load_lane_02_viewfix_compatible/000_BRAIN_FULL_LOAD_LANE_02_VIEWFIX_COMPATIBLE_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_211103_brain_full_load_lane_02_viewfix_compatible/010_patch_coverage_view_compatible.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260503_211103_brain_full_load_lane_02_viewfix_compatible/100_apply_brain_full_load_lane_02_VIEWFIX_COMPATIBLE.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_211103_brain_full_load_lane_02_viewfix_compatible/200_verify_brain_full_load_lane_02_VIEWFIX_COMPATIBLE.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_215135_brain_full_load_lane_03_backlog_mapping/000_BRAIN_FULL_LOAD_LANE_03_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_215135_brain_full_load_lane_03_backlog_mapping/100_apply_brain_full_load_lane_03.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_215135_brain_full_load_lane_03_backlog_mapping/200_verify_brain_full_load_lane_03.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_223022_brain_full_load_lane_04_runtime_source_registry_adapter/000_BRAIN_FULL_LOAD_LANE_04_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_223022_brain_full_load_lane_04_runtime_source_registry_adapter/100_apply_brain_full_load_lane_04.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_223022_brain_full_load_lane_04_runtime_source_registry_adapter/200_verify_brain_full_load_lane_04.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_223022_brain_full_load_lane_04_runtime_source_registry_adapter/300_runtime_source_registry_material_probe.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260503_225854_brain_full_load_lane_05_target_fillup/000_BRAIN_FULL_LOAD_LANE_05_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260503_225854_brain_full_load_lane_05_target_fillup/100_apply_brain_full_load_lane_05.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260503_225854_brain_full_load_lane_05_target_fillup/200_verify_brain_full_load_lane_05.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053026_brain_full_load_lane_05_repair_axis_active_flag/000_BRAIN_FULL_LOAD_LANE_05_REPAIR_AXIS_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053026_brain_full_load_lane_05_repair_axis_active_flag/010_patch_axis_active_flag.mjs
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053026_brain_full_load_lane_05_repair_axis_active_flag/100_apply_brain_full_load_lane_05_REPAIRED_AXIS.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053026_brain_full_load_lane_05_repair_axis_active_flag/200_verify_brain_full_load_lane_05_REPAIRED_AXIS.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053517_brain_full_load_lane_06_runtime_selection_tuning/000_BRAIN_FULL_LOAD_LANE_06_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053517_brain_full_load_lane_06_runtime_selection_tuning/100_apply_brain_full_load_lane_06.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_053517_brain_full_load_lane_06_runtime_selection_tuning/200_verify_brain_full_load_lane_06.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061307_brain_full_load_lane_06_failure_diagnosis/000_BRAIN_FULL_LOAD_LANE_06_FAILURE_DIAGNOSIS_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061307_brain_full_load_lane_06_failure_diagnosis/010_lane06_fail_extract.txt
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061307_brain_full_load_lane_06_failure_diagnosis/100_lane06_failure_diagnosis.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061524_brain_full_load_lane_06_srcmat_priority_repair/000_BRAIN_FULL_LOAD_LANE_06_SRCMAT_PRIORITY_REPAIR_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061524_brain_full_load_lane_06_srcmat_priority_repair/100_apply_lane06_srcmat_priority_repair.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_061524_brain_full_load_lane_06_srcmat_priority_repair/200_verify_lane06_srcmat_priority_repair.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062328_brain_full_load_lane_06_srcmat_repair_failure_diagnosis/000_LANE06_SRCMAT_REPAIR_FAILURE_DIAGNOSIS_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062328_brain_full_load_lane_06_srcmat_repair_failure_diagnosis/010_fail_extract.txt
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062328_brain_full_load_lane_06_srcmat_repair_failure_diagnosis/100_lane06_srcmat_repair_failure_diagnosis.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062651_brain_full_load_lane_06_definitive_two_stage_rank_repair/000_BRAIN_FULL_LOAD_LANE_06_DEFINITIVE_REPAIR_REPORT.md
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062651_brain_full_load_lane_06_definitive_two_stage_rank_repair/100_apply_lane06_definitive_two_stage_rank_repair.sql
+11.aiworker-os/brain-data-thickening/900.meta/20260504_062651_brain_full_load_lane_06_definitive_two_stage_rank_repair/200_verify_lane06_definitive_two_stage_rank_repair.sql
+11.aiworker-os/robot-capability-profile/900.meta/model_capability_card_20260428_114445/000_model_capability_card_report.txt
+11.aiworker-os/robot-capability-profile/900.meta/model_capability_card_20260428_114445/010_MODEL_CAPABILITY_CARD_SUMMARY.md
+11.aiworker-os/robot-capability-profile/900.meta/robot_capability_profile_20260428_113429/000_robot_capability_profile_report.txt
+11.aiworker-os/robot-capability-profile/900.meta/robot_capability_profile_20260428_113429/010_ROBOT_CAPABILITY_PROFILE_SUMMARY.md
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_battler_migration_20260428_115711/000_hd_r2_battler_migration_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_battler_resume_verify_fix_20260428_115856/000_hd_r2_battler_resume_verify_fix_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_battler_resume_verify_fix_20260428_115856/010_HD_R2_BATTLER_RESUME_VERIFY_FIX_SUMMARY.md
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_fighter_fix_20260428_114848/000_hd_r2_fighter_fix_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_old_bundle_delete_resume_20260428_120252/000_hd_r2_old_bundle_delete_resume_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_old_bundle_delete_resume_20260428_120252/010_HD_R2_OLD_BUNDLE_DELETE_RESUME_SUMMARY.md
+11.aiworker-os/robot-catalog-fix/900.meta/hd_r2_old_bundle_physical_delete_20260428_120122/000_hd_r2_old_bundle_physical_delete_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/robot_public_registry_restore_after_hd_r2_20260428_120706/000_robot_public_registry_restore_report.txt
+11.aiworker-os/robot-catalog-fix/900.meta/robot_public_registry_restore_after_hd_r2_20260428_120706/010_ROBOT_PUBLIC_REGISTRY_RESTORE_SUMMARY.md
+11.aiworker-os/robot-list/900.meta/robot_list_after_hd_r2_battler_20260428_120450/000_robot_list_after_hd_r2_battler_report.txt
+11.aiworker-os/robot-list/900.meta/robot_list_after_hd_r2_battler_20260428_120450/010_ROBOT_LIST_AFTER_HD_R2_BATTLER_SUMMARY.md
+11.aiworker-os/runtime-brain-context/000_INDEX.md
+11.aiworker-os/runtime-brain-context/001_OVERVIEW.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_071003_runtime_brain_context_provider/000_RUNTIME_BRAIN_CONTEXT_PROVIDER_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_071003_runtime_brain_context_provider/030_demo_context.json
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/000_RUNTIME_PROMPT_BUILDER_INTEGRATION_INVENTORY_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/010_aiworker_runtime_tree.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/020_integration_candidates.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/030_prompt_context_grep.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/040_package_inventory.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072056_runtime_prompt_builder_integration_inventory/050_recommended_patch_plan.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072343_runtime_execution_http_api_brain_context_bridge/000_RUNTIME_EXECUTION_HTTP_API_BRAIN_CONTEXT_BRIDGE_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072343_runtime_execution_http_api_brain_context_bridge/patch-server.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072343_runtime_execution_http_api_brain_context_bridge/server.before_brain_context_bridge.js
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072343_runtime_execution_http_api_brain_context_bridge/smoke-brain-context-endpoint.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072453_brain_context_bridge_smoke_retry_port_autodetect/000_BRAIN_CONTEXT_BRIDGE_SMOKE_RETRY_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_072453_brain_context_bridge_smoke_retry_port_autodetect/100_smoke_retry_port_autodetect.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_075051_runtime_brain_context_materials_patch/000_RUNTIME_BRAIN_CONTEXT_MATERIALS_PATCH_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_075051_runtime_brain_context_materials_patch/aiworker-brain-context-provider.before_materials.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_075051_runtime_brain_context_materials_patch/brain-context-bridge.before_materials.js
+11.aiworker-os/runtime-brain-context/900.meta/20260503_075051_runtime_brain_context_materials_patch/smoke-endpoint-materials.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_105640_runtime_material_probe_pack_02/000_RUNTIME_MATERIAL_PROBE_PACK_02_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_105640_runtime_material_probe_pack_02/100_runtime_material_probe_pack_02.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_172650_runtime_material_probe_pack_03/000_RUNTIME_MATERIAL_PROBE_PACK_03_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_172650_runtime_material_probe_pack_03/100_runtime_material_probe_pack_03.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_175921_runtime_material_probe_pack_04/000_RUNTIME_MATERIAL_PROBE_PACK_04_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_175921_runtime_material_probe_pack_04/100_runtime_material_probe_pack_04.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/000_PACK04_FAILURE_DIAGNOSIS_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/001_latest_probe_dir.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/010_fail_extract.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/100_pack04_expected_material_db_readability.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180134_runtime_material_probe_pack_04_failure_diagnosis/200_pack04_endpoint_diagnosis.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/000_PACK04_TARGETED_REPAIR_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/100_pack04_targeted_repair.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/200_pack04_targeted_repair_verify.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/300_patch_runtime_material_prompt_limit.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/aiworker-brain-context-provider.before_pack04_repair.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180403_pack04_targeted_repair/brain-context-bridge.before_pack04_repair.js
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/000_PACK04_FINAL_REPAIR_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/100_pack04_final_repair.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/200_pack04_final_repair_verify.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/300_patch_prompt_material_limit_50.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/aiworker-brain-context-provider.before_pack04_final_repair.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260503_180659_pack04_final_repair/brain-context-bridge.before_pack04_final_repair.js
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064025_brain_full_load_lane_07_provider_selector_integration/000_BRAIN_FULL_LOAD_LANE_07_PROVIDER_SELECTOR_INTEGRATION_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064025_brain_full_load_lane_07_provider_selector_integration/020_db_precheck.sql
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064025_brain_full_load_lane_07_provider_selector_integration/050_http_probe_lane07.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064025_brain_full_load_lane_07_provider_selector_integration/aiworker-brain-context-provider.before_lane07.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064605_lane07_http_bridge_selector_repair/000_LANE07_HTTP_BRIDGE_SELECTOR_REPAIR_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064605_lane07_http_bridge_selector_repair/030_http_probe_lane07_bridge_repair.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064605_lane07_http_bridge_selector_repair/brain-context-bridge.before_lane07_repair.js
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064605_lane07_http_bridge_selector_repair/server.snapshot_lane07_repair.js
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064727_lane07_http_probe_esm_retry/000_LANE07_HTTP_PROBE_ESM_RETRY_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064727_lane07_http_probe_esm_retry/030_http_probe_lane07_bridge_repair_ESM.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/000_LANE07_HTTP_500_DIAGNOSIS_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/010_server_bridge_grep.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/020_bridge_exports_grep.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/030_direct_bridge_call_test.cjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/040_http_500_raw_diagnosis.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_064907_lane07_http_500_diagnosis/042_http_raw_output.txt
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/000_LANE07_RENDER_PROMPT_ALIAS_REPAIR_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/010_patch_render_prompt_alias.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/020_direct_bridge_alias_test.cjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/030_http_probe_render_prompt_alias.mjs
+11.aiworker-os/runtime-brain-context/900.meta/20260504_065115_lane07_render_prompt_alias_repair/brain-context-bridge.before_render_prompt_alias.js
+11.aiworker-os/runtime-brain-context/900.meta/20260504_105801_brain_full_load_lane_08_regression_handoff/000_BRAIN_FULL_LOAD_LANE_08_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_112937_brain_full_load_final_review_push_prep/000_BRAIN_FULL_LOAD_FINAL_REVIEW_PUSH_PREP_REPORT.md
+11.aiworker-os/runtime-brain-context/900.meta/20260504_112937_brain_full_load_final_review_push_prep/000_start_marker
+11.aiworker-os/runtime-brain-context/900.meta/20260504_112937_brain_full_load_final_review_push_prep/100_db_readonly_final_review.sql
+11.aiworker-os/runtime-brain-context/bin/aiworker-brain-context-demo.mjs
+11.aiworker-os/runtime-brain-context/docs/010_RUNTIME_BRAIN_CONTEXT_CONTRACT.md
+11.aiworker-os/runtime-brain-context/docs/020_RUNTIME_SELECTOR_PROVIDER_HANDOFF.md
+11.aiworker-os/runtime-brain-context/smoke/smoke-brain-context-provider-materials.mjs
+11.aiworker-os/runtime-brain-context/smoke/smoke-brain-context-provider.mjs
+11.aiworker-os/runtime-brain-context/smoke/smoke-lane08-runtime-selector-regression.mjs
+11.aiworker-os/runtime-brain-context/src/aiworker-brain-context-provider.mjs
+11.aiworker-os/runtime-control-profile/900.meta/runtime_control_profile_20260429_073759/000_runtime_control_profile_report.txt
+11.aiworker-os/runtime-control-profile/900.meta/runtime_control_profile_fix_20260429_074239/000_runtime_control_profile_fix_report.txt
+11.aiworker-os/runtime-control-profile/900.meta/runtime_control_profile_fix_20260429_074239/010_RUNTIME_CONTROL_PROFILE_FIX_SUMMARY.md
+11.aiworker-os/runtime-execution-app-api/900.meta/runtime_execution_app_api_20260429_112604/000_runtime_execution_app_api_report.txt
+11.aiworker-os/runtime-execution-app-api/900.meta/runtime_execution_app_api_20260429_112604/010_RUNTIME_EXECUTION_APP_API_SUMMARY.md
+11.aiworker-os/runtime-execution-complete/900.meta/runtime_execution_complete_20260429_112133/000_runtime_execution_complete_report.txt
+11.aiworker-os/runtime-execution-complete/900.meta/runtime_execution_complete_20260429_112133/010_RUNTIME_EXECUTION_COMPLETE_SUMMARY.md
+11.aiworker-os/runtime-execution-http-api/.env.local
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/000_runtime_execution_http_api_report.txt
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/020_health_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/021_noauth_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/030_api_contract_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/031_endpoint_ready_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/032_persistent_smoke_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/040_post_request_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_20260429_172314/041_post_request_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/000_runtime_execution_http_api_fix_report.txt
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/010_RUNTIME_EXECUTION_HTTP_API_FIX_SUMMARY.md
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/020_health_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/021_noauth_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/030_api_contract_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/031_endpoint_ready_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/032_persistent_smoke_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/040_post_request_body.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/041_post_request_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/050_app_read_payload_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/051_pipeline_board_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/052_delivery_response.json
+11.aiworker-os/runtime-execution-http-api/900.meta/runtime_execution_http_api_fix_20260429_205303/090_server_log_tail.txt
+11.aiworker-os/runtime-execution-http-api/brain-context-bridge.js
+11.aiworker-os/runtime-execution-http-api/runtime/server.pid
+11.aiworker-os/runtime-execution-http-api/server.js
+11.aiworker-os/runtime-execution-http-api/start.sh
+11.aiworker-os/runtime-execution-http-api/stop.sh
+11.aiworker-os/runtime-execution-request/900.meta/runtime_execution_request_20260429_075312/000_runtime_execution_request_report.txt
+11.aiworker-os/runtime-execution-request/900.meta/runtime_execution_request_20260429_075312/010_RUNTIME_EXECUTION_REQUEST_SUMMARY.md
+```
+
+## Final judgement
+FINAL_STATUS=BRAIN_FULL_LOAD_FINAL_REVIEW_PUSH_PREP_PASS_REVIEW_REQUIRED
+NEXT=Review report, then explicit git add/commit/push if approved.
