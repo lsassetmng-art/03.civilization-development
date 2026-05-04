@@ -8965,6 +8965,58 @@ function aicmInjectLeaderHandoffConfirmCardR8SV9F4B(html) {
         window.__aicmR8zV9f4bLeaderHandoffClickBridgeInstalled = true;
 
         document.addEventListener("click", function aicmR8zV9f4bLeaderHandoffClickBridge(ev) {
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D9_BRIDGE_CLICK_CALLBACK_ROUTE_ACTION_FIX_START
+        // Route picker action gate inside existing bridge click callback.
+        // This fixes dynamic confirm-panel controls that are not reaching the card handler.
+        // No DB write. No API POST. No fetch.
+        try {
+          var aicmR8zC2d9Event = arguments && arguments.length ? arguments[0] : null;
+          var aicmR8zC2d9Target = null;
+          var aicmR8zC2d9Action = "";
+
+          if (aicmR8zC2d9Event && aicmR8zC2d9Event.target) {
+            if (aicmR8zC2d9Event.target.closest) {
+              aicmR8zC2d9Target = aicmR8zC2d9Event.target.closest("[data-core-action]");
+            } else if (aicmR8zC2d9Event.target.getAttribute) {
+              aicmR8zC2d9Target = aicmR8zC2d9Event.target;
+            }
+          }
+
+          if (aicmR8zC2d9Target && aicmR8zC2d9Target.getAttribute) {
+            aicmR8zC2d9Action = String(aicmR8zC2d9Target.getAttribute("data-core-action") || "").trim();
+          }
+
+          if (!aicmR8zC2d9Action && aicmR8zC2d9Target && aicmR8zC2d9Target.dataset) {
+            aicmR8zC2d9Action = String(aicmR8zC2d9Target.dataset.coreAction || "").trim();
+          }
+
+          if (
+            aicmR8zC2d9Action &&
+            aicmR8zC2d9Action.indexOf("r8z-mgr-major-card-route-") === 0 &&
+            typeof aicmR8zMgrMajorCardHandleAction === "function"
+          ) {
+            if (aicmR8zC2d9Event && aicmR8zC2d9Event.preventDefault) {
+              aicmR8zC2d9Event.preventDefault();
+            }
+            if (aicmR8zC2d9Event && aicmR8zC2d9Event.stopPropagation) {
+              aicmR8zC2d9Event.stopPropagation();
+            }
+
+            aicmR8zMgrMajorCardHandleAction(
+              aicmR8zC2d9Event,
+              aicmR8zC2d9Target,
+              aicmR8zC2d9Action
+            );
+            return;
+          }
+        } catch (aicmR8zC2d9Error) {
+          if (typeof console !== "undefined" && console.warn) {
+            console.warn("C2D9 bridge route action gate failed", aicmR8zC2d9Error);
+          }
+        }
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D9_BRIDGE_CLICK_CALLBACK_ROUTE_ACTION_FIX_END
+
+
           try {
             var target = ev && ev.target;
             var btn = target && typeof target.closest === "function"
