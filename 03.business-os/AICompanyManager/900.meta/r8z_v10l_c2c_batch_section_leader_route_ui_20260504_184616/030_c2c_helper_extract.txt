@@ -1,0 +1,531 @@
+AICompanyManager V10L-C2C helper extracts
+DB_WRITE=NO
+API_POST=NO
+SERVER_PATCH=NO
+
+============================================================
+C2C_HELPERS
+AICM_R8Z_MGR_MAJOR_CARD_C2C_BATCH_SECTION_LEADER_ROUTE_HELPERS_START
+  // C2C: selected major items share one batch section route. DB_WRITE=NO / API_POST=NO.
+  function aicmR8zC2cAttr(target, name) {
+    if (!target || !target.getAttribute) return "";
+    return String(target.getAttribute(name) || "").trim();
+  }
+
+  function aicmR8zC2cBag() {
+    var bag = typeof aicmR8zMgrMajorCardState === "function" ? aicmR8zMgrMajorCardState() : {};
+    if (!bag.handoffBatchRoute || typeof bag.handoffBatchRoute !== "object") {
+      bag.handoffBatchRoute = {
+        sectionId: "",
+        sectionLabel: "",
+        departmentId: "",
+        departmentLabel: "",
+        leaderPlacementId: "",
+        leaderId: "",
+        leaderLabel: ""
+      };
+    }
+    return bag;
+  }
+
+  function aicmR8zC2cChoice() {
+    return aicmR8zC2cBag().handoffBatchRoute;
+  }
+
+  function aicmR8zC2cAsArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function aicmR8zC2cContext() {
+    return state && state.context && typeof state.context === "object" ? state.context : {};
+  }
+
+  function aicmR8zC2cField(row, keys) {
+    row = row && typeof row === "object" ? row : {};
+    for (var i = 0; i < keys.length; i += 1) {
+      var key = keys[i];
+      if (row[key] !== null && typeof row[key] !== "undefined" && String(row[key]).trim() !== "") {
+        return String(row[key]).trim();
+      }
+    }
+    return "";
+  }
+
+  function aicmR8zC2cNormalizeSection(row, index) {
+    row = row && typeof row === "object" ? row : {};
+    var sectionId = aicmR8zC2cField(row, ["section_id", "aicm_section_id", "organization_id", "department_section_id", "id"]);
+    var sectionLabel = aicmR8zC2cField(row, ["section_name", "section_label", "organization_name", "organization_label", "name", "label"]);
+    var departmentId = aicmR8zC2cField(row, ["department_id", "aicm_department_id", "parent_department_id"]);
+    var departmentLabel = aicmR8zC2cField(row, ["department_name", "department_label", "parent_department_name"]);
+    if (!sectionId && sectionLabel) sectionId = "section-label-" + String(index);
+    return {
+      sectionId: sectionId,
+      sectionLabel: sectionLabel || sectionId || "課",
+      departmentId: departmentId,
+      departmentLabel: departmentLabel
+    };
+  }
+
+  function aicmR8zC2cSectionCandidates() {
+    var ctx = aicmR8zC2cContext();
+    var source = []
+      .concat(aicmR8zC2cAsArray(ctx.sections))
+      .concat(aicmR8zC2cAsArray(ctx.section_list))
+      .concat(aicmR8zC2cAsArray(ctx.organizations))
+      .concat(aicmR8zC2cAsArray(ctx.organization_list));
+
+    if (!source.length) {
+      source = aicmR8zMgrMajorCardSelectedRows().map(function (row) {
+        return row || {};
+      });
+    }
+
+    var seen = {};
+    var list = [];
+
+    source.forEach(function (row, index) {
+      var section = aicmR8zC2cNormalizeSection(row, index);
+      var key = section.sectionId || section.sectionLabel;
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      list.push(section);
+    });
+
+    list.sort(function (a, b) {
+      var ak = String((a.departmentLabel || "") + " " + (a.sectionLabel || ""));
+      var bk = String((b.departmentLabel || "") + " " + (b.sectionLabel || ""));
+      return ak.localeCompare(bk, "ja");
+    });
+
+    return list;
+  }
+
+  function aicmR8zC2cPlacementRole(row) {
+    return String(
+      aicmR8zC2cField(row, [
+        "placement_role_code",
+        "role_code",
+        "assigned_role_code",
+        "worker_role_code",
+        "aicm_role_code",
+        "placement_role_code_1",
+        "placement_role_code_2",
+        "placement_role_code_3",
+        "role_label"
+      ])
+    ).toLowerCase();
+  }
+
+  function aicmR8zC2cIsLeaderPlacement(row) {
+    var role = aicmR8zC2cPlacementRole(row);
+    var label = String(
+      aicmR8zC2cField(row, [
+        "placement_role_label",
+        "role_label",
+        "internal_nickname",
+        "display_name",
+        "robot_display_name",
+        "robot_model_name"
+      ])
+    ).toLowerCase();
+
+    return role.indexOf("leader") >= 0 ||
+      role.indexOf("課長") >= 0 ||
+      label.indexOf("leader") >= 0 ||
+      label.indexOf("課長") >= 0;
+  }
+
+  function aicmR8zC2cPlacementSectionId(row) {
+    return aicmR8zC2cField(row, [
+      "section_id",
+      "aicm_section_id",
+      "organization_id",
+      "department_section_id",
+      "assigned_section_id"
+    ]);
+  }
+
+  function aicmR8zC2cNormalizeLeader(row, index) {
+    row = row && typeof row === "object" ? row : {};
+    var leaderPlacementId = aicmR8zC2cField(row, [
+      "placement_id",
+      "robot_placement_id",
+      "leader_placement_id",
+      "aicm_robot_placement_id",
+      "id"
+    ]);
+
+    var leaderId = aicmR8zC2cField(row, [
+      "robot_id",
+      "leader_id",
+      "assigned_leader_id",
+      "worker_robot_id",
+      "aiworker_robot_id"
+    ]);
+
+    var leaderLabel = aicmR8zC2cField(row, [
+      "internal_nickname",
+      "placement_label",
+      "robot_display_name",
+      "robot_model_name",
+      "display_name",
+      "name",
+      "leader_label"
+    ]);
+
+    var sectionId = aicmR8zC2cPlacementSectionId(row);
+
+    if (!leaderPlacementId && leaderLabel) leaderPlacementId = "leader-label-" + String(index);
+
+    return {
+      leaderPlacementId: leaderPlacementId,
+      leaderId: leaderId,
+      leaderLabel: leaderLabel || leaderPlacementId || leaderId || "Leader",
+      sectionId: sectionId
+    };
+  }
+
+  function aicmR8zC2cLeaderCandidatesForSection(sectionId) {
+    var ctx = aicmR8zC2cContext();
+    var source = []
+      .concat(aicmR8zC2cAsArray(ctx.placements))
+      .concat(aicmR8zC2cAsArray(ctx.robotPlacements))
+      .concat(aicmR8zC2cAsArray(ctx.robot_placements))
+      .concat(aicmR8zC2cAsArray(ctx.organizationPlacements))
+      .concat(aicmR8zC2cAsArray(ctx.section_placements));
+
+    var list = [];
+    var seen = {};
+
+    source.forEach(function (row, index) {
+      if (!aicmR8zC2cIsLeaderPlacement(row)) return;
+
+      var placementSectionId = aicmR8zC2cPlacementSectionId(row);
+      if (sectionId && placementSectionId && placementSectionId !== sectionId) return;
+
+      var leader = aicmR8zC2cNormalizeLeader(row, index);
+      var key = leader.leaderPlacementId || leader.leaderId || leader.leaderLabel;
+      if (!key || seen[key]) return;
+
+      seen[key] = true;
+      list.push(leader);
+    });
+
+    list.sort(function (a, b) {
+      return String(a.leaderLabel || "").localeCompare(String(b.leaderLabel || ""), "ja");
+    });
+
+    return list;
+  }
+
+  function aicmR8zC2cFindSection(sectionId) {
+    var sections = aicmR8zC2cSectionCandidates();
+    for (var i = 0; i < sections.length; i += 1) {
+      if (String(sections[i].sectionId || "") === String(sectionId || "")) return sections[i];
+    }
+    return null;
+  }
+
+  function aicmR8zC2cFindLeader(sectionId, leaderPlacementId) {
+    var leaders = aicmR8zC2cLeaderCandidatesForSection(sectionId);
+    for (var i = 0; i < leaders.length; i += 1) {
+      if (String(leaders[i].leaderPlacementId || "") === String(leaderPlacementId || "")) return leaders[i];
+    }
+    return null;
+  }
+
+  function aicmR8zC2cApplySectionChoice(sectionId) {
+    var bag = aicmR8zC2cBag();
+    var section = aicmR8zC2cFindSection(sectionId);
+
+    bag.handoffBatchRoute = {
+      sectionId: section ? section.sectionId : "",
+      sectionLabel: section ? section.sectionLabel : "",
+      departmentId: section ? section.departmentId : "",
+      departmentLabel: section ? section.departmentLabel : "",
+      leaderPlacementId: "",
+      leaderId: "",
+      leaderLabel: ""
+    };
+
+    var leaders = aicmR8zC2cLeaderCandidatesForSection(bag.handoffBatchRoute.sectionId);
+    if (leaders.length === 1) {
+      bag.handoffBatchRoute.leaderPlacementId = leaders[0].leaderPlacementId;
+      bag.handoffBatchRoute.leaderId = leaders[0].leaderId;
+      bag.handoffBatchRoute.leaderLabel = leaders[0].leaderLabel;
+    }
+
+    return bag.handoffBatchRoute;
+  }
+
+  function aicmR8zC2cApplyLeaderChoice(leaderPlacementId) {
+    var bag = aicmR8zC2cBag();
+    var choice = bag.handoffBatchRoute || {};
+    var leader = aicmR8zC2cFindLeader(choice.sectionId, leaderPlacementId);
+
+    if (leader) {
+      choice.leaderPlacementId = leader.leaderPlacementId;
+      choice.leaderId = leader.leaderId;
+      choice.leaderLabel = leader.leaderLabel;
+    }
+
+    bag.handoffBatchRoute = choice;
+    return choice;
+  }
+
+  function aicmR8zC2cClearRouteChoice() {
+    var bag = aicmR8zC2cBag();
+    bag.handoffBatchRoute = {
+      sectionId: "",
+      sectionLabel: "",
+      departmentId: "",
+      departmentLabel: "",
+      leaderPlacementId: "",
+      leaderId: "",
+      leaderLabel: ""
+    };
+    return bag.handoffBatchRoute;
+  }
+
+  function aicmR8zC2cEffectiveRoute() {
+    var choice = aicmR8zC2cChoice();
+    var sectionId = aicmR8zC2cText(choice.sectionId || "");
+    var leaders = sectionId ? aicmR8zC2cLeaderCandidatesForSection(sectionId) : [];
+
+    var leaderPlacementId = aicmR8zC2cText(choice.leaderPlacementId || "");
+    var leaderId = aicmR8zC2cText(choice.leaderId || "");
+    var leaderLabel = aicmR8zC2cText(choice.leaderLabel || "");
+
+    if (!leaderPlacementId && leaders.length === 1) {
+      leaderPlacementId = leaders[0].leaderPlacementId;
+      leaderId = leaders[0].leaderId;
+      leaderLabel = leaders[0].leaderLabel;
+    }
+
+    return {
+      clear: !!sectionId && !!(leaderPlacementId || leaderId || leaderLabel) && leaders.length > 0,
+      sectionId: sectionId,
+      sectionLabel: aicmR8zC2cText(choice.sectionLabel || ""),
+      departmentId: aicmR8zC2cText(choice.departmentId || ""),
+      departmentLabel: aicmR8zC2cText(choice.departmentLabel || ""),
+      leaderPlacementId: leaderPlacementId,
+      leaderId: leaderId,
+      leaderLabel: leaderLabel,
+      leaderCount: leaders.length,
+      displayLeader: leaderLabel || leaderPlacementId || leaderId || "",
+      displaySection: aicmR8zC2cText(choice.sectionLabel || sectionId || ""),
+      displayDepartment: aicmR8zC2cText(choice.departmentLabel || choice.departmentId || "")
+    };
+  }
+
+  function aicmR8zC2cText(value) {
+    if (value === null || typeof value === "undefined") return "";
+    return String(value).trim();
+  }
+
+  function aicmR8zC2cRenderRoutePicker() {
+    var sections = aicmR8zC2cSectionCandidates();
+    var choice = aicmR8zC2cChoice();
+    var selectedSectionId = aicmR8zC2cText(choice.sectionId || "");
+    var leaders = selectedSectionId ? aicmR8zC2cLeaderCandidatesForSection(selectedSectionId) : [];
+
+    var sectionButtons = sections.length
+      ? sections.map(function (section) {
+          var selected = selectedSectionId && section.sectionId === selectedSectionId;
+          var style = selected ? ' style="border:2px solid #2563eb;background:#eff6ff;"' : "";
+          return '<button type="button" data-core-action="r8z-c2c-select-section" data-r8z-c2c-section-id="' + escapeHtml(section.sectionId) + '"' + style + '>' + escapeHtml((section.departmentLabel ? section.departmentLabel + " / " : "") + section.sectionLabel) + '</button>';
+        }).join("")
+      : '<p class="aicm-selected-note">選択できる課がありません。部門/課の設定またはcontext読込を確認してください。</p>';
+
+    var leaderButtons = "";
+
+    if (!selectedSectionId) {
+      leaderButtons = '<p class="aicm-selected-note">先に課を選択してください。</p>';
+    } else if (!leaders.length) {
+      leaderButtons = '<p class="aicm-selected-note">この課にLeaderが配置されていません。</p>';
+    } else if (leaders.length === 1) {
+      leaderButtons = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+    } else {
+      leaderButtons = leaders.map(function (leader) {
+        var selected = choice.leaderPlacementId && choice.leaderPlacementId === leader.leaderPlacementId;
+        var style = selected ? ' style="border:2px solid #2563eb;background:#eff6ff;"' : "";
+        return '<button type="button" data-core-action="r8z-c2c-select-leader" data-r8z-c2c-leader-placement-id="' + escapeHtml(leader.leaderPlacementId) + '"' + style + '>' + escapeHtml(leader.leaderLabel) + '</button>';
+      }).join("");
+    }
+
+    return [
+      '<div class="aicm-core-card" data-r8z-c2c-route-picker="1" style="margin:12px 0;border:1px solid #c7d2fe;">',
+      '  <p class="aicm-eyebrow">引き渡し先 一括選択</p>',
+      '  <h4>選択済み大項目をまとめて送る課を選択</h4>',
+      '  <p class="aicm-selected-note">大項目ごとの個別課選択は行いません。ここで選んだ課/Leaderを、選択済み大項目すべてに適用します。</p>',
+      '  <div class="aicm-dashboard-action-row" style="align-items:flex-start;">' + sectionButtons + '</div>',
+      '  <h4>Leader</h4>',
+      '  <div class="aicm-dashboard-action-row" style="align-items:flex-start;">' + leaderButtons + '</div>',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="r8z-c2c-clear-route">引き渡し先を解除</button>',
+      '  </div>',
+      '</div>'
+    ].join("");
+  }
+  // AICM_R8Z_MGR_MAJOR_CARD_C2C_BATCH_SECTION_LEADER_ROUTE_HELPERS_END
+
+============================================================
+FUNCTION=aicmR8zC2bValidateLeaderHandoffRows
+function aicmR8zC2bValidateLeaderHandoffRows(rows) {
+    rows = Array.isArray(rows) ? rows : [];
+
+    var errors = [];
+    var items = [];
+    var payloads = [];
+    var route = typeof aicmR8zC2cEffectiveRoute === "function"
+      ? aicmR8zC2cEffectiveRoute()
+      : { clear: false, leaderCount: 0, displayLeader: "", displaySection: "", displayDepartment: "" };
+
+    if (!rows.length) {
+      errors.push("対象の大項目を選択してください。");
+    }
+
+    if (!route.sectionId) {
+      errors.push("引き渡し先の課を一括選択してください。");
+    } else if (route.leaderCount === 0) {
+      errors.push("選択した課にLeaderが配置されていません。");
+    } else if (route.leaderCount > 1 && !route.leaderPlacementId && !route.leaderId && !route.leaderLabel) {
+      errors.push("選択した課にLeaderが複数います。Leaderを1人選択してください。");
+    } else if (!route.clear) {
+      errors.push("引き渡し先の課/Leaderが未確定です。");
+    }
+
+    rows.forEach(function (row, index) {
+      var title = typeof aicmR8zMgrMajorCardTitle === "function"
+        ? aicmR8zMgrMajorCardTitle(row)
+        : "Manager大項目";
+
+      var id = typeof aicmR8zMgrMajorCardRowId === "function"
+        ? aicmR8zMgrMajorCardRowId(row, index)
+        : "";
+
+      var selectable = typeof aicmR8zMgrMajorCardIsSelectable === "function"
+        ? aicmR8zMgrMajorCardIsSelectable(row)
+        : true;
+
+      if (!id) {
+        errors.push(title + ": Manager大項目IDを特定できません。");
+      }
+
+      if (!selectable) {
+        errors.push(title + ": すでに引渡し済み、完了、削除、または対象外です。");
+      }
+
+      var payload = aicmR8zC2bBuildLeaderHandoffPayload(row, index);
+
+      items.push({
+        id: id,
+        title: title,
+        route: route,
+        payload: payload
+      });
+
+      payloads.push(payload);
+    });
+
+    return {
+      ok: errors.length === 0,
+      errors: errors,
+      items: items,
+      payloads: payloads,
+      route: route,
+      endpoint: "/api/aicm/v2/manager-major/update"
+    };
+  }
+
+============================================================
+FUNCTION=aicmR8zC2bBuildLeaderHandoffPayload
+function aicmR8zC2bBuildLeaderHandoffPayload(row, index) {
+    row = row && typeof row === "object" ? row : {};
+
+    var majorId = typeof aicmR8zMgrMajorCardRowId === "function"
+      ? aicmR8zMgrMajorCardRowId(row, index)
+      : "";
+
+    var route = typeof aicmR8zC2cEffectiveRoute === "function"
+      ? aicmR8zC2cEffectiveRoute()
+      : aicmR8zC2bLeaderRoute(row);
+
+    var payload = {
+      owner_civilization_id: aicmR8zC2bOwnerId(row),
+      aicm_manager_major_work_item_id: majorId,
+      assigned_leader_label: route.displayLeader || route.leaderLabel || "",
+      decomposition_status_code: "assigned_to_leader",
+      handoff_status_code: "handed_off",
+      note: aicmR8zC2bText(row.note || "")
+    };
+
+    if (route.sectionId) payload.section_id = route.sectionId;
+    if (route.leaderPlacementId) payload.leader_placement_id = route.leaderPlacementId;
+    if (route.leaderId) payload.assigned_leader_id = route.leaderId;
+
+    return payload;
+  }
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardRenderConfirm
+function aicmR8zMgrMajorCardRenderConfirm() {
+    var bag = aicmR8zMgrMajorCardState();
+    var confirm = bag.confirm || null;
+
+    if (!confirm || !Array.isArray(confirm.items) || !confirm.items.length) {
+      return "";
+    }
+
+    var errors = Array.isArray(confirm.errors) ? confirm.errors : [];
+    var payloads = Array.isArray(confirm.payloads) ? confirm.payloads : [];
+    var hasErrors = errors.length > 0;
+    var yesDisabled = hasErrors ? " disabled" : "";
+    var yesStyle = hasErrors ? ' style="opacity:0.45;cursor:not-allowed;"' : "";
+    var route = confirm.route || (typeof aicmR8zC2cEffectiveRoute === "function" ? aicmR8zC2cEffectiveRoute() : {});
+
+    var routePickerHtml = typeof aicmR8zC2cRenderRoutePicker === "function"
+      ? aicmR8zC2cRenderRoutePicker()
+      : "";
+
+    var summaryHtml = [
+      '<div class="aicm-core-card" style="margin:12px 0;">',
+      '<p class="aicm-eyebrow">一括引き渡し先</p>',
+      '<div class="aicm-selected-note">部門: ' + escapeHtml(route.displayDepartment || "-") + '</div>',
+      '<div class="aicm-selected-note">課: ' + escapeHtml(route.displaySection || "-") + '</div>',
+      '<div class="aicm-selected-note">Leader: ' + escapeHtml(route.displayLeader || "-") + '</div>',
+      '</div>'
+    ].join("");
+
+    var itemHtml = confirm.items.map(function (item) {
+      return '<li><strong>' + escapeHtml(item.title || item.id || "Manager大項目") + '</strong></li>';
+    }).join("");
+
+    var errorHtml = hasErrors
+      ? '<div class="aicm-core-card" style="border:1px solid #ef4444;background:#fff7f7;margin:12px 0;"><p class="aicm-eyebrow">実行前チェック</p><ul class="aicm-selected-note">' + errors.map(function (message) { return '<li>' + escapeHtml(message) + '</li>'; }).join("") + '</ul></div>'
+      : '<p class="aicm-selected-note">実行前チェックOK。次工程でAPI POST解放前に佐藤(DB担当)レビューが必要です。</p>';
+
+    var payloadPreviewHtml = payloads.length
+      ? '<details class="aicm-selected-note" style="margin-top:12px;"><summary>payload preview（POST未実行）</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(payloads, null, 2)) + '</pre></details>'
+      : "";
+
+    return [
+      '<div class="aicm-core-card" data-r8z-mgr-major-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
+      '  <p class="aicm-eyebrow">確認</p>',
+      '  <h3>' + escapeHtml(confirm.title || "確認") + '</h3>',
+      '  <p class="aicm-selected-note">endpoint: ' + escapeHtml(confirm.endpoint || "/api/aicm/v2/manager-major/update") + '</p>',
+      routePickerHtml,
+      summaryHtml,
+      '  <p class="aicm-eyebrow">対象大項目</p>',
+      '  <ul class="aicm-selected-note">' + itemHtml + '</ul>',
+      errorHtml,
+      payloadPreviewHtml,
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-yes"' + yesDisabled + yesStyle + '>Yes</button>',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-no">No</button>',
+      '  </div>',
+      '  <p class="aicm-selected-note">この確認画面ではDB更新/API POSTは実行しません。</p>',
+      '</div>'
+    ].join("");
+  }
+

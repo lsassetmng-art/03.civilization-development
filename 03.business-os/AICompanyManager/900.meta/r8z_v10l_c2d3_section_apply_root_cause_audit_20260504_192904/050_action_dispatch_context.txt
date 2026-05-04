@@ -1,0 +1,1408 @@
+AICompanyManager V10L-C2D3 action dispatch contexts
+DB_WRITE=NO
+API_POST=NO
+
+============================================================
+LOCAL contexts: r8z-mgr-major-card-route-apply-section
+--- needle=r8z-mgr-major-card-route-apply-section around L6025
+  6009:     ).join("");
+  6010: 
+  6011:     var departmentHint = "";
+  6012:     if (ledgerDept.ok) {
+  6013:       departmentHint = '<p class="aicm-selected-note">部門は選択済み台帳行から取得: ' + escapeHtml(ledgerDept.departmentLabel) + '</p>';
+  6014:     } else if (ledgerDept.ambiguous) {
+  6015:       departmentHint = '<p class="aicm-selected-note">選択済み台帳行の部門が複数あります。対象大項目の部門を揃えてください。</p>';
+  6016:     } else {
+  6017:       departmentHint = '<p class="aicm-selected-note">部門は台帳行から取得します。台帳行に部門がない場合は課候補の情報を使います。</p>';
+  6018:     }
+  6019: 
+  6020:     var sectionSelectHtml = sections.length
+  6021:       ? [
+  6022:           '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+  6023:           '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-section-select">課</label>',
+  6024:           '  <select id="aicm-r8z-mgr-major-card-route-section-select" data-r8z-mgr-major-card-route-section-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + sectionOptions + '</select>',
+  6025:           '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-section">課を適用</button>',
+  6026:           '</div>'
+  6027:         ].join("")
+  6028:       : '<p class="aicm-selected-note">選択できる課がありません。部門/課の設定またはcontext読込を確認してください。</p>';
+  6029: 
+  6030:     var leaderSelectHtml = "";
+  6031: 
+  6032:     if (!selectedSectionId) {
+  6033:       leaderSelectHtml = '<p class="aicm-selected-note">先に課を選択してください。</p>';
+  6034:     } else if (!leaders.length) {
+  6035:       leaderSelectHtml = '<p class="aicm-selected-note">この課にLeaderが配置されていません。</p>';
+  6036:     } else if (leaders.length === 1) {
+  6037:       leaderSelectHtml = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+  6038:     } else {
+  6039:       var selectedLeaderId = aicmR8zC2cText(choice.leaderPlacementId || "");
+  6040:       var leaderOptions = ['<option value="">Leaderを選択してください</option>'].concat(
+  6041:         leaders.map(function (leader) {
+
+--- needle=r8z-mgr-major-card-route-apply-section around L6485
+  6469: 
+  6470:       if (action === "r8z-mgr-major-card-confirm-no") {
+  6471:         bag.confirm = null;
+  6472: 
+  6473:         if (typeof setMessage === "function") {
+  6474:           setMessage("ok", "操作をキャンセルしました。");
+  6475:         }
+  6476: 
+  6477:         aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_no");
+  6478:         return;
+  6479:       }
+  6480: 
+  6481:       
+  6482: 
+  6483: 
+  6484:       // AICM_R8Z_MGR_MAJOR_CARD_C2D2_LEDGER_DEPARTMENT_ROUTE_ACTION_ROUTE
+  6485:       if (action === "r8z-mgr-major-card-route-apply-section") {
+  6486:         var routeRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
+  6487:         var sectionSelect = routeRoot && routeRoot.querySelector
+  6488:           ? routeRoot.querySelector("[data-r8z-mgr-major-card-route-section-select]")
+  6489:           : (typeof document !== "undefined" ? document.getElementById("aicm-r8z-mgr-major-card-route-section-select") : null);
+  6490: 
+  6491:         var option = sectionSelect && sectionSelect.options
+  6492:           ? sectionSelect.options[sectionSelect.selectedIndex]
+  6493:           : null;
+  6494: 
+  6495:         var sectionId = sectionSelect ? String(sectionSelect.value || "").trim() : "";
+  6496: 
+  6497:         if (!sectionId || !option) {
+  6498:           if (typeof setMessage === "function") setMessage("error", "課を選択してください。");
+  6499:           aicmR8zMgrMajorCardRerender("r8z_c2d2_section_select_empty");
+  6500:           return;
+  6501:         }
+
+============================================================
+LOCAL contexts: aicmR8zMgrMajorCardHandleAction
+--- needle=aicmR8zMgrMajorCardHandleAction around L6389
+  6371:     };
+  6372: 
+  6373:     if (typeof setMessage === "function") {
+  6374:       if (validation.ok) {
+  6375:         setMessage("ok", "確認画面を表示しました。");
+  6376:       } else {
+  6377:         setMessage("error", "引き渡し先の課/Leaderを選択してください。");
+  6378:       }
+  6379:     }
+  6380: 
+  6381:     aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_open_c2d2");
+  6382:   }
+  6383: 
+  6384: 
+  6385: 
+  6386: 
+  6387: 
+  6388: 
+  6389:   function aicmR8zMgrMajorCardHandleAction(ev, target, action) {
+  6390:     try {
+  6391:       if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+  6392: 
+  6393:       target = target || null;
+  6394: 
+  6395:       if (!target && ev && ev.target && typeof ev.target.closest === "function") {
+  6396:         target = ev.target.closest("[data-core-action]");
+  6397:       }
+  6398: 
+  6399:       var bag = aicmR8zMgrMajorCardState();
+  6400: 
+  6401:       if (action === "r8z-mgr-major-card-toggle") {
+  6402:         var id = "";
+  6403: 
+  6404:         if (target && target.getAttribute) {
+  6405:           id = String(target.getAttribute("data-r8z-mgr-major-id") || "").trim();
+  6406:         }
+  6407: 
+
+--- needle=aicmR8zMgrMajorCardHandleAction around L8687
+  8669:         document.addEventListener("click", function aicmR8zV9f4bLeaderHandoffClickBridge(ev) {
+  8670:           try {
+  8671:             var target = ev && ev.target;
+  8672:             var btn = target && typeof target.closest === "function"
+  8673:               ? target.closest("[data-core-action]")
+  8674:               : null;
+  8675: 
+  8676:             if (!btn || !btn.getAttribute) return;
+  8677: 
+  8678:             var action = String(btn.getAttribute("data-core-action") || "").trim();
+  8679: 
+  8680: 
+  8681:             // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_ACTION_ROUTE_START
+  8682: 
+  8683: 
+  8684:             if (["r8z-mgr-major-card-toggle", "r8z-mgr-major-card-select-all", "r8z-mgr-major-card-clear", "r8z-mgr-major-card-open-handoff-confirm", "r8z-mgr-major-card-open-delete-confirm", "r8z-mgr-major-card-confirm-yes", "r8z-mgr-major-card-confirm-no"].indexOf(action) >= 0) {
+  8685: 
+  8686: 
+  8687:               if (typeof aicmR8zMgrMajorCardHandleAction === "function") {
+  8688: 
+  8689: 
+  8690:                 aicmR8zMgrMajorCardHandleAction(
+  8691: 
+  8692: 
+  8693:                   (typeof ev !== "undefined" ? ev : (typeof event !== "undefined" ? event : null)),
+  8694: 
+  8695: 
+  8696:                   (typeof btn !== "undefined" ? btn : (typeof target !== "undefined" ? target : (typeof el !== "undefined" ? el : null))),
+  8697: 
+  8698: 
+  8699:                   action
+  8700: 
+  8701: 
+  8702:                 );
+  8703: 
+  8704: 
+  8705:               }
+
+--- needle=aicmR8zMgrMajorCardHandleAction around L8690
+  8672:             var btn = target && typeof target.closest === "function"
+  8673:               ? target.closest("[data-core-action]")
+  8674:               : null;
+  8675: 
+  8676:             if (!btn || !btn.getAttribute) return;
+  8677: 
+  8678:             var action = String(btn.getAttribute("data-core-action") || "").trim();
+  8679: 
+  8680: 
+  8681:             // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_ACTION_ROUTE_START
+  8682: 
+  8683: 
+  8684:             if (["r8z-mgr-major-card-toggle", "r8z-mgr-major-card-select-all", "r8z-mgr-major-card-clear", "r8z-mgr-major-card-open-handoff-confirm", "r8z-mgr-major-card-open-delete-confirm", "r8z-mgr-major-card-confirm-yes", "r8z-mgr-major-card-confirm-no"].indexOf(action) >= 0) {
+  8685: 
+  8686: 
+  8687:               if (typeof aicmR8zMgrMajorCardHandleAction === "function") {
+  8688: 
+  8689: 
+  8690:                 aicmR8zMgrMajorCardHandleAction(
+  8691: 
+  8692: 
+  8693:                   (typeof ev !== "undefined" ? ev : (typeof event !== "undefined" ? event : null)),
+  8694: 
+  8695: 
+  8696:                   (typeof btn !== "undefined" ? btn : (typeof target !== "undefined" ? target : (typeof el !== "undefined" ? el : null))),
+  8697: 
+  8698: 
+  8699:                   action
+  8700: 
+  8701: 
+  8702:                 );
+  8703: 
+  8704: 
+  8705:               }
+  8706: 
+  8707: 
+  8708:               return;
+
+============================================================
+LOCAL contexts: data-core-action getter
+--- needle=getAttribute("data-core-action") around L8322
+  8304:   }
+  8305: }
+  8306: 
+  8307: (function aicmInstallR8zV9g5DeleteConfirmExecuteBridge() {
+  8308:   try {
+  8309:     if (typeof document !== "undefined" && document.addEventListener && typeof window !== "undefined") {
+  8310:       if (!window.__aicmR8zV9g5DeleteConfirmExecuteBridgeInstalled) {
+  8311:         window.__aicmR8zV9g5DeleteConfirmExecuteBridgeInstalled = true;
+  8312: 
+  8313:         document.addEventListener("click", function aicmR8zV9g5DeleteConfirmClickBridge(ev) {
+  8314:           try {
+  8315:             var target = ev && ev.target;
+  8316:             var btn = target && typeof target.closest === "function"
+  8317:               ? target.closest("[data-core-action], button")
+  8318:               : null;
+  8319: 
+  8320:             if (!btn || !btn.getAttribute) return;
+  8321: 
+  8322:             var action = aicmR8zV9g5Text(btn.getAttribute("data-core-action"));
+  8323:             var label = aicmR8zV9g5Text(btn.textContent || btn.innerText || "");
+  8324: 
+  8325:             var isDeleteExecuteAction =
+  8326:               action === "pmlw-major-delete-execute" ||
+  8327:               action === "manager-major-delete-execute" ||
+  8328:               action === "major-delete-execute" ||
+  8329:               action === "delete-major-confirm" ||
+  8330:               action === "r8z-v9g-delete-execute" ||
+  8331:               action === "r8z-v9g5-delete-execute";
+  8332: 
+  8333:             var isDeleteCancelAction =
+  8334:               action === "pmlw-major-delete-cancel" ||
+  8335:               action === "manager-major-delete-cancel" ||
+  8336:               action === "major-delete-cancel" ||
+  8337:               action === "delete-major-cancel" ||
+  8338:               action === "r8z-v9g-delete-cancel" ||
+  8339:               action === "r8z-v9g5-delete-cancel";
+  8340: 
+
+--- needle=getAttribute("data-core-action") around L8678
+  8660:       wrappedTaskLedgerPlaceholderR8zV9f4b.__r8zV9f4bLeaderConfirmWrapped = true;
+  8661:       wrappedTaskLedgerPlaceholderR8zV9f4b.__r8zV9f4bOriginal = originalTaskLedgerPlaceholderR8zV9f4b;
+  8662:       renderTaskLedgerPlaceholder = wrappedTaskLedgerPlaceholderR8zV9f4b;
+  8663:     }
+  8664: 
+  8665:     if (typeof document !== "undefined" && document.addEventListener && typeof window !== "undefined") {
+  8666:       if (!window.__aicmR8zV9f4bLeaderHandoffClickBridgeInstalled) {
+  8667:         window.__aicmR8zV9f4bLeaderHandoffClickBridgeInstalled = true;
+  8668: 
+  8669:         document.addEventListener("click", function aicmR8zV9f4bLeaderHandoffClickBridge(ev) {
+  8670:           try {
+  8671:             var target = ev && ev.target;
+  8672:             var btn = target && typeof target.closest === "function"
+  8673:               ? target.closest("[data-core-action]")
+  8674:               : null;
+  8675: 
+  8676:             if (!btn || !btn.getAttribute) return;
+  8677: 
+  8678:             var action = String(btn.getAttribute("data-core-action") || "").trim();
+  8679: 
+  8680: 
+  8681:             // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_ACTION_ROUTE_START
+  8682: 
+  8683: 
+  8684:             if (["r8z-mgr-major-card-toggle", "r8z-mgr-major-card-select-all", "r8z-mgr-major-card-clear", "r8z-mgr-major-card-open-handoff-confirm", "r8z-mgr-major-card-open-delete-confirm", "r8z-mgr-major-card-confirm-yes", "r8z-mgr-major-card-confirm-no"].indexOf(action) >= 0) {
+  8685: 
+  8686: 
+  8687:               if (typeof aicmR8zMgrMajorCardHandleAction === "function") {
+  8688: 
+  8689: 
+  8690:                 aicmR8zMgrMajorCardHandleAction(
+  8691: 
+  8692: 
+  8693:                   (typeof ev !== "undefined" ? ev : (typeof event !== "undefined" ? event : null)),
+  8694: 
+  8695: 
+  8696:                   (typeof btn !== "undefined" ? btn : (typeof target !== "undefined" ? target : (typeof el !== "undefined" ? el : null))),
+
+--- needle=getAttribute("data-core-action") around L10575
+ 10557:       var aicmScreenOnlyTarget = aicmActionTarget && aicmActionTarget.closest
+ 10558:         ? aicmActionTarget.closest("[data-screen]")
+ 10559:         : null;
+ 10560: 
+ 10561:       if (aicmScreenOnlyTarget && aicmScreenOnlyTarget.getAttribute) {
+ 10562:         var aicmScreenOnlyName = String(aicmScreenOnlyTarget.getAttribute("data-screen") || "").trim();
+ 10563: 
+ 10564:         if (aicmScreenOnlyName) {
+ 10565:           state.screen = aicmScreenOnlyName;
+ 10566:           if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+ 10567:           if (typeof render === "function") render();
+ 10568:           return;
+ 10569:         }
+ 10570:       }
+ 10571: 
+ 10572:       return;
+ 10573:     }
+ 10574: 
+ 10575:     var action = button.getAttribute("data-core-action") || "";
+ 10576: 
+ 10577:     // AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+ 10578:     
+ 10579: 
+ 10580:     // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+ 10581:     if (action === "worker-runtime-status-refresh") {
+ 10582:       aicmRuntimeStatusRefresh();
+ 10583:       return;
+ 10584:     }
+ 10585: 
+ 10586:     // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+ 10587:     if (action === "worker-runtime-confirm") {
+ 10588:       confirmWorkerRuntimeRequestFromForm();
+ 10589:       return;
+ 10590:     }
+ 10591: 
+ 10592:     if (action === "worker-runtime-execute") {
+ 10593:       executeWorkerRuntimeConfirm();
+
+--- needle=getAttribute("data-core-action") around L13410
+ 13392:       var s = app();
+ 13393:       s.aicmR8zV10dSelectedReviewId = t(id) || selectedReviewId(s);
+ 13394:       s.aicmR8zV10dDecisionPreviewMode = mode;
+ 13395:       rerender();
+ 13396:     }
+ 13397: 
+ 13398:     function clearPreview() {
+ 13399:       var s = app();
+ 13400:       s.aicmR8zV10dDecisionPreviewMode = "";
+ 13401:       rerender();
+ 13402:     }
+ 13403: 
+ 13404:     function installClickBridge() {
+ 13405:       if (typeof document === "undefined" || document.__aicmR8zV10dReviewDetailClickBridge) return;
+ 13406:       document.__aicmR8zV10dReviewDetailClickBridge = true;
+ 13407: 
+ 13408:       document.addEventListener("click", function(event) {
+ 13409:         var target = event.target;
+ 13410:         while (target && target !== document && !target.getAttribute("data-core-action")) {
+ 13411:           target = target.parentNode;
+ 13412:         }
+ 13413: 
+ 13414:         if (!target || target === document) return;
+ 13415: 
+ 13416:         var action = target.getAttribute("data-core-action");
+ 13417:         if (!action || action.indexOf("review-v10d-") !== 0) return;
+ 13418: 
+ 13419:         event.preventDefault();
+ 13420:         event.stopPropagation();
+ 13421: 
+ 13422:         var id = target.getAttribute("data-review-id") || target.getAttribute("data-human-review-id") || "";
+ 13423: 
+ 13424:         if (action === "review-v10d-open-detail") return setDetail(id);
+ 13425:         if (action === "review-v10d-close-detail") return closeDetail();
+ 13426:         if (action === "review-v10d-preview-approve") return previewDecision("approve", id);
+ 13427:         if (action === "review-v10d-preview-return") return previewDecision("return", id);
+ 13428:         if (action === "review-v10d-clear-preview") return clearPreview();
+
+--- needle=getAttribute("data-core-action") around L13416
+ 13398:     function clearPreview() {
+ 13399:       var s = app();
+ 13400:       s.aicmR8zV10dDecisionPreviewMode = "";
+ 13401:       rerender();
+ 13402:     }
+ 13403: 
+ 13404:     function installClickBridge() {
+ 13405:       if (typeof document === "undefined" || document.__aicmR8zV10dReviewDetailClickBridge) return;
+ 13406:       document.__aicmR8zV10dReviewDetailClickBridge = true;
+ 13407: 
+ 13408:       document.addEventListener("click", function(event) {
+ 13409:         var target = event.target;
+ 13410:         while (target && target !== document && !target.getAttribute("data-core-action")) {
+ 13411:           target = target.parentNode;
+ 13412:         }
+ 13413: 
+ 13414:         if (!target || target === document) return;
+ 13415: 
+ 13416:         var action = target.getAttribute("data-core-action");
+ 13417:         if (!action || action.indexOf("review-v10d-") !== 0) return;
+ 13418: 
+ 13419:         event.preventDefault();
+ 13420:         event.stopPropagation();
+ 13421: 
+ 13422:         var id = target.getAttribute("data-review-id") || target.getAttribute("data-human-review-id") || "";
+ 13423: 
+ 13424:         if (action === "review-v10d-open-detail") return setDetail(id);
+ 13425:         if (action === "review-v10d-close-detail") return closeDetail();
+ 13426:         if (action === "review-v10d-preview-approve") return previewDecision("approve", id);
+ 13427:         if (action === "review-v10d-preview-return") return previewDecision("return", id);
+ 13428:         if (action === "review-v10d-clear-preview") return clearPreview();
+ 13429:       }, true);
+ 13430:     }
+ 13431: 
+ 13432:     installClickBridge();
+ 13433: 
+ 13434:     if (typeof window !== "undefined") {
+
+--- needle=getAttribute("data-core-action") around L13877
+ 13859:       s.aicmR8zV10d2SelectedReviewId = t(id) || selectedReviewId(s);
+ 13860:       s.aicmR8zV10dSelectedReviewId = s.aicmR8zV10d2SelectedReviewId;
+ 13861:       s.aicmR8zV10d2DecisionPreviewMode = mode;
+ 13862:       rerenderAndScroll(s.aicmR8zV10d2SelectedReviewId);
+ 13863:     }
+ 13864: 
+ 13865:     function clearPreview() {
+ 13866:       var s = app();
+ 13867:       s.aicmR8zV10d2DecisionPreviewMode = "";
+ 13868:       rerenderAndScroll(selectedReviewId(s));
+ 13869:     }
+ 13870: 
+ 13871:     function installClickBridge() {
+ 13872:       if (typeof document === "undefined" || document.__aicmR8zV10d2InlineDetailClickBridge) return;
+ 13873:       document.__aicmR8zV10d2InlineDetailClickBridge = true;
+ 13874: 
+ 13875:       document.addEventListener("click", function(event) {
+ 13876:         var target = event.target;
+ 13877:         while (target && target !== document && !(target.getAttribute && target.getAttribute("data-core-action"))) {
+ 13878:           target = target.parentNode;
+ 13879:         }
+ 13880: 
+ 13881:         if (!target || target === document || !(target.getAttribute)) return;
+ 13882: 
+ 13883:         var action = target.getAttribute("data-core-action");
+ 13884:         if (!action || action.indexOf("review-v10d2-") !== 0) return;
+ 13885: 
+ 13886:         event.preventDefault();
+ 13887:         event.stopPropagation();
+ 13888: 
+ 13889:         var id = target.getAttribute("data-review-id") || "";
+ 13890: 
+ 13891:         if (action === "review-v10d2-open-detail") return setDetail(id);
+ 13892:         if (action === "review-v10d2-close-detail") return closeDetail();
+ 13893:         if (action === "review-v10d2-preview-approve") return preview("approve", id);
+ 13894:         if (action === "review-v10d2-preview-return") return preview("return", id);
+ 13895:         if (action === "review-v10d2-clear-preview") return clearPreview();
+
+--- needle=getAttribute("data-core-action") around L13883
+ 13865:     function clearPreview() {
+ 13866:       var s = app();
+ 13867:       s.aicmR8zV10d2DecisionPreviewMode = "";
+ 13868:       rerenderAndScroll(selectedReviewId(s));
+ 13869:     }
+ 13870: 
+ 13871:     function installClickBridge() {
+ 13872:       if (typeof document === "undefined" || document.__aicmR8zV10d2InlineDetailClickBridge) return;
+ 13873:       document.__aicmR8zV10d2InlineDetailClickBridge = true;
+ 13874: 
+ 13875:       document.addEventListener("click", function(event) {
+ 13876:         var target = event.target;
+ 13877:         while (target && target !== document && !(target.getAttribute && target.getAttribute("data-core-action"))) {
+ 13878:           target = target.parentNode;
+ 13879:         }
+ 13880: 
+ 13881:         if (!target || target === document || !(target.getAttribute)) return;
+ 13882: 
+ 13883:         var action = target.getAttribute("data-core-action");
+ 13884:         if (!action || action.indexOf("review-v10d2-") !== 0) return;
+ 13885: 
+ 13886:         event.preventDefault();
+ 13887:         event.stopPropagation();
+ 13888: 
+ 13889:         var id = target.getAttribute("data-review-id") || "";
+ 13890: 
+ 13891:         if (action === "review-v10d2-open-detail") return setDetail(id);
+ 13892:         if (action === "review-v10d2-close-detail") return closeDetail();
+ 13893:         if (action === "review-v10d2-preview-approve") return preview("approve", id);
+ 13894:         if (action === "review-v10d2-preview-return") return preview("return", id);
+ 13895:         if (action === "review-v10d2-clear-preview") return clearPreview();
+ 13896:       }, true);
+ 13897:     }
+ 13898: 
+ 13899:     installClickBridge();
+ 13900: 
+ 13901:     if (typeof window !== "undefined") {
+
+--- needle=getAttribute("data-core-action") around L14275
+ 14257:         field("依頼日時", row.requested_at || row.created_at),
+ 14258:         field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+ 14259:         field("会社", row.company_name),
+ 14260:         '  </dl>',
+ 14261:         '  <div class="aicm-core-card" style="background:#ffffff;">',
+ 14262:         '    <p class="aicm-eyebrow">確認事項</p>',
+ 14263:         '    <p class="aicm-selected-note">成果物内容・AIレビュー・未解決事項を確認したうえで、下のボタンからDB更新を実行します。</p>',
+ 14264:         '  </div>',
+ 14265:         '  <div class="aicm-dashboard-action-row">',
+ 14266:         '    <button type="button" data-core-action="review-v10f-cancel-confirm" data-review-id="' + esc(id) + '">確認を閉じる</button>',
+ 14267:         '    <button type="button" class="aicm-primary-button" data-core-action="review-decision-execute" data-review-decision="' + esc(nextStatus) + '" data-review-item-id="' + esc(id) + '" data-owner-civilization-id="' + esc(row.owner_civilization_id || row.ownerCivilizationId || row.owner_id || row.ownerId || "") + '" data-human-reviewer-label="' + esc(row.human_reviewer_label || row.humanReviewerLabel || row.reviewer_label || row.reviewerLabel || "user") + '">' + esc(operation) + 'を実行する</button>',
+ 14268:         '  </div>',
+ 14269:         '</section>'
+ 14270:       ].join("");
+ 14271:     }
+ 14272: 
+ 14273:     function findActionElement(target) {
+ 14274:       while (target && target !== document) {
+ 14275:         if (target.getAttribute && target.getAttribute("data-core-action")) return target;
+ 14276:         target = target.parentNode;
+ 14277:       }
+ 14278:       return null;
+ 14279:     }
+ 14280: 
+ 14281:     function findInsertHost(actionEl) {
+ 14282:       var host = actionEl;
+ 14283: 
+ 14284:       while (host && host !== document) {
+ 14285:         if (
+ 14286:           host.className &&
+ 14287:           String(host.className).indexOf("aicm-core-card") >= 0 &&
+ 14288:           host.innerHTML &&
+ 14289:           String(host.innerHTML).indexOf("次工程") >= 0
+ 14290:         ) {
+ 14291:           return host;
+ 14292:         }
+ 14293:         host = host.parentNode;
+
+--- needle=getAttribute("data-core-action") around L14364
+ 14346: 
+ 14347:       visibleDebug("confirm shown / mode=" + mode + " / id=" + id + " / source=" + eventSource);
+ 14348: 
+ 14349:       setTimeout(function() {
+ 14350:         try {
+ 14351:           var el = wrap.querySelector(".aicm-core-card");
+ 14352:           if (el && typeof el.scrollIntoView === "function") {
+ 14353:             el.scrollIntoView({ behavior: "smooth", block: "start" });
+ 14354:           }
+ 14355:         } catch (_) {}
+ 14356:       }, 80);
+ 14357: 
+ 14358:       return true;
+ 14359:     }
+ 14360: 
+ 14361:     function handle(actionEl, event, source) {
+ 14362:       if (!actionEl) return false;
+ 14363: 
+ 14364:       var action = actionEl.getAttribute("data-core-action") || "";
+ 14365:       var id = actionEl.getAttribute("data-review-id") || actionEl.getAttribute("data-human-review-id") || "";
+ 14366: 
+ 14367:       var mode = "";
+ 14368:       if (
+ 14369:         action === "review-v10d-preview-approve" ||
+ 14370:         action === "review-v10d2-preview-approve" ||
+ 14371:         action === "review-v10d4-preview-approve" ||
+ 14372:         action === "review-v10f-preview-approve"
+ 14373:       ) mode = "approve";
+ 14374: 
+ 14375:       if (
+ 14376:         action === "review-v10d-preview-return" ||
+ 14377:         action === "review-v10d2-preview-return" ||
+ 14378:         action === "review-v10d4-preview-return" ||
+ 14379:         action === "review-v10f-preview-return"
+ 14380:       ) mode = "return";
+ 14381: 
+ 14382:       
+
+--- needle=getAttribute("data-core-action") around L14433
+ 14415:         try { event.preventDefault(); } catch (_) {}
+ 14416:         try { event.stopPropagation(); } catch (_) {}
+ 14417:         try { event.stopImmediatePropagation(); } catch (_) {}
+ 14418:       }
+ 14419: 
+ 14420:       var s = app();
+ 14421:       s.aicmR8zV10fLastAction = action;
+ 14422:       s.aicmR8zV10fLastReviewId = id;
+ 14423:       s.aicmR8zV10fLastMode = mode;
+ 14424:       s.aicmR8zV10fLastSource = source || "";
+ 14425: 
+ 14426:       return showConfirm(actionEl, mode, id, source || "");
+ 14427:     }
+ 14428: 
+ 14429:     function bridge(event) {
+ 14430:       var actionEl = findActionElement(event && event.target);
+ 14431:       if (!actionEl) return;
+ 14432: 
+ 14433:       var action = actionEl.getAttribute("data-core-action") || "";
+ 14434:       if (action.indexOf("review-v10d") !== 0 && action.indexOf("review-v10f") !== 0) return;
+ 14435: 
+ 14436:       handle(actionEl, event, event && event.type ? event.type : "event");
+ 14437:     }
+ 14438: 
+ 14439:     function installBridge() {
+ 14440:       if (typeof document === "undefined" || document.__aicmR8zV10fReviewConfirmUiBridge) return;
+ 14441:       document.__aicmR8zV10fReviewConfirmUiBridge = true;
+ 14442: 
+ 14443:       document.addEventListener("click", bridge, true);
+ 14444:       document.addEventListener("pointerup", bridge, true);
+ 14445:       document.addEventListener("touchend", bridge, true);
+ 14446:     }
+ 14447: 
+ 14448:     installBridge();
+ 14449: 
+ 14450:     if (typeof window !== "undefined") {
+ 14451:       window.aicmR8zV10fShowReviewConfirm = function(actionEl, mode, id) {
+
+--- needle=getAttribute("data-core-action") around L14625
+ 14607:         field("review_id", id),
+ 14608:         field("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+ 14609:         field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+ 14610:         '  </dl>',
+ 14611:         '</section>'
+ 14612:       ].join("");
+ 14613:     }
+ 14614: 
+ 14615:     function removeExistingDetails() {
+ 14616:       if (typeof document === "undefined") return;
+ 14617:       var existing = document.querySelectorAll('[data-aicm-v10d4-detail="true"]');
+ 14618:       for (var i = 0; i < existing.length; i += 1) {
+ 14619:         if (existing[i] && existing[i].parentNode) existing[i].parentNode.removeChild(existing[i]);
+ 14620:       }
+ 14621:     }
+ 14622: 
+ 14623:     function findActionElement(target) {
+ 14624:       while (target && target !== document) {
+ 14625:         if (target.getAttribute && target.getAttribute("data-core-action")) return target;
+ 14626:         target = target.parentNode;
+ 14627:       }
+ 14628:       return null;
+ 14629:     }
+ 14630: 
+ 14631:     function setVisibleDebug(message) {
+ 14632:       var s = app();
+ 14633:       s.aicmR8zV10d4Debug = message;
+ 14634:       s.aicmR8zV10d4ClickedAt = new Date().toISOString();
+ 14635: 
+ 14636:       try {
+ 14637:         var root = document.querySelector(".aicm-core-card");
+ 14638:         if (root && !document.getElementById("aicm-v10d4-visible-debug")) {
+ 14639:           var node = document.createElement("div");
+ 14640:           node.id = "aicm-v10d4-visible-debug";
+ 14641:           node.className = "aicm-core-card";
+ 14642:           node.style.border = "2px solid #38bdf8";
+ 14643:           node.style.background = "#eff6ff";
+
+--- needle=getAttribute("data-core-action") around L14687
+ 14669: 
+ 14670:       host.parentNode.insertBefore(wrap, host.nextSibling);
+ 14671: 
+ 14672:       setTimeout(function() {
+ 14673:         try {
+ 14674:           var el = document.getElementById(detailId(id));
+ 14675:           if (el && typeof el.scrollIntoView === "function") {
+ 14676:             el.scrollIntoView({ behavior: "smooth", block: "start" });
+ 14677:           }
+ 14678:         } catch (_) {}
+ 14679:       }, 80);
+ 14680: 
+ 14681:       return true;
+ 14682:     }
+ 14683: 
+ 14684:     function handle(actionEl, event, source) {
+ 14685:       if (!actionEl) return false;
+ 14686: 
+ 14687:       var action = actionEl.getAttribute("data-core-action") || "";
+ 14688:       var id = actionEl.getAttribute("data-review-id") || actionEl.getAttribute("data-human-review-id") || "";
+ 14689: 
+ 14690:       var supported = {
+ 14691:         "review-v10d-open-detail": "open",
+ 14692:         "review-v10d2-open-detail": "open",
+ 14693:         "review-v10d4-open-detail": "open",
+ 14694:         "review-v10d-preview-approve": "approve",
+ 14695:         "review-v10d2-preview-approve": "approve",
+ 14696:         "review-v10d4-preview-approve": "approve",
+ 14697:         "review-v10d-preview-return": "return",
+ 14698:         "review-v10d2-preview-return": "return",
+ 14699:         "review-v10d4-preview-return": "return",
+ 14700:         "review-v10d-close-detail": "close",
+ 14701:         "review-v10d2-close-detail": "close",
+ 14702:         "review-v10d4-close-detail": "close"
+ 14703:       };
+ 14704: 
+ 14705:       var mode = supported[action];
+
+--- needle=getAttribute("data-core-action") around L14750
+ 14732:       s.aicmR8zV10d4SelectedReviewId = id;
+ 14733:       s.aicmR8zV10d2SelectedReviewId = id;
+ 14734:       s.aicmR8zV10dSelectedReviewId = id;
+ 14735: 
+ 14736:       var previewMode = "";
+ 14737:       if (mode === "approve") previewMode = "approve";
+ 14738:       if (mode === "return") previewMode = "return";
+ 14739: 
+ 14740:       var inserted = insertDetailAfterButton(actionEl, row, id, previewMode);
+ 14741:       setVisibleDebug("clicked / source=" + (source || "") + " / action=" + action + " / id=" + id + " / inserted=" + String(inserted));
+ 14742: 
+ 14743:       return true;
+ 14744:     }
+ 14745: 
+ 14746:     function bridge(event) {
+ 14747:       var actionEl = findActionElement(event && event.target);
+ 14748:       if (!actionEl) return;
+ 14749: 
+ 14750:       var action = actionEl.getAttribute("data-core-action") || "";
+ 14751:       if (action.indexOf("review-v10d") !== 0) return;
+ 14752: 
+ 14753:       handle(actionEl, event, event && event.type ? event.type : "event");
+ 14754:     }
+ 14755: 
+ 14756:     function installBridge() {
+ 14757:       if (typeof document === "undefined" || document.__aicmR8zV10d4CompatClickBridge) return;
+ 14758:       document.__aicmR8zV10d4CompatClickBridge = true;
+ 14759: 
+ 14760:       document.addEventListener("click", bridge, true);
+ 14761:       document.addEventListener("pointerup", bridge, true);
+ 14762:       document.addEventListener("touchend", bridge, true);
+ 14763:     }
+ 14764: 
+ 14765:     installBridge();
+ 14766: 
+ 14767:     if (typeof window !== "undefined") {
+ 14768:       window.aicmR8zV10d4HandleReviewDetailAction = function(actionEl) {
+
+
+
+============================================================
+SERVED contexts: r8z-mgr-major-card-route-apply-section
+--- needle=r8z-mgr-major-card-route-apply-section around L6025
+  6009:     ).join("");
+  6010: 
+  6011:     var departmentHint = "";
+  6012:     if (ledgerDept.ok) {
+  6013:       departmentHint = '<p class="aicm-selected-note">部門は選択済み台帳行から取得: ' + escapeHtml(ledgerDept.departmentLabel) + '</p>';
+  6014:     } else if (ledgerDept.ambiguous) {
+  6015:       departmentHint = '<p class="aicm-selected-note">選択済み台帳行の部門が複数あります。対象大項目の部門を揃えてください。</p>';
+  6016:     } else {
+  6017:       departmentHint = '<p class="aicm-selected-note">部門は台帳行から取得します。台帳行に部門がない場合は課候補の情報を使います。</p>';
+  6018:     }
+  6019: 
+  6020:     var sectionSelectHtml = sections.length
+  6021:       ? [
+  6022:           '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+  6023:           '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-section-select">課</label>',
+  6024:           '  <select id="aicm-r8z-mgr-major-card-route-section-select" data-r8z-mgr-major-card-route-section-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + sectionOptions + '</select>',
+  6025:           '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-section">課を適用</button>',
+  6026:           '</div>'
+  6027:         ].join("")
+  6028:       : '<p class="aicm-selected-note">選択できる課がありません。部門/課の設定またはcontext読込を確認してください。</p>';
+  6029: 
+  6030:     var leaderSelectHtml = "";
+  6031: 
+  6032:     if (!selectedSectionId) {
+  6033:       leaderSelectHtml = '<p class="aicm-selected-note">先に課を選択してください。</p>';
+  6034:     } else if (!leaders.length) {
+  6035:       leaderSelectHtml = '<p class="aicm-selected-note">この課にLeaderが配置されていません。</p>';
+  6036:     } else if (leaders.length === 1) {
+  6037:       leaderSelectHtml = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+  6038:     } else {
+  6039:       var selectedLeaderId = aicmR8zC2cText(choice.leaderPlacementId || "");
+  6040:       var leaderOptions = ['<option value="">Leaderを選択してください</option>'].concat(
+  6041:         leaders.map(function (leader) {
+
+--- needle=r8z-mgr-major-card-route-apply-section around L6485
+  6469: 
+  6470:       if (action === "r8z-mgr-major-card-confirm-no") {
+  6471:         bag.confirm = null;
+  6472: 
+  6473:         if (typeof setMessage === "function") {
+  6474:           setMessage("ok", "操作をキャンセルしました。");
+  6475:         }
+  6476: 
+  6477:         aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_no");
+  6478:         return;
+  6479:       }
+  6480: 
+  6481:       
+  6482: 
+  6483: 
+  6484:       // AICM_R8Z_MGR_MAJOR_CARD_C2D2_LEDGER_DEPARTMENT_ROUTE_ACTION_ROUTE
+  6485:       if (action === "r8z-mgr-major-card-route-apply-section") {
+  6486:         var routeRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
+  6487:         var sectionSelect = routeRoot && routeRoot.querySelector
+  6488:           ? routeRoot.querySelector("[data-r8z-mgr-major-card-route-section-select]")
+  6489:           : (typeof document !== "undefined" ? document.getElementById("aicm-r8z-mgr-major-card-route-section-select") : null);
+  6490: 
+  6491:         var option = sectionSelect && sectionSelect.options
+  6492:           ? sectionSelect.options[sectionSelect.selectedIndex]
+  6493:           : null;
+  6494: 
+  6495:         var sectionId = sectionSelect ? String(sectionSelect.value || "").trim() : "";
+  6496: 
+  6497:         if (!sectionId || !option) {
+  6498:           if (typeof setMessage === "function") setMessage("error", "課を選択してください。");
+  6499:           aicmR8zMgrMajorCardRerender("r8z_c2d2_section_select_empty");
+  6500:           return;
+  6501:         }
+
+============================================================
+SERVED contexts: aicmR8zMgrMajorCardHandleAction
+--- needle=aicmR8zMgrMajorCardHandleAction around L6389
+  6371:     };
+  6372: 
+  6373:     if (typeof setMessage === "function") {
+  6374:       if (validation.ok) {
+  6375:         setMessage("ok", "確認画面を表示しました。");
+  6376:       } else {
+  6377:         setMessage("error", "引き渡し先の課/Leaderを選択してください。");
+  6378:       }
+  6379:     }
+  6380: 
+  6381:     aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_open_c2d2");
+  6382:   }
+  6383: 
+  6384: 
+  6385: 
+  6386: 
+  6387: 
+  6388: 
+  6389:   function aicmR8zMgrMajorCardHandleAction(ev, target, action) {
+  6390:     try {
+  6391:       if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+  6392: 
+  6393:       target = target || null;
+  6394: 
+  6395:       if (!target && ev && ev.target && typeof ev.target.closest === "function") {
+  6396:         target = ev.target.closest("[data-core-action]");
+  6397:       }
+  6398: 
+  6399:       var bag = aicmR8zMgrMajorCardState();
+  6400: 
+  6401:       if (action === "r8z-mgr-major-card-toggle") {
+  6402:         var id = "";
+  6403: 
+  6404:         if (target && target.getAttribute) {
+  6405:           id = String(target.getAttribute("data-r8z-mgr-major-id") || "").trim();
+  6406:         }
+  6407: 
+
+--- needle=aicmR8zMgrMajorCardHandleAction around L8687
+  8669:         document.addEventListener("click", function aicmR8zV9f4bLeaderHandoffClickBridge(ev) {
+  8670:           try {
+  8671:             var target = ev && ev.target;
+  8672:             var btn = target && typeof target.closest === "function"
+  8673:               ? target.closest("[data-core-action]")
+  8674:               : null;
+  8675: 
+  8676:             if (!btn || !btn.getAttribute) return;
+  8677: 
+  8678:             var action = String(btn.getAttribute("data-core-action") || "").trim();
+  8679: 
+  8680: 
+  8681:             // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_ACTION_ROUTE_START
+  8682: 
+  8683: 
+  8684:             if (["r8z-mgr-major-card-toggle", "r8z-mgr-major-card-select-all", "r8z-mgr-major-card-clear", "r8z-mgr-major-card-open-handoff-confirm", "r8z-mgr-major-card-open-delete-confirm", "r8z-mgr-major-card-confirm-yes", "r8z-mgr-major-card-confirm-no"].indexOf(action) >= 0) {
+  8685: 
+  8686: 
+  8687:               if (typeof aicmR8zMgrMajorCardHandleAction === "function") {
+  8688: 
+  8689: 
+  8690:                 aicmR8zMgrMajorCardHandleAction(
+  8691: 
+  8692: 
+  8693:                   (typeof ev !== "undefined" ? ev : (typeof event !== "undefined" ? event : null)),
+  8694: 
+  8695: 
+  8696:                   (typeof btn !== "undefined" ? btn : (typeof target !== "undefined" ? target : (typeof el !== "undefined" ? el : null))),
+  8697: 
+  8698: 
+  8699:                   action
+  8700: 
+  8701: 
+  8702:                 );
+  8703: 
+  8704: 
+  8705:               }
+
+--- needle=aicmR8zMgrMajorCardHandleAction around L8690
+  8672:             var btn = target && typeof target.closest === "function"
+  8673:               ? target.closest("[data-core-action]")
+  8674:               : null;
+  8675: 
+  8676:             if (!btn || !btn.getAttribute) return;
+  8677: 
+  8678:             var action = String(btn.getAttribute("data-core-action") || "").trim();
+  8679: 
+  8680: 
+  8681:             // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_ACTION_ROUTE_START
+  8682: 
+  8683: 
+  8684:             if (["r8z-mgr-major-card-toggle", "r8z-mgr-major-card-select-all", "r8z-mgr-major-card-clear", "r8z-mgr-major-card-open-handoff-confirm", "r8z-mgr-major-card-open-delete-confirm", "r8z-mgr-major-card-confirm-yes", "r8z-mgr-major-card-confirm-no"].indexOf(action) >= 0) {
+  8685: 
+  8686: 
+  8687:               if (typeof aicmR8zMgrMajorCardHandleAction === "function") {
+  8688: 
+  8689: 
+  8690:                 aicmR8zMgrMajorCardHandleAction(
+  8691: 
+  8692: 
+  8693:                   (typeof ev !== "undefined" ? ev : (typeof event !== "undefined" ? event : null)),
+  8694: 
+  8695: 
+  8696:                   (typeof btn !== "undefined" ? btn : (typeof target !== "undefined" ? target : (typeof el !== "undefined" ? el : null))),
+  8697: 
+  8698: 
+  8699:                   action
+  8700: 
+  8701: 
+  8702:                 );
+  8703: 
+  8704: 
+  8705:               }
+  8706: 
+  8707: 
+  8708:               return;
+
+============================================================
+SERVED contexts: data-core-action getter
+--- needle=getAttribute("data-core-action") around L8322
+  8304:   }
+  8305: }
+  8306: 
+  8307: (function aicmInstallR8zV9g5DeleteConfirmExecuteBridge() {
+  8308:   try {
+  8309:     if (typeof document !== "undefined" && document.addEventListener && typeof window !== "undefined") {
+  8310:       if (!window.__aicmR8zV9g5DeleteConfirmExecuteBridgeInstalled) {
+  8311:         window.__aicmR8zV9g5DeleteConfirmExecuteBridgeInstalled = true;
+  8312: 
+  8313:         document.addEventListener("click", function aicmR8zV9g5DeleteConfirmClickBridge(ev) {
+  8314:           try {
+  8315:             var target = ev && ev.target;
+  8316:             var btn = target && typeof target.closest === "function"
+  8317:               ? target.closest("[data-core-action], button")
+  8318:               : null;
+  8319: 
+  8320:             if (!btn || !btn.getAttribute) return;
+  8321: 
+  8322:             var action = aicmR8zV9g5Text(btn.getAttribute("data-core-action"));
+  8323:             var label = aicmR8zV9g5Text(btn.textContent || btn.innerText || "");
+  8324: 
+  8325:             var isDeleteExecuteAction =
+  8326:               action === "pmlw-major-delete-execute" ||
+  8327:               action === "manager-major-delete-execute" ||
+  8328:               action === "major-delete-execute" ||
+  8329:               action === "delete-major-confirm" ||
+  8330:               action === "r8z-v9g-delete-execute" ||
+  8331:               action === "r8z-v9g5-delete-execute";
+  8332: 
+  8333:             var isDeleteCancelAction =
+  8334:               action === "pmlw-major-delete-cancel" ||
+  8335:               action === "manager-major-delete-cancel" ||
+  8336:               action === "major-delete-cancel" ||
+  8337:               action === "delete-major-cancel" ||
+  8338:               action === "r8z-v9g-delete-cancel" ||
+  8339:               action === "r8z-v9g5-delete-cancel";
+  8340: 
+
+--- needle=getAttribute("data-core-action") around L8678
+  8660:       wrappedTaskLedgerPlaceholderR8zV9f4b.__r8zV9f4bLeaderConfirmWrapped = true;
+  8661:       wrappedTaskLedgerPlaceholderR8zV9f4b.__r8zV9f4bOriginal = originalTaskLedgerPlaceholderR8zV9f4b;
+  8662:       renderTaskLedgerPlaceholder = wrappedTaskLedgerPlaceholderR8zV9f4b;
+  8663:     }
+  8664: 
+  8665:     if (typeof document !== "undefined" && document.addEventListener && typeof window !== "undefined") {
+  8666:       if (!window.__aicmR8zV9f4bLeaderHandoffClickBridgeInstalled) {
+  8667:         window.__aicmR8zV9f4bLeaderHandoffClickBridgeInstalled = true;
+  8668: 
+  8669:         document.addEventListener("click", function aicmR8zV9f4bLeaderHandoffClickBridge(ev) {
+  8670:           try {
+  8671:             var target = ev && ev.target;
+  8672:             var btn = target && typeof target.closest === "function"
+  8673:               ? target.closest("[data-core-action]")
+  8674:               : null;
+  8675: 
+  8676:             if (!btn || !btn.getAttribute) return;
+  8677: 
+  8678:             var action = String(btn.getAttribute("data-core-action") || "").trim();
+  8679: 
+  8680: 
+  8681:             // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_ACTION_ROUTE_START
+  8682: 
+  8683: 
+  8684:             if (["r8z-mgr-major-card-toggle", "r8z-mgr-major-card-select-all", "r8z-mgr-major-card-clear", "r8z-mgr-major-card-open-handoff-confirm", "r8z-mgr-major-card-open-delete-confirm", "r8z-mgr-major-card-confirm-yes", "r8z-mgr-major-card-confirm-no"].indexOf(action) >= 0) {
+  8685: 
+  8686: 
+  8687:               if (typeof aicmR8zMgrMajorCardHandleAction === "function") {
+  8688: 
+  8689: 
+  8690:                 aicmR8zMgrMajorCardHandleAction(
+  8691: 
+  8692: 
+  8693:                   (typeof ev !== "undefined" ? ev : (typeof event !== "undefined" ? event : null)),
+  8694: 
+  8695: 
+  8696:                   (typeof btn !== "undefined" ? btn : (typeof target !== "undefined" ? target : (typeof el !== "undefined" ? el : null))),
+
+--- needle=getAttribute("data-core-action") around L10575
+ 10557:       var aicmScreenOnlyTarget = aicmActionTarget && aicmActionTarget.closest
+ 10558:         ? aicmActionTarget.closest("[data-screen]")
+ 10559:         : null;
+ 10560: 
+ 10561:       if (aicmScreenOnlyTarget && aicmScreenOnlyTarget.getAttribute) {
+ 10562:         var aicmScreenOnlyName = String(aicmScreenOnlyTarget.getAttribute("data-screen") || "").trim();
+ 10563: 
+ 10564:         if (aicmScreenOnlyName) {
+ 10565:           state.screen = aicmScreenOnlyName;
+ 10566:           if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+ 10567:           if (typeof render === "function") render();
+ 10568:           return;
+ 10569:         }
+ 10570:       }
+ 10571: 
+ 10572:       return;
+ 10573:     }
+ 10574: 
+ 10575:     var action = button.getAttribute("data-core-action") || "";
+ 10576: 
+ 10577:     // AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+ 10578:     
+ 10579: 
+ 10580:     // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+ 10581:     if (action === "worker-runtime-status-refresh") {
+ 10582:       aicmRuntimeStatusRefresh();
+ 10583:       return;
+ 10584:     }
+ 10585: 
+ 10586:     // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+ 10587:     if (action === "worker-runtime-confirm") {
+ 10588:       confirmWorkerRuntimeRequestFromForm();
+ 10589:       return;
+ 10590:     }
+ 10591: 
+ 10592:     if (action === "worker-runtime-execute") {
+ 10593:       executeWorkerRuntimeConfirm();
+
+--- needle=getAttribute("data-core-action") around L13410
+ 13392:       var s = app();
+ 13393:       s.aicmR8zV10dSelectedReviewId = t(id) || selectedReviewId(s);
+ 13394:       s.aicmR8zV10dDecisionPreviewMode = mode;
+ 13395:       rerender();
+ 13396:     }
+ 13397: 
+ 13398:     function clearPreview() {
+ 13399:       var s = app();
+ 13400:       s.aicmR8zV10dDecisionPreviewMode = "";
+ 13401:       rerender();
+ 13402:     }
+ 13403: 
+ 13404:     function installClickBridge() {
+ 13405:       if (typeof document === "undefined" || document.__aicmR8zV10dReviewDetailClickBridge) return;
+ 13406:       document.__aicmR8zV10dReviewDetailClickBridge = true;
+ 13407: 
+ 13408:       document.addEventListener("click", function(event) {
+ 13409:         var target = event.target;
+ 13410:         while (target && target !== document && !target.getAttribute("data-core-action")) {
+ 13411:           target = target.parentNode;
+ 13412:         }
+ 13413: 
+ 13414:         if (!target || target === document) return;
+ 13415: 
+ 13416:         var action = target.getAttribute("data-core-action");
+ 13417:         if (!action || action.indexOf("review-v10d-") !== 0) return;
+ 13418: 
+ 13419:         event.preventDefault();
+ 13420:         event.stopPropagation();
+ 13421: 
+ 13422:         var id = target.getAttribute("data-review-id") || target.getAttribute("data-human-review-id") || "";
+ 13423: 
+ 13424:         if (action === "review-v10d-open-detail") return setDetail(id);
+ 13425:         if (action === "review-v10d-close-detail") return closeDetail();
+ 13426:         if (action === "review-v10d-preview-approve") return previewDecision("approve", id);
+ 13427:         if (action === "review-v10d-preview-return") return previewDecision("return", id);
+ 13428:         if (action === "review-v10d-clear-preview") return clearPreview();
+
+--- needle=getAttribute("data-core-action") around L13416
+ 13398:     function clearPreview() {
+ 13399:       var s = app();
+ 13400:       s.aicmR8zV10dDecisionPreviewMode = "";
+ 13401:       rerender();
+ 13402:     }
+ 13403: 
+ 13404:     function installClickBridge() {
+ 13405:       if (typeof document === "undefined" || document.__aicmR8zV10dReviewDetailClickBridge) return;
+ 13406:       document.__aicmR8zV10dReviewDetailClickBridge = true;
+ 13407: 
+ 13408:       document.addEventListener("click", function(event) {
+ 13409:         var target = event.target;
+ 13410:         while (target && target !== document && !target.getAttribute("data-core-action")) {
+ 13411:           target = target.parentNode;
+ 13412:         }
+ 13413: 
+ 13414:         if (!target || target === document) return;
+ 13415: 
+ 13416:         var action = target.getAttribute("data-core-action");
+ 13417:         if (!action || action.indexOf("review-v10d-") !== 0) return;
+ 13418: 
+ 13419:         event.preventDefault();
+ 13420:         event.stopPropagation();
+ 13421: 
+ 13422:         var id = target.getAttribute("data-review-id") || target.getAttribute("data-human-review-id") || "";
+ 13423: 
+ 13424:         if (action === "review-v10d-open-detail") return setDetail(id);
+ 13425:         if (action === "review-v10d-close-detail") return closeDetail();
+ 13426:         if (action === "review-v10d-preview-approve") return previewDecision("approve", id);
+ 13427:         if (action === "review-v10d-preview-return") return previewDecision("return", id);
+ 13428:         if (action === "review-v10d-clear-preview") return clearPreview();
+ 13429:       }, true);
+ 13430:     }
+ 13431: 
+ 13432:     installClickBridge();
+ 13433: 
+ 13434:     if (typeof window !== "undefined") {
+
+--- needle=getAttribute("data-core-action") around L13877
+ 13859:       s.aicmR8zV10d2SelectedReviewId = t(id) || selectedReviewId(s);
+ 13860:       s.aicmR8zV10dSelectedReviewId = s.aicmR8zV10d2SelectedReviewId;
+ 13861:       s.aicmR8zV10d2DecisionPreviewMode = mode;
+ 13862:       rerenderAndScroll(s.aicmR8zV10d2SelectedReviewId);
+ 13863:     }
+ 13864: 
+ 13865:     function clearPreview() {
+ 13866:       var s = app();
+ 13867:       s.aicmR8zV10d2DecisionPreviewMode = "";
+ 13868:       rerenderAndScroll(selectedReviewId(s));
+ 13869:     }
+ 13870: 
+ 13871:     function installClickBridge() {
+ 13872:       if (typeof document === "undefined" || document.__aicmR8zV10d2InlineDetailClickBridge) return;
+ 13873:       document.__aicmR8zV10d2InlineDetailClickBridge = true;
+ 13874: 
+ 13875:       document.addEventListener("click", function(event) {
+ 13876:         var target = event.target;
+ 13877:         while (target && target !== document && !(target.getAttribute && target.getAttribute("data-core-action"))) {
+ 13878:           target = target.parentNode;
+ 13879:         }
+ 13880: 
+ 13881:         if (!target || target === document || !(target.getAttribute)) return;
+ 13882: 
+ 13883:         var action = target.getAttribute("data-core-action");
+ 13884:         if (!action || action.indexOf("review-v10d2-") !== 0) return;
+ 13885: 
+ 13886:         event.preventDefault();
+ 13887:         event.stopPropagation();
+ 13888: 
+ 13889:         var id = target.getAttribute("data-review-id") || "";
+ 13890: 
+ 13891:         if (action === "review-v10d2-open-detail") return setDetail(id);
+ 13892:         if (action === "review-v10d2-close-detail") return closeDetail();
+ 13893:         if (action === "review-v10d2-preview-approve") return preview("approve", id);
+ 13894:         if (action === "review-v10d2-preview-return") return preview("return", id);
+ 13895:         if (action === "review-v10d2-clear-preview") return clearPreview();
+
+--- needle=getAttribute("data-core-action") around L13883
+ 13865:     function clearPreview() {
+ 13866:       var s = app();
+ 13867:       s.aicmR8zV10d2DecisionPreviewMode = "";
+ 13868:       rerenderAndScroll(selectedReviewId(s));
+ 13869:     }
+ 13870: 
+ 13871:     function installClickBridge() {
+ 13872:       if (typeof document === "undefined" || document.__aicmR8zV10d2InlineDetailClickBridge) return;
+ 13873:       document.__aicmR8zV10d2InlineDetailClickBridge = true;
+ 13874: 
+ 13875:       document.addEventListener("click", function(event) {
+ 13876:         var target = event.target;
+ 13877:         while (target && target !== document && !(target.getAttribute && target.getAttribute("data-core-action"))) {
+ 13878:           target = target.parentNode;
+ 13879:         }
+ 13880: 
+ 13881:         if (!target || target === document || !(target.getAttribute)) return;
+ 13882: 
+ 13883:         var action = target.getAttribute("data-core-action");
+ 13884:         if (!action || action.indexOf("review-v10d2-") !== 0) return;
+ 13885: 
+ 13886:         event.preventDefault();
+ 13887:         event.stopPropagation();
+ 13888: 
+ 13889:         var id = target.getAttribute("data-review-id") || "";
+ 13890: 
+ 13891:         if (action === "review-v10d2-open-detail") return setDetail(id);
+ 13892:         if (action === "review-v10d2-close-detail") return closeDetail();
+ 13893:         if (action === "review-v10d2-preview-approve") return preview("approve", id);
+ 13894:         if (action === "review-v10d2-preview-return") return preview("return", id);
+ 13895:         if (action === "review-v10d2-clear-preview") return clearPreview();
+ 13896:       }, true);
+ 13897:     }
+ 13898: 
+ 13899:     installClickBridge();
+ 13900: 
+ 13901:     if (typeof window !== "undefined") {
+
+--- needle=getAttribute("data-core-action") around L14275
+ 14257:         field("依頼日時", row.requested_at || row.created_at),
+ 14258:         field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+ 14259:         field("会社", row.company_name),
+ 14260:         '  </dl>',
+ 14261:         '  <div class="aicm-core-card" style="background:#ffffff;">',
+ 14262:         '    <p class="aicm-eyebrow">確認事項</p>',
+ 14263:         '    <p class="aicm-selected-note">成果物内容・AIレビュー・未解決事項を確認したうえで、下のボタンからDB更新を実行します。</p>',
+ 14264:         '  </div>',
+ 14265:         '  <div class="aicm-dashboard-action-row">',
+ 14266:         '    <button type="button" data-core-action="review-v10f-cancel-confirm" data-review-id="' + esc(id) + '">確認を閉じる</button>',
+ 14267:         '    <button type="button" class="aicm-primary-button" data-core-action="review-decision-execute" data-review-decision="' + esc(nextStatus) + '" data-review-item-id="' + esc(id) + '" data-owner-civilization-id="' + esc(row.owner_civilization_id || row.ownerCivilizationId || row.owner_id || row.ownerId || "") + '" data-human-reviewer-label="' + esc(row.human_reviewer_label || row.humanReviewerLabel || row.reviewer_label || row.reviewerLabel || "user") + '">' + esc(operation) + 'を実行する</button>',
+ 14268:         '  </div>',
+ 14269:         '</section>'
+ 14270:       ].join("");
+ 14271:     }
+ 14272: 
+ 14273:     function findActionElement(target) {
+ 14274:       while (target && target !== document) {
+ 14275:         if (target.getAttribute && target.getAttribute("data-core-action")) return target;
+ 14276:         target = target.parentNode;
+ 14277:       }
+ 14278:       return null;
+ 14279:     }
+ 14280: 
+ 14281:     function findInsertHost(actionEl) {
+ 14282:       var host = actionEl;
+ 14283: 
+ 14284:       while (host && host !== document) {
+ 14285:         if (
+ 14286:           host.className &&
+ 14287:           String(host.className).indexOf("aicm-core-card") >= 0 &&
+ 14288:           host.innerHTML &&
+ 14289:           String(host.innerHTML).indexOf("次工程") >= 0
+ 14290:         ) {
+ 14291:           return host;
+ 14292:         }
+ 14293:         host = host.parentNode;
+
+--- needle=getAttribute("data-core-action") around L14364
+ 14346: 
+ 14347:       visibleDebug("confirm shown / mode=" + mode + " / id=" + id + " / source=" + eventSource);
+ 14348: 
+ 14349:       setTimeout(function() {
+ 14350:         try {
+ 14351:           var el = wrap.querySelector(".aicm-core-card");
+ 14352:           if (el && typeof el.scrollIntoView === "function") {
+ 14353:             el.scrollIntoView({ behavior: "smooth", block: "start" });
+ 14354:           }
+ 14355:         } catch (_) {}
+ 14356:       }, 80);
+ 14357: 
+ 14358:       return true;
+ 14359:     }
+ 14360: 
+ 14361:     function handle(actionEl, event, source) {
+ 14362:       if (!actionEl) return false;
+ 14363: 
+ 14364:       var action = actionEl.getAttribute("data-core-action") || "";
+ 14365:       var id = actionEl.getAttribute("data-review-id") || actionEl.getAttribute("data-human-review-id") || "";
+ 14366: 
+ 14367:       var mode = "";
+ 14368:       if (
+ 14369:         action === "review-v10d-preview-approve" ||
+ 14370:         action === "review-v10d2-preview-approve" ||
+ 14371:         action === "review-v10d4-preview-approve" ||
+ 14372:         action === "review-v10f-preview-approve"
+ 14373:       ) mode = "approve";
+ 14374: 
+ 14375:       if (
+ 14376:         action === "review-v10d-preview-return" ||
+ 14377:         action === "review-v10d2-preview-return" ||
+ 14378:         action === "review-v10d4-preview-return" ||
+ 14379:         action === "review-v10f-preview-return"
+ 14380:       ) mode = "return";
+ 14381: 
+ 14382:       
+
+--- needle=getAttribute("data-core-action") around L14433
+ 14415:         try { event.preventDefault(); } catch (_) {}
+ 14416:         try { event.stopPropagation(); } catch (_) {}
+ 14417:         try { event.stopImmediatePropagation(); } catch (_) {}
+ 14418:       }
+ 14419: 
+ 14420:       var s = app();
+ 14421:       s.aicmR8zV10fLastAction = action;
+ 14422:       s.aicmR8zV10fLastReviewId = id;
+ 14423:       s.aicmR8zV10fLastMode = mode;
+ 14424:       s.aicmR8zV10fLastSource = source || "";
+ 14425: 
+ 14426:       return showConfirm(actionEl, mode, id, source || "");
+ 14427:     }
+ 14428: 
+ 14429:     function bridge(event) {
+ 14430:       var actionEl = findActionElement(event && event.target);
+ 14431:       if (!actionEl) return;
+ 14432: 
+ 14433:       var action = actionEl.getAttribute("data-core-action") || "";
+ 14434:       if (action.indexOf("review-v10d") !== 0 && action.indexOf("review-v10f") !== 0) return;
+ 14435: 
+ 14436:       handle(actionEl, event, event && event.type ? event.type : "event");
+ 14437:     }
+ 14438: 
+ 14439:     function installBridge() {
+ 14440:       if (typeof document === "undefined" || document.__aicmR8zV10fReviewConfirmUiBridge) return;
+ 14441:       document.__aicmR8zV10fReviewConfirmUiBridge = true;
+ 14442: 
+ 14443:       document.addEventListener("click", bridge, true);
+ 14444:       document.addEventListener("pointerup", bridge, true);
+ 14445:       document.addEventListener("touchend", bridge, true);
+ 14446:     }
+ 14447: 
+ 14448:     installBridge();
+ 14449: 
+ 14450:     if (typeof window !== "undefined") {
+ 14451:       window.aicmR8zV10fShowReviewConfirm = function(actionEl, mode, id) {
+
+--- needle=getAttribute("data-core-action") around L14625
+ 14607:         field("review_id", id),
+ 14608:         field("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+ 14609:         field("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+ 14610:         '  </dl>',
+ 14611:         '</section>'
+ 14612:       ].join("");
+ 14613:     }
+ 14614: 
+ 14615:     function removeExistingDetails() {
+ 14616:       if (typeof document === "undefined") return;
+ 14617:       var existing = document.querySelectorAll('[data-aicm-v10d4-detail="true"]');
+ 14618:       for (var i = 0; i < existing.length; i += 1) {
+ 14619:         if (existing[i] && existing[i].parentNode) existing[i].parentNode.removeChild(existing[i]);
+ 14620:       }
+ 14621:     }
+ 14622: 
+ 14623:     function findActionElement(target) {
+ 14624:       while (target && target !== document) {
+ 14625:         if (target.getAttribute && target.getAttribute("data-core-action")) return target;
+ 14626:         target = target.parentNode;
+ 14627:       }
+ 14628:       return null;
+ 14629:     }
+ 14630: 
+ 14631:     function setVisibleDebug(message) {
+ 14632:       var s = app();
+ 14633:       s.aicmR8zV10d4Debug = message;
+ 14634:       s.aicmR8zV10d4ClickedAt = new Date().toISOString();
+ 14635: 
+ 14636:       try {
+ 14637:         var root = document.querySelector(".aicm-core-card");
+ 14638:         if (root && !document.getElementById("aicm-v10d4-visible-debug")) {
+ 14639:           var node = document.createElement("div");
+ 14640:           node.id = "aicm-v10d4-visible-debug";
+ 14641:           node.className = "aicm-core-card";
+ 14642:           node.style.border = "2px solid #38bdf8";
+ 14643:           node.style.background = "#eff6ff";
+
+--- needle=getAttribute("data-core-action") around L14687
+ 14669: 
+ 14670:       host.parentNode.insertBefore(wrap, host.nextSibling);
+ 14671: 
+ 14672:       setTimeout(function() {
+ 14673:         try {
+ 14674:           var el = document.getElementById(detailId(id));
+ 14675:           if (el && typeof el.scrollIntoView === "function") {
+ 14676:             el.scrollIntoView({ behavior: "smooth", block: "start" });
+ 14677:           }
+ 14678:         } catch (_) {}
+ 14679:       }, 80);
+ 14680: 
+ 14681:       return true;
+ 14682:     }
+ 14683: 
+ 14684:     function handle(actionEl, event, source) {
+ 14685:       if (!actionEl) return false;
+ 14686: 
+ 14687:       var action = actionEl.getAttribute("data-core-action") || "";
+ 14688:       var id = actionEl.getAttribute("data-review-id") || actionEl.getAttribute("data-human-review-id") || "";
+ 14689: 
+ 14690:       var supported = {
+ 14691:         "review-v10d-open-detail": "open",
+ 14692:         "review-v10d2-open-detail": "open",
+ 14693:         "review-v10d4-open-detail": "open",
+ 14694:         "review-v10d-preview-approve": "approve",
+ 14695:         "review-v10d2-preview-approve": "approve",
+ 14696:         "review-v10d4-preview-approve": "approve",
+ 14697:         "review-v10d-preview-return": "return",
+ 14698:         "review-v10d2-preview-return": "return",
+ 14699:         "review-v10d4-preview-return": "return",
+ 14700:         "review-v10d-close-detail": "close",
+ 14701:         "review-v10d2-close-detail": "close",
+ 14702:         "review-v10d4-close-detail": "close"
+ 14703:       };
+ 14704: 
+ 14705:       var mode = supported[action];
+
+--- needle=getAttribute("data-core-action") around L14750
+ 14732:       s.aicmR8zV10d4SelectedReviewId = id;
+ 14733:       s.aicmR8zV10d2SelectedReviewId = id;
+ 14734:       s.aicmR8zV10dSelectedReviewId = id;
+ 14735: 
+ 14736:       var previewMode = "";
+ 14737:       if (mode === "approve") previewMode = "approve";
+ 14738:       if (mode === "return") previewMode = "return";
+ 14739: 
+ 14740:       var inserted = insertDetailAfterButton(actionEl, row, id, previewMode);
+ 14741:       setVisibleDebug("clicked / source=" + (source || "") + " / action=" + action + " / id=" + id + " / inserted=" + String(inserted));
+ 14742: 
+ 14743:       return true;
+ 14744:     }
+ 14745: 
+ 14746:     function bridge(event) {
+ 14747:       var actionEl = findActionElement(event && event.target);
+ 14748:       if (!actionEl) return;
+ 14749: 
+ 14750:       var action = actionEl.getAttribute("data-core-action") || "";
+ 14751:       if (action.indexOf("review-v10d") !== 0) return;
+ 14752: 
+ 14753:       handle(actionEl, event, event && event.type ? event.type : "event");
+ 14754:     }
+ 14755: 
+ 14756:     function installBridge() {
+ 14757:       if (typeof document === "undefined" || document.__aicmR8zV10d4CompatClickBridge) return;
+ 14758:       document.__aicmR8zV10d4CompatClickBridge = true;
+ 14759: 
+ 14760:       document.addEventListener("click", bridge, true);
+ 14761:       document.addEventListener("pointerup", bridge, true);
+ 14762:       document.addEventListener("touchend", bridge, true);
+ 14763:     }
+ 14764: 
+ 14765:     installBridge();
+ 14766: 
+ 14767:     if (typeof window !== "undefined") {
+ 14768:       window.aicmR8zV10d4HandleReviewDetailAction = function(actionEl) {
+
+
+

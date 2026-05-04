@@ -1,0 +1,272 @@
+AICompanyManager V10L-C2D4 state extract
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+SERVER_PATCH=NO
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardState L5084-L5098
+function aicmR8zMgrMajorCardState() {
+    if (typeof state === "undefined" || !state) {
+      return { selectedIds: {}, confirm: null };
+    }
+
+    if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+      state.r8zMgrMajorCardSelection = { selectedIds: {}, confirm: null };
+    }
+
+    if (!state.r8zMgrMajorCardSelection.selectedIds || typeof state.r8zMgrMajorCardSelection.selectedIds !== "object") {
+      state.r8zMgrMajorCardSelection.selectedIds = {};
+    }
+
+    return state.r8zMgrMajorCardSelection;
+  }
+
+============================================================
+FUNCTION=aicmR8zC2cBag L5334-L5374
+function aicmR8zC2cBag() {
+    var bag = null;
+
+    if (typeof aicmR8zMgrMajorCardState === "function") {
+      bag = aicmR8zMgrMajorCardState();
+    }
+
+    if (!bag || typeof bag !== "object") {
+      if (state && typeof state === "object") {
+        if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+          state.r8zMgrMajorCardSelection = {};
+        }
+        bag = state.r8zMgrMajorCardSelection;
+      } else {
+        bag = {};
+      }
+    }
+
+    if (state && typeof state === "object") {
+      if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+        state.r8zMgrMajorCardSelection = bag;
+      }
+      bag = state.r8zMgrMajorCardSelection;
+    }
+
+    if (!bag.handoffBatchRoute || typeof bag.handoffBatchRoute !== "object") {
+      bag.handoffBatchRoute = {
+        sectionId: "",
+        sectionLabel: "",
+        departmentId: "",
+        departmentLabel: "",
+        leaderPlacementId: "",
+        leaderId: "",
+        leaderLabel: "",
+        routeApplied: false,
+        routeSource: "c2d2-canonical"
+      };
+    }
+
+    return bag;
+  }
+
+============================================================
+FUNCTION=aicmR8zC2cApplySectionChoice L5809-L5859
+function aicmR8zC2cApplySectionChoice(sectionId, sectionSnapshot) {
+    var bag = aicmR8zC2cBag();
+    var section = sectionSnapshot && typeof sectionSnapshot === "object"
+      ? sectionSnapshot
+      : aicmR8zC2cFindSection(sectionId);
+
+    if (!section) {
+      return null;
+    }
+
+    var ledgerDept = typeof aicmR8zC2d2LedgerDepartmentFromSelectedRows === "function"
+      ? aicmR8zC2d2LedgerDepartmentFromSelectedRows()
+      : { ok: false, ambiguous: false, departmentId: "", departmentLabel: "" };
+
+    var departmentId = ledgerDept.ok
+      ? ledgerDept.departmentId
+      : aicmR8zC2cText(section.departmentId || "");
+
+    var departmentLabel = ledgerDept.ok
+      ? ledgerDept.departmentLabel
+      : aicmR8zC2cText(section.departmentLabel || "");
+
+    if (ledgerDept.ambiguous) {
+      departmentLabel = "複数部門";
+      departmentId = "";
+    }
+
+    bag.handoffBatchRoute = {
+      sectionId: aicmR8zC2cText(section.sectionId || sectionId),
+      sectionLabel: aicmR8zC2cText(section.sectionLabel || ""),
+      departmentId: departmentId,
+      departmentLabel: departmentLabel,
+      departmentSource: ledgerDept.ok ? "selected-ledger-row" : "section-candidate",
+      departmentAmbiguous: !!ledgerDept.ambiguous,
+      leaderPlacementId: "",
+      leaderId: "",
+      leaderLabel: "",
+      routeApplied: true,
+      routeAppliedAt: Date.now(),
+      routeSource: "c2d2-ledger-department-section-select"
+    };
+
+    var leaders = aicmR8zC2cLeaderCandidatesForSection(bag.handoffBatchRoute.sectionId);
+    if (leaders.length === 1) {
+      bag.handoffBatchRoute.leaderPlacementId = leaders[0].leaderPlacementId;
+      bag.handoffBatchRoute.leaderId = leaders[0].leaderId;
+      bag.handoffBatchRoute.leaderLabel = leaders[0].leaderLabel;
+    }
+
+    return bag.handoffBatchRoute;
+  }
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardOpenConfirm L6331-L6382
+function aicmR8zMgrMajorCardOpenConfirm(kind) {
+    var bag = aicmR8zMgrMajorCardState();
+    var rows = aicmR8zMgrMajorCardSelectedRows();
+
+    if (!rows.length) {
+      bag.confirm = null;
+      if (typeof setMessage === "function") {
+        setMessage("error", "対象の大項目を選択してください。");
+      }
+      aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_empty");
+      return;
+    }
+
+    var validation = kind === "leader-handoff" && typeof aicmR8zC2bValidateLeaderHandoffRows === "function"
+      ? aicmR8zC2bValidateLeaderHandoffRows(rows)
+      : {
+          ok: true,
+          errors: [],
+          items: rows.map(function (row, index) {
+            return {
+              id: aicmR8zMgrMajorCardRowId(row, index),
+              title: aicmR8zMgrMajorCardTitle(row),
+              route: {},
+              payload: {}
+            };
+          }),
+          payloads: [],
+          route: {},
+          endpoint: ""
+        };
+
+    bag.confirm = {
+      kind: kind,
+      title: kind === "delete" ? "削除確認" : "課長へ送る確認",
+      endpoint: validation.endpoint || "/api/aicm/v2/manager-major/update",
+      ok: validation.ok,
+      errors: validation.errors || [],
+      items: validation.items || [],
+      payloads: validation.payloads || [],
+      route: validation.route || {}
+    };
+
+    if (typeof setMessage === "function") {
+      if (validation.ok) {
+        setMessage("ok", "確認画面を表示しました。");
+      } else {
+        setMessage("error", "引き渡し先の課/Leaderを選択してください。");
+      }
+    }
+
+    aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_open_c2d2");
+  }
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardRenderConfirm L6204-L6280
+function aicmR8zMgrMajorCardRenderConfirm() {
+    var bag = aicmR8zMgrMajorCardState();
+    var confirm = bag.confirm || null;
+
+    if (!confirm || !Array.isArray(confirm.items) || !confirm.items.length) {
+      return "";
+    }
+
+    var liveValidation = confirm.kind === "leader-handoff" && typeof aicmR8zC2bValidateLeaderHandoffRows === "function"
+      ? aicmR8zC2bValidateLeaderHandoffRows(aicmR8zMgrMajorCardSelectedRows())
+      : null;
+
+    if (liveValidation) {
+      confirm.ok = liveValidation.ok;
+      confirm.errors = liveValidation.errors || [];
+      confirm.items = liveValidation.items || confirm.items;
+      confirm.payloads = liveValidation.payloads || [];
+      confirm.route = liveValidation.route || {};
+      confirm.endpoint = liveValidation.endpoint || confirm.endpoint;
+      bag.confirm = confirm;
+    }
+
+    var errors = Array.isArray(confirm.errors) ? confirm.errors : [];
+    var payloads = Array.isArray(confirm.payloads) ? confirm.payloads : [];
+    var hasErrors = errors.length > 0;
+    var yesDisabled = hasErrors ? " disabled" : "";
+    var yesStyle = hasErrors ? ' style="opacity:0.45;cursor:not-allowed;"' : "";
+
+    var route = typeof aicmR8zC2cEffectiveRoute === "function"
+      ? aicmR8zC2cEffectiveRoute()
+      : (confirm.route || {});
+
+    var routePickerHtml = typeof aicmR8zC2cRenderRoutePicker === "function"
+      ? aicmR8zC2cRenderRoutePicker()
+      : "";
+
+    var summaryHtml = [
+      '<div class="aicm-core-card" style="margin:12px 0;">',
+      '<p class="aicm-eyebrow">一括引き渡し先</p>',
+      '<div class="aicm-selected-note">部門: ' + escapeHtml(route.displayDepartment || "-") + '</div>',
+      '<div class="aicm-selected-note">課: ' + escapeHtml(route.displaySection || "-") + '</div>',
+      '<div class="aicm-selected-note">Leader: ' + escapeHtml(route.displayLeader || "-") + '</div>',
+      route.routeApplied ? '<div class="aicm-selected-note">適用済み</div>' : '',
+      '</div>'
+    ].join("");
+
+    var itemHtml = confirm.items.map(function (item) {
+      return '<li><strong>' + escapeHtml(item.title || item.id || "Manager大項目") + '</strong></li>';
+    }).join("");
+
+    var errorHtml = hasErrors
+      ? '<div class="aicm-core-card" style="border:1px solid #ef4444;background:#fff7f7;margin:12px 0;"><p class="aicm-eyebrow">実行前チェック</p><ul class="aicm-selected-note">' + errors.map(function (message) { return '<li>' + escapeHtml(message) + '</li>'; }).join("") + '</ul></div>'
+      : '<p class="aicm-selected-note">実行前チェックOK。次工程でAPI POST解放前に佐藤(DB担当)レビューが必要です。</p>';
+
+    var payloadPreviewHtml = payloads.length
+      ? '<details class="aicm-selected-note" style="margin-top:12px;"><summary>payload preview（POST未実行）</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(payloads, null, 2)) + '</pre></details>'
+      : "";
+
+    return [
+      '<div class="aicm-core-card" data-r8z-mgr-major-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
+      '  <p class="aicm-eyebrow">確認</p>',
+      '  <h3>' + escapeHtml(confirm.title || "確認") + '</h3>',
+      '  <p class="aicm-selected-note">endpoint: ' + escapeHtml(confirm.endpoint || "/api/aicm/v2/manager-major/update") + '</p>',
+      routePickerHtml,
+      summaryHtml,
+      '  <p class="aicm-eyebrow">対象大項目</p>',
+      '  <ul class="aicm-selected-note">' + itemHtml + '</ul>',
+      errorHtml,
+      payloadPreviewHtml,
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-yes"' + yesDisabled + yesStyle + '>Yes</button>',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-no">No</button>',
+      '  </div>',
+      '  <p class="aicm-selected-note">この確認画面ではDB更新/API POSTは実行しません。</p>',
+      '</div>'
+    ].join("");
+  }
+
+============================================================
+FUNCTIONS_CONTAINING_r8zMgrMajorCardSelection
+FUNCTION=h L4265-L7866
+FUNCTION=aicmR8zMgrMajorCardState L5084-L5098
+FUNCTION=aicmR8zC2cBag L5334-L5374
+
+============================================================
+FUNCTIONS_CONTAINING_handoffBatchRoute
+FUNCTION=h L4265-L7866
+FUNCTION=aicmR8zC2cBag L5334-L5374
+FUNCTION=aicmR8zC2cChoice L5380-L5382
+FUNCTION=aicmR8zC2cApplySectionChoice L5809-L5859
+FUNCTION=aicmR8zC2cApplyLeaderChoice L5866-L5882
+FUNCTION=aicmR8zC2cClearRouteChoice L5888-L5904
+

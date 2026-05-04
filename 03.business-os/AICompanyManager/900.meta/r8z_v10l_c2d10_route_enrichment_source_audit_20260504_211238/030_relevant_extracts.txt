@@ -1,0 +1,593 @@
+AICompanyManager V10L-C2D10 relevant extracts
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+
+============================================================
+FUNCTION=aicmR8zC2cRenderRoutePicker
+LINES=5982-6070
+function aicmR8zC2cRenderRoutePicker() {
+    var sections = aicmR8zC2cSectionCandidates();
+    var choice = aicmR8zC2cChoice();
+    var selectedSectionId = aicmR8zC2cText(choice.sectionId || "");
+    var leaders = selectedSectionId ? aicmR8zC2cLeaderCandidatesForSection(selectedSectionId) : [];
+    var ledgerDept = typeof aicmR8zC2d2LedgerDepartmentFromSelectedRows === "function"
+      ? aicmR8zC2d2LedgerDepartmentFromSelectedRows()
+      : { ok: false, ambiguous: false, departmentLabel: "" };
+
+    var sectionOptions = ['<option value="">課を選択してください</option>'].concat(
+      sections.map(function (section) {
+        var selected = selectedSectionId && section.sectionId === selectedSectionId ? " selected" : "";
+        var departmentLabelForDisplay = ledgerDept.ok ? ledgerDept.departmentLabel : (section.departmentLabel || "");
+        var label = (departmentLabelForDisplay ? departmentLabelForDisplay + " / " : "") + section.sectionLabel;
+        return [
+          '<option',
+          ' value="' + escapeHtml(section.sectionId) + '"',
+          selected,
+          ' data-section-id="' + escapeHtml(section.sectionId || "") + '"',
+          ' data-section-label="' + escapeHtml(section.sectionLabel || "") + '"',
+          ' data-department-id="' + escapeHtml(ledgerDept.ok ? ledgerDept.departmentId : (section.departmentId || "")) + '"',
+          ' data-department-label="' + escapeHtml(ledgerDept.ok ? ledgerDept.departmentLabel : (section.departmentLabel || "")) + '"',
+          '>',
+          escapeHtml(label),
+          '</option>'
+        ].join("");
+      })
+    ).join("");
+
+    var departmentHint = "";
+    if (ledgerDept.ok) {
+      departmentHint = '<p class="aicm-selected-note">部門は選択済み台帳行から取得: ' + escapeHtml(ledgerDept.departmentLabel) + '</p>';
+    } else if (ledgerDept.ambiguous) {
+      departmentHint = '<p class="aicm-selected-note">選択済み台帳行の部門が複数あります。対象大項目の部門を揃えてください。</p>';
+    } else {
+      departmentHint = '<p class="aicm-selected-note">部門は台帳行から取得します。台帳行に部門がない場合は課候補の情報を使います。</p>';
+    }
+
+    var sectionSelectHtml = sections.length
+      ? [
+          '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+          '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-section-select">課</label>',
+          '  <select id="aicm-r8z-mgr-major-card-route-section-select" data-r8z-mgr-major-card-route-section-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + sectionOptions + '</select>',
+          '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-section">課を適用</button>',
+          '</div>'
+        ].join("")
+      : '<p class="aicm-selected-note">選択できる課がありません。部門/課の設定またはcontext読込を確認してください。</p>';
+
+    var leaderSelectHtml = "";
+
+    if (!selectedSectionId) {
+      leaderSelectHtml = '<p class="aicm-selected-note">先に課を選択してください。</p>';
+    } else if (!leaders.length) {
+      leaderSelectHtml = '<p class="aicm-selected-note">この課にLeaderが配置されていません。</p>';
+    } else if (leaders.length === 1) {
+      leaderSelectHtml = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+    } else {
+      var selectedLeaderId = aicmR8zC2cText(choice.leaderPlacementId || "");
+      var leaderOptions = ['<option value="">Leaderを選択してください</option>'].concat(
+        leaders.map(function (leader) {
+          var selected = selectedLeaderId && leader.leaderPlacementId === selectedLeaderId ? " selected" : "";
+          return '<option value="' + escapeHtml(leader.leaderPlacementId) + '"' + selected + '>' + escapeHtml(leader.leaderLabel) + '</option>';
+        })
+      ).join("");
+
+      leaderSelectHtml = [
+        '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+        '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-leader-select">Leader</label>',
+        '  <select id="aicm-r8z-mgr-major-card-route-leader-select" data-r8z-mgr-major-card-route-leader-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + leaderOptions + '</select>',
+        '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-leader">Leaderを適用</button>',
+        '</div>'
+      ].join("");
+    }
+
+    return [
+      '<div class="aicm-core-card" data-r8z-mgr-major-card-route-picker="1" style="margin:12px 0;border:1px solid #c7d2fe;">',
+      '  <p class="aicm-eyebrow">引き渡し先 一括選択</p>',
+      '  <h4>選択済み大項目をまとめて送る課を選択</h4>',
+      '  <p class="aicm-selected-note">大項目ごとの個別課選択は行いません。ここで選んだ課/Leaderを、選択済み大項目すべてに適用します。</p>',
+      departmentHint,
+      sectionSelectHtml,
+      '  <h4>Leader</h4>',
+      leaderSelectHtml,
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-route-clear">引き渡し先を解除</button>',
+      '  </div>',
+      '</div>'
+    ].join("");
+  }
+
+============================================================
+FUNCTION=aicmR8zC2cApplySectionRoute
+NOT_FOUND
+
+============================================================
+FUNCTION=aicmR8zC2cEffectiveHandoffRoute
+NOT_FOUND
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardRenderConfirm
+LINES=6204-6324
+function aicmR8zMgrMajorCardRenderConfirm() {
+    var bag = aicmR8zMgrMajorCardState();
+    var confirm = bag.confirm || null;
+
+    if (!confirm || !Array.isArray(confirm.items) || !confirm.items.length) {
+      return "";
+    }
+
+    var liveValidation = confirm.kind === "leader-handoff" && typeof aicmR8zC2bValidateLeaderHandoffRows === "function"
+      ? aicmR8zC2bValidateLeaderHandoffRows(aicmR8zMgrMajorCardSelectedRows())
+      : null;
+
+    if (liveValidation) {
+      confirm.ok = liveValidation.ok;
+      confirm.errors = liveValidation.errors || [];
+      confirm.items = liveValidation.items || confirm.items;
+      confirm.payloads = liveValidation.payloads || [];
+      confirm.route = liveValidation.route || {};
+      confirm.endpoint = liveValidation.endpoint || confirm.endpoint;
+      bag.confirm = confirm;
+    }
+
+    var errors = Array.isArray(confirm.errors) ? confirm.errors : [];
+    var payloads = Array.isArray(confirm.payloads) ? confirm.payloads : [];
+    var hasErrors = errors.length > 0;
+    var yesDisabled = hasErrors ? " disabled" : "";
+    var yesStyle = hasErrors ? ' style="opacity:0.45;cursor:not-allowed;"' : "";
+
+    var route = typeof aicmR8zC2cEffectiveRoute === "function"
+      ? aicmR8zC2cEffectiveRoute()
+      : (confirm.route || {});
+
+    var routePickerHtml = typeof aicmR8zC2cRenderRoutePicker === "function"
+      ? aicmR8zC2cRenderRoutePicker()
+      : "";
+
+
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_RENDER_DEBUG_PANEL_START
+    var routeApplyDebugData = state && state.r8zMgrMajorCardRouteApplyDebug
+      ? state.r8zMgrMajorCardRouteApplyDebug
+      : null;
+
+    var routeApplyDebugHtml = routeApplyDebugData
+      ? [
+          '<details class="aicm-selected-note" open style="margin:12px 0;border:1px dashed #64748b;padding:10px;border-radius:10px;background:#f8fafc;">',
+          '<summary>C2D5R2A 課を適用 debug</summary>',
+          '<pre style="white-space:pre-wrap;max-height:280px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(routeApplyDebugData, null, 2)) + '</pre>',
+          '</details>'
+        ].join("")
+      : [
+          '<details class="aicm-selected-note" style="margin:12px 0;border:1px dashed #cbd5e1;padding:10px;border-radius:10px;">',
+          '<summary>C2D5R2A 課を適用 debug</summary>',
+          '<p>まだ「課を適用」branchは記録されていません。</p>',
+          '</details>'
+        ].join("");
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_RENDER_DEBUG_PANEL_END
+
+
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_RENDER_PANEL_START
+    var handlerEntryDebugData = state && state.r8zMgrMajorCardHandlerEntryDebug
+      ? state.r8zMgrMajorCardHandlerEntryDebug
+      : null;
+
+    var handlerEntryDebugHtml = handlerEntryDebugData
+      ? [
+          '<details class="aicm-selected-note" open style="margin:12px 0;border:1px dashed #334155;padding:10px;border-radius:10px;background:#f8fafc;">',
+          '<summary>C2D7 handler entry debug</summary>',
+          '<pre style="white-space:pre-wrap;max-height:340px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(handlerEntryDebugData, null, 2)) + '</pre>',
+          '</details>'
+        ].join("")
+      : [
+          '<details class="aicm-selected-note" open style="margin:12px 0;border:1px dashed #cbd5e1;padding:10px;border-radius:10px;">',
+          '<summary>C2D7 handler entry debug</summary>',
+          '<p>まだ aicmR8zMgrMajorCardHandleAction は呼ばれていません。</p>',
+          '</details>'
+        ].join("");
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_RENDER_PANEL_END
+
+    var summaryHtml = [
+      '<div class="aicm-core-card" style="margin:12px 0;">',
+      '<p class="aicm-eyebrow">一括引き渡し先</p>',
+      '<div class="aicm-selected-note">部門: ' + escapeHtml(route.displayDepartment || "-") + '</div>',
+      '<div class="aicm-selected-note">課: ' + escapeHtml(route.displaySection || "-") + '</div>',
+      '<div class="aicm-selected-note">Leader: ' + escapeHtml(route.displayLeader || "-") + '</div>',
+      route.routeApplied ? '<div class="aicm-selected-note">適用済み</div>' : '',
+      '</div>'
+    ].join("");
+
+    var itemHtml = confirm.items.map(function (item) {
+      return '<li><strong>' + escapeHtml(item.title || item.id || "Manager大項目") + '</strong></li>';
+    }).join("");
+
+    var errorHtml = hasErrors
+      ? '<div class="aicm-core-card" style="border:1px solid #ef4444;background:#fff7f7;margin:12px 0;"><p class="aicm-eyebrow">実行前チェック</p><ul class="aicm-selected-note">' + errors.map(function (message) { return '<li>' + escapeHtml(message) + '</li>'; }).join("") + '</ul></div>'
+      : '<p class="aicm-selected-note">実行前チェックOK。次工程でAPI POST解放前に佐藤(DB担当)レビューが必要です。</p>';
+
+    var payloadPreviewHtml = payloads.length
+      ? '<details class="aicm-selected-note" style="margin-top:12px;"><summary>payload preview（POST未実行）</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(payloads, null, 2)) + '</pre></details>'
+      : "";
+
+    return [
+      '<div class="aicm-core-card" data-r8z-mgr-major-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
+      '  <p class="aicm-eyebrow">確認</p>',
+      '  <h3>' + escapeHtml(confirm.title || "確認") + '</h3>',
+      '  <p class="aicm-selected-note">endpoint: ' + escapeHtml(confirm.endpoint || "/api/aicm/v2/manager-major/update") + '</p>',
+      routePickerHtml,
+      routeApplyDebugHtml,
+      handlerEntryDebugHtml,
+      summaryHtml,
+      '  <p class="aicm-eyebrow">対象大項目</p>',
+      '  <ul class="aicm-selected-note">' + itemHtml + '</ul>',
+      errorHtml,
+      payloadPreviewHtml,
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-yes"' + yesDisabled + yesStyle + '>Yes</button>',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-no">No</button>',
+      '  </div>',
+      '  <p class="aicm-selected-note">この確認画面ではDB更新/API POSTは実行しません。</p>',
+      '</div>'
+    ].join("");
+  }
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardHandleAction
+LINES=6433-6745
+function aicmR8zMgrMajorCardHandleAction(ev, target, action) {
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_ENTRY_START
+      try {
+        var aicmR8zC2d7Args = [];
+        for (var aicmR8zC2d7I = 0; aicmR8zC2d7I < arguments.length; aicmR8zC2d7I += 1) {
+          var aicmR8zC2d7Arg = arguments[aicmR8zC2d7I];
+          var aicmR8zC2d7Item = {
+            index: aicmR8zC2d7I,
+            type: typeof aicmR8zC2d7Arg,
+            stringValue: typeof aicmR8zC2d7Arg === "string" ? String(aicmR8zC2d7Arg) : "",
+            hasTarget: !!(aicmR8zC2d7Arg && aicmR8zC2d7Arg.target),
+            tagName: aicmR8zC2d7Arg && aicmR8zC2d7Arg.tagName ? String(aicmR8zC2d7Arg.tagName) : "",
+            id: aicmR8zC2d7Arg && aicmR8zC2d7Arg.id ? String(aicmR8zC2d7Arg.id) : "",
+            className: aicmR8zC2d7Arg && aicmR8zC2d7Arg.className ? String(aicmR8zC2d7Arg.className) : "",
+            dataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.getAttribute ? String(aicmR8zC2d7Arg.getAttribute("data-core-action") || "") : "",
+            targetDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.getAttribute
+              ? String(aicmR8zC2d7Arg.target.getAttribute("data-core-action") || "")
+              : "",
+            closestDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.closest
+              ? String((aicmR8zC2d7Arg.target.closest("[data-core-action]") || {}).getAttribute ? aicmR8zC2d7Arg.target.closest("[data-core-action]").getAttribute("data-core-action") || "" : "")
+              : ""
+          };
+          aicmR8zC2d7Args.push(aicmR8zC2d7Item);
+        }
+
+        if (state && typeof state === "object") {
+          state.r8zMgrMajorCardHandlerEntryDebug = {
+            marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG",
+            at: (new Date()).toISOString(),
+            phase: "handler-entry",
+            args: aicmR8zC2d7Args,
+            actionVar: typeof action !== "undefined" ? String(action || "") : "__ACTION_VAR_UNDEFINED__",
+            targetVarTag: typeof target !== "undefined" && target && target.tagName ? String(target.tagName) : "",
+            targetVarAction: typeof target !== "undefined" && target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : ""
+          };
+        }
+
+        if (typeof console !== "undefined" && console.info) {
+          console.info("AICM C2D7 handler entry debug", state && state.r8zMgrMajorCardHandlerEntryDebug);
+        }
+      } catch (aicmR8zC2d7Error) {
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("AICM C2D7 handler entry debug failed", aicmR8zC2d7Error);
+        }
+      }
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_ENTRY_END
+
+
+    try {
+      if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+
+      target = target || null;
+
+      if (!target && ev && ev.target && typeof ev.target.closest === "function") {
+        target = ev.target.closest("[data-core-action]");
+      }
+
+      var bag = aicmR8zMgrMajorCardState();
+
+      if (action === "r8z-mgr-major-card-toggle") {
+        var id = "";
+
+        if (target && target.getAttribute) {
+          id = String(target.getAttribute("data-r8z-mgr-major-id") || "").trim();
+        }
+
+        if (!id && target && target.dataset) {
+          id = String(target.dataset.r8zMgrMajorId || "").trim();
+        }
+
+        if (!id) {
+          if (typeof setMessage === "function") setMessage("error", "選択対象の大項目IDを特定できません。");
+          aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_toggle_missing_id");
+          return;
+        }
+
+        if (target && target.checked) {
+          bag.selectedIds[id] = true;
+        } else {
+          delete bag.selectedIds[id];
+        }
+
+        bag.confirm = null;
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_toggle");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-select-all") {
+        bag.selectedIds = {};
+
+        aicmR8zMgrMajorCardAllRows().forEach(function (row, index) {
+          if (!aicmR8zMgrMajorCardIsSelectable(row)) return;
+          var id = aicmR8zMgrMajorCardRowId(row, index);
+          if (id) bag.selectedIds[id] = true;
+        });
+
+        bag.confirm = null;
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "未送信の大項目を全件選択しました。");
+        }
+
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_select_all");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-clear") {
+        bag.selectedIds = {};
+        bag.confirm = null;
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "大項目の選択を解除しました。");
+        }
+
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_clear");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-open-handoff-confirm") {
+        aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-open-delete-confirm") {
+        aicmR8zMgrMajorCardOpenConfirm("delete");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-confirm-no") {
+        bag.confirm = null;
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "操作をキャンセルしました。");
+        }
+
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_no");
+        return;
+      }
+
+      
+
+
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D2_LEDGER_DEPARTMENT_ROUTE_ACTION_ROUTE
+      if (action === "r8z-mgr-major-card-route-apply-section") {
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_BRANCH_ENTER_START
+        var aicmR8zC2d5r2aDebug = {
+          marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY",
+          phase: "branch-enter",
+          at: (new Date()).toISOString(),
+          action: String(action || ""),
+          targetTag: target && target.tagName ? String(target.tagName) : "",
+          targetAction: target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : "",
+          targetId: target && target.id ? String(target.id) : "",
+          targetClass: target && target.className ? String(target.className) : ""
+        };
+
+        try {
+          if (state && typeof state === "object") {
+            state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+          }
+          if (typeof console !== "undefined" && console.info) {
+            console.info("AICM C2D5R2A route apply debug", aicmR8zC2d5r2aDebug);
+          }
+        } catch (_) {}
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_BRANCH_ENTER_END
+
+        var routeRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
+        var sectionSelect = routeRoot && routeRoot.querySelector
+          ? routeRoot.querySelector("[data-r8z-mgr-major-card-route-section-select]")
+          : (typeof document !== "undefined" ? document.getElementById("aicm-r8z-mgr-major-card-route-section-select") : null);
+
+        var option = sectionSelect && sectionSelect.options
+          ? sectionSelect.options[sectionSelect.selectedIndex]
+          : null;
+
+        var sectionId = sectionSelect ? String(sectionSelect.value || "").trim() : "";
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_SELECT_READ_START
+        try {
+          aicmR8zC2d5r2aDebug.phase = "after-select-read";
+          aicmR8zC2d5r2aDebug.routeRootFound = !!routeRoot;
+          aicmR8zC2d5r2aDebug.sectionSelectFound = !!sectionSelect;
+          aicmR8zC2d5r2aDebug.optionFound = !!option;
+          aicmR8zC2d5r2aDebug.selectedIndex = sectionSelect ? sectionSelect.selectedIndex : null;
+          aicmR8zC2d5r2aDebug.sectionId = sectionId;
+          aicmR8zC2d5r2aDebug.optionText = option ? String(option.textContent || "").trim() : "";
+          aicmR8zC2d5r2aDebug.optionSectionId = option && option.getAttribute ? String(option.getAttribute("data-section-id") || "") : "";
+          aicmR8zC2d5r2aDebug.optionSectionLabel = option && option.getAttribute ? String(option.getAttribute("data-section-label") || "") : "";
+          aicmR8zC2d5r2aDebug.optionDepartmentId = option && option.getAttribute ? String(option.getAttribute("data-department-id") || "") : "";
+          aicmR8zC2d5r2aDebug.optionDepartmentLabel = option && option.getAttribute ? String(option.getAttribute("data-department-label") || "") : "";
+
+          if (state && typeof state === "object") {
+            state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+          }
+          if (typeof console !== "undefined" && console.info) {
+            console.info("AICM C2D5R2A route apply after select", aicmR8zC2d5r2aDebug);
+          }
+        } catch (_) {}
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_SELECT_READ_END
+
+
+        if (!sectionId || !option) {
+          if (typeof setMessage === "function") setMessage("error", "課を選択してください。");
+          aicmR8zMgrMajorCardRerender("r8z_c2d2_section_select_empty");
+          return;
+        }
+
+        var sectionSnapshot = {
+          sectionId: String(option.getAttribute("data-section-id") || sectionId || "").trim(),
+          sectionLabel: String(option.getAttribute("data-section-label") || option.textContent || "").trim(),
+          departmentId: String(option.getAttribute("data-department-id") || "").trim(),
+          departmentLabel: String(option.getAttribute("data-department-label") || "").trim()
+        };
+
+        var appliedRoute = aicmR8zC2cApplySectionChoice(sectionId, sectionSnapshot);
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_APPLY_START
+        try {
+          aicmR8zC2d5r2aDebug.phase = "after-apply";
+          aicmR8zC2d5r2aDebug.appliedRouteOk = !!appliedRoute;
+          aicmR8zC2d5r2aDebug.appliedRoute = appliedRoute || null;
+          aicmR8zC2d5r2aDebug.choiceAfterApply = typeof aicmR8zC2cChoice === "function" ? aicmR8zC2cChoice() : null;
+          aicmR8zC2d5r2aDebug.stateSelectionAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection : null;
+          aicmR8zC2d5r2aDebug.confirmAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection.confirm || null : null;
+
+          if (state && typeof state === "object") {
+            state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+          }
+          if (typeof console !== "undefined" && console.info) {
+            console.info("AICM C2D5R2A route apply after apply", aicmR8zC2d5r2aDebug);
+          }
+        } catch (_) {}
+        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_APPLY_END
+
+
+        if (!appliedRoute || !appliedRoute.sectionId) {
+          if (typeof setMessage === "function") setMessage("error", "選択した課を適用できません。再読み込みしてください。");
+          aicmR8zMgrMajorCardRerender("r8z_c2d2_section_apply_failed");
+          return;
+        }
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "引き渡し先の課を適用しました: " + appliedRoute.sectionLabel);
+        }
+
+        aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-route-apply-leader") {
+        var leaderRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
+        var leaderSelect = leaderRoot && leaderRoot.querySelector
+          ? leaderRoot.querySelector("[data-r8z-mgr-major-card-route-leader-select]")
+          : (typeof document !== "undefined" ? document.getElementById("aicm-r8z-mgr-major-card-route-leader-select") : null);
+
+        var leaderPlacementId = leaderSelect ? String(leaderSelect.value || "").trim() : "";
+
+        if (!leaderPlacementId) {
+          if (typeof setMessage === "function") setMessage("error", "Leaderを選択してください。");
+          aicmR8zMgrMajorCardRerender("r8z_c2d2_leader_select_empty");
+          return;
+        }
+
+        aicmR8zC2cApplyLeaderChoice(leaderPlacementId);
+
+        if (typeof setMessage === "function") {
+          setMessage("ok", "Leaderを適用しました。");
+        }
+
+        aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+        return;
+      }
+
+      if (action === "r8z-mgr-major-card-route-clear") {
+        aicmR8zC2cClearRouteChoice();
+        aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+        return;
+      }
+
+if (action === "r8z-mgr-major-card-confirm-yes") {
+        // AICM_R8Z_MGR_MAJOR_CARD_C2B_PAYLOAD_VALIDATION_CONFIRM_YES_VALIDATION_GUARD
+        if (bag.confirm && Array.isArray(bag.confirm.errors) && bag.confirm.errors.length) {
+          if (typeof setMessage === "function") {
+            setMessage("error", "実行前チェックが未解決のため、Yesは実行できません。");
+          }
+          aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_blocked_c2b");
+          return;
+        }
+
+        var kind = bag.confirm && bag.confirm.kind ? bag.confirm.kind : "";
+        var count = bag.confirm && Array.isArray(bag.confirm.items) ? bag.confirm.items.length : 0;
+
+        bag.confirm = null;
+
+        if (typeof setMessage === "function") {
+          setMessage(
+            "ok",
+            (kind === "delete" ? "削除" : "課長へ送る") +
+            "のYesを受け付けました。ただしこの確認画面ではDB更新/API POSTは実行していません。対象件数: " +
+            String(count)
+          );
+        }
+
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_no_write");
+        return;
+      }
+    } catch (error) {
+      try {
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "大項目選択操作に失敗しました。");
+        }
+        aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_action_error");
+      } catch (_) {}
+    }
+  }
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardSelectionState
+NOT_FOUND
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardSelectedRows
+LINES=5206-5210
+function aicmR8zMgrMajorCardSelectedRows() {
+    return aicmR8zMgrMajorCardAllRows().filter(function (row, index) {
+      return aicmR8zMgrMajorCardIsSelected(aicmR8zMgrMajorCardRowId(row, index));
+    });
+  }
+
+============================================================
+SOURCE CANDIDATE RANKING
+score=290; function=h; lines=4265-8020; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT,HAS_PLACEMENT_CONTEXT,USES_CONTEXT_SECTIONS,USES_CONTEXT_DEPARTMENTS,USES_LEDGER_ROWS
+score=230; function=aicmRenderLeaderHandoffConfirmCardR8SV9F4B; lines=8722-11845; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT,HAS_PLACEMENT_CONTEXT,USES_LEDGER_ROWS
+score=230; function=renderReviewListPlaceholder; lines=9305-12150; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT,HAS_PLACEMENT_CONTEXT,USES_LEDGER_ROWS
+score=230; function=r8zV4bEsc; lines=9325-11865; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT,HAS_PLACEMENT_CONTEXT,USES_LEDGER_ROWS
+score=200; function=aicmR8zC2cSectionCandidates; lines=5570-5667; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,USES_CONTEXT_SECTIONS,USES_CONTEXT_DEPARTMENTS
+score=180; function=renderTaskLedgerCreateForm; lines=3087-3160; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=180; function=aicmR8zC2bLeaderRoute; lines=5258-5322; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=180; function=aicmR8zC2cBag; lines=5334-5374; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=180; function=aicmR8zC2cApplySectionChoice; lines=5809-5859; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=180; function=aicmR8zC2cClearRouteChoice; lines=5888-5904; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=180; function=aicmR8zC2cEffectiveRoute; lines=5911-5967; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=180; function=aicmR8zC2cRenderRoutePicker; lines=5982-6070; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=180; function=aicmR8zMgrMajorCardHandleAction; lines=6433-6745; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=165; function=renderPlacementNew; lines=2963-3006; reasons=HAS_DEPARTMENT_ID,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT,HAS_PLACEMENT_CONTEXT
+score=140; function=renderSectionUpdatePicker; lines=897-931; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL
+score=140; function=buildTaskLedgerCsvPreview; lines=3388-3457; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL
+score=140; function=aicmR8zC2cNormalizeSection; lines=5486-5562; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL
+score=140; function=aicmR8ZNHtml; lines=8011-9333; reasons=HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=140; function=renderSectionEditPlaceholder; lines=9502-9566; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_ID,HAS_SECTION_LABEL
+score=110; function=aicmAxcSectionRolePlacements; lines=1200-1252; reasons=HAS_DEPARTMENT_ID,HAS_SECTION_ID,HAS_LEADER_HINT
+score=110; function=aicmDepartmentNameByIdSafe; lines=1597-1605; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,USES_CONTEXT_DEPARTMENTS
+score=110; function=renderTree; lines=2870-2918; reasons=HAS_DEPARTMENT_ID,HAS_DEPARTMENT_LABEL,HAS_SECTION_LABEL
+score=110; function=aicmPmlwCsvPromptText; lines=3530-3571; reasons=HAS_DEPARTMENT_LABEL,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=110; function=aicmAxuR1BestLeaderForMajor; lines=4065-4088; reasons=HAS_DEPARTMENT_ID,HAS_SECTION_ID,HAS_LEADER_HINT
+score=110; function=renderPmlwMajorRowsBaseAxuR1B; lines=4213-4261; reasons=HAS_DEPARTMENT_LABEL,HAS_SECTION_LABEL,HAS_LEADER_HINT
+score=110; function=aicmR8zC2bBuildLeaderHandoffPayload; lines=6082-6108; reasons=HAS_DEPARTMENT_ID,HAS_SECTION_ID,HAS_LEADER_HINT
+score=100; function=createSection; lines=436-459; reasons=HAS_DEPARTMENT_ID,HAS_SECTION_ID,HAS_SECTION_LABEL
+score=100; function=saveSectionUpdateFromForm; lines=1358-1401; reasons=HAS_DEPARTMENT_ID,HAS_SECTION_ID,HAS_SECTION_LABEL
+score=100; function=findSectionByName; lines=3377-3385; reasons=HAS_DEPARTMENT_ID,HAS_SECTION_LABEL,USES_CONTEXT_SECTIONS
+score=95; function=aicmR8zC2cLeaderCandidatesForSection; lines=5757-5788; reasons=HAS_SECTION_ID,HAS_LEADER_HINT,HAS_PLACEMENT_CONTEXT

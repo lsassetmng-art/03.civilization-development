@@ -1,0 +1,231 @@
+AICompanyManager V10L-C2C4 route state persist fix extracts
+DB_WRITE=NO
+API_POST=NO
+SERVER_PATCH=NO
+
+============================================================
+FUNCTION=aicmR8zC2cApplySectionChoice
+function aicmR8zC2cApplySectionChoice(sectionId, sectionSnapshot) {
+    var bag = aicmR8zC2cBag();
+
+    var section = sectionSnapshot && typeof sectionSnapshot === "object"
+      ? sectionSnapshot
+      : aicmR8zC2cFindSection(sectionId);
+
+    bag.handoffBatchRoute = {
+      sectionId: section ? aicmR8zC2cText(section.sectionId || sectionId) : "",
+      sectionLabel: section ? aicmR8zC2cText(section.sectionLabel || "") : "",
+      departmentId: section ? aicmR8zC2cText(section.departmentId || "") : "",
+      departmentLabel: section ? aicmR8zC2cText(section.departmentLabel || "") : "",
+      leaderPlacementId: "",
+      leaderId: "",
+      leaderLabel: "",
+      routeAppliedAt: Date.now(),
+      routeSource: "c2c4-section-combobox"
+    };
+
+    var leaders = aicmR8zC2cLeaderCandidatesForSection(bag.handoffBatchRoute.sectionId);
+    if (leaders.length === 1) {
+      bag.handoffBatchRoute.leaderPlacementId = leaders[0].leaderPlacementId;
+      bag.handoffBatchRoute.leaderId = leaders[0].leaderId;
+      bag.handoffBatchRoute.leaderLabel = leaders[0].leaderLabel;
+    }
+
+    return bag.handoffBatchRoute;
+  }
+
+============================================================
+FUNCTION=aicmR8zC2cEffectiveRoute
+function aicmR8zC2cEffectiveRoute() {
+    var choice = aicmR8zC2cChoice();
+
+    var sectionId = aicmR8zC2cText(choice.sectionId || "");
+    var leaders = sectionId ? aicmR8zC2cLeaderCandidatesForSection(sectionId) : [];
+
+    var leaderPlacementId = aicmR8zC2cText(choice.leaderPlacementId || "");
+    var leaderId = aicmR8zC2cText(choice.leaderId || "");
+    var leaderLabel = aicmR8zC2cText(choice.leaderLabel || "");
+
+    if (!leaderPlacementId && leaders.length === 1) {
+      leaderPlacementId = leaders[0].leaderPlacementId;
+      leaderId = leaders[0].leaderId;
+      leaderLabel = leaders[0].leaderLabel;
+    }
+
+    var sectionLabel = aicmR8zC2cText(choice.sectionLabel || "");
+    var departmentLabel = aicmR8zC2cText(choice.departmentLabel || "");
+    var departmentId = aicmR8zC2cText(choice.departmentId || "");
+
+    if (sectionId && (!sectionLabel || !departmentLabel)) {
+      var foundSection = aicmR8zC2cFindSection(sectionId);
+      if (foundSection) {
+        if (!sectionLabel) sectionLabel = aicmR8zC2cText(foundSection.sectionLabel || "");
+        if (!departmentLabel) departmentLabel = aicmR8zC2cText(foundSection.departmentLabel || "");
+        if (!departmentId) departmentId = aicmR8zC2cText(foundSection.departmentId || "");
+      }
+    }
+
+    return {
+      clear: !!sectionId && !!(leaderPlacementId || leaderId || leaderLabel) && leaders.length > 0,
+      sectionId: sectionId,
+      sectionLabel: sectionLabel,
+      departmentId: departmentId,
+      departmentLabel: departmentLabel,
+      leaderPlacementId: leaderPlacementId,
+      leaderId: leaderId,
+      leaderLabel: leaderLabel,
+      leaderCount: leaders.length,
+      displayLeader: leaderLabel || leaderPlacementId || leaderId || "",
+      displaySection: sectionLabel || sectionId || "",
+      displayDepartment: departmentLabel || departmentId || "",
+      routeAppliedAt: choice.routeAppliedAt || null,
+      routeSource: choice.routeSource || ""
+    };
+  }
+
+============================================================
+FUNCTION=aicmR8zC2cRenderRoutePicker
+function aicmR8zC2cRenderRoutePicker() {
+    var sections = aicmR8zC2cSectionCandidates();
+    var choice = aicmR8zC2cChoice();
+    var selectedSectionId = aicmR8zC2cText(choice.sectionId || "");
+    var leaders = selectedSectionId ? aicmR8zC2cLeaderCandidatesForSection(selectedSectionId) : [];
+
+    var sectionOptions = ['<option value="">課を選択してください</option>'].concat(
+      sections.map(function (section) {
+        var selected = selectedSectionId && section.sectionId === selectedSectionId ? " selected" : "";
+        var label = (section.departmentLabel ? section.departmentLabel + " / " : "") + section.sectionLabel;
+        return [
+          '<option',
+          ' value="' + escapeHtml(section.sectionId) + '"',
+          selected,
+          ' data-section-id="' + escapeHtml(section.sectionId) + '"',
+          ' data-section-label="' + escapeHtml(section.sectionLabel || "") + '"',
+          ' data-department-id="' + escapeHtml(section.departmentId || "") + '"',
+          ' data-department-label="' + escapeHtml(section.departmentLabel || "") + '"',
+          '>',
+          escapeHtml(label),
+          '</option>'
+        ].join("");
+      })
+    ).join("");
+
+    var sectionSelectHtml = sections.length
+      ? [
+          '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+          '  <label class="aicm-selected-note" for="aicm-r8z-c2c-section-select">課</label>',
+          '  <select id="aicm-r8z-c2c-section-select" data-r8z-c2c-section-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + sectionOptions + '</select>',
+          '  <button type="button" data-core-action="r8z-c2c4-apply-section-select">課を適用</button>',
+          '</div>'
+        ].join("")
+      : '<p class="aicm-selected-note">選択できる課がありません。部門/課の設定またはcontext読込を確認してください。</p>';
+
+    var leaderSelectHtml = "";
+
+    if (!selectedSectionId) {
+      leaderSelectHtml = '<p class="aicm-selected-note">先に課を選択してください。</p>';
+    } else if (!leaders.length) {
+      leaderSelectHtml = '<p class="aicm-selected-note">この課にLeaderが配置されていません。</p>';
+    } else if (leaders.length === 1) {
+      leaderSelectHtml = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+    } else {
+      var selectedLeaderId = aicmR8zC2cText(choice.leaderPlacementId || "");
+      var leaderOptions = ['<option value="">Leaderを選択してください</option>'].concat(
+        leaders.map(function (leader) {
+          var selected = selectedLeaderId && leader.leaderPlacementId === selectedLeaderId ? " selected" : "";
+          return '<option value="' + escapeHtml(leader.leaderPlacementId) + '"' + selected + '>' + escapeHtml(leader.leaderLabel) + '</option>';
+        })
+      ).join("");
+
+      leaderSelectHtml = [
+        '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+        '  <label class="aicm-selected-note" for="aicm-r8z-c2c-leader-select">Leader</label>',
+        '  <select id="aicm-r8z-c2c-leader-select" data-r8z-c2c-leader-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + leaderOptions + '</select>',
+        '  <button type="button" data-core-action="r8z-c2c4-apply-leader-select">Leaderを適用</button>',
+        '</div>'
+      ].join("");
+    }
+
+    return [
+      '<div class="aicm-core-card" data-r8z-c2c-route-picker="1" style="margin:12px 0;border:1px solid #c7d2fe;">',
+      '  <p class="aicm-eyebrow">引き渡し先 一括選択</p>',
+      '  <h4>選択済み大項目をまとめて送る課を選択</h4>',
+      '  <p class="aicm-selected-note">大項目ごとの個別課選択は行いません。ここで選んだ課/Leaderを、選択済み大項目すべてに適用します。</p>',
+      '  <p class="aicm-selected-note">課はコンボボックスから1つ選び、「課を適用」を押してください。</p>',
+      '  <p class="aicm-selected-note">割り当て先の部門は、選択した課の親部門です。</p>',
+      sectionSelectHtml,
+      '  <h4>Leader</h4>',
+      leaderSelectHtml,
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="r8z-c2c-clear-route">引き渡し先を解除</button>',
+      '  </div>',
+      '</div>'
+    ].join("");
+  }
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardRenderConfirm
+function aicmR8zMgrMajorCardRenderConfirm() {
+    var bag = aicmR8zMgrMajorCardState();
+    var confirm = bag.confirm || null;
+
+    if (!confirm || !Array.isArray(confirm.items) || !confirm.items.length) {
+      return "";
+    }
+
+    var errors = Array.isArray(confirm.errors) ? confirm.errors : [];
+    var payloads = Array.isArray(confirm.payloads) ? confirm.payloads : [];
+    var hasErrors = errors.length > 0;
+    var yesDisabled = hasErrors ? " disabled" : "";
+    var yesStyle = hasErrors ? ' style="opacity:0.45;cursor:not-allowed;"' : "";
+
+    var route = typeof aicmR8zC2cEffectiveRoute === "function"
+      ? aicmR8zC2cEffectiveRoute()
+      : (confirm.route || {});
+
+    var routePickerHtml = typeof aicmR8zC2cRenderRoutePicker === "function"
+      ? aicmR8zC2cRenderRoutePicker()
+      : "";
+
+    var summaryHtml = [
+      '<div class="aicm-core-card" style="margin:12px 0;">',
+      '<p class="aicm-eyebrow">一括引き渡し先</p>',
+      '<div class="aicm-selected-note">部門: ' + escapeHtml(route.displayDepartment || "-") + '</div>',
+      '<div class="aicm-selected-note">課: ' + escapeHtml(route.displaySection || "-") + '</div>',
+      '<div class="aicm-selected-note">Leader: ' + escapeHtml(route.displayLeader || "-") + '</div>',
+      route.routeAppliedAt ? '<div class="aicm-selected-note">適用済み</div>' : '',
+      '</div>'
+    ].join("");
+
+    var itemHtml = confirm.items.map(function (item) {
+      return '<li><strong>' + escapeHtml(item.title || item.id || "Manager大項目") + '</strong></li>';
+    }).join("");
+
+    var errorHtml = hasErrors
+      ? '<div class="aicm-core-card" style="border:1px solid #ef4444;background:#fff7f7;margin:12px 0;"><p class="aicm-eyebrow">実行前チェック</p><ul class="aicm-selected-note">' + errors.map(function (message) { return '<li>' + escapeHtml(message) + '</li>'; }).join("") + '</ul></div>'
+      : '<p class="aicm-selected-note">実行前チェックOK。次工程でAPI POST解放前に佐藤(DB担当)レビューが必要です。</p>';
+
+    var payloadPreviewHtml = payloads.length
+      ? '<details class="aicm-selected-note" style="margin-top:12px;"><summary>payload preview（POST未実行）</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(payloads, null, 2)) + '</pre></details>'
+      : "";
+
+    return [
+      '<div class="aicm-core-card" data-r8z-mgr-major-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
+      '  <p class="aicm-eyebrow">確認</p>',
+      '  <h3>' + escapeHtml(confirm.title || "確認") + '</h3>',
+      '  <p class="aicm-selected-note">endpoint: ' + escapeHtml(confirm.endpoint || "/api/aicm/v2/manager-major/update") + '</p>',
+      routePickerHtml,
+      summaryHtml,
+      '  <p class="aicm-eyebrow">対象大項目</p>',
+      '  <ul class="aicm-selected-note">' + itemHtml + '</ul>',
+      errorHtml,
+      payloadPreviewHtml,
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-yes"' + yesDisabled + yesStyle + '>Yes</button>',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-no">No</button>',
+      '  </div>',
+      '  <p class="aicm-selected-note">この確認画面ではDB更新/API POSTは実行しません。</p>',
+      '</div>'
+    ].join("");
+  }
+
