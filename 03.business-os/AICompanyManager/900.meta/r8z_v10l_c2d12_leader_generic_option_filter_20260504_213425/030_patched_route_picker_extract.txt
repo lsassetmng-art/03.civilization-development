@@ -1,0 +1,175 @@
+AICompanyManager V10L-C2D12 patched route picker extract
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=YES
+SERVER_PATCH=NO
+
+FUNCTION=aicmR8zC2cRenderRoutePicker
+FUNCTION_LINES=5982-6139
+
+============================================================
+SAMPLE_FILTERED_HTML
+============================================================
+<select><option value="">Leaderを選択してください</option><option value="gachi">ガチ</option></select>
+
+============================================================
+PATCHED_FUNCTION
+============================================================
+function aicmR8zC2cRenderRoutePicker() {
+  // AICM_R8Z_MGR_MAJOR_CARD_C2D12_LEADER_GENERIC_OPTION_FILTER_START
+  // Keep route picker as the single UI source.
+  // Filter only generic Leader role labels from rendered option HTML.
+  // No DB write. No API POST. No fetch.
+  function aicmC2d12StripTags(value) {
+    return String(value == null ? "" : value)
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&#x2F;/g, "/")
+      .replace(/&#47;/g, "/")
+      .trim();
+  }
+
+  function aicmC2d12NormalizeLeaderOption(value) {
+    return aicmC2d12StripTags(value)
+      .replace(/[\s　]+/g, "")
+      .toLowerCase();
+  }
+
+  function aicmC2d12IsGenericLeaderOption(label, attrs) {
+    var visible = aicmC2d12StripTags(label);
+    var normalized = aicmC2d12NormalizeLeaderOption(label);
+    var normalizedAttrs = aicmC2d12NormalizeLeaderOption(attrs);
+
+    if (!normalized) return false;
+
+    // Placeholder must stay.
+    if (visible.indexOf("選択してください") >= 0) return false;
+    if (visible.indexOf("Leaderを選択") >= 0) return false;
+    if (visible.indexOf("課長を選択") >= 0) return false;
+
+    if (normalized === "leader") return true;
+    if (normalized === "課長") return true;
+    if (normalized === "課長/leader") return true;
+    if (normalized === "leader/課長") return true;
+    if (normalized === "section_leader") return true;
+    if (normalized === "-") return true;
+    if (normalized === "未設定") return true;
+
+    // Keep real nicknames such as ガチ.
+    // Remove only if both value/label are generic role-ish.
+    if (normalizedAttrs.indexOf('value="leader"') >= 0 && normalized === "leader") return true;
+    if (normalizedAttrs.indexOf("value='leader'") >= 0 && normalized === "leader") return true;
+
+    return false;
+  }
+
+  function aicmC2d12FilterGenericLeaderOptions(html) {
+    if (typeof html !== "string") return html;
+
+    return html.replace(/<option\b([^>]*)>([\s\S]*?)<\/option>/gi, function (match, attrs, label) {
+      if (aicmC2d12IsGenericLeaderOption(label, attrs)) {
+        return "";
+      }
+      return match;
+    });
+  }
+
+  var aicmC2d12Args = arguments;
+  var aicmC2d12Html = (function () {
+
+    var sections = aicmR8zC2cSectionCandidates();
+    var choice = aicmR8zC2cChoice();
+    var selectedSectionId = aicmR8zC2cText(choice.sectionId || "");
+    var leaders = selectedSectionId ? aicmR8zC2cLeaderCandidatesForSection(selectedSectionId) : [];
+    var ledgerDept = typeof aicmR8zC2d2LedgerDepartmentFromSelectedRows === "function"
+      ? aicmR8zC2d2LedgerDepartmentFromSelectedRows()
+      : { ok: false, ambiguous: false, departmentLabel: "" };
+
+    var sectionOptions = ['<option value="">課を選択してください</option>'].concat(
+      sections.map(function (section) {
+        var selected = selectedSectionId && section.sectionId === selectedSectionId ? " selected" : "";
+        var departmentLabelForDisplay = ledgerDept.ok ? ledgerDept.departmentLabel : (section.departmentLabel || "");
+        var label = (departmentLabelForDisplay ? departmentLabelForDisplay + " / " : "") + section.sectionLabel;
+        return [
+          '<option',
+          ' value="' + escapeHtml(section.sectionId) + '"',
+          selected,
+          ' data-section-id="' + escapeHtml(section.sectionId || "") + '"',
+          ' data-section-label="' + escapeHtml(section.sectionLabel || "") + '"',
+          ' data-department-id="' + escapeHtml(ledgerDept.ok ? ledgerDept.departmentId : (section.departmentId || "")) + '"',
+          ' data-department-label="' + escapeHtml(ledgerDept.ok ? ledgerDept.departmentLabel : (section.departmentLabel || "")) + '"',
+          '>',
+          escapeHtml(label),
+          '</option>'
+        ].join("");
+      })
+    ).join("");
+
+    var departmentHint = "";
+    if (ledgerDept.ok) {
+      departmentHint = '<p class="aicm-selected-note">部門は選択済み台帳行から取得: ' + escapeHtml(ledgerDept.departmentLabel) + '</p>';
+    } else if (ledgerDept.ambiguous) {
+      departmentHint = '<p class="aicm-selected-note">選択済み台帳行の部門が複数あります。対象大項目の部門を揃えてください。</p>';
+    } else {
+      departmentHint = '<p class="aicm-selected-note">部門は台帳行から取得します。台帳行に部門がない場合は課候補の情報を使います。</p>';
+    }
+
+    var sectionSelectHtml = sections.length
+      ? [
+          '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+          '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-section-select">課</label>',
+          '  <select id="aicm-r8z-mgr-major-card-route-section-select" data-r8z-mgr-major-card-route-section-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + sectionOptions + '</select>',
+          '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-section">課を適用</button>',
+          '</div>'
+        ].join("")
+      : '<p class="aicm-selected-note">選択できる課がありません。部門/課の設定またはcontext読込を確認してください。</p>';
+
+    var leaderSelectHtml = "";
+
+    if (!selectedSectionId) {
+      leaderSelectHtml = '<p class="aicm-selected-note">先に課を選択してください。</p>';
+    } else if (!leaders.length) {
+      leaderSelectHtml = '<p class="aicm-selected-note">この課にLeaderが配置されていません。</p>';
+    } else if (leaders.length === 1) {
+      leaderSelectHtml = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+    } else {
+      var selectedLeaderId = aicmR8zC2cText(choice.leaderPlacementId || "");
+      var leaderOptions = ['<option value="">Leaderを選択してください</option>'].concat(
+        leaders.map(function (leader) {
+          var selected = selectedLeaderId && leader.leaderPlacementId === selectedLeaderId ? " selected" : "";
+          return '<option value="' + escapeHtml(leader.leaderPlacementId) + '"' + selected + '>' + escapeHtml(leader.leaderLabel) + '</option>';
+        })
+      ).join("");
+
+      leaderSelectHtml = [
+        '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+        '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-leader-select">Leader</label>',
+        '  <select id="aicm-r8z-mgr-major-card-route-leader-select" data-r8z-mgr-major-card-route-leader-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + leaderOptions + '</select>',
+        '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-leader">Leaderを適用</button>',
+        '</div>'
+      ].join("");
+    }
+
+    return [
+      '<div class="aicm-core-card" data-r8z-mgr-major-card-route-picker="1" style="margin:12px 0;border:1px solid #c7d2fe;">',
+      '  <p class="aicm-eyebrow">引き渡し先 一括選択</p>',
+      '  <h4>選択済み大項目をまとめて送る課を選択</h4>',
+      '  <p class="aicm-selected-note">大項目ごとの個別課選択は行いません。ここで選んだ課/Leaderを、選択済み大項目すべてに適用します。</p>',
+      departmentHint,
+      sectionSelectHtml,
+      '  <h4>Leader</h4>',
+      leaderSelectHtml,
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="r8z-mgr-major-card-route-clear">引き渡し先を解除</button>',
+      '  </div>',
+      '</div>'
+    ].join("");
+  
+  }).apply(this, aicmC2d12Args);
+
+  return aicmC2d12FilterGenericLeaderOptions(aicmC2d12Html);
+  // AICM_R8Z_MGR_MAJOR_CARD_C2D12_LEADER_GENERIC_OPTION_FILTER_END
+}

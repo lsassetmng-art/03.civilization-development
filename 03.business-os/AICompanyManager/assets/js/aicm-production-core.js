@@ -5980,6 +5980,70 @@ await aicmReloadTaskLedgerContext();
   
   
   function aicmR8zC2cRenderRoutePicker() {
+  // AICM_R8Z_MGR_MAJOR_CARD_C2D12_LEADER_GENERIC_OPTION_FILTER_START
+  // Keep route picker as the single UI source.
+  // Filter only generic Leader role labels from rendered option HTML.
+  // No DB write. No API POST. No fetch.
+  function aicmC2d12StripTags(value) {
+    return String(value == null ? "" : value)
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&#x2F;/g, "/")
+      .replace(/&#47;/g, "/")
+      .trim();
+  }
+
+  function aicmC2d12NormalizeLeaderOption(value) {
+    return aicmC2d12StripTags(value)
+      .replace(/[\s　]+/g, "")
+      .toLowerCase();
+  }
+
+  function aicmC2d12IsGenericLeaderOption(label, attrs) {
+    var visible = aicmC2d12StripTags(label);
+    var normalized = aicmC2d12NormalizeLeaderOption(label);
+    var normalizedAttrs = aicmC2d12NormalizeLeaderOption(attrs);
+
+    if (!normalized) return false;
+
+    // Placeholder must stay.
+    if (visible.indexOf("選択してください") >= 0) return false;
+    if (visible.indexOf("Leaderを選択") >= 0) return false;
+    if (visible.indexOf("課長を選択") >= 0) return false;
+
+    if (normalized === "leader") return true;
+    if (normalized === "課長") return true;
+    if (normalized === "課長/leader") return true;
+    if (normalized === "leader/課長") return true;
+    if (normalized === "section_leader") return true;
+    if (normalized === "-") return true;
+    if (normalized === "未設定") return true;
+
+    // Keep real nicknames such as ガチ.
+    // Remove only if both value/label are generic role-ish.
+    if (normalizedAttrs.indexOf('value="leader"') >= 0 && normalized === "leader") return true;
+    if (normalizedAttrs.indexOf("value='leader'") >= 0 && normalized === "leader") return true;
+
+    return false;
+  }
+
+  function aicmC2d12FilterGenericLeaderOptions(html) {
+    if (typeof html !== "string") return html;
+
+    return html.replace(/<option\b([^>]*)>([\s\S]*?)<\/option>/gi, function (match, attrs, label) {
+      if (aicmC2d12IsGenericLeaderOption(label, attrs)) {
+        return "";
+      }
+      return match;
+    });
+  }
+
+  var aicmC2d12Args = arguments;
+  var aicmC2d12Html = (function () {
+
     var sections = aicmR8zC2cSectionCandidates();
     var choice = aicmR8zC2cChoice();
     var selectedSectionId = aicmR8zC2cText(choice.sectionId || "");
@@ -6067,7 +6131,12 @@ await aicmReloadTaskLedgerContext();
       '  </div>',
       '</div>'
     ].join("");
-  }
+  
+  }).apply(this, aicmC2d12Args);
+
+  return aicmC2d12FilterGenericLeaderOptions(aicmC2d12Html);
+  // AICM_R8Z_MGR_MAJOR_CARD_C2D12_LEADER_GENERIC_OPTION_FILTER_END
+}
 
 
 
