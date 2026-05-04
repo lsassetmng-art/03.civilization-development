@@ -1,0 +1,271 @@
+AICompanyManager V10L-C2F-D1 execute exact window
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+SERVER_PATCH=NO
+
+TARGET_FUNCTION=aicmExecuteLeaderHandoffConfirmR8S
+DECLARATION_LINE=8816
+WINDOW=8816-9076
+============================================================
+  8816: async function aicmExecuteLeaderHandoffConfirmR8S() {
+  8817:   var payload = state && state.managerMajorLeaderHandoffConfirm;
+  8818: 
+  8819:   try {
+  8820:     if (!payload || typeof payload !== "object") {
+  8821:       throw new Error("課長へ送る確認情報が見つかりません。もう一度「課長へ送る」を押してください。");
+  8822:     }
+  8823: 
+  8824:     var body = payload.body && typeof payload.body === "object" ? payload.body : {};
+  8825: 
+  8826:     var owner = String(
+  8827:       body.owner_civilization_id ||
+  8828:       (typeof aicmLeaderHandoffOwnerIdR8S === "function" ? aicmLeaderHandoffOwnerIdR8S(payload.row || payload) : "") ||
+  8829:       (state && state.ownerCivilizationId) ||
+  8830:       (state && state.owner_civilization_id) ||
+  8831:       (state && state.context && state.context.owner_civilization_id) ||
+  8832:       "00000000-0000-4000-8000-000000000001"
+  8833:     ).trim();
+  8834: 
+  8835:     var majorId = String(
+  8836:       body.aicm_manager_major_work_item_id ||
+  8837:       payload.majorId ||
+  8838:       payload.aicm_manager_major_work_item_id ||
+  8839:       ""
+  8840:     ).trim();
+  8841: 
+  8842:     if (!owner) throw new Error("owner_civilization_idを特定できません。");
+  8843:     if (!majorId) throw new Error("Manager大項目IDを特定できません。");
+  8844: 
+  8845:     var leader = String(
+  8846:       body.assigned_leader_label ||
+  8847:       payload.leaderLabel ||
+  8848:       payload.leaderRaw ||
+  8849:       (payload.row && (payload.row.assigned_leader_label || payload.row.leader_robot_label)) ||
+  8850:       "課長/Leader"
+  8851:     ).trim();
+  8852: 
+  8853:     var postBody = {
+  8854:       owner_civilization_id: owner,
+  8855:       aicm_manager_major_work_item_id: majorId,
+  8856:       assigned_leader_label: leader,
+  8857:       decomposition_status_code: "assigned_to_leader",
+  8858:       handoff_status_code: "handed_off",
+  8859:       note: String(body.note || (payload.row && payload.row.note) || "").trim()
+  8860:     };
+  8861: 
+  8862:     if (typeof setMessage === "function") {
+  8863:       setMessage("info", "課長へ送る処理を実行しています。");
+  8864:     }
+  8865: 
+  8866:     var result = null;
+  8867: 
+  8868:     if (typeof requestJson === "function") {
+  8869:       result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+  8870:     } else {
+  8871:       var response = await fetch("/api/aicm/v2/manager-major/update", {
+  8872:         method: "POST",
+  8873:         headers: { "content-type": "application/json" },
+  8874:         body: JSON.stringify(postBody)
+  8875:       });
+  8876: 
+  8877:       var json = null;
+  8878:       try {
+  8879:         json = await response.json();
+  8880:       } catch (_) {
+  8881:         json = null;
+  8882:       }
+  8883: 
+  8884:       if (!response.ok || (json && json.result && json.result !== "ok")) {
+  8885:         throw new Error(
+  8886:           json && (json.error_message || json.message || json.error)
+  8887:             ? (json.error_message || json.message || json.error)
+  8888:             : "課長へ送る更新に失敗しました。"
+  8889:         );
+  8890:       }
+  8891: 
+  8892:       result = json || {};
+  8893:     }
+  8894: 
+  8895:     var autoMessages = [];
+  8896: 
+  8897:     async function callOptionalAutoFunction(fnName, arg) {
+  8898:       try {
+  8899:         if (typeof globalThis !== "undefined" && typeof globalThis[fnName] === "function") {
+  8900:           return await globalThis[fnName](arg);
+  8901:         }
+  8902:       } catch (_) {}
+  8903:       return null;
+  8904:     }
+  8905: 
+  8906:     try {
+  8907:       var autoResult = null;
+  8908: 
+  8909:       if (typeof aicmRunLeaderAutoDecompositionAfterHandoffR8ZB === "function") {
+  8910:         autoResult = await aicmRunLeaderAutoDecompositionAfterHandoffR8ZB(majorId);
+  8911:       } else if (typeof aicmRunLeaderAutoDecompositionAfterConfirmR8ZB === "function") {
+  8912:         autoResult = await aicmRunLeaderAutoDecompositionAfterConfirmR8ZB(majorId);
+  8913:       } else if (typeof aicmRunLeaderAutoDecompositionForMajorR8ZB === "function") {
+  8914:         autoResult = await aicmRunLeaderAutoDecompositionForMajorR8ZB(majorId);
+  8915:       } else {
+  8916:         autoResult = await callOptionalAutoFunction("aicmRunLeaderAutoDecompositionAfterHandoffR8ZB", majorId);
+  8917:       }
+  8918: 
+  8919:       if (autoResult && autoResult.message) {
+  8920:         autoMessages.push(String(autoResult.message));
+  8921:       }
+  8922:     } catch (autoError) {
+  8923:       autoMessages.push("Leader自動分解は後続確認が必要です: " + String(autoError && autoError.message ? autoError.message : autoError));
+  8924:     }
+  8925: 
+  8926:     try {
+  8927:       if (typeof aicmRunWorkerAutoExecutionAfterDecompositionR8ZI === "function") {
+  8928:         var workerAuto = await aicmRunWorkerAutoExecutionAfterDecompositionR8ZI(majorId);
+  8929:         if (typeof aicmWorkerAutoExecutionMessageR8ZI === "function") {
+  8930:           autoMessages.push(aicmWorkerAutoExecutionMessageR8ZI(workerAuto));
+  8931:         }
+  8932:       }
+  8933:     } catch (workerAutoError) {
+  8934:       autoMessages.push("Worker自動実行は後続確認が必要です: " + String(workerAutoError && workerAutoError.message ? workerAutoError.message : workerAutoError));
+  8935:     }
+  8936: 
+  8937:     state.managerMajorLeaderHandoffConfirm = null;
+  8938:     state.screen = "task-ledger";
+  8939: 
+  8940:     try {
+  8941:       if (typeof aicmReloadTaskLedgerContext === "function") {
+  8942:         await aicmReloadTaskLedgerContext();
+  8943:       } else if (typeof refreshContext === "function") {
+  8944:         await refreshContext();
+  8945:       } else if (typeof loadContext === "function") {
+  8946:         await loadContext();
+  8947:       } else {
+  8948:         var ownerForReload = encodeURIComponent(owner);
+  8949:         var responseReload = await fetch("/api/aicm/v2/context?owner_civilization_id=" + ownerForReload + "&v=r8z_v9f6_" + Date.now());
+  8950:         var contextJson = await responseReload.json();
+  8951:         if (contextJson && contextJson.result === "ok") {
+  8952:           state.context = contextJson;
+  8953:         }
+  8954:       }
+  8955:     } catch (reloadError) {
+  8956:       if (typeof console !== "undefined" && console.warn) {
+  8957:         console.warn("AICM V9F6 context reload skipped", reloadError);
+  8958:       }
+  8959:     }
+  8960: 
+  8961:     var okMessage = "課長へ送りました。";
+  8962:     if (autoMessages.length) {
+  8963:       okMessage += " " + autoMessages.join(" / ");
+  8964:     }
+  8965: 
+  8966:     if (typeof setMessage === "function") {
+  8967:       setMessage("ok", okMessage);
+  8968:     }
+  8969: 
+  8970:     if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  8971:       aicmRenderTaskLedgerSafeR8V4("r8z_v9f6_execute_done");
+  8972:     } else if (typeof render === "function") {
+  8973:       render();
+  8974:     }
+  8975: 
+  8976:     return result || {};
+  8977:   } catch (error) {
+  8978:     if (typeof setMessage === "function") {
+  8979:       setMessage("error", error && error.message ? error.message : "課長へ送る処理に失敗しました。");
+  8980:     }
+  8981: 
+  8982:     if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  8983:       aicmRenderTaskLedgerSafeR8V4("r8z_v9f6_execute_error");
+  8984:     } else if (typeof render === "function") {
+  8985:       render();
+  8986:     }
+  8987: 
+  8988:     throw error;
+  8989:   }
+  8990: }
+  8991: 
+  8992: /* AICM_R8Z_V9F4B_CONFIRM_CARD_POST_RENDER_WRAPPER
+  8993:  * Display-only repair for Manager大項目 -> 課長へ送る confirmation card.
+  8994:  * This block is intentionally installed AFTER renderTaskLedgerPlaceholder exists.
+  8995:  * It does not write DB and does not call API.
+  8996:  */
+  8997: function aicmRenderLeaderHandoffConfirmCardR8SV9F4B() {
+  8998:   var payload = state && state.managerMajorLeaderHandoffConfirm;
+  8999:   if (!payload || typeof payload !== "object") return "";
+  9000: 
+  9001:   var esc = typeof escapeHtml === "function" ? escapeHtml : function(value) {
+  9002:     return String(value === undefined || value === null ? "" : value)
+  9003:       .replace(/&/g, "&amp;")
+  9004:       .replace(/</g, "&lt;")
+  9005:       .replace(/>/g, "&gt;")
+  9006:       .replace(/"/g, "&quot;")
+  9007:       .replace(/'/g, "&#039;");
+  9008:   };
+  9009: 
+  9010:   var majorId = String(
+  9011:     payload.majorId ||
+  9012:     payload.aicm_manager_major_work_item_id ||
+  9013:     (payload.body && payload.body.aicm_manager_major_work_item_id) ||
+  9014:     ""
+  9015:   ).trim();
+  9016: 
+  9017:   var row = payload.row || {};
+  9018:   var title = String(
+  9019:     payload.major_item_name ||
+  9020:     payload.targetTitle ||
+  9021:     row.major_item_name ||
+  9022:     row.task_name ||
+  9023:     row.deliverable_name ||
+  9024:     "Manager大項目"
+  9025:   ).trim();
+  9026: 
+  9027:   var leader = String(
+  9028:     payload.leaderLabel ||
+  9029:     payload.leaderRaw ||
+  9030:     payload.assigned_leader_label ||
+  9031:     (payload.body && payload.body.assigned_leader_label) ||
+  9032:     row.assigned_leader_label ||
+  9033:     row.leader_robot_label ||
+  9034:     "課長/Leader"
+  9035:   ).trim();
+  9036: 
+  9037:   return [
+  9038:     '<section class="aicm-core-card aicm-leader-handoff-confirm-r8s" style="border:2px solid #f59e0b;">',
+  9039:     '  <p class="aicm-eyebrow">課長へ送る確認</p>',
+  9040:     '  <h2>このManager大項目を課長へ送りますか？</h2>',
+  9041:     '  <p class="aicm-selected-note">DB更新前の確認カードです。内容を確認してから確定してください。</p>',
+  9042:     '  <dl class="aicm-core-detail-list">',
+  9043:     '    <dt>対象</dt><dd>' + esc(title) + '</dd>',
+  9044:     '    <dt>課長/Leader</dt><dd>' + esc(leader) + '</dd>',
+  9045:     '    <dt>Manager大項目ID</dt><dd>' + esc(majorId || '-') + '</dd>',
+  9046:     '  </dl>',
+  9047:     '  <div class="aicm-dashboard-action-row">',
+  9048:     '    <button type="button" data-core-action="r8z-v9f4b-leader-handoff-confirm-cancel">キャンセル</button>',
+  9049:     '    <button type="button" data-core-action="r8z-v9f4b-leader-handoff-confirm-execute" data-major-id="' + esc(majorId) + '">確認して課長へ送る</button>',
+  9050:     '  </div>',
+  9051:     '</section>'
+  9052:   ].join("");
+  9053: }
+  9054: 
+  9055: function aicmInjectLeaderHandoffConfirmCardR8SV9F4B(html) {
+  9056:   var source = String(html || "");
+  9057:   var card = aicmRenderLeaderHandoffConfirmCardR8SV9F4B();
+  9058: 
+  9059:   if (!card) return source;
+  9060:   if (source.indexOf("aicm-leader-handoff-confirm-r8s") >= 0) return source;
+  9061: 
+  9062:   var anchor = '<p class="aicm-eyebrow">Manager大項目</p>';
+  9063:   var idx = source.indexOf(anchor);
+  9064: 
+  9065:   if (idx >= 0) {
+  9066:     var sectionIdx = source.lastIndexOf("<section", idx);
+  9067:     if (sectionIdx >= 0) {
+  9068:       return source.slice(0, sectionIdx) + card + source.slice(sectionIdx);
+  9069:     }
+  9070:     return source.slice(0, idx) + card + source.slice(idx);
+  9071:   }
+  9072: 
+  9073:   if (source.indexOf("</main>") >= 0) {
+  9074:     return source.replace("</main>", card + "</main>");
+  9075:   }
+  9076: 

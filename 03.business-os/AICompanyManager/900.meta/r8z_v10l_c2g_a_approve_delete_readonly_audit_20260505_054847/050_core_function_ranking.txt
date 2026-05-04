@@ -1,0 +1,2904 @@
+AICompanyManager V10L-C2G-A core function ranking
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+SERVER_PATCH=NO
+
+FUNCTION_CANDIDATE_COUNT=311
+
+============================================================
+FUNCTION=aicmR8zV9g5ExecuteDeleteConfirm; LINES=8612-8730; SCORE=47; REASONS=APPROVE_HANDOFF,DELETE,FETCH,POST,CONFIRM,PAYLOAD
+============================================================
+  8612: async function aicmR8zV9g5ExecuteDeleteConfirm(btn) {
+  8613:   // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: V9G5 owns confirmed delete via manager-major/update fallback.
+  8614:   var payload = aicmR8zV9g5DeleteConfirmState();
+  8615: 
+  8616:   if (!payload) {
+  8617:     if (typeof setMessage === "function") setMessage("error", "削除確認情報が見つかりません。もう一度削除を押してください。");
+  8618:     if (typeof render === "function") render();
+  8619:     return;
+  8620:   }
+  8621: 
+  8622:   var majorId = aicmR8zV9g5MajorId(payload, btn);
+  8623:   var owner = aicmR8zV9g5OwnerId(payload);
+  8624: 
+  8625:   if (!majorId) {
+  8626:     if (typeof setMessage === "function") setMessage("error", "削除対象のManager大項目IDを特定できません。");
+  8627:     if (typeof render === "function") render();
+  8628:     return;
+  8629:   }
+  8630: 
+  8631:   try {
+  8632:     if (typeof setMessage === "function") setMessage("info", "削除を実行しています。");
+  8633: 
+  8634:     if (false && typeof aicmExecuteMajorItemDeleteConfirmR8P === "function") { // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: skip old1
+  8635:       try {
+  8636:         await aicmExecuteMajorItemDeleteConfirmR8P();
+  8637:         return;
+  8638:       } catch (existingError1) {
+  8639:         if (typeof console !== "undefined" && console.warn) console.warn("existing delete execute R8P failed; fallback follows", existingError1);
+  8640:       }
+  8641:     }
+  8642: 
+  8643:     if (false && typeof aicmExecuteManagerMajorDeleteConfirmR8P === "function") { // AICM_R8Z_V9G8B_DELETE_EXECUTE_LEGACY_GUARD_DISABLE: skip old2
+  8644:       try {
+  8645:         await aicmExecuteManagerMajorDeleteConfirmR8P();
+  8646:         return;
+  8647:       } catch (existingError2) {
+  8648:         if (typeof console !== "undefined" && console.warn) console.warn("existing manager delete execute R8P failed; fallback follows", existingError2);
+  8649:       }
+  8650:     }
+  8651: 
+  8652:     var postBody = {
+  8653:       owner_civilization_id: owner,
+  8654:       aicm_manager_major_work_item_id: majorId,
+  8655:       decomposition_status_code: "archived",
+  8656:       handoff_status_code: "archived",
+  8657:       note: aicmR8zV9g5Text(
+  8658:         (payload.body && payload.body.note) ||
+  8659:         (payload.row && payload.row.note) ||
+  8660:         ""
+  8661:       )
+  8662:     };
+  8663: 
+  8664:     var result = null;
+  8665: 
+  8666:     if (typeof requestJson === "function") {
+  8667:       result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+  8668:     } else {
+  8669:       var response = await fetch("/api/aicm/v2/manager-major/update", {
+  8670:         method: "POST",
+  8671:         headers: { "content-type": "application/json" },
+  8672:         body: JSON.stringify(postBody)
+  8673:       });
+  8674: 
+  8675:       var json = null;
+  8676:       try { json = await response.json(); } catch (_) { json = null; }
+  8677: 
+  8678:       if (!response.ok || (json && json.result && json.result !== "ok")) {
+  8679:         throw new Error(
+  8680:           json && (json.error_message || json.message || json.error)
+  8681:             ? (json.error_message || json.message || json.error)
+  8682:             : "削除更新に失敗しました。"
+  8683:         );
+  8684:       }
+  8685: 
+  8686:       result = json || {};
+  8687:     }
+  8688: 
+  8689:     state.managerMajorDeleteConfirm = null;
+  8690:     state.screen = "task-ledger";
+  8691: 
+  8692:     try {
+  8693:       if (typeof aicmReloadTaskLedgerContext === "function") {
+  8694:         await aicmReloadTaskLedgerContext();
+  8695:       } else if (typeof refreshContext === "function") {
+  8696:         await refreshContext();
+  8697:       } else if (typeof loadContext === "function") {
+  8698:         await loadContext();
+  8699:       } else {
+  8700:         var responseReload = await fetch("/api/aicm/v2/context?owner_civilization_id=" + encodeURIComponent(owner) + "&v=r8z_v9g5_" + Date.now());
+  8701:         var contextJson = await responseReload.json();
+  8702:         if (contextJson && contextJson.result === "ok") state.context = contextJson;
+  8703:       }
+  8704:     } catch (reloadError) {
+  8705:       if (typeof console !== "undefined" && console.warn) console.warn("delete context reload skipped", reloadError);
+  8706:     }
+  8707: 
+  8708:     if (typeof setMessage === "function") setMessage("ok", "Manager大項目を削除しました。");
+  8709: 
+  8710:     if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  8711:       aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_done");
+  8712:     } else if (typeof render === "function") {
+  8713:       render();
+  8714:     }
+  8715: 
+  8716:     return result || {};
+  8717:   } catch (error) {
+  8718:     if (typeof setMessage === "function") {
+  8719:       setMessage("error", error && error.message ? error.message : "削除に失敗しました。");
+  8720:     }
+  8721:     if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  8722:       aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_execute_error");
+  8723:     } else if (typeof render === "function") {
+  8724:       render();
+  8725:     }
+  8726:     throw error;
+  8727:   }
+  8728: }
+  8729: 
+  8730: function aicmR8zV9g5CancelDeleteConfirm() {
+  8731:   if (state) state.managerMajorDeleteConfirm = null;
+  8732:   if (typeof setMessage === "function") setMessage("info", "削除をキャンセルしました。");
+  8733: 
+  8734:   if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  8735:     aicmRenderTaskLedgerSafeR8V4("r8z_v9g5_delete_cancel");
+  8736:   } else if (typeof render === "function") {
+  8737:     render();
+  8738:   }
+  8739: }
+  8740: 
+  8741: (function aicmInstallR8zV9g5DeleteConfirmExecuteBridge() {
+  8742:   try {
+  8743:     if (typeof document !== "undefined" && document.addEventListener && typeof window !== "undefined") {
+  8744:       if (!window.__aicmR8zV9g5DeleteConfirmExecuteBridgeInstalled) {
+  8745:         window.__aicmR8zV9g5DeleteConfirmExecuteBridgeInstalled = true;
+  8746: 
+  8747:         document.addEventListener("click", function aicmR8zV9g5DeleteConfirmClickBridge(ev) {
+  8748:           try {
+  8749:             var target = ev && ev.target;
+  8750:             var btn = target && typeof target.closest === "function"
+
+============================================================
+FUNCTION=aicmR8zV7RenderReviewList; LINES=13355-13451; SCORE=45; REASONS=REVIEW,APPROVE_HANDOFF,DELETE,CONFIRM,PAYLOAD,ACTION_HANDLER
+============================================================
+ 13355: window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) {
+ 13356:     appState = appState || {};
+ 13357:     var list = rows(appState);
+ 13358: 
+ 13359:     if (!list.length && typeof aicmR8zV9ReviewListScriptHydrate === "function") aicmR8zV9ReviewListScriptHydrate(appState);
+ 13360:     if (!list.length) hydrateIfNeeded(appState);
+ 13361: 
+ 13362:     var debug = [
+ 13363:       "selectedCompanyId=" + companyId(appState),
+ 13364:       "owner=" + ownerId(appState),
+ 13365:       "rows=" + String(list.length),
+ 13366:       appState.aicmR8zV7Hydrating ? "hydrating=YES" : "hydrating=NO",
+ 13367:       appState.aicmR8zV7HydrationError ? "error=" + t(appState.aicmR8zV7HydrationError) : "",
+ 13368:       // AICM_R8Z_V8K_VISIBLE_RUNTIME_DEBUG: visible debug fields
+ 13369:       "v8k=" + t(appState.aicmR8zV8kDebug || (typeof state !== "undefined" && state ? state.aicmR8zV8kDebug : "") || "none"),
+ 13370:       "payload=" + String(appState.aicmR8zV8kPayloadCount !== undefined ? appState.aicmR8zV8kPayloadCount : ((typeof state !== "undefined" && state && state.aicmR8zV8kPayloadCount !== undefined) ? state.aicmR8zV8kPayloadCount : "na")),
+ 13371:       "merged=" + String(appState.aicmR8zV8kMergedCount !== undefined ? appState.aicmR8zV8kMergedCount : ((typeof state !== "undefined" && state && state.aicmR8zV8kMergedCount !== undefined) ? state.aicmR8zV8kMergedCount : "na")),
+ 13372:       "stRows=" + String(appState.aicmR8zV8kAfterMergeStateRows !== undefined ? appState.aicmR8zV8kAfterMergeStateRows : ((typeof state !== "undefined" && state && state.aicmR8zV8kAfterMergeStateRows !== undefined) ? state.aicmR8zV8kAfterMergeStateRows : "na")),
+ 13373:       "ctxRows=" + String(appState.aicmR8zV8kAfterMergeContextRows !== undefined ? appState.aicmR8zV8kAfterMergeContextRows : ((typeof state !== "undefined" && state && state.aicmR8zV8kAfterMergeContextRows !== undefined) ? state.aicmR8zV8kAfterMergeContextRows : "na")),
+ 13374:       appState.aicmR8zV8kError ? "v8kError=" + t(appState.aicmR8zV8kError) : ""
+ 13375:     ].filter(Boolean).join(" / ");
+ 13376: 
+ 13377:     var html = [
+ 13378:       '<section class="aicm-core-card aicm-review-list-stable-r8z-v7">',
+ 13379:       '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+ 13380:       '  <h2>納品サマリー確認</h2>',
+ 13381:       '  <p class="aicm-selected-note">対象会社: <strong>' + esc(companyName(appState)) + '</strong></p>',
+ 13382:       '  <p class="aicm-selected-note">レビュー・承認待ち: <strong>' + esc(String(list.length)) + '件</strong></p>',
+ 13383:       '  <p class="aicm-selected-note">R8Z-V7: ' + esc(debug) + '</p>'
+ 13384:     ];
+ 13385: 
+ 13386:     if (!list.length) {
+ 13387:       html.push(
+ 13388:         '  <article class="aicm-core-card">',
+ 13389:         '    <strong>レビュー・承認待ちはありません</strong>',
+ 13390:         '    <p>context反映待ちです。数秒後に再描画されます。</p>',
+ 13391:         '  </article>',
+ 13392:         '</section>'
+ 13393:       );
+ 13394:       return html.join("");
+ 13395:     }
+ 13396: 
+ 13397:     list.forEach(function (row, index) {
+ 13398:       var id = first(row, ["aicm_human_review_item_id", "review_id", "id"], "");
+ 13399:       var title = first(row, ["review_title", "title"], "レビュー項目");
+ 13400:       var kind = first(row, ["review_kind_label", "review_kind_code"], "納品サマリー");
+ 13401:       var artifact = first(row, ["artifact_kind_label", "artifact_kind_code"], "delivery_package");
+ 13402:       var priority = first(row, ["priority_label", "priority_code"], "-");
+ 13403:       var summary = first(row, [
+ 13404:         "delivery_summary_text",
+ 13405:         "delivery_summary_preview",
+ 13406:         "result_summary_text",
+ 13407:         "ai_review_result_text",
+ 13408:         "review_summary_text",
+ 13409:         "summary"
+ 13410:       ], "要約未設定");
+ 13411:       var requestId = first(row, ["source_request_id", "request_id"], "");
+ 13412:       var workerUnitId = first(row, ["related_worker_work_unit_id"], "");
+ 13413: 
+ 13414:       html.push(
+ 13415:         '  <article class="aicm-core-card aicm-review-card">',
+ 13416:         '    <div class="aicm-review-head">',
+ 13417:         '      <div>',
+ 13418:         '        <p class="aicm-eyebrow">レビュー #' + esc(String(index + 1)) + '</p>',
+ 13419:         '        <h3>' + esc(title) + '</h3>',
+ 13420:         '      </div>',
+ 13421:         '      <strong>' + esc(statusLabel(row)) + '</strong>',
+ 13422:         '    </div>',
+ 13423:         '    <div class="aicm-review-meta">',
+ 13424:         '      <span>種別: ' + esc(kind) + '</span>',
+ 13425:         '      <span>成果物: ' + esc(artifact) + '</span>',
+ 13426:         '      <span>優先度: ' + esc(priority) + '</span>',
+ 13427:         requestId ? '      <span>request_id: ' + esc(requestId) + '</span>' : '',
+ 13428:         workerUnitId ? '      <span>worker_unit: ' + esc(workerUnitId) + '</span>' : '',
+ 13429:         '    </div>',
+ 13430:         '    <section class="aicm-review-summary">',
+ 13431:         '      <h3>納品サマリー</h3>',
+ 13432:         '      <p>' + esc(summary) + '</p>',
+ 13433:         '    </section>',
+ 13434:         '    <div class="aicm-dashboard-action-row">',
+ 13435:         '      <button type="button" data-core-action="human-review-approve" data-review-id="' + esc(id) + '">承認</button>',
+ 13436:         '      <button type="button" data-core-action="human-review-return" data-review-id="' + esc(id) + '">差し戻し</button>',
+ 13437:         '    </div>',
+ 13438:         '  </article>'
+ 13439:       );
+ 13440:     });
+ 13441: 
+ 13442:     html.push('</section>');
+ 13443:     return html.join("");
+ 13444:   };
+ 13445: })();
+ 13446: 
+ 13447: 
+ 13448:   // AICM_R8Z_V10C_REVIEW_LIST_DIRECT_CONTEXT_RENDERER_START
+ 13449:   // Final review-list renderer override. Scope is review-list display only.
+ 13450:   // It does not touch task ledger / leader handoff / delete paths.
+ 13451:   (function installAicmR8zV10cReviewListDirectContextRenderer() {
+ 13452:     function v10cText(value) {
+ 13453:       return String(value === undefined || value === null ? "" : value).trim();
+ 13454:     }
+ 13455: 
+ 13456:     function v10cEsc(value) {
+ 13457:       var text = v10cText(value);
+ 13458:       if (typeof escapeHtml === "function") return escapeHtml(text);
+ 13459:       return text
+ 13460:         .replace(/&/g, "&amp;")
+ 13461:         .replace(/</g, "&lt;")
+ 13462:         .replace(/>/g, "&gt;")
+ 13463:         .replace(/"/g, "&quot;")
+ 13464:         .replace(/'/g, "&#039;");
+ 13465:     }
+ 13466: 
+ 13467:     function v10cState(appState) {
+ 13468:       if (appState && typeof appState === "object") return appState;
+ 13469:       if (typeof state !== "undefined" && state && typeof state === "object") return state;
+ 13470:       return {};
+ 13471:     }
+
+============================================================
+FUNCTION=aicmExecuteMajorLeaderHandoffConfirmR8S; LINES=4767-4859; SCORE=41; REASONS=APPROVE_HANDOFF,DELETE,FETCH,POST,PAYLOAD
+============================================================
+  4767:   async function aicmExecuteMajorLeaderHandoffConfirmR8S() {
+  4768:     var payload = state.managerMajorLeaderHandoffConfirm || null;
+  4769:     if (!payload || !payload.majorId) {
+  4770:       setMessage("error", "課長へ送る対象がありません。");
+  4771:       render();
+  4772:       return;
+  4773:     }
+  4774: 
+  4775:     var ownerCivilizationId = aicmLeaderHandoffOwnerIdR8S(payload);
+  4776:     if (!ownerCivilizationId) {
+  4777:       setMessage("error", "owner_civilization_idを特定できません。");
+  4778:       render();
+  4779:       return;
+  4780:     }
+  4781: 
+  4782:     try {
+  4783:       var body = {
+  4784:         owner_civilization_id: ownerCivilizationId,
+  4785:         aicm_manager_major_work_item_id: payload.majorId,
+  4786:         decomposition_status_code: "assigned_to_leader",
+  4787:         handoff_status_code: "handed_off"
+  4788:       };
+  4789: 
+  4790:       if (payload.leaderRaw) {
+  4791:         body.assigned_leader_label = payload.leaderRaw;
+  4792:       }
+  4793: 
+  4794:       var response = await fetch("/api/aicm/v2/manager-major/update", {
+  4795:         method: "POST",
+  4796:         headers: {
+  4797:           "content-type": "application/json"
+  4798:         },
+  4799:         body: JSON.stringify(body)
+  4800:       });
+  4801: 
+  4802:       var rawText = await response.text();
+  4803:       var json = null;
+  4804:       try {
+  4805:         json = rawText ? JSON.parse(rawText) : null;
+  4806:       } catch (_) {
+  4807:         json = null;
+  4808:       }
+  4809: 
+  4810:       if (!response.ok || (json && json.result && json.result !== "ok")) {
+  4811:         throw new Error(aicmLeaderHandoffApiErrorTextR8S(response, json, rawText));
+  4812:       }
+  4813: 
+  4814:       state.managerMajorLeaderHandoffConfirm = null;
+  4815:       state.screen = "task-ledger";
+  4816:       setMessage("ok", "課長へ送信しました。");
+  4817: 
+  4818:       if (typeof aicmReloadTaskLedgerContext === "function") {
+  4819:         
+  4820:       // AICM_R8Z_B_LEADER_AUTO_DECOMPOSITION_CORE_CALL_START
+  4821:       var aicmR8zBMajorIdForAuto = "";
+  4822:       try {
+  4823:         aicmR8zBMajorIdForAuto = aicmR8ZBText(
+  4824:           (payload && (payload.majorId || payload.aicm_manager_major_work_item_id || payload.manager_major_work_item_id)) || ""
+  4825:         );
+  4826:       } catch (_) {
+  4827:         aicmR8zBMajorIdForAuto = "";
+  4828:       }
+  4829: 
+  4830:       var aicmR8zBAutoResult = await aicmRunLeaderAutoDecompositionAfterHandoffR8ZB(aicmR8zBMajorIdForAuto);
+  4831:       var aicmR8zIWorkerAutoResult = await aicmRunWorkerAutoExecutionAfterDecompositionR8ZI(aicmR8zBMajorIdForAuto);
+  4832:       if (typeof aicmWorkerAutoExecutionMessageR8ZI === "function") {
+  4833:         setMessage("ok", aicmWorkerAutoExecutionMessageR8ZI(aicmR8zIWorkerAutoResult));
+  4834:       }
+  4835:       if (aicmR8zBAutoResult && aicmR8zBAutoResult.ok) {
+  4836:         setMessage("ok", aicmR8zBAutoResult.message || "課長へ送信し、Leader自動分解を実行しました。");
+  4837:       } else {
+  4838:         setMessage(
+  4839:           "error",
+  4840:           "課長へ送信しましたが、Leader自動分解に失敗しました: " +
+  4841:           (aicmR8zBAutoResult && aicmR8zBAutoResult.message ? aicmR8zBAutoResult.message : "原因不明")
+  4842:         );
+  4843:       }
+  4844:       // AICM_R8Z_B_LEADER_AUTO_DECOMPOSITION_CORE_CALL_END
+  4845: 
+  4846: await aicmReloadTaskLedgerContext();
+  4847:       } else {
+  4848:         render();
+  4849:       }
+  4850:     } catch (error) {
+  4851:       setMessage("error", error && error.message ? error.message : "課長へ送る処理に失敗しました。");
+  4852:       render();
+  4853:     }
+  4854:   }
+  4855: // AICM_R8S_LEADER_HANDOFF_CONFIRM_FLOW_HELPER_END
+  4856: 
+  4857: 
+  4858: // AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_START
+  4859:   function aicmMajorItemPageSizeR8O() {
+  4860:     return 20;
+  4861:   }
+  4862: 
+  4863:   function aicmMajorItemCurrentPageR8O(totalRows) {
+  4864:     var pageSize = aicmMajorItemPageSizeR8O();
+  4865:     var total = Number(totalRows || 0);
+  4866:     var totalPages = Math.max(1, Math.ceil(total / pageSize));
+  4867:     var page = Number(state.managerMajorPage || 1);
+  4868: 
+  4869:     if (!Number.isFinite(page) || page < 1) page = 1;
+  4870:     if (page > totalPages) page = totalPages;
+  4871: 
+  4872:     state.managerMajorPage = page;
+  4873:     return page;
+  4874:   }
+  4875: 
+  4876:   function aicmMajorItemSetPageR8O(delta) {
+  4877:     var current = Number(state.managerMajorPage || 1);
+  4878:     if (!Number.isFinite(current) || current < 1) current = 1;
+  4879:     state.managerMajorPage = current + Number(delta || 0);
+
+============================================================
+FUNCTION=aicmC2fD2FindArray; LINES=8915-9071; SCORE=41; REASONS=REVIEW,APPROVE_HANDOFF,FETCH,POST,PAYLOAD
+============================================================
+  8915:       function aicmC2fD2FindArray(obj, keys, depth) {
+  8916:         if (depth > 6 || obj === null || typeof obj === "undefined") return [];
+  8917:         if (Array.isArray(obj)) {
+  8918:           return obj;
+  8919:         }
+  8920:         if (!aicmC2fD2IsObject(obj)) return [];
+  8921:         for (var aicmC2fD2KI = 0; aicmC2fD2KI < keys.length; aicmC2fD2KI += 1) {
+  8922:           var aicmC2fD2Key = keys[aicmC2fD2KI];
+  8923:           if (Object.prototype.hasOwnProperty.call(obj, aicmC2fD2Key) && Array.isArray(obj[aicmC2fD2Key])) {
+  8924:             return obj[aicmC2fD2Key];
+  8925:           }
+  8926:         }
+  8927:         var aicmC2fD2ObjKeys = Object.keys(obj);
+  8928:         for (var aicmC2fD2OI = 0; aicmC2fD2OI < aicmC2fD2ObjKeys.length; aicmC2fD2OI += 1) {
+  8929:           var aicmC2fD2NestedArray = aicmC2fD2FindArray(obj[aicmC2fD2ObjKeys[aicmC2fD2OI]], keys, depth + 1);
+  8930:           if (aicmC2fD2NestedArray.length) return aicmC2fD2NestedArray;
+  8931:         }
+  8932:         return [];
+  8933:       }
+  8934: 
+  8935:       var aicmC2fD2Payload = postBody || {};
+  8936:       var aicmC2fD2Missing = [];
+  8937: 
+  8938:       var aicmC2fD2Ids = aicmC2fD2FindArray(aicmC2fD2Payload, [
+  8939:         "selected_manager_major_item_ids",
+  8940:         "manager_major_item_ids",
+  8941:         "managerMajorItemIds",
+  8942:         "selectedIds",
+  8943:         "ids"
+  8944:       ], 0).filter(function (value) { return aicmC2fD2Text(value); });
+  8945: 
+  8946:       var aicmC2fD2SingleId = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+  8947:         "manager_major_item_id",
+  8948:         "managerMajorItemId",
+  8949:         "pmlw_major_item_id",
+  8950:         "major_item_id",
+  8951:         "majorItemId",
+  8952:         "id",
+  8953:         "uuid"
+  8954:       ], 0);
+  8955: 
+  8956:       var aicmC2fD2Department = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+  8957:         "department_id",
+  8958:         "departmentId",
+  8959:         "department_label",
+  8960:         "departmentLabel",
+  8961:         "department_name",
+  8962:         "departmentName"
+  8963:       ], 0);
+  8964: 
+  8965:       var aicmC2fD2Section = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+  8966:         "section_id",
+  8967:         "sectionId",
+  8968:         "section_label",
+  8969:         "sectionLabel",
+  8970:         "section_name",
+  8971:         "sectionName"
+  8972:       ], 0);
+  8973: 
+  8974:       var aicmC2fD2Leader = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+  8975:         "leader_label",
+  8976:         "leaderLabel",
+  8977:         "assigned_leader_label",
+  8978:         "leader_name",
+  8979:         "leaderName"
+  8980:       ], 0);
+  8981: 
+  8982:       var aicmC2fD2LeaderPlacement = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+  8983:         "leader_placement_id",
+  8984:         "leaderPlacementId",
+  8985:         "assigned_leader_placement_id",
+  8986:         "placement_id",
+  8987:         "placementId"
+  8988:       ], 0);
+  8989: 
+  8990:       if (!aicmC2fD2Ids.length && !aicmC2fD2SingleId) aicmC2fD2Missing.push("対象大項目IDがありません");
+  8991:       if (!aicmC2fD2Department) aicmC2fD2Missing.push("部門がありません");
+  8992:       if (!aicmC2fD2Section) aicmC2fD2Missing.push("課がありません");
+  8993:       if (!aicmC2fD2Leader) aicmC2fD2Missing.push("Leaderがありません");
+  8994:       if (!aicmC2fD2LeaderPlacement) aicmC2fD2Missing.push("Leader配置IDがありません");
+  8995: 
+  8996:       var aicmC2fD2Summary = {
+  8997:         ok: aicmC2fD2Missing.length === 0,
+  8998:         missing: aicmC2fD2Missing,
+  8999:         selected_count: aicmC2fD2Ids.length || (aicmC2fD2SingleId ? 1 : 0),
+  9000:         department: aicmC2fD2Department || "",
+  9001:         section: aicmC2fD2Section || "",
+  9002:         leader: aicmC2fD2Leader || "",
+  9003:         leader_placement_id: aicmC2fD2LeaderPlacement || "",
+  9004:         api_post: "LOCKED_BY_C2F_D2_EXECUTE_GATE",
+  9005:         db_write: "NO"
+  9006:       };
+  9007: 
+  9008:       if (typeof state !== "undefined" && state && typeof state === "object") {
+  9009:         state.managerMajorLeaderHandoffConfirm = state.managerMajorLeaderHandoffConfirm || {};
+  9010:         state.managerMajorLeaderHandoffConfirm.executeValidation = aicmC2fD2Summary;
+  9011:         state.managerMajorLeaderHandoffConfirm.executeLocked = true;
+  9012:       }
+  9013: 
+  9014:       if (typeof window !== "undefined" && window && typeof window.alert === "function") {
+  9015:         window.alert(
+  9016:           aicmC2fD2Missing.length
+  9017:             ? "実行前チェックNG: " + aicmC2fD2Missing.join(" / ")
+  9018:             : "実行前チェックOK。API POSTはまだ未解放です。"
+  9019:         );
+  9020:       }
+  9021: 
+  9022:       if (typeof aicmR8zMgrMajorCardRerender === "function") {
+  9023:         try {
+  9024:           aicmR8zMgrMajorCardRerender("c2f-d2-execute-payload-validation-gate");
+  9025:         } catch (_) {}
+  9026:       }
+  9027: 
+  9028:       return {
+  9029:         ok: false,
+  9030:         reason: aicmC2fD2Missing.length ? "C2F_D2_PRE_POST_VALIDATION_NG" : "C2F_D2_API_POST_LOCKED_PENDING_APPROVAL",
+  9031:         validation: aicmC2fD2Summary
+  9032:       };
+  9033:     } catch (aicmC2fD2Error) {
+  9034:       if (typeof window !== "undefined" && window && typeof window.alert === "function") {
+  9035:         window.alert("実行前チェックでエラーが発生しました。API POSTは実行していません。");
+  9036:       }
+  9037:       return {
+  9038:         ok: false,
+  9039:         reason: "C2F_D2_VALIDATION_ERROR_POST_NOT_EXECUTED",
+  9040:         message: String(aicmC2fD2Error && aicmC2fD2Error.message ? aicmC2fD2Error.message : aicmC2fD2Error)
+  9041:       };
+  9042:     }
+  9043:     // AICM_R8Z_MGR_MAJOR_CARD_C2F_D2_EXECUTE_PAYLOAD_VALIDATION_GATE_END
+  9044: 
+  9045:       var response = await fetch("/api/aicm/v2/manager-major/update", {
+  9046:         method: "POST",
+  9047:         headers: { "content-type": "application/json" },
+  9048:         body: JSON.stringify(postBody)
+  9049:       });
+  9050: 
+  9051:       var json = null;
+  9052:       try {
+  9053:         json = await response.json();
+  9054:       } catch (_) {
+  9055:         json = null;
+  9056:       }
+  9057: 
+  9058:       if (!response.ok || (json && json.result && json.result !== "ok")) {
+  9059:         throw new Error(
+  9060:           json && (json.error_message || json.message || json.error)
+  9061:             ? (json.error_message || json.message || json.error)
+  9062:             : "課長へ送る更新に失敗しました。"
+  9063:         );
+  9064:       }
+  9065: 
+  9066:       result = json || {};
+  9067:     }
+  9068: 
+  9069:     var autoMessages = [];
+  9070: 
+  9071:     async function callOptionalAutoFunction(fnName, arg) {
+  9072:       try {
+  9073:         if (typeof globalThis !== "undefined" && typeof globalThis[fnName] === "function") {
+  9074:           return await globalThis[fnName](arg);
+  9075:         }
+  9076:       } catch (_) {}
+  9077:       return null;
+  9078:     }
+  9079: 
+  9080:     try {
+  9081:       var autoResult = null;
+  9082: 
+  9083:       if (typeof aicmRunLeaderAutoDecompositionAfterHandoffR8ZB === "function") {
+  9084:         autoResult = await aicmRunLeaderAutoDecompositionAfterHandoffR8ZB(majorId);
+  9085:       } else if (typeof aicmRunLeaderAutoDecompositionAfterConfirmR8ZB === "function") {
+  9086:         autoResult = await aicmRunLeaderAutoDecompositionAfterConfirmR8ZB(majorId);
+  9087:       } else if (typeof aicmRunLeaderAutoDecompositionForMajorR8ZB === "function") {
+  9088:         autoResult = await aicmRunLeaderAutoDecompositionForMajorR8ZB(majorId);
+  9089:       } else {
+  9090:         autoResult = await callOptionalAutoFunction("aicmRunLeaderAutoDecompositionAfterHandoffR8ZB", majorId);
+  9091:       }
+
+============================================================
+FUNCTION=aicmR8zV9f4bLeaderHandoffClickBridge; LINES=9415-9568; SCORE=40; REASONS=REVIEW,APPROVE_HANDOFF,DELETE,CONFIRM,ACTION_HANDLER
+============================================================
+  9415:         document.addEventListener("click", function aicmR8zV9f4bLeaderHandoffClickBridge(ev) {
+  9416:         // AICM_R8Z_MGR_MAJOR_CARD_C2D9_BRIDGE_CLICK_CALLBACK_ROUTE_ACTION_FIX_START
+  9417:         // Route picker action gate inside existing bridge click callback.
+  9418:         // This fixes dynamic confirm-panel controls that are not reaching the card handler.
+  9419:         // No DB write. No API POST. No fetch.
+  9420:         try {
+  9421:           var aicmR8zC2d9Event = arguments && arguments.length ? arguments[0] : null;
+  9422:           var aicmR8zC2d9Target = null;
+  9423:           var aicmR8zC2d9Action = "";
+  9424: 
+  9425:           if (aicmR8zC2d9Event && aicmR8zC2d9Event.target) {
+  9426:             if (aicmR8zC2d9Event.target.closest) {
+  9427:               aicmR8zC2d9Target = aicmR8zC2d9Event.target.closest("[data-core-action]");
+  9428:             } else if (aicmR8zC2d9Event.target.getAttribute) {
+  9429:               aicmR8zC2d9Target = aicmR8zC2d9Event.target;
+  9430:             }
+  9431:           }
+  9432: 
+  9433:           if (aicmR8zC2d9Target && aicmR8zC2d9Target.getAttribute) {
+  9434:             aicmR8zC2d9Action = String(aicmR8zC2d9Target.getAttribute("data-core-action") || "").trim();
+  9435:           }
+  9436: 
+  9437:           if (!aicmR8zC2d9Action && aicmR8zC2d9Target && aicmR8zC2d9Target.dataset) {
+  9438:             aicmR8zC2d9Action = String(aicmR8zC2d9Target.dataset.coreAction || "").trim();
+  9439:           }
+  9440: 
+  9441:           if (
+  9442:             aicmR8zC2d9Action &&
+  9443:             aicmR8zC2d9Action.indexOf("r8z-mgr-major-card-route-") === 0 &&
+  9444:             typeof aicmR8zMgrMajorCardHandleAction === "function"
+  9445:           ) {
+  9446:             if (aicmR8zC2d9Event && aicmR8zC2d9Event.preventDefault) {
+  9447:               aicmR8zC2d9Event.preventDefault();
+  9448:             }
+  9449:             if (aicmR8zC2d9Event && aicmR8zC2d9Event.stopPropagation) {
+  9450:               aicmR8zC2d9Event.stopPropagation();
+  9451:             }
+  9452: 
+  9453:             aicmR8zMgrMajorCardHandleAction(
+  9454:               aicmR8zC2d9Event,
+  9455:               aicmR8zC2d9Target,
+  9456:               aicmR8zC2d9Action
+  9457:             );
+  9458:             return;
+  9459:           }
+  9460:         } catch (aicmR8zC2d9Error) {
+  9461:           if (typeof console !== "undefined" && console.warn) {
+  9462:             console.warn("C2D9 bridge route action gate failed", aicmR8zC2d9Error);
+  9463:           }
+  9464:         }
+  9465:         // AICM_R8Z_MGR_MAJOR_CARD_C2D9_BRIDGE_CLICK_CALLBACK_ROUTE_ACTION_FIX_END
+  9466: 
+  9467: 
+  9468:           try {
+  9469:             var target = ev && ev.target;
+  9470:             var btn = target && typeof target.closest === "function"
+  9471:               ? target.closest("[data-core-action]")
+  9472:               : null;
+  9473: 
+  9474:             if (!btn || !btn.getAttribute) return;
+  9475: 
+  9476:             var action = String(btn.getAttribute("data-core-action") || "").trim();
+  9477: 
+  9478: 
+  9479:             // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_ACTION_ROUTE_START
+  9480: 
+  9481: 
+  9482:             if (["r8z-mgr-major-card-toggle", "r8z-mgr-major-card-select-all", "r8z-mgr-major-card-clear", "r8z-mgr-major-card-open-handoff-confirm", "r8z-mgr-major-card-open-delete-confirm", "r8z-mgr-major-card-confirm-yes", "r8z-mgr-major-card-confirm-no"].indexOf(action) >= 0) {
+  9483: 
+  9484: 
+  9485:               if (typeof aicmR8zMgrMajorCardHandleAction === "function") {
+  9486: 
+  9487: 
+  9488:                 aicmR8zMgrMajorCardHandleAction(
+  9489: 
+  9490: 
+  9491:                   (typeof ev !== "undefined" ? ev : (typeof event !== "undefined" ? event : null)),
+  9492: 
+  9493: 
+  9494:                   (typeof btn !== "undefined" ? btn : (typeof target !== "undefined" ? target : (typeof el !== "undefined" ? el : null))),
+  9495: 
+  9496: 
+  9497:                   action
+  9498: 
+  9499: 
+  9500:                 );
+  9501: 
+  9502: 
+  9503:               }
+  9504: 
+  9505: 
+  9506:               return;
+  9507: 
+  9508: 
+  9509:             }
+  9510: 
+  9511: 
+  9512:             // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_ACTION_ROUTE_END
+  9513: 
+  9514:             if (action === "pmlw-major-leader-handoff") {
+  9515:               if (typeof aicmOpenLeaderHandoffConfirmR8S === "function") {
+  9516:                 ev.preventDefault();
+  9517:                 ev.stopPropagation();
+  9518:                 aicmOpenLeaderHandoffConfirmR8S(ev, btn);
+  9519:               }
+  9520:               return;
+  9521:             }
+  9522: 
+  9523:             if (action === "r8z-v9f4b-leader-handoff-confirm-cancel") {
+  9524:               ev.preventDefault();
+  9525:               ev.stopPropagation();
+  9526:               if (state) state.managerMajorLeaderHandoffConfirm = null;
+  9527: 
+  9528:               if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  9529:                 aicmRenderTaskLedgerSafeR8V4("r8z_v9f4b_confirm_cancel");
+  9530:               } else if (typeof render === "function") {
+  9531:                 render();
+  9532:               }
+  9533:               return;
+  9534:             }
+  9535: 
+  9536:             if (action === "r8z-v9f4b-leader-handoff-confirm-execute") {
+  9537:               if (typeof aicmExecuteLeaderHandoffConfirmR8S === "function") {
+  9538:                 ev.preventDefault();
+  9539:                 ev.stopPropagation();
+  9540:                 aicmExecuteLeaderHandoffConfirmR8S();
+  9541:               }
+  9542:             }
+  9543:           } catch (error) {
+  9544:             try {
+  9545:               if (typeof setMessage === "function") {
+  9546:                 setMessage("error", error && error.message ? error.message : "課長へ送る確認の操作に失敗しました。");
+  9547:               }
+  9548:               if (typeof render === "function") render();
+  9549:             } catch (_) {}
+  9550:           }
+  9551:         }, true);
+  9552:       }
+  9553:     }
+  9554:   } catch (error) {
+  9555:     try {
+  9556:       if (typeof console !== "undefined" && console.warn) {
+  9557:         console.warn("AICM leader handoff confirm bridge V9F4B install skipped", error);
+  9558:       }
+  9559:     } catch (_) {}
+  9560:   }
+  9561: })();
+  9562: 
+  9563: // AICM_HUMAN_REVIEW_QUEUE_CORE_ARO_ART_V1
+  9564: // Human review queue UI.
+  9565: // Human review only shows delivery summaries / exception summaries.
+  9566: // AI review remains internal; the UI displays ai_review_result_text summary only.
+  9567: 
+  9568: function aicmHumanReviewOwnerId() {
+  9569:     if (state && state.ownerCivilizationId) return state.ownerCivilizationId;
+  9570:     if (state && state.owner_civilization_id) return state.owner_civilization_id;
+  9571:     if (state && state.context && state.context.owner_civilization_id) return state.context.owner_civilization_id;
+  9572:     return "00000000-0000-4000-8000-000000000001";
+  9573:   }
+  9574: 
+  9575:   function aicmHumanReviewRows() {
+  9576:     var ctx = state.context || state || {};
+  9577:     var rows = ctx.review_wait_items || state.review_wait_items || [];
+  9578:     return Array.isArray(rows) ? rows : [];
+  9579:   }
+  9580: 
+  9581:   function aicmHumanReviewRowsForCompany(companyId) {
+  9582:     return aicmHumanReviewRows().filter(function (row) {
+  9583:       return !companyId || row.aicm_user_company_id === companyId;
+  9584:     });
+  9585:   }
+  9586: 
+  9587:   async function aicmHumanReviewPostJson(path, body) {
+  9588:     var response = await fetch(path, {
+
+============================================================
+FUNCTION=handleRootClick; LINES=11335-11692; SCORE=40; REASONS=REVIEW,APPROVE_HANDOFF,DELETE,CONFIRM,ACTION_HANDLER
+============================================================
+ 11335: function handleRootClick(event) {
+ 11336:   // AICM_CHANGE_BUTTON_CLICK_TARGET_NORMALIZE_AXD_V1
+ 11337:   var aicmRawClickTarget = event.target;
+ 11338:   var aicmActionTarget = aicmRawClickTarget && aicmRawClickTarget.closest
+ 11339:     ? (aicmRawClickTarget.closest("[data-core-action]") || aicmRawClickTarget)
+ 11340:     : aicmRawClickTarget;
+ 11341: 
+ 11342:     var button = aicmActionTarget.closest("[data-core-action]");
+ 11343:     if (!button) {
+ 11344:       // AICM_AXU_R1C_SCREEN_ONLY_NAV_FALLBACK
+ 11345:       var aicmScreenOnlyTarget = aicmActionTarget && aicmActionTarget.closest
+ 11346:         ? aicmActionTarget.closest("[data-screen]")
+ 11347:         : null;
+ 11348: 
+ 11349:       if (aicmScreenOnlyTarget && aicmScreenOnlyTarget.getAttribute) {
+ 11350:         var aicmScreenOnlyName = String(aicmScreenOnlyTarget.getAttribute("data-screen") || "").trim();
+ 11351: 
+ 11352:         if (aicmScreenOnlyName) {
+ 11353:           state.screen = aicmScreenOnlyName;
+ 11354:           if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+ 11355:           if (typeof render === "function") render();
+ 11356:           return;
+ 11357:         }
+ 11358:       }
+ 11359: 
+ 11360:       return;
+ 11361:     }
+ 11362: 
+ 11363:     var action = button.getAttribute("data-core-action") || "";
+ 11364: 
+ 11365:     // AICM_AXU_R1_MANAGER_MAJOR_TO_LEADER_V1
+ 11366:     
+ 11367: 
+ 11368:     // AICM_RUNTIME_STATUS_PANEL_AXT_R9_R1_V1
+ 11369:     if (action === "worker-runtime-status-refresh") {
+ 11370:       aicmRuntimeStatusRefresh();
+ 11371:       return;
+ 11372:     }
+ 11373: 
+ 11374:     // AICM_WORKBENCH_CONFIRM_STATE_AXT_R3_V1
+ 11375:     if (action === "worker-runtime-confirm") {
+ 11376:       confirmWorkerRuntimeRequestFromForm();
+ 11377:       return;
+ 11378:     }
+ 11379: 
+ 11380:     if (action === "worker-runtime-execute") {
+ 11381:       executeWorkerRuntimeConfirm();
+ 11382:       return;
+ 11383:     }
+ 11384: 
+ 11385:     if (action === "worker-runtime-cancel") {
+ 11386:       cancelWorkerRuntimeConfirm();
+ 11387:       return;
+ 11388:     }
+ 11389: 
+ 11390:             if (action === "task-ledger-fill-csv-template") {
+ 11391:       fillTaskLedgerCsvTemplate();
+ 11392:       return;
+ 11393:     }
+ 11394: 
+ 11395:         if (action === "task-ledger-csv-file-open") {
+ 11396:       openTaskLedgerCsvFilePicker();
+ 11397:       return;
+ 11398:     }
+ 11399: 
+ 11400:     if (action === "task-ledger-chatgpt-prompt") {
+ 11401:       handleTaskLedgerChatGptPrompt();
+ 11402:       return;
+ 11403:     }
+ 11404: if (action === "task-ledger-csv-preview") {
+ 11405:       previewTaskLedgerCsv();
+ 11406:       return;
+ 11407:     }
+ 11408: 
+ 11409:     if (action === "task-ledger-csv-import") {
+ 11410:       importTaskLedgerCsvToPmlwMajor();
+ 11411:       return;
+ 11412:     }
+ 11413: if (action === "task-ledger-create") {
+ 11414:       createTaskLedgerFromForm();
+ 11415:       return;
+ 11416:     }
+ 11417: if (action === "human-review-approve") {
+ 11418:       approveHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+ 11419:       return;
+ 11420:     }
+ 11421: 
+ 11422:     if (action === "human-review-return") {
+ 11423:       returnHumanReviewFromAction(typeof target !== "undefined" ? target : null);
+ 11424:       return;
+ 11425:     }
+ 11426: 
+ 11427:     if (action === "department-update-select") {
+ 11428:       // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+ 11429:       state.editingDepartmentId = button && button.getAttribute ? String(button.getAttribute("data-department-id") || "") : "";
+ 11430:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+ 11431:       if (typeof render === "function") render();
+ 11432:       return;
+ 11433:     }
+ 11434: 
+ 11435:     if (action === "department-update-clear") {
+ 11436:       state.editingDepartmentId = "";
+ 11437:       if (typeof render === "function") render();
+ 11438:       return;
+ 11439:     }
+ 11440: 
+ 11441:     if (action === "section-update-select") {
+ 11442:       // AICM_CHANGE_BUTTON_TARGET_VAR_AXF_V1
+ 11443:       state.editingSectionId = button && button.getAttribute ? String(button.getAttribute("data-section-id") || "") : "";
+ 11444:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+ 11445:       if (typeof render === "function") render();
+ 11446:       return;
+ 11447:     }
+ 11448: 
+ 11449:     if (action === "section-update-clear") {
+ 11450:       state.editingSectionId = "";
+ 11451:       if (typeof render === "function") render();
+ 11452:       return;
+ 11453:     }
+ 11454: 
+ 11455:     if (action === "company-update-save") {
+ 11456:       saveCompanyUpdateFromForm();
+ 11457:       return;
+ 11458:     }
+ 11459: 
+ 11460:     if (action === "department-update-save") {
+ 11461:       saveDepartmentUpdateFromForm();
+ 11462:       return;
+ 11463:     }
+ 11464: 
+ 11465:     if (action === "section-update-save") {
+ 11466:       saveSectionUpdateFromForm();
+ 11467:       return;
+ 11468:     }
+ 11469: 
+ 11470:     if (action === "org-update-confirm-execute") {
+ 11471:       executeAicmOrgUpdateConfirm();
+ 11472:       return;
+ 11473:     }
+ 11474: 
+ 11475:     if (action === "org-update-confirm-cancel") {
+ 11476:       cancelAicmOrgUpdateConfirm();
+ 11477:       return;
+ 11478:     }
+ 11479: 
+ 11480:     if (action === "company-edit-open") {
+ 11481:       state.screen = "company-edit";
+ 11482:       if (typeof render === "function") render();
+ 11483:       return;
+ 11484:     }
+ 11485: 
+ 11486:     if (action === "department-edit-pick") {
+ 11487:       var actionTarget = aicmActionTargetSafe(event, button);
+ 11488:       state.editingDepartmentId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-department-id") || "") : "";
+ 11489:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+ 11490:       if (typeof render === "function") render();
+ 11491:       return;
+ 11492:     }
+ 11493: 
+ 11494:     if (action === "section-edit-pick") {
+ 11495:       var actionTarget = aicmActionTargetSafe(event, button);
+ 11496:       state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : "";
+ 11497:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+ 11498:       if (typeof render === "function") render();
+ 11499:       return;
+ 11500:     }
+ 11501: 
+ 11502:     if (action === "section-worker-update-open") {
+ 11503:       var actionTarget = aicmActionTargetSafe(event, button);
+ 11504:       state.editingSectionId = actionTarget && actionTarget.getAttribute ? String(actionTarget.getAttribute("data-section-id") || "") : (state.editingSectionId || "");
+ 11505:       state.workerPlacementSectionId = state.editingSectionId || "";
+ 11506:       state.screen = "worker-placement";
+ 11507:       if (typeof aicmClearTransientMessage === "function") aicmClearTransientMessage();
+ 11508:       if (typeof render === "function") render();
+ 11509:       return;
+ 11510:     }
+ 11511: 
+ 11512:         // AICM_REMOVE_STALE_ROLE_SETTING_OPEN_AUC_AUF_V1: stale role setting open action removed
+ 11513: 
+ 11514:     
+ 11515: 
+
+============================================================
+FUNCTION=handle; LINES=15148-15216; SCORE=40; REASONS=REVIEW,APPROVE_HANDOFF,DELETE,CONFIRM,ACTION_HANDLER
+============================================================
+ 15148:     function handle(actionEl, event, source) {
+ 15149:       if (!actionEl) return false;
+ 15150: 
+ 15151:       var action = actionEl.getAttribute("data-core-action") || "";
+ 15152:       var id = actionEl.getAttribute("data-review-id") || actionEl.getAttribute("data-human-review-id") || "";
+ 15153: 
+ 15154:       var mode = "";
+ 15155:       if (
+ 15156:         action === "review-v10d-preview-approve" ||
+ 15157:         action === "review-v10d2-preview-approve" ||
+ 15158:         action === "review-v10d4-preview-approve" ||
+ 15159:         action === "review-v10f-preview-approve"
+ 15160:       ) mode = "approve";
+ 15161: 
+ 15162:       if (
+ 15163:         action === "review-v10d-preview-return" ||
+ 15164:         action === "review-v10d2-preview-return" ||
+ 15165:         action === "review-v10d4-preview-return" ||
+ 15166:         action === "review-v10f-preview-return"
+ 15167:       ) mode = "return";
+ 15168: 
+ 15169:       
+ 15170:       if (action === "review-v10f-back-list") {
+ 15171:         if (event) {
+ 15172:           try { event.preventDefault(); } catch (_) {}
+ 15173:           try { event.stopPropagation(); } catch (_) {}
+ 15174:           try { event.stopImmediatePropagation(); } catch (_) {}
+ 15175:         }
+ 15176: 
+ 15177:         removeExistingConfirm();
+ 15178:         try {
+ 15179:           var s = app();
+ 15180:           s.screen = "review-list";
+ 15181:           if (typeof render === "function") render();
+ 15182:         } catch (_) {}
+ 15183:         visibleDebug("back to review-list / id=" + id);
+ 15184:         return true;
+ 15185:       }
+ 15186: 
+ 15187: if (action === "review-v10f-cancel-confirm") {
+ 15188:         if (event) {
+ 15189:           try { event.preventDefault(); } catch (_) {}
+ 15190:           try { event.stopPropagation(); } catch (_) {}
+ 15191:           try { event.stopImmediatePropagation(); } catch (_) {}
+ 15192:         }
+ 15193: 
+ 15194:         removeExistingConfirm();
+ 15195:         visibleDebug("confirm closed / id=" + id);
+ 15196:         return true;
+ 15197:       }
+ 15198: 
+ 15199:       if (!mode) return false;
+ 15200: 
+ 15201:       if (event) {
+ 15202:         try { event.preventDefault(); } catch (_) {}
+ 15203:         try { event.stopPropagation(); } catch (_) {}
+ 15204:         try { event.stopImmediatePropagation(); } catch (_) {}
+ 15205:       }
+ 15206: 
+ 15207:       var s = app();
+ 15208:       s.aicmR8zV10fLastAction = action;
+ 15209:       s.aicmR8zV10fLastReviewId = id;
+ 15210:       s.aicmR8zV10fLastMode = mode;
+ 15211:       s.aicmR8zV10fLastSource = source || "";
+ 15212: 
+ 15213:       return showConfirm(actionEl, mode, id, source || "");
+ 15214:     }
+ 15215: 
+ 15216:     function bridge(event) {
+ 15217:       var actionEl = findActionElement(event && event.target);
+ 15218:       if (!actionEl) return;
+ 15219: 
+ 15220:       var action = actionEl.getAttribute("data-core-action") || "";
+ 15221:       if (action.indexOf("review-v10d") !== 0 && action.indexOf("review-v10f") !== 0) return;
+ 15222: 
+ 15223:       handle(actionEl, event, event && event.type ? event.type : "event");
+ 15224:     }
+ 15225: 
+ 15226:     function installBridge() {
+ 15227:       if (typeof document === "undefined" || document.__aicmR8zV10fReviewConfirmUiBridge) return;
+ 15228:       document.__aicmR8zV10fReviewConfirmUiBridge = true;
+ 15229: 
+ 15230:       document.addEventListener("click", bridge, true);
+ 15231:       document.addEventListener("pointerup", bridge, true);
+ 15232:       document.addEventListener("touchend", bridge, true);
+ 15233:     }
+ 15234: 
+ 15235:     installBridge();
+ 15236: 
+
+============================================================
+FUNCTION=aicmExecuteMajorItemDeleteConfirmR8P; LINES=4982-5030; SCORE=37; REASONS=DELETE,FETCH,POST,CONFIRM,PAYLOAD
+============================================================
+  4982:   async function aicmExecuteMajorItemDeleteConfirmR8P() {
+  4983:     var payload = state.managerMajorDeleteConfirm || null;
+  4984:     if (!payload || !payload.majorId) {
+  4985:       setMessage("error", "削除確認対象がありません。");
+  4986:       render();
+  4987:       return;
+  4988:     }
+  4989: 
+  4990:     try {
+  4991:       var response = await fetch("/api/aicm/v2/manager-major/archive", {
+  4992:         method: "POST",
+  4993:         headers: {
+  4994:           "content-type": "application/json"
+  4995:         },
+  4996:         body: JSON.stringify({
+  4997:           aicm_manager_major_work_item_id: payload.majorId
+  4998:         })
+  4999:       });
+  5000: 
+  5001:       var json = null;
+  5002:       try {
+  5003:         json = await response.json();
+  5004:       } catch (_) {
+  5005:         json = null;
+  5006:       }
+  5007: 
+  5008:       if (!response.ok || (json && json.result && json.result !== "ok")) {
+  5009:         throw new Error(json && (json.error || json.message) ? (json.error || json.message) : "大項目の削除に失敗しました。");
+  5010:       }
+  5011: 
+  5012:       state.managerMajorDeleteConfirm = null;
+  5013:       setMessage("ok", "大項目を削除済みにしました。");
+  5014:       await aicmReloadTaskLedgerContext();
+  5015:       state.screen = "task-ledger";
+  5016:       render();
+  5017:     } catch (error) {
+  5018:       setMessage("error", error && error.message ? error.message : "大項目の削除に失敗しました。");
+  5019:       render();
+  5020:     }
+  5021:   }
+  5022: // AICM_R8O_R8P_R8Q_MAJOR_ITEM_PAGING_DELETE_PROMPT_V1_END
+  5023: 
+  5024: 
+  5025:   
+  5026: 
+  5027:   // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_HELPER_START
+  5028:   // Consolidated card-selection helpers for aicmRenderManagerMajorRows.
+  5029:   // DB_WRITE=NO / API_POST=NO. These helpers only manage browser-side UI state.
+  5030:   function aicmR8zMgrMajorCardState() {
+  5031:     if (typeof state === "undefined" || !state) {
+  5032:       return { selectedIds: {}, confirm: null };
+  5033:     }
+  5034: 
+  5035:     if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+  5036:       state.r8zMgrMajorCardSelection = { selectedIds: {}, confirm: null };
+  5037:     }
+  5038: 
+  5039:     if (!state.r8zMgrMajorCardSelection.selectedIds || typeof state.r8zMgrMajorCardSelection.selectedIds !== "object") {
+  5040:       state.r8zMgrMajorCardSelection.selectedIds = {};
+  5041:     }
+  5042: 
+  5043:     return state.r8zMgrMajorCardSelection;
+  5044:   }
+  5045: 
+  5046:   function aicmR8zMgrMajorCardRowId(row, index) {
+  5047:     if (typeof aicmAxuR1MajorId === "function") {
+  5048:       var existingId = aicmAxuR1MajorId(row);
+  5049:       if (existingId) return String(existingId).trim();
+  5050:     }
+
+============================================================
+FUNCTION=aicmR8ZOFilterLabel; LINES=11993-12009; SCORE=36; REASONS=REVIEW,APPROVE_HANDOFF,DELETE,CONFIRM
+============================================================
+ 11993:   function aicmR8ZOFilterLabel(filter) {
+ 11994:     var labels = {
+ 11995:       unhandoff: "未引き継ぎ",
+ 11996:       auto_waiting: "自動処理待ち",
+ 11997:       auto_processing: "自動処理中",
+ 11998:       manager_completed: "分解済み",
+ 11999:       worker_running: "Worker実行中",
+ 12000:       review_waiting: "レビュー待ち",
+ 12001:       worker_completed: "Worker完了",
+ 12002:       needs_check: "要確認",
+ 12003:       worker_needs_check: "Worker要確認",
+ 12004:       archived: "削除済み"
+ 12005:     };
+ 12006:     return labels[filter] || "詳細";
+ 12007:   }
+ 12008: 
+ 12009:   function aicmR8ZOSummaryButton(code, label, count, note) {
+ 12010:     return [
+ 12011:       '<button type="button" data-core-action="manager-major-summary-filter" data-summary-filter="' + aicmR8ZOEscape(code) + '" style="text-align:left;display:block;">',
+ 12012:       '  <span class="aicm-eyebrow">' + aicmR8ZOEscape(label) + '</span>',
+ 12013:       '  <strong style="display:block;font-size:30px;margin:6px 0;">' + aicmR8ZOEscape(String(count || 0)) + '件</strong>',
+ 12014:       note ? '  <span style="display:block;color:#64748b;font-weight:800;">' + aicmR8ZOEscape(note) + '</span>' : '',
+ 12015:       '</button>'
+ 12016:     ].join("");
+ 12017:   }
+ 12018: 
+ 12019:   function aicmR8ZORenderDetail(filter) {
+ 12020:     if (!filter) return "";
+ 12021: 
+ 12022:     var rows = aicmR8ZODetailRows(filter);
+ 12023:     var label = aicmR8ZOFilterLabel(filter);
+ 12024: 
+ 12025:     var body = rows.length ? rows.slice(0, 20).map(function(row, index) {
+ 12026:       var title = aicmR8ZOTitle(row);
+ 12027:       var description = aicmR8ZODescription(row);
+ 12028:       var worker = aicmR8ZOText(row && (row.assigned_worker_label || row.assigned_leader_label || row.leader_robot_label || row.responsible_robot_label));
+ 12029:       var priority = aicmR8ZOText(row && row.priority_code) || "-";
+
+============================================================
+FUNCTION=aicmRenderManagerMajorSummaryPanelR8U; LINES=12061-12087; SCORE=36; REASONS=REVIEW,APPROVE_HANDOFF,DELETE,CONFIRM
+============================================================
+ 12061:   function aicmRenderManagerMajorSummaryPanelR8U() {
+ 12062:     var majorRows = aicmR8ZOArray("pmlw_major_items", "managerMajorItems", "manager_major_items");
+ 12063:     var workerRows = aicmR8ZOArray("pmlw_worker_work_units", "pmlwWorkerWorkUnits");
+ 12064:     var majorCounts = aicmR8ZOCountBy(majorRows, aicmR8ZOMajorStatus);
+ 12065:     var workerCounts = aicmR8ZOCountBy(workerRows, aicmR8ZOWorkerStatus);
+ 12066:     var filter = state && state.managerMajorSummaryFilter ? String(state.managerMajorSummaryFilter) : "";
+ 12067: 
+ 12068:     return [
+ 12069:       '<section class="aicm-core-card aicm-manager-major-summary-card">',
+ 12070:       '  <p class="aicm-eyebrow">本番サマリ</p>',
+ 12071:       '  <h2>部門別タスク台帳サマリ</h2>',
+ 12072:       '  <p class="aicm-selected-note">合計: <strong>' + aicmR8ZOEscape(String(majorRows.length)) + '件</strong> / Worker作業単位: <strong>' + aicmR8ZOEscape(String(workerRows.length)) + '件</strong></p>',
+ 12073:       '  <div class="aicm-dashboard-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));">',
+ 12074:       aicmR8ZOSummaryButton("unhandoff", "未引き継ぎ", majorCounts.unhandoff || 0, "課長へ送る前"),
+ 12075:       aicmR8ZOSummaryButton("auto_waiting", "自動処理待ち", majorCounts.auto_waiting || 0, "Leader以降の開始待ち"),
+ 12076:       aicmR8ZOSummaryButton("manager_completed", "分解済み", majorCounts.manager_completed || 0, "Worker作業単位まで作成"),
+ 12077:       aicmR8ZOSummaryButton("worker_running", "Worker実行中", workerCounts.worker_running || 0, "AIWorkerOS受付済み"),
+ 12078:       aicmR8ZOSummaryButton("review_waiting", "レビュー待ち", workerCounts.review_waiting || 0, "承認待ちへ表示予定"),
+ 12079:       aicmR8ZOSummaryButton("archived", "削除済み", majorCounts.archived || 0, "非表示・保管扱い"),
+ 12080:       '  </div>',
+ 12081:       '  <p class="aicm-selected-note">件数カードを押すと、その分類の詳細だけ確認できます。request_id などの開発者情報は通常表示しません。</p>',
+ 12082:       aicmR8ZORenderDetail(filter),
+ 12083:       '</section>'
+ 12084:     ].join("");
+ 12085:   }
+ 12086: 
+ 12087:   function aicmRenderLeaderAutoFlowStatusR8W() {
+ 12088:     return "";
+ 12089:   }
+ 12090: 
+ 12091:   function aicmRenderPmlwAutoOutputsPanelR8ZC() {
+ 12092:     return "";
+ 12093:   }
+ 12094: 
+ 12095:   function aicmRenderR8ZNWorkerRuntimeStatusPanel() {
+ 12096:     return "";
+ 12097:   }
+ 12098: // AICM_R8Z_O_PRODUCTION_SUMMARY_UI_END
+ 12099: 
+ 12100: 
+ 12101: function handleRootChange(event) {
+ 12102:     var field = event.target;
+ 12103:     var fileKind = field.getAttribute("data-core-file") || "";
+ 12104:     if (fileKind === "task-ledger-csv") {
+ 12105:       aicmCsvReadSelectedFile(field);
+ 12106:       return;
+ 12107:     }
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardRenderConfirm; LINES=6198-6301; SCORE=35; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,PAYLOAD,ACTION_HANDLER
+============================================================
+  6198:   function aicmR8zMgrMajorCardRenderConfirm() {
+  6199:     var bag = aicmR8zMgrMajorCardState();
+  6200:     var confirm = bag.confirm || null;
+  6201: 
+  6202:     if (!confirm || !Array.isArray(confirm.items) || !confirm.items.length) {
+  6203:       return "";
+  6204:     }
+  6205: 
+  6206:     var liveValidation = confirm.kind === "leader-handoff" && typeof aicmR8zC2bValidateLeaderHandoffRows === "function"
+  6207:       ? aicmR8zC2bValidateLeaderHandoffRows(aicmR8zMgrMajorCardSelectedRows())
+  6208:       : null;
+  6209: 
+  6210:     if (liveValidation) {
+  6211:       confirm.ok = liveValidation.ok;
+  6212:       confirm.errors = liveValidation.errors || [];
+  6213:       confirm.items = liveValidation.items || confirm.items;
+  6214:       confirm.payloads = liveValidation.payloads || [];
+  6215:       confirm.route = liveValidation.route || {};
+  6216:       confirm.endpoint = liveValidation.endpoint || confirm.endpoint;
+  6217:       bag.confirm = confirm;
+  6218:     }
+  6219: 
+  6220:     var errors = Array.isArray(confirm.errors) ? confirm.errors : [];
+  6221:     var payloads = Array.isArray(confirm.payloads) ? confirm.payloads : [];
+  6222:     var hasErrors = errors.length > 0;
+  6223:     var yesDisabled = hasErrors ? " disabled" : "";
+  6224:     var yesStyle = hasErrors ? ' style="opacity:0.45;cursor:not-allowed;"' : "";
+  6225: 
+  6226:     var route = typeof aicmR8zC2cEffectiveRoute === "function"
+  6227:       ? aicmR8zC2cEffectiveRoute()
+  6228:       : (confirm.route || {});
+  6229: 
+  6230:     var routePickerHtml = typeof aicmR8zC2cRenderRoutePicker === "function"
+  6231:       ? aicmR8zC2cRenderRoutePicker()
+  6232:       : "";
+  6233: 
+  6234: 
+  6235:     var routeApplyDebugData = state && state.r8zMgrMajorCardRouteApplyDebug
+  6236:       ? state.r8zMgrMajorCardRouteApplyDebug
+  6237:       : null;
+  6238: 
+  6239:     var routeApplyDebugHtml = routeApplyDebugData
+  6240:       ? [
+  6241:         ].join("")
+  6242:       : [
+  6243:         ].join("");
+  6244: 
+  6245: 
+  6246:     var handlerEntryDebugData = state && state.r8zMgrMajorCardHandlerEntryDebug
+  6247:       ? state.r8zMgrMajorCardHandlerEntryDebug
+  6248:       : null;
+  6249: 
+  6250:     var handlerEntryDebugHtml = handlerEntryDebugData
+  6251:       ? [
+  6252:         ].join("")
+  6253:       : [
+  6254:         ].join("");
+  6255: 
+  6256:     var summaryHtml = [
+  6257:       '<div class="aicm-core-card" style="margin:12px 0;">',
+  6258:       '<p class="aicm-eyebrow">一括引き渡し先</p>',
+  6259:       '<div class="aicm-selected-note">部門: ' + escapeHtml(route.displayDepartment || "-") + '</div>',
+  6260:       '<div class="aicm-selected-note">課: ' + escapeHtml(route.displaySection || "-") + '</div>',
+  6261:       '<div class="aicm-selected-note">Leader: ' + escapeHtml(route.displayLeader || "-") + '</div>',
+  6262:       route.routeApplied ? '<div class="aicm-selected-note">適用済み</div>' : '',
+  6263:       '</div>'
+  6264:     ].join("");
+  6265: 
+  6266:     var itemHtml = confirm.items.map(function (item) {
+  6267:       return '<li><strong>' + escapeHtml(item.title || item.id || "Manager大項目") + '</strong></li>';
+  6268:     }).join("");
+  6269: 
+  6270:     var errorHtml = hasErrors
+  6271:       ? '<div class="aicm-core-card" style="border:1px solid #ef4444;background:#fff7f7;margin:12px 0;"><p class="aicm-eyebrow">実行前チェック</p><ul class="aicm-selected-note">' + errors.map(function (message) { return '<li>' + escapeHtml(message) + '</li>'; }).join("") + '</ul></div>'
+  6272:       : '<p class="aicm-selected-note">実行前チェックOK。次工程でAPI POST解放前に佐藤(DB担当)レビューが必要です。</p>';
+  6273: 
+  6274:     var payloadPreviewHtml = payloads.length
+  6275:       ? '<details class="aicm-selected-note" style="margin-top:12px;"><summary>payload preview（POST未実行）</summary><pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(payloads, null, 2)) + '</pre></details>'
+  6276:       : "";
+  6277: 
+  6278:     return [
+  6279:       '<div class="aicm-core-card" data-r8z-mgr-major-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
+  6280:       '  <p class="aicm-eyebrow">確認</p>',
+  6281:       '  <h3>' + escapeHtml(confirm.title || "確認") + '</h3>',
+  6282:       '  <p class="aicm-selected-note">endpoint: ' + escapeHtml(confirm.endpoint || "/api/aicm/v2/manager-major/update") + '</p>',
+  6283:       routePickerHtml,
+  6284:       routeApplyDebugHtml,
+  6285:       handlerEntryDebugHtml,
+  6286:       summaryHtml,
+  6287:       '  <p class="aicm-eyebrow">対象大項目</p>',
+  6288:       '  <ul class="aicm-selected-note">' + itemHtml + '</ul>',
+  6289:       errorHtml,
+  6290:       payloadPreviewHtml,
+  6291:       '  <div class="aicm-dashboard-action-row">',
+  6292:       '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-yes"' + yesDisabled + yesStyle + '>Yes</button>',
+  6293:       '    <button type="button" data-core-action="r8z-mgr-major-card-confirm-no">No</button>',
+  6294:       '  </div>',
+  6295:       '  <p class="aicm-selected-note">この確認画面ではDB更新/API POSTは実行しません。</p>',
+  6296:       '</div>'
+  6297:     ].join("");
+  6298:   }
+  6299: 
+  6300: 
+  6301:   function aicmR8zMgrMajorCardRenderOperationPanel(rows) {
+  6302:     rows = Array.isArray(rows) ? rows : [];
+  6303: 
+  6304:     var selectedCount = rows.filter(function (row, index) {
+  6305:       return aicmR8zMgrMajorCardIsSelected(aicmR8zMgrMajorCardRowId(row, index));
+  6306:     }).length;
+  6307: 
+  6308:     var eligibleCount = rows.filter(function (row) {
+  6309:       return aicmR8zMgrMajorCardIsSelectable(row);
+  6310:     }).length;
+  6311: 
+  6312:     return [
+  6313:       '<div class="aicm-core-card" data-r8z-mgr-major-operation-panel="1" style="margin:12px 0;">',
+  6314:       '  <p class="aicm-eyebrow">登録済み大項目 操作</p>',
+  6315:       '  <h3>選択操作</h3>',
+  6316:       '  <p class="aicm-selected-note">選択 ' + String(selectedCount) + ' / 未送信 ' + String(eligibleCount) + ' / 全件 ' + String(rows.length) + '</p>',
+  6317:       '  <div class="aicm-dashboard-action-row">',
+  6318:       '    <button type="button" data-core-action="r8z-mgr-major-card-open-handoff-confirm">課長へ送る</button>',
+  6319:       '    <button type="button" data-core-action="r8z-mgr-major-card-open-delete-confirm">削除</button>',
+  6320:       '    <button type="button" data-core-action="r8z-mgr-major-card-select-all">全件選択</button>',
+  6321:       '    <button type="button" data-core-action="r8z-mgr-major-card-clear">解除</button>',
+
+============================================================
+FUNCTION=aicmR8zV10gc3iExecuteReviewDecision; LINES=15706-15766; SCORE=35; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,PAYLOAD,ACTION_HANDLER
+============================================================
+ 15706: async function aicmR8zV10gc3iExecuteReviewDecision(button) {
+ 15707:   var decision = aicmR8zV10gc3iText(button.getAttribute("data-review-decision") || "");
+ 15708:   var payload = aicmR8zV10gc3iBuildPayload(button);
+ 15709:   var missing = aicmR8zV10gc3iMissingPayloadKeys(payload);
+ 15710: 
+ 15711:   if (decision !== "approved" && decision !== "returned") {
+ 15712:     aicmR8zV10gc3iSetMessage("error", "レビュー操作種別が不明です。");
+ 15713:     return;
+ 15714:   }
+ 15715: 
+ 15716:   if (missing.length > 0) {
+ 15717:     aicmR8zV10gc3iSetMessage("error", "レビュー更新に必要な値が不足しています: " + missing.join(", "));
+ 15718:     try {
+ 15719:       if (typeof window !== "undefined") {
+ 15720:         window.aicmR8zV10gc3iLastMissingPayload = payload;
+ 15721:       }
+ 15722:     } catch (_) {}
+ 15723:     if (typeof render === "function") render();
+ 15724:     return;
+ 15725:   }
+ 15726: 
+ 15727:   try {
+ 15728:     button.disabled = true;
+ 15729:     aicmR8zV10gc3iSetMessage("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
+ 15730: 
+ 15731:     await aicmR8zV10gc3iPostDecision(decision, payload);
+ 15732: 
+ 15733:     aicmR8zV10gc3iSetMessage("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+ 15734: 
+ 15735:     await aicmR8zV10gc3iRefreshReviewList(payload.aicm_human_review_item_id);
+ 15736:   } catch (error) {
+ 15737:     button.disabled = false;
+ 15738:     aicmR8zV10gc3iSetMessage("error", error && error.message ? error.message : "レビュー更新に失敗しました。");
+ 15739:     if (typeof render === "function") render();
+ 15740:   }
+ 15741: }
+ 15742: 
+ 15743: if (typeof document !== "undefined") {
+ 15744:   document.addEventListener("click", function(event) {
+ 15745:     var target = event && event.target;
+ 15746:     var button = target && target.closest ? target.closest('button[data-core-action="review-decision-execute"]') : null;
+ 15747:     if (!button) return;
+ 15748: 
+ 15749:     try { event.preventDefault(); } catch (_) {}
+ 15750:     try { event.stopPropagation(); } catch (_) {}
+ 15751:     try { event.stopImmediatePropagation(); } catch (_) {}
+ 15752: 
+ 15753:     aicmR8zV10gc3iExecuteReviewDecision(button);
+ 15754:   }, true);
+ 15755: }
+ 15756: 
+ 15757: if (typeof window !== "undefined") {
+ 15758:   window.aicmR8zV10gc3iExecuteReviewDecision = aicmR8zV10gc3iExecuteReviewDecision;
+ 15759: }
+ 15760: // AICM_R8Z_V10GC3I_RENDERCONFIRM_DIRECT_BUTTON_CANON_END
+ 15761: 
+ 15762: 
+ 15763: // AICM_R8Z_V10GC4B_REVIEW_PENDING_ONLY_SCREEN_CONTROL_START
+ 15764: // Review list screen-control guard.
+ 15765: // Shows pending review items only and clears stale confirm/detail/metadata state after review decisions.
+ 15766: function aicmR8zV10gc4bText(value) {
+ 15767:   return String(value === undefined || value === null ? "" : value).trim();
+ 15768: }
+ 15769: 
+ 15770: function aicmR8zV10gc4bApp() {
+ 15771:   if (typeof state !== "undefined" && state && typeof state === "object") return state;
+ 15772:   if (typeof window !== "undefined" && window.state && typeof window.state === "object") return window.state;
+ 15773:   return {};
+ 15774: }
+ 15775: 
+ 15776: function aicmR8zV10gc4bIsReviewRow(row) {
+ 15777:   return !!(row && typeof row === "object" && (
+ 15778:     Object.prototype.hasOwnProperty.call(row, "aicm_human_review_item_id") ||
+ 15779:     Object.prototype.hasOwnProperty.call(row, "human_review_status_code") ||
+ 15780:     Object.prototype.hasOwnProperty.call(row, "review_kind_code") ||
+ 15781:     Object.prototype.hasOwnProperty.call(row, "artifact_kind_code")
+ 15782:   ));
+ 15783: }
+ 15784: 
+ 15785: function aicmR8zV10gc4bStatus(row) {
+ 15786:   return aicmR8zV10gc4bText(row && (
+
+============================================================
+FUNCTION=handle; LINES=15470-15532; SCORE=34; REASONS=REVIEW,APPROVE_HANDOFF,DELETE,ACTION_HANDLER
+============================================================
+ 15470:     function handle(actionEl, event, source) {
+ 15471:       if (!actionEl) return false;
+ 15472: 
+ 15473:       var action = actionEl.getAttribute("data-core-action") || "";
+ 15474:       var id = actionEl.getAttribute("data-review-id") || actionEl.getAttribute("data-human-review-id") || "";
+ 15475: 
+ 15476:       var supported = {
+ 15477:         "review-v10d-open-detail": "open",
+ 15478:         "review-v10d2-open-detail": "open",
+ 15479:         "review-v10d4-open-detail": "open",
+ 15480:         "review-v10d-preview-approve": "approve",
+ 15481:         "review-v10d2-preview-approve": "approve",
+ 15482:         "review-v10d4-preview-approve": "approve",
+ 15483:         "review-v10d-preview-return": "return",
+ 15484:         "review-v10d2-preview-return": "return",
+ 15485:         "review-v10d4-preview-return": "return",
+ 15486:         "review-v10d-close-detail": "close",
+ 15487:         "review-v10d2-close-detail": "close",
+ 15488:         "review-v10d4-close-detail": "close"
+ 15489:       };
+ 15490: 
+ 15491:       var mode = supported[action];
+ 15492:       if (!mode) return false;
+ 15493: 
+ 15494:       if (event) {
+ 15495:         try { event.preventDefault(); } catch (_) {}
+ 15496:         try { event.stopPropagation(); } catch (_) {}
+ 15497:         try { event.stopImmediatePropagation(); } catch (_) {}
+ 15498:       }
+ 15499: 
+ 15500:       var s = app();
+ 15501:       s.aicmR8zV10d4LastAction = action;
+ 15502:       s.aicmR8zV10d4LastReviewId = id;
+ 15503:       s.aicmR8zV10d4LastSource = source || "";
+ 15504: 
+ 15505:       if (mode === "close") {
+ 15506:         removeExistingDetails();
+ 15507:         s.aicmR8zV10d4SelectedReviewId = "";
+ 15508:         setVisibleDebug("closed / action=" + action);
+ 15509:         return true;
+ 15510:       }
+ 15511: 
+ 15512:       var row = findRowById(id);
+ 15513:       if (!row) {
+ 15514:         setVisibleDebug("clicked but row not found / action=" + action + " / id=" + id + " / rows=" + String(rowsFromState().length));
+ 15515:         return true;
+ 15516:       }
+ 15517: 
+ 15518:       s.aicmR8zV10d4SelectedReviewId = id;
+ 15519:       s.aicmR8zV10d2SelectedReviewId = id;
+ 15520:       s.aicmR8zV10dSelectedReviewId = id;
+ 15521: 
+ 15522:       var previewMode = "";
+ 15523:       if (mode === "approve") previewMode = "approve";
+ 15524:       if (mode === "return") previewMode = "return";
+ 15525: 
+ 15526:       var inserted = insertDetailAfterButton(actionEl, row, id, previewMode);
+ 15527:       setVisibleDebug("clicked / source=" + (source || "") + " / action=" + action + " / id=" + id + " / inserted=" + String(inserted));
+ 15528: 
+ 15529:       return true;
+ 15530:     }
+ 15531: 
+ 15532:     function bridge(event) {
+ 15533:       var actionEl = findActionElement(event && event.target);
+ 15534:       if (!actionEl) return;
+ 15535: 
+ 15536:       var action = actionEl.getAttribute("data-core-action") || "";
+ 15537:       if (action.indexOf("review-v10d") !== 0) return;
+ 15538: 
+ 15539:       handle(actionEl, event, event && event.type ? event.type : "event");
+ 15540:     }
+ 15541: 
+ 15542:     function installBridge() {
+ 15543:       if (typeof document === "undefined" || document.__aicmR8zV10d4CompatClickBridge) return;
+ 15544:       document.__aicmR8zV10d4CompatClickBridge = true;
+ 15545: 
+ 15546:       document.addEventListener("click", bridge, true);
+ 15547:       document.addEventListener("pointerup", bridge, true);
+ 15548:       document.addEventListener("touchend", bridge, true);
+ 15549:     }
+ 15550: 
+ 15551:     installBridge();
+ 15552: 
+
+============================================================
+FUNCTION=importTaskLedgerCsv; LINES=3777-3848; SCORE=31; REASONS=REVIEW,FETCH,POST,PAYLOAD
+============================================================
+  3777: async function importTaskLedgerCsv() {
+  3778:     var preview = [];
+  3779: 
+  3780:     try {
+  3781:       preview = buildTaskLedgerCsvPreview();
+  3782:     } catch (error) {
+  3783:       setMessage("error", error && error.message ? error.message : "CSV取り込みに失敗しました。");
+  3784:       render();
+  3785:       return;
+  3786:     }
+  3787: 
+  3788:     var invalidRows = preview.filter(function (row) { return !row.valid; });
+  3789:     if (invalidRows.length) {
+  3790:       var message = invalidRows.slice(0, 3).map(function (row) {
+  3791:         return "行" + row.row_number + ": " + row.errors.join(" / ");
+  3792:       }).join(" / ");
+  3793: 
+  3794:       setMessage("error", "CSV取り込み前チェックでエラーがあります。 " + message);
+  3795:       render();
+  3796:       return;
+  3797:     }
+  3798: 
+  3799:     var success = 0;
+  3800:     var failed = 0;
+  3801:     var messages = [];
+  3802: 
+  3803:     for (var i = 0; i < preview.length; i++) {
+  3804:       var row = preview[i];
+  3805: 
+  3806:       try {
+  3807:         var response = await fetch("/api/aicm/v2/task-ledger/create", {
+  3808:           method: "POST",
+  3809:           headers: { "content-type": "application/json" },
+  3810:           body: JSON.stringify(row.payload)
+  3811:         });
+  3812: 
+  3813:         var json = await response.json();
+  3814: 
+  3815:         if (!response.ok || !json || json.result !== "ok") {
+  3816:           throw new Error((json && json.error_message) || "取り込み失敗");
+  3817:         }
+  3818: 
+  3819:         success++;
+  3820:       } catch (error) {
+  3821:         failed++;
+  3822:         messages.push("行" + row.row_number + ": " + (error && error.message ? error.message : "取り込み失敗"));
+  3823:       }
+  3824:     }
+  3825: 
+  3826:     if (typeof loadContext === "function") {
+  3827:       await loadContext();
+  3828:     }
+  3829: 
+  3830:     if (failed > 0) {
+  3831:       state.csvImportLastResult = "CSV取り込み: 成功 " + success + "件 / 失敗 " + failed + "件";
+  3832:       setMessage("error", state.csvImportLastResult + "。 " + messages.slice(0, 3).join(" / "));
+  3833:     } else {
+  3834:       state.csvImportLastResult = "CSV取り込み完了: " + success + "件";
+  3835:       state.csvImportText = "";
+  3836:       state.csvImportFileName = "";
+  3837:       setMessage("ok", state.csvImportLastResult);
+  3838:     }
+  3839: 
+  3840:     state.csvImportPreview = [];
+  3841:     state.screen = "task-ledger";
+  3842:     render();
+  3843:   }
+  3844: 
+  3845: 
+  3846:   
+  3847: 
+  3848: function pmlwMajorRowsForCompany(companyId) {
+  3849:     // AICM_AXU_CSV_R7_PMLW_MAJOR_UI_FILTER_REPAIR_V1
+  3850:     var ctx = state && state.context ? state.context : {};
+  3851:     var targetCompanyId = String(companyId || "");
+  3852: 
+  3853:     function asArray(value) {
+  3854:       return Array.isArray(value) ? value : [];
+  3855:     }
+  3856: 
+  3857:     function rowCompanyId(row) {
+  3858:       return String(
+  3859:         row && (
+  3860:           row.aicm_user_company_id ||
+  3861:           row.company_id ||
+  3862:           row.user_company_id ||
+  3863:           row.companyId ||
+  3864:           ""
+  3865:         ) || ""
+  3866:       );
+  3867:     }
+  3868: 
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardOpenConfirm; LINES=6344-6398; SCORE=31; REASONS=APPROVE_HANDOFF,DELETE,CONFIRM,PAYLOAD
+============================================================
+  6344:   function aicmR8zMgrMajorCardOpenConfirm(kind) {
+  6345:     var bag = aicmR8zMgrMajorCardState();
+  6346:     var rows = aicmR8zMgrMajorCardSelectedRows();
+  6347: 
+  6348:     if (!rows.length) {
+  6349:       bag.confirm = null;
+  6350:       if (typeof setMessage === "function") {
+  6351:         setMessage("error", "対象の大項目を選択してください。");
+  6352:       }
+  6353:       aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_empty");
+  6354:       return;
+  6355:     }
+  6356: 
+  6357:     var validation = kind === "leader-handoff" && typeof aicmR8zC2bValidateLeaderHandoffRows === "function"
+  6358:       ? aicmR8zC2bValidateLeaderHandoffRows(rows)
+  6359:       : {
+  6360:           ok: true,
+  6361:           errors: [],
+  6362:           items: rows.map(function (row, index) {
+  6363:             return {
+  6364:               id: aicmR8zMgrMajorCardRowId(row, index),
+  6365:               title: aicmR8zMgrMajorCardTitle(row),
+  6366:               route: {},
+  6367:               payload: {}
+  6368:             };
+  6369:           }),
+  6370:           payloads: [],
+  6371:           route: {},
+  6372:           endpoint: ""
+  6373:         };
+  6374: 
+  6375:     bag.confirm = {
+  6376:       kind: kind,
+  6377:       title: kind === "delete" ? "削除確認" : "課長へ送る確認",
+  6378:       endpoint: validation.endpoint || "/api/aicm/v2/manager-major/update",
+  6379:       ok: validation.ok,
+  6380:       errors: validation.errors || [],
+  6381:       items: validation.items || [],
+  6382:       payloads: validation.payloads || [],
+  6383:       route: validation.route || {}
+  6384:     };
+  6385: 
+  6386:     if (typeof setMessage === "function") {
+  6387:       if (validation.ok) {
+  6388:         setMessage("ok", "確認画面を表示しました。");
+  6389:       } else {
+  6390:         setMessage("error", "引き渡し先の課/Leaderを選択してください。");
+  6391:       }
+  6392:     }
+  6393: 
+  6394:     aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_open_c2d2");
+  6395:   }
+  6396: 
+  6397: 
+  6398:   function aicmR8zMgrMajorCardHandleAction(ev, target, action) {
+  6399:       // AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY_START
+  6400:       // Route enrichment when section is applied.
+  6401:       // No DB write. No API POST. No fetch.
+  6402:       try {
+  6403:         var c2d11r1Action = "";
+  6404:         var c2d11r1Event = null;
+  6405:         var c2d11r1Target = null;
+  6406: 
+  6407:         for (var c2d11r1I = 0; c2d11r1I < arguments.length; c2d11r1I += 1) {
+  6408:           var c2d11r1Arg = arguments[c2d11r1I];
+  6409: 
+  6410:           if (!c2d11r1Event && c2d11r1Arg && c2d11r1Arg.preventDefault) c2d11r1Event = c2d11r1Arg;
+  6411:           if (!c2d11r1Action && typeof c2d11r1Arg === "string") c2d11r1Action = String(c2d11r1Arg || "").trim();
+  6412:           if (!c2d11r1Target && c2d11r1Arg && c2d11r1Arg.getAttribute) c2d11r1Target = c2d11r1Arg;
+  6413: 
+  6414:           if (!c2d11r1Target && c2d11r1Arg && c2d11r1Arg.target) {
+  6415:             if (c2d11r1Arg.target.closest) {
+  6416:               c2d11r1Target = c2d11r1Arg.target.closest("[data-core-action]");
+  6417:             } else if (c2d11r1Arg.target.getAttribute) {
+  6418:               c2d11r1Target = c2d11r1Arg.target;
+
+============================================================
+FUNCTION=aicmRunLeaderAutoDecompositionAfterHandoffR8ZB; LINES=7918-7994; SCORE=31; REASONS=APPROVE_HANDOFF,FETCH,POST,PAYLOAD
+============================================================
+  7918:   async function aicmRunLeaderAutoDecompositionAfterHandoffR8ZB(majorId) {
+  7919:     var safeMajorId = aicmR8ZBText(majorId);
+  7920: 
+  7921:     if (!safeMajorId && state && state.managerMajorLeaderHandoffConfirm) {
+  7922:       safeMajorId = aicmR8ZBText(
+  7923:         state.managerMajorLeaderHandoffConfirm.majorId ||
+  7924:         state.managerMajorLeaderHandoffConfirm.aicm_manager_major_work_item_id ||
+  7925:         state.managerMajorLeaderHandoffConfirm.manager_major_work_item_id
+  7926:       );
+  7927:     }
+  7928: 
+  7929:     var companyId = aicmR8ZBCompanyId();
+  7930:     var ownerId = aicmR8ZBOwnerId();
+  7931: 
+  7932:     if (!safeMajorId) {
+  7933:       return {
+  7934:         ok: false,
+  7935:         message: "Leader自動分解対象のManager大項目IDを特定できません。"
+  7936:       };
+  7937:     }
+  7938: 
+  7939:     if (!companyId) {
+  7940:       return {
+  7941:         ok: false,
+  7942:         message: "Leader自動分解対象のAI企業IDを特定できません。"
+  7943:       };
+  7944:     }
+  7945: 
+  7946:     try {
+  7947:       var response = await fetch("/api/aicm/v2/leader-auto-decomposition/run", {
+  7948:         method: "POST",
+  7949:         headers: {
+  7950:           "content-type": "application/json"
+  7951:         },
+  7952:         body: JSON.stringify({
+  7953:           owner_civilization_id: ownerId,
+  7954:           aicm_user_company_id: companyId,
+  7955:           aicm_manager_major_work_item_id: safeMajorId,
+  7956:           mode: "single",
+  7957:           source_app_ref: "AICompanyManager",
+  7958:           auto_decomposition_version: "r8z_v1"
+  7959:         })
+  7960:       });
+  7961: 
+  7962:       var json = null;
+  7963:       try {
+  7964:         json = await response.json();
+  7965:       } catch (_) {
+  7966:         json = null;
+  7967:       }
+  7968: 
+  7969:       if (!response.ok || !json || json.result !== "ok") {
+  7970:         return {
+  7971:           ok: false,
+  7972:           json: json,
+  7973:           message: json && (json.error_message || json.message || json.error)
+  7974:             ? String(json.error_message || json.message || json.error)
+  7975:             : "Leader自動分解APIに失敗しました。"
+  7976:         };
+  7977:       }
+  7978: 
+  7979:       return {
+  7980:         ok: true,
+  7981:         json: json,
+  7982:         message: aicmR8ZBAutoMessage({ json: json })
+  7983:       };
+  7984:     } catch (error) {
+  7985:       return {
+  7986:         ok: false,
+  7987:         message: error && error.message ? error.message : "Leader自動分解APIに失敗しました。"
+  7988:       };
+  7989:     }
+  7990:   }
+  7991: 
+  7992: 
+  7993: // AICM_R8Z_I_WORKER_AUTO_EXECUTION_CORE_START
+  7994:   async function aicmRunWorkerAutoExecutionAfterDecompositionR8ZI(majorId) {
+  7995:     var body = {
+  7996:       owner_civilization_id: state && state.ownerCivilizationId ? state.ownerCivilizationId : "00000000-0000-4000-8000-000000000001",
+  7997:       aicm_user_company_id: state && state.selectedCompanyId ? state.selectedCompanyId : "",
+  7998:       aicm_manager_major_work_item_id: majorId || "",
+  7999:       limit: 10
+  8000:     };
+  8001: 
+  8002:     var response = await fetch("/api/aicm/v2/worker-auto-execution/run", {
+  8003:       method: "POST",
+  8004:       headers: {
+  8005:         "content-type": "application/json"
+  8006:       },
+  8007:       body: JSON.stringify(body)
+  8008:     });
+  8009: 
+  8010:     var json = null;
+  8011:     try {
+  8012:       json = await response.json();
+  8013:     } catch (_) {
+  8014:       json = null;
+
+============================================================
+FUNCTION=aicmExecuteLeaderHandoffConfirmR8S; LINES=8821-8881; SCORE=31; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,PAYLOAD
+============================================================
+  8821: async function aicmExecuteLeaderHandoffConfirmR8S() {
+  8822:   var payload = state && state.managerMajorLeaderHandoffConfirm;
+  8823: 
+  8824:   try {
+  8825:     if (!payload || typeof payload !== "object") {
+  8826:       throw new Error("課長へ送る確認情報が見つかりません。もう一度「課長へ送る」を押してください。");
+  8827:     }
+  8828: 
+  8829:     var body = payload.body && typeof payload.body === "object" ? payload.body : {};
+  8830: 
+  8831:     var owner = String(
+  8832:       body.owner_civilization_id ||
+  8833:       (typeof aicmLeaderHandoffOwnerIdR8S === "function" ? aicmLeaderHandoffOwnerIdR8S(payload.row || payload) : "") ||
+  8834:       (state && state.ownerCivilizationId) ||
+  8835:       (state && state.owner_civilization_id) ||
+  8836:       (state && state.context && state.context.owner_civilization_id) ||
+  8837:       "00000000-0000-4000-8000-000000000001"
+  8838:     ).trim();
+  8839: 
+  8840:     var majorId = String(
+  8841:       body.aicm_manager_major_work_item_id ||
+  8842:       payload.majorId ||
+  8843:       payload.aicm_manager_major_work_item_id ||
+  8844:       ""
+  8845:     ).trim();
+  8846: 
+  8847:     if (!owner) throw new Error("owner_civilization_idを特定できません。");
+  8848:     if (!majorId) throw new Error("Manager大項目IDを特定できません。");
+  8849: 
+  8850:     var leader = String(
+  8851:       body.assigned_leader_label ||
+  8852:       payload.leaderLabel ||
+  8853:       payload.leaderRaw ||
+  8854:       (payload.row && (payload.row.assigned_leader_label || payload.row.leader_robot_label)) ||
+  8855:       "課長/Leader"
+  8856:     ).trim();
+  8857: 
+  8858:     var postBody = {
+  8859:       owner_civilization_id: owner,
+  8860:       aicm_manager_major_work_item_id: majorId,
+  8861:       assigned_leader_label: leader,
+  8862:       decomposition_status_code: "assigned_to_leader",
+  8863:       handoff_status_code: "handed_off",
+  8864:       note: String(body.note || (payload.row && payload.row.note) || "").trim()
+  8865:     };
+  8866: 
+  8867:     if (typeof setMessage === "function") {
+  8868:       setMessage("info", "課長へ送る処理を実行しています。");
+  8869:     }
+  8870: 
+  8871:     var result = null;
+  8872: 
+  8873:     if (typeof requestJson === "function") {
+  8874:       result = await requestJson("/api/aicm/v2/manager-major/update", postBody);
+  8875:     } else {
+  8876:     // AICM_R8Z_MGR_MAJOR_CARD_C2F_D2_EXECUTE_PAYLOAD_VALIDATION_GATE_START
+  8877:     // Execute-path payload validation gate.
+  8878:     // Validates the existing postBody variable immediately before the network request.
+  8879:     // This phase intentionally keeps API POST locked until explicit approval.
+  8880:     try {
+  8881:       function aicmC2fD2Text(value) {
+  8882:         if (value === null || typeof value === "undefined") return "";
+  8883:         return String(value).trim();
+  8884:       }
+  8885: 
+  8886:       function aicmC2fD2IsObject(value) {
+  8887:         return value !== null && typeof value === "object" && !Array.isArray(value);
+  8888:       }
+  8889: 
+  8890:       function aicmC2fD2FindFirst(obj, keys, depth) {
+  8891:         if (depth > 6 || obj === null || typeof obj === "undefined") return "";
+  8892:         if (Array.isArray(obj)) {
+  8893:           for (var aicmC2fD2AI = 0; aicmC2fD2AI < obj.length; aicmC2fD2AI += 1) {
+  8894:             var aicmC2fD2AValue = aicmC2fD2FindFirst(obj[aicmC2fD2AI], keys, depth + 1);
+  8895:             if (aicmC2fD2AValue) return aicmC2fD2AValue;
+  8896:           }
+  8897:           return "";
+  8898:         }
+  8899:         if (!aicmC2fD2IsObject(obj)) return "";
+  8900:         for (var aicmC2fD2KI = 0; aicmC2fD2KI < keys.length; aicmC2fD2KI += 1) {
+  8901:           var aicmC2fD2Key = keys[aicmC2fD2KI];
+
+============================================================
+FUNCTION=aicmHumanReviewPostJson; LINES=9587-9610; SCORE=31; REASONS=REVIEW,FETCH,POST,PAYLOAD
+============================================================
+  9587:   async function aicmHumanReviewPostJson(path, body) {
+  9588:     var response = await fetch(path, {
+  9589:       method: "POST",
+  9590:       headers: { "Content-Type": "application/json" },
+  9591:       body: JSON.stringify(body || {})
+  9592:     });
+  9593: 
+  9594:     var text = await response.text();
+  9595:     var json = {};
+  9596: 
+  9597:     try {
+  9598:       json = text ? JSON.parse(text) : {};
+  9599:     } catch (_) {
+  9600:       json = { result: "error", message: text || "Invalid server response" };
+  9601:     }
+  9602: 
+  9603:     if (!response.ok || (json.result && json.result !== "ok")) {
+  9604:       throw new Error(json.message || json.error || ("API failed: " + path));
+  9605:     }
+  9606: 
+  9607:     return json;
+  9608:   }
+  9609: 
+  9610:   async function aicmHumanReviewReload() {
+  9611:     if (typeof aicmPmlwReloadContext === "function") {
+  9612:       await aicmReloadTaskLedgerContext();
+  9613:       return;
+  9614:     }
+  9615: 
+  9616:     if (typeof loadContext === "function") {
+  9617:       await loadContext();
+  9618:       return;
+  9619:     }
+  9620: 
+  9621:     var owner = encodeURIComponent(aicmHumanReviewOwnerId());
+  9622:     var response = await fetch("/api/aicm/v2/context?owner_civilization_id=" + owner);
+  9623:     var json = await response.json();
+  9624: 
+  9625:     if (json && json.result === "ok") state.context = json;
+  9626:     // AICM_CONTEXT_HYDRATION_MANAGER_MAJOR_R8M_CALL
+  9627:     if (typeof aicmHydrateManagerMajorContextArraysR8M === "function") {
+  9628:       aicmHydrateManagerMajorContextArraysR8M(
+  9629:         typeof json !== "undefined" ? json :
+  9630:         (typeof data !== "undefined" ? data :
+
+============================================================
+FUNCTION=renderReviewList; LINES=14104-14149; SCORE=31; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,PAYLOAD
+============================================================
+ 14104:     function renderReviewList(appState) {
+ 14105:       appState = app(appState);
+ 14106: 
+ 14107:       if (!rows(appState).length) {
+ 14108:         syncFetch(appState);
+ 14109:       }
+ 14110: 
+ 14111:       var r = rows(appState);
+ 14112:       var currentId = selectedReviewId(appState);
+ 14113: 
+ 14114:       var debug = [
+ 14115:         "V10D",
+ 14116:         "selectedCompanyId=" + companyId(appState),
+ 14117:         "owner=" + ownerId(appState),
+ 14118:         "rows=" + String(r.length),
+ 14119:         "payloadRows=" + String(appState.aicmR8zV10dPayloadRows !== undefined ? appState.aicmR8zV10dPayloadRows : "na"),
+ 14120:         "http=" + String(appState.aicmR8zV10dHttpStatus !== undefined ? appState.aicmR8zV10dHttpStatus : "na"),
+ 14121:         "status=" + t(appState.aicmR8zV10dFetchStatus || "context"),
+ 14122:         currentId ? "selectedReviewId=" + currentId : "",
+ 14123:         appState.aicmR8zV10dError ? "error=" + t(appState.aicmR8zV10dError) : ""
+ 14124:       ].filter(Boolean).join(" / ");
+ 14125: 
+ 14126:       var body = [
+ 14127:         '<section class="aicm-core-card">',
+ 14128:         '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+ 14129:         '  <h2>レビュー・承認待ち: ' + esc(String(r.length)) + '件</h2>',
+ 14130:         '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
+ 14131:         '  <p class="aicm-selected-note">成果物を確認してから、次工程で承認/差し戻しを行います。</p>',
+ 14132:         '</section>',
+ 14133:         renderDetailCard(appState),
+ 14134:         renderPreviewDecisionCard(appState),
+ 14135:         r.length
+ 14136:           ? r.map(function(row, index) { return renderListRow(row, index, currentId); }).join("")
+ 14137:           : [
+ 14138:               '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
+ 14139:               '  <h3>レビュー・承認待ちはありません</h3>',
+ 14140:               '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
+ 14141:               '</section>'
+ 14142:             ].join("")
+ 14143:       ].join("");
+ 14144: 
+ 14145:       if (typeof renderShell === "function") return renderShell(body);
+ 14146:       return body;
+ 14147:     }
+ 14148: 
+ 14149:     function rerender() {
+ 14150:       try {
+ 14151:         if (typeof render === "function") {
+ 14152:           render();
+ 14153:           return;
+ 14154:         }
+ 14155:       } catch (_) {}
+ 14156: 
+ 14157:       try {
+ 14158:         if (typeof window !== "undefined" && typeof window.aicmRender === "function") {
+ 14159:           window.aicmRender();
+ 14160:         }
+ 14161:       } catch (_) {}
+ 14162:     }
+ 14163: 
+ 14164:     function setDetail(id) {
+ 14165:       var s = app();
+ 14166:       s.aicmR8zV10dSelectedReviewId = t(id);
+ 14167:       s.aicmR8zV10dDecisionPreviewMode = "";
+ 14168:       rerender();
+ 14169:     }
+
+============================================================
+FUNCTION=renderReviewList; LINES=14569-14610; SCORE=31; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,PAYLOAD
+============================================================
+ 14569:     function renderReviewList(appState) {
+ 14570:       appState = app(appState);
+ 14571: 
+ 14572:       if (!rows(appState).length) syncFetch(appState);
+ 14573: 
+ 14574:       var r = rows(appState);
+ 14575:       var currentId = selectedReviewId(appState);
+ 14576: 
+ 14577:       var debug = [
+ 14578:         "V10D2",
+ 14579:         "selectedCompanyId=" + companyId(appState),
+ 14580:         "owner=" + ownerId(appState),
+ 14581:         "rows=" + String(r.length),
+ 14582:         "payloadRows=" + String(appState.aicmR8zV10d2PayloadRows !== undefined ? appState.aicmR8zV10d2PayloadRows : "na"),
+ 14583:         "http=" + String(appState.aicmR8zV10d2HttpStatus !== undefined ? appState.aicmR8zV10d2HttpStatus : "na"),
+ 14584:         "status=" + t(appState.aicmR8zV10d2FetchStatus || "context"),
+ 14585:         currentId ? "selectedReviewId=" + currentId : "",
+ 14586:         appState.aicmR8zV10d2Error ? "error=" + t(appState.aicmR8zV10d2Error) : ""
+ 14587:       ].filter(Boolean).join(" / ");
+ 14588: 
+ 14589:       var body = [
+ 14590:         '<section class="aicm-core-card">',
+ 14591:         '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+ 14592:         '  <h2>レビュー・承認待ち: ' + esc(String(r.length)) + '件</h2>',
+ 14593:         '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
+ 14594:         '  <p class="aicm-selected-note">「成果物を確認」を押すと、その項目の直下に詳細カードを表示します。</p>',
+ 14595:         '</section>',
+ 14596:         r.length
+ 14597:           ? r.map(function(row, index) { return renderListRow(appState, row, index, currentId); }).join("")
+ 14598:           : [
+ 14599:               '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
+ 14600:               '  <h3>レビュー・承認待ちはありません</h3>',
+ 14601:               '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
+ 14602:               '</section>'
+ 14603:             ].join("")
+ 14604:       ].join("");
+ 14605: 
+ 14606:       if (typeof renderShell === "function") return renderShell(body);
+ 14607:       return body;
+ 14608:     }
+ 14609: 
+ 14610:     function rerenderAndScroll(id) {
+ 14611:       try {
+ 14612:         if (typeof render === "function") render();
+ 14613:         else if (typeof window !== "undefined" && typeof window.aicmRender === "function") window.aicmRender();
+ 14614:       } catch (_) {}
+ 14615: 
+ 14616:       if (!id || typeof document === "undefined") return;
+ 14617: 
+ 14618:       setTimeout(function() {
+ 14619:         try {
+ 14620:           var el = document.getElementById("aicm-v10d2-detail-" + id);
+ 14621:           if (el && typeof el.scrollIntoView === "function") {
+ 14622:             el.scrollIntoView({ behavior: "smooth", block: "start" });
+ 14623:           }
+ 14624:         } catch (_) {}
+ 14625:       }, 80);
+ 14626:     }
+ 14627: 
+ 14628:     function setDetail(id) {
+ 14629:       var s = app();
+ 14630:       s.aicmR8zV10d2SelectedReviewId = t(id);
+
+============================================================
+FUNCTION=aicmIsPendingManagerMajorRowR8V6; LINES=4422-4464; SCORE=30; REASONS=APPROVE_HANDOFF,DELETE,CONFIRM,ACTION_HANDLER
+============================================================
+  4422:   function aicmIsPendingManagerMajorRowR8V6(row) {
+  4423:     if (!row || typeof row !== "object") return false;
+  4424: 
+  4425:     var handoff = String(row.handoff_status_code || "").toLowerCase();
+  4426:     var decomposition = String(row.decomposition_status_code || "").toLowerCase();
+  4427:     var deleted = String(row.deleted_flag || row.is_deleted || "").toLowerCase();
+  4428:     var archived = String(row.archived_flag || row.is_archived || "").toLowerCase();
+  4429: 
+  4430:     if (deleted === "true" || deleted === "1") return false;
+  4431:     if (archived === "true" || archived === "1") return false;
+  4432: 
+  4433:     if (
+  4434:       handoff === "archived" ||
+  4435:       handoff === "deleted" ||
+  4436:       handoff === "cancelled" ||
+  4437:       handoff === "canceled" ||
+  4438:       handoff === "sent" ||
+  4439:       handoff === "handed_off" ||
+  4440:       handoff === "completed" ||
+  4441:       handoff === "done"
+  4442:     ) {
+  4443:       return false;
+  4444:     }
+  4445: 
+  4446:     if (
+  4447:       decomposition === "completed" ||
+  4448:       decomposition === "complete" ||
+  4449:       decomposition === "done"
+  4450:     ) {
+  4451:       return false;
+  4452:     }
+  4453: 
+  4454:     return true;
+  4455:   }
+  4456: // AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_END
+  4457: 
+  4458: 
+  4459:   
+  4460: 
+  4461:   // AICM_R8Z_V9F3_RESTORE_LEADER_HANDOFF_OPEN_CONFIRM_ONLY
+  4462:   // Restore only the missing open-confirm entrypoint for data-core-action="pmlw-major-leader-handoff".
+  4463:   // This function does not write DB and does not call any API.
+  4464:   function aicmOpenLeaderHandoffConfirmR8S(ev, btn) {
+  4465:     try {
+  4466:       btn = btn || (typeof aicmActionTargetSafe === "function" ? aicmActionTargetSafe(ev, null) : null);
+  4467:       if (!btn && ev && ev.target && typeof ev.target.closest === "function") {
+  4468:         btn = ev.target.closest("[data-core-action]");
+  4469:       }
+  4470: 
+  4471:       var majorId = "";
+  4472:       if (btn && btn.getAttribute) {
+  4473:         majorId = String(btn.getAttribute("data-major-id") || btn.getAttribute("data-manager-major-id") || "").trim();
+  4474:       }
+  4475: 
+  4476:       if (!majorId && btn && btn.dataset) {
+  4477:         majorId = String(btn.dataset.majorId || btn.dataset.managerMajorId || "").trim();
+  4478:       }
+  4479: 
+  4480:       if (!majorId) {
+  4481:         if (typeof setMessage === "function") setMessage("error", "課長へ送る対象のManager大項目IDを特定できません。");
+  4482:         if (typeof render === "function") render();
+  4483:         return;
+  4484:       }
+
+============================================================
+FUNCTION=aicmR8zMgrMajorCardRenderOperationPanel; LINES=6301-6328; SCORE=30; REASONS=APPROVE_HANDOFF,DELETE,CONFIRM,ACTION_HANDLER
+============================================================
+  6301:   function aicmR8zMgrMajorCardRenderOperationPanel(rows) {
+  6302:     rows = Array.isArray(rows) ? rows : [];
+  6303: 
+  6304:     var selectedCount = rows.filter(function (row, index) {
+  6305:       return aicmR8zMgrMajorCardIsSelected(aicmR8zMgrMajorCardRowId(row, index));
+  6306:     }).length;
+  6307: 
+  6308:     var eligibleCount = rows.filter(function (row) {
+  6309:       return aicmR8zMgrMajorCardIsSelectable(row);
+  6310:     }).length;
+  6311: 
+  6312:     return [
+  6313:       '<div class="aicm-core-card" data-r8z-mgr-major-operation-panel="1" style="margin:12px 0;">',
+  6314:       '  <p class="aicm-eyebrow">登録済み大項目 操作</p>',
+  6315:       '  <h3>選択操作</h3>',
+  6316:       '  <p class="aicm-selected-note">選択 ' + String(selectedCount) + ' / 未送信 ' + String(eligibleCount) + ' / 全件 ' + String(rows.length) + '</p>',
+  6317:       '  <div class="aicm-dashboard-action-row">',
+  6318:       '    <button type="button" data-core-action="r8z-mgr-major-card-open-handoff-confirm">課長へ送る</button>',
+  6319:       '    <button type="button" data-core-action="r8z-mgr-major-card-open-delete-confirm">削除</button>',
+  6320:       '    <button type="button" data-core-action="r8z-mgr-major-card-select-all">全件選択</button>',
+  6321:       '    <button type="button" data-core-action="r8z-mgr-major-card-clear">解除</button>',
+  6322:       '  </div>',
+  6323:       aicmR8zMgrMajorCardRenderConfirm(),
+  6324:       '</div>'
+  6325:     ].join("");
+  6326:   }
+  6327: 
+  6328:   function aicmR8zMgrMajorCardRerender(sourceLabel) {
+  6329:     if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  6330:       aicmRenderTaskLedgerSafeR8V4(sourceLabel || "r8z_mgr_major_card_selection_clean_v1");
+  6331:       return;
+  6332:     }
+  6333: 
+  6334:     if (typeof render === "function") {
+  6335:       render();
+  6336:     }
+  6337:   }
+  6338: 
+  6339:   
+  6340:   
+  6341:   
+  6342:   
+  6343:   
+  6344:   function aicmR8zMgrMajorCardOpenConfirm(kind) {
+  6345:     var bag = aicmR8zMgrMajorCardState();
+  6346:     var rows = aicmR8zMgrMajorCardSelectedRows();
+  6347: 
+  6348:     if (!rows.length) {
+
+============================================================
+FUNCTION=sameSection; LINES=6600-7034; SCORE=30; REASONS=APPROVE_HANDOFF,DELETE,CONFIRM,ACTION_HANDLER
+============================================================
+  6600:               var sameSection =
+  6601:                 (sectionId && psid === sectionId) ||
+  6602:                 (sectionLabel && pslabel === sectionLabel);
+  6603: 
+  6604:               var isLeader =
+  6605:                 role === "leader" ||
+  6606:                 role === "section_leader" ||
+  6607:                 role === "課長" ||
+  6608:                 roleLabel.indexOf("Leader") >= 0 ||
+  6609:                 roleLabel.indexOf("課長") >= 0;
+  6610: 
+  6611:               if (sameSection && isLeader) {
+  6612:                 leaderLabel = leaderLabel || c2d11r1Get(p, [
+  6613:                   "internal_nickname",
+  6614:                   "robot_internal_nickname",
+  6615:                   "placement_label",
+  6616:                   "robot_display_name",
+  6617:                   "robot_name",
+  6618:                   "display_name",
+  6619:                   "name"
+  6620:                 ]);
+  6621:                 leaderPlacementId = leaderPlacementId || c2d11r1Get(p, [
+  6622:                   "placement_id",
+  6623:                   "robot_placement_id",
+  6624:                   "aicm_robot_placement_id",
+  6625:                   "id"
+  6626:                 ]);
+  6627:                 break;
+  6628:               }
+  6629:             }
+  6630:           }
+  6631: 
+  6632:           var selectionState = null;
+  6633:           if (typeof aicmR8zMgrMajorCardSelectionState === "function") {
+  6634:             try {
+  6635:               selectionState = aicmR8zMgrMajorCardSelectionState();
+  6636:             } catch (_) {
+  6637:               selectionState = null;
+  6638:             }
+  6639:           }
+  6640: 
+  6641:           if (!selectionState) {
+  6642:             if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+  6643:               state.r8zMgrMajorCardSelection = {};
+  6644:             }
+  6645:             selectionState = state.r8zMgrMajorCardSelection;
+  6646:           }
+  6647: 
+  6648:           if (!selectionState.handoffBatchRoute || typeof selectionState.handoffBatchRoute !== "object") {
+  6649:             selectionState.handoffBatchRoute = {};
+  6650:           }
+  6651: 
+  6652:           var route = selectionState.handoffBatchRoute;
+  6653: 
+  6654:           route.applied = true;
+  6655:           route.applied_flag = true;
+  6656:           route.appliedLabel = "適用済み";
+  6657:           route.applied_label = "適用済み";
+  6658: 
+  6659:           route.sectionId = sectionId;
+  6660:           route.section_id = sectionId;
+  6661:           route.sectionLabel = sectionLabel;
+  6662:           route.section_label = sectionLabel;
+  6663:           route.sectionName = sectionLabel;
+  6664:           route.section_name = sectionLabel;
+  6665: 
+  6666:           route.departmentId = departmentId;
+  6667:           route.department_id = departmentId;
+  6668:           route.departmentLabel = departmentLabel;
+  6669:           route.department_label = departmentLabel;
+  6670:           route.departmentName = departmentLabel;
+  6671:           route.department_name = departmentLabel;
+  6672: 
+  6673:           // AICM_R8Z_MGR_MAJOR_CARD_C2F_D2B_R3_SECTION_APPLY_CLEAR_AUTO_LEADER_START
+  6674:           // Section apply must not auto-confirm Leader. Leader is confirmed only by the dedicated Leader apply action.
+  6675:           leaderPlacementId = "";
+  6676:           leaderLabel = "";
+  6677:           // AICM_R8Z_MGR_MAJOR_CARD_C2F_D2B_R3_SECTION_APPLY_CLEAR_AUTO_LEADER_END
+  6678:           route.leaderPlacementId = leaderPlacementId;
+  6679:           route.leader_placement_id = leaderPlacementId;
+  6680:           route.leaderLabel = leaderLabel;
+  6681:           route.leader_label = leaderLabel;
+  6682:           route.assigned_leader_label = leaderLabel;
+  6683: 
+  6684:           route.departmentMissing = !departmentLabel;
+  6685:           route.leaderMissing = !leaderLabel;
+  6686:           route.lastAppliedAt = (new Date()).toISOString();
+  6687: 
+  6688:           state.r8zMgrMajorCardRouteEnrichmentDebug = {
+  6689:             marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY",
+  6690:             at: route.lastAppliedAt,
+  6691:             action: c2d11r1Action,
+  6692:             sectionId: sectionId,
+  6693:             sectionLabel: sectionLabel,
+  6694:             departmentId: departmentId,
+  6695:             departmentLabel: departmentLabel,
+  6696:             leaderPlacementId: leaderPlacementId,
+  6697:             leaderLabel: leaderLabel,
+  6698:             matchedSection: !!matchedSection,
+  6699:             selectedRows: c2d11r1Rows.length
+  6700:           };
+  6701: 
+  6702:           if (typeof setMessage === "function") {
+  6703:             if (departmentLabel && leaderLabel) {
+  6704:               setMessage("ok", "課・部門・Leaderを一括引き渡し先へ適用しました。");
+  6705:             } else if (departmentLabel) {
+  6706:               setMessage("ok", "課と部門を一括引き渡し先へ適用しました。Leaderは未設定です。");
+  6707:             } else {
+  6708:               setMessage("error", "課は適用しましたが、部門情報を特定できません。課設定または台帳行を確認してください。");
+  6709:             }
+  6710:           }
+  6711: 
+  6712:           if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  6713:             aicmRenderTaskLedgerSafeR8V4("c2d11r1-route-enrichment");
+  6714:             return;
+  6715:           }
+  6716: 
+  6717:           if (typeof render === "function") {
+  6718:             render();
+  6719:             return;
+  6720:           }
+  6721: 
+  6722:           return;
+  6723:         }
+  6724:       } catch (c2d11r1Error) {
+  6725:         if (typeof console !== "undefined" && console.warn) {
+  6726:           console.warn("C2D11R1 route enrichment failed", c2d11r1Error);
+  6727:         }
+  6728:       }
+  6729:       // AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY_END
+  6730: 
+  6731: 
+  6732:       try {
+  6733:         var aicmR8zC2d7Args = [];
+  6734:         for (var aicmR8zC2d7I = 0; aicmR8zC2d7I < arguments.length; aicmR8zC2d7I += 1) {
+  6735:           var aicmR8zC2d7Arg = arguments[aicmR8zC2d7I];
+  6736:           var aicmR8zC2d7Item = {
+  6737:             index: aicmR8zC2d7I,
+  6738:             type: typeof aicmR8zC2d7Arg,
+  6739:             stringValue: typeof aicmR8zC2d7Arg === "string" ? String(aicmR8zC2d7Arg) : "",
+  6740:             hasTarget: !!(aicmR8zC2d7Arg && aicmR8zC2d7Arg.target),
+  6741:             tagName: aicmR8zC2d7Arg && aicmR8zC2d7Arg.tagName ? String(aicmR8zC2d7Arg.tagName) : "",
+  6742:             id: aicmR8zC2d7Arg && aicmR8zC2d7Arg.id ? String(aicmR8zC2d7Arg.id) : "",
+  6743:             className: aicmR8zC2d7Arg && aicmR8zC2d7Arg.className ? String(aicmR8zC2d7Arg.className) : "",
+  6744:             dataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.getAttribute ? String(aicmR8zC2d7Arg.getAttribute("data-core-action") || "") : "",
+  6745:             targetDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.getAttribute
+  6746:               ? String(aicmR8zC2d7Arg.target.getAttribute("data-core-action") || "")
+  6747:               : "",
+  6748:             closestDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.closest
+  6749:               ? String((aicmR8zC2d7Arg.target.closest("[data-core-action]") || {}).getAttribute ? aicmR8zC2d7Arg.target.closest("[data-core-action]").getAttribute("data-core-action") || "" : "")
+  6750:               : ""
+  6751:           };
+  6752:           aicmR8zC2d7Args.push(aicmR8zC2d7Item);
+  6753:         }
+  6754: 
+  6755:         if (state && typeof state === "object") {
+  6756:           state.r8zMgrMajorCardHandlerEntryDebug = {
+  6757:             at: (new Date()).toISOString(),
+  6758:             phase: "handler-entry",
+  6759:             args: aicmR8zC2d7Args,
+  6760:             actionVar: typeof action !== "undefined" ? String(action || "") : "__ACTION_VAR_UNDEFINED__",
+  6761:             targetVarTag: typeof target !== "undefined" && target && target.tagName ? String(target.tagName) : "",
+  6762:             targetVarAction: typeof target !== "undefined" && target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : ""
+  6763:           };
+  6764:         }
+  6765: 
+  6766:         if (typeof console !== "undefined" && console.info) {
+  6767:         }
+  6768:       } catch (aicmR8zC2d7Error) {
+  6769:         if (typeof console !== "undefined" && console.warn) {
+  6770:         }
+  6771:       }
+  6772: 
+  6773: 
+  6774:     try {
+  6775:       if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+  6776: 
+  6777:       target = target || null;
+  6778: 
+  6779:       if (!target && ev && ev.target && typeof ev.target.closest === "function") {
+  6780:         target = ev.target.closest("[data-core-action]");
+
+============================================================
+FUNCTION=aicmR8zV9g5DeleteConfirmClickBridge; LINES=8747-8821; SCORE=30; REASONS=APPROVE_HANDOFF,DELETE,CONFIRM,ACTION_HANDLER
+============================================================
+  8747:         document.addEventListener("click", function aicmR8zV9g5DeleteConfirmClickBridge(ev) {
+  8748:           try {
+  8749:             var target = ev && ev.target;
+  8750:             var btn = target && typeof target.closest === "function"
+  8751:               ? target.closest("[data-core-action], button")
+  8752:               : null;
+  8753: 
+  8754:             if (!btn || !btn.getAttribute) return;
+  8755: 
+  8756:             var action = aicmR8zV9g5Text(btn.getAttribute("data-core-action"));
+  8757:             var label = aicmR8zV9g5Text(btn.textContent || btn.innerText || "");
+  8758: 
+  8759:             var isDeleteExecuteAction =
+  8760:               action === "pmlw-major-delete-execute" ||
+  8761:               action === "manager-major-delete-execute" ||
+  8762:               action === "major-delete-execute" ||
+  8763:               action === "delete-major-confirm" ||
+  8764:               action === "r8z-v9g-delete-execute" ||
+  8765:               action === "r8z-v9g5-delete-execute";
+  8766: 
+  8767:             var isDeleteCancelAction =
+  8768:               action === "pmlw-major-delete-cancel" ||
+  8769:               action === "manager-major-delete-cancel" ||
+  8770:               action === "major-delete-cancel" ||
+  8771:               action === "delete-major-cancel" ||
+  8772:               action === "r8z-v9g-delete-cancel" ||
+  8773:               action === "r8z-v9g5-delete-cancel";
+  8774: 
+  8775:             var hasDeleteState = !!aicmR8zV9g5DeleteConfirmState();
+  8776: 
+  8777:             if (!isDeleteExecuteAction && hasDeleteState && /削除/.test(label) && /確定|実行|削除する|はい/.test(label)) {
+  8778:               isDeleteExecuteAction = true;
+  8779:             }
+  8780: 
+  8781:             if (!isDeleteCancelAction && hasDeleteState && /キャンセル|戻る|いいえ/.test(label)) {
+  8782:               isDeleteCancelAction = true;
+  8783:             }
+  8784: 
+  8785:             if (isDeleteExecuteAction) {
+  8786:               ev.preventDefault();
+  8787:               ev.stopPropagation();
+  8788:               aicmR8zV9g5ExecuteDeleteConfirm(btn);
+  8789:               return;
+  8790:             }
+  8791: 
+  8792:             if (isDeleteCancelAction) {
+  8793:               ev.preventDefault();
+  8794:               ev.stopPropagation();
+  8795:               aicmR8zV9g5CancelDeleteConfirm();
+  8796:             }
+  8797:           } catch (error) {
+  8798:             try {
+  8799:               if (typeof setMessage === "function") setMessage("error", error && error.message ? error.message : "削除操作でエラーが発生しました。");
+  8800:               if (typeof render === "function") render();
+  8801:             } catch (_) {}
+  8802:           }
+  8803:         }, true);
+  8804:       }
+  8805:     }
+  8806:   } catch (error) {
+  8807:     try {
+  8808:       if (typeof console !== "undefined" && console.warn) {
+  8809:         console.warn("AICM R8Z-V9G5 delete confirm execute bridge install skipped", error);
+  8810:       }
+  8811:     } catch (_) {}
+  8812:   }
+  8813: })();
+  8814: 
+  8815: /* AICM_R8Z_V9F6_RESTORE_LEADER_HANDOFF_EXECUTE_ONLY
+  8816:  * Restore only the missing execute entrypoint for the already-visible
+  8817:  * Manager大項目 -> 課長へ送る confirmation card.
+  8818:  * Patch execution itself does not write DB or call API.
+  8819:  * User click on the confirm button will POST to /api/aicm/v2/manager-major/update.
+  8820:  */
+  8821: async function aicmExecuteLeaderHandoffConfirmR8S() {
+  8822:   var payload = state && state.managerMajorLeaderHandoffConfirm;
+  8823: 
+  8824:   try {
+  8825:     if (!payload || typeof payload !== "object") {
+  8826:       throw new Error("課長へ送る確認情報が見つかりません。もう一度「課長へ送る」を押してください。");
+  8827:     }
+  8828: 
+  8829:     var body = payload.body && typeof payload.body === "object" ? payload.body : {};
+  8830: 
+  8831:     var owner = String(
+  8832:       body.owner_civilization_id ||
+  8833:       (typeof aicmLeaderHandoffOwnerIdR8S === "function" ? aicmLeaderHandoffOwnerIdR8S(payload.row || payload) : "") ||
+  8834:       (state && state.ownerCivilizationId) ||
+  8835:       (state && state.owner_civilization_id) ||
+  8836:       (state && state.context && state.context.owner_civilization_id) ||
+  8837:       "00000000-0000-4000-8000-000000000001"
+  8838:     ).trim();
+  8839: 
+  8840:     var majorId = String(
+  8841:       body.aicm_manager_major_work_item_id ||
+
+============================================================
+FUNCTION=r8zV4bSummary; LINES=9798-9884; SCORE=30; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,ACTION_HANDLER
+============================================================
+  9798:   function r8zV4bSummary(row) {
+  9799:     return r8zV4bText(
+  9800:       row.delivery_summary_text ||
+  9801:       row.delivery_summary_preview ||
+  9802:       row.result_summary_text ||
+  9803:       row.summary_text ||
+  9804:       row.note,
+  9805:       "要約未設定"
+  9806:     );
+  9807:   }
+  9808: 
+  9809:   var html = [
+  9810:     '<section class="aicm-core-card aicm-review-list-card">',
+  9811:     '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+  9812:     '  <h2>納品サマリー確認</h2>',
+  9813:     '  <div class="aicm-info-box">対象会社: <strong>' + r8zV4bEsc(r8zV4bCompanyName()) + '</strong></div>',
+  9814:     '  <p class="aicm-selected-note">人間レビューは、設計書・実装・例外対応の納品時サマリーだけを確認します。AIレビューは内部工程で通常通り実施されます。</p>',
+  9815:     '  <p class="aicm-selected-note">レビュー・承認待ち: <strong>' + r8zV4bEsc(String(rows.length)) + '件</strong></p>',
+  9816:     '</section>'
+  9817:   ];
+  9818: 
+  9819:   if (!rows.length) {
+  9820:     html.push(
+  9821:       '<section class="aicm-core-card aicm-empty-card">',
+  9822:       '  <strong>レビュー・承認待ちはありません</strong>',
+  9823:       '  <p>設計書と実装は、納品時にAIがまとめた要約だけがここに表示されます。</p>',
+  9824:       '  <p>AIレビューは内部工程で通常通り実施され、ここにはAIレビュー結果の要約だけが出ます。</p>',
+  9825:       '</section>'
+  9826:     );
+  9827:     return html.join("");
+  9828:   }
+  9829: 
+  9830:   html.push('<section class="aicm-core-card aicm-review-list-items">');
+  9831:   html.push('  <h3>承認待ちサマリー</h3>');
+  9832: 
+  9833:   rows.forEach(function(row, index) {
+  9834:     row = row || {};
+  9835:     var id = r8zV4bText(row.aicm_human_review_item_id || row.review_id || row.id);
+  9836:     var title = r8zV4bText(row.review_title || row.title, "レビュー項目");
+  9837:     var kind = r8zV4bText(row.review_kind_label || row.review_kind_code, "納品サマリー");
+  9838:     var artifact = r8zV4bText(row.artifact_kind_label || row.artifact_kind_code, "delivery_package");
+  9839:     var status = r8zV4bText(row.human_review_status_label || row.human_review_status_code, "pending");
+  9840:     var priority = r8zV4bText(row.priority_label || row.priority_code, "-");
+  9841:     var summary = r8zV4bSummary(row);
+  9842:     var aiReview = r8zV4bText(row.ai_review_result_text || row.ai_review_summary_text || "");
+  9843: 
+  9844:     html.push(
+  9845:       '<article class="aicm-core-card aicm-review-card">',
+  9846:       '  <div class="aicm-review-head">',
+  9847:       '    <div>',
+  9848:       '      <p class="aicm-eyebrow">承認待ち #' + r8zV4bEsc(String(index + 1)) + '</p>',
+  9849:       '      <h3>' + r8zV4bEsc(title) + '</h3>',
+  9850:       '    </div>',
+  9851:       '    <strong>' + r8zV4bEsc(status) + '</strong>',
+  9852:       '  </div>',
+  9853:       '  <div class="aicm-review-meta">',
+  9854:       '    <span>' + r8zV4bEsc(kind) + '</span>',
+  9855:       '    <span>' + r8zV4bEsc(artifact) + '</span>',
+  9856:       '    <span>優先度: ' + r8zV4bEsc(priority) + '</span>',
+  9857:       '  </div>',
+  9858:       '  <section class="aicm-review-summary">',
+  9859:       '    <h3>納品サマリー</h3>',
+  9860:       '    <p>' + r8zV4bEsc(summary) + '</p>',
+  9861:       aiReview ? '    <h3>AIレビュー要約</h3><p>' + r8zV4bEsc(aiReview) + '</p>' : '',
+  9862:       '  </section>',
+  9863:       '  <div class="aicm-dashboard-action-row">',
+  9864:       '    <button type="button" data-core-action="human-review-approve" data-review-id="' + r8zV4bEsc(id) + '">承認</button>',
+  9865:       '    <button type="button" data-core-action="human-review-return" data-review-id="' + r8zV4bEsc(id) + '">差し戻し</button>',
+  9866:       '  </div>',
+  9867:       '</article>'
+  9868:     );
+  9869:   });
+  9870: 
+  9871:   html.push('</section>');
+  9872:   return html.join("");
+  9873:   // AICM_R8Z_V4B_REVIEW_LIST_STABLE_RENDERER_END
+  9874: 
+  9875: }
+  9876: 
+  9877: 
+  9878:   
+  9879: 
+  9880: 
+  9881: // AICM_DEPT_SECTION_EDIT_FORM_WORKER_ROUTE_ASW_ASZ_V1
+  9882: 
+  9883: 
+  9884: function renderDepartmentEditPlaceholder() {
+  9885:     var company = aicmAvdCurrentCompany();
+  9886:     var department = aicmAvdCurrentDepartment(company && company.aicm_user_company_id);
+  9887: 
+  9888:     if (!company) {
+  9889:       return renderShell([
+  9890:         '<section class="aicm-core-card">',
+  9891:         '  <p class="aicm-eyebrow">部門変更</p>',
+  9892:         '  <h2>AI企業を選択してください</h2>',
+  9893:         '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="go" data-screen="dashboard">戻る</button></div>',
+  9894:         '</section>'
+  9895:       ].join(""));
+  9896:     }
+  9897: 
+  9898:     if (!department) {
+  9899:       return renderShell([
+  9900:         '<section class="aicm-core-card">',
+  9901:         '  <p class="aicm-eyebrow">部門変更</p>',
+  9902:         '  <h2>部門がありません</h2>',
+  9903:         '  <p class="aicm-core-empty">先に部門を追加してください。</p>',
+  9904:         '  <div class="aicm-dashboard-action-row"><button type="button" data-core-action="go" data-screen="dashboard">戻る</button></div>',
+
+============================================================
+FUNCTION=aicmR8ZOStatusText; LINES=11964-11985; SCORE=30; REASONS=REVIEW,APPROVE_HANDOFF,DELETE
+============================================================
+ 11964:   function aicmR8ZOStatusText(row) {
+ 11965:     var work = aicmR8ZOText(row && row.work_status_code);
+ 11966:     var review = aicmR8ZOText(row && row.review_status_code);
+ 11967:     var handoff = aicmR8ZOText(row && row.handoff_status_code);
+ 11968:     var decomposition = aicmR8ZOText(row && row.decomposition_status_code);
+ 11969: 
+ 11970:     if (work || review) {
+ 11971:       if (work === "in_progress") return "実行依頼済み / 進行中";
+ 11972:       if (work === "todo") return "実行待ち";
+ 11973:       if (work === "review_waiting") return "レビュー待ち";
+ 11974:       if (work === "done") return "完了";
+ 11975:       return [work, review].filter(Boolean).join(" / ") || "-";
+ 11976:     }
+ 11977: 
+ 11978:     if (decomposition === "decomposed" || handoff === "completed") return "分解済み";
+ 11979:     if (decomposition === "assigned_to_leader" || handoff === "handed_off") return "自動処理待ち";
+ 11980:     if (decomposition === "not_started" || handoff === "draft") return "未引き継ぎ";
+ 11981:     if (decomposition === "archived" || handoff === "archived") return "削除済み";
+ 11982:     return [decomposition, handoff].filter(Boolean).join(" / ") || "-";
+ 11983:   }
+ 11984: 
+ 11985:   function aicmR8ZODetailRows(filter) {
+ 11986:     if (filter === "worker_running") return aicmR8ZOWorkerRowsBy("worker_running");
+ 11987:     if (filter === "review_waiting") return aicmR8ZOWorkerRowsBy("review_waiting");
+ 11988:     if (filter === "worker_completed") return aicmR8ZOWorkerRowsBy("worker_completed");
+ 11989:     if (filter === "worker_needs_check") return aicmR8ZOWorkerRowsBy("worker_needs_check");
+ 11990:     return aicmR8ZOMajorRowsBy(filter);
+ 11991:   }
+ 11992: 
+ 11993:   function aicmR8ZOFilterLabel(filter) {
+ 11994:     var labels = {
+ 11995:       unhandoff: "未引き継ぎ",
+ 11996:       auto_waiting: "自動処理待ち",
+ 11997:       auto_processing: "自動処理中",
+ 11998:       manager_completed: "分解済み",
+ 11999:       worker_running: "Worker実行中",
+ 12000:       review_waiting: "レビュー待ち",
+ 12001:       worker_completed: "Worker完了",
+ 12002:       needs_check: "要確認",
+ 12003:       worker_needs_check: "Worker要確認",
+ 12004:       archived: "削除済み"
+ 12005:     };
+
+============================================================
+FUNCTION=renderReviewListPlaceholderR8zV5d; LINES=12507-12595; SCORE=30; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,ACTION_HANDLER
+============================================================
+ 12507:   window.renderReviewListPlaceholder = function renderReviewListPlaceholderR8zV5d() {
+ 12508:     var rows = r8zV5dReviewRows();
+ 12509: 
+ 12510:     if (!rows.length) {
+ 12511:       r8zV5dHydrateIfNeeded();
+ 12512:     }
+ 12513: 
+ 12514:     var html = [
+ 12515:       '<section class="aicm-core-card aicm-review-list-stable-r8z-v5d">',
+ 12516:       '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+ 12517:       '  <h2>納品サマリー確認</h2>',
+ 12518:       '  <p class="aicm-selected-note">対象会社: <strong>' + r8zV5dEscape(r8zV5dCompanyName()) + '</strong></p>',
+ 12519:       '  <p class="aicm-selected-note">人間レビューは、設計書・実装・例外対応の納品時サマリーだけを確認します。AIレビューは内部工程で通常通り実施されます。</p>',
+ 12520:       '  <p class="aicm-selected-note">レビュー・承認待ち: <strong>' + r8zV5dEscape(String(rows.length)) + '件</strong></p>'
+ 12521:     ];
+ 12522: 
+ 12523:     if (!rows.length) {
+ 12524:       var state = r8zV5dState();
+ 12525:       var err = r8zV5dText(state.aicmR8zV5dHydrationError);
+ 12526:       html.push(
+ 12527:         '  <article class="aicm-core-card">',
+ 12528:         '    <strong>レビュー・承認待ちはありません</strong>',
+ 12529:         '    <p>context反映待ちです。数秒後に再描画されます。</p>',
+ 12530:         err ? '    <p>context error: ' + r8zV5dEscape(err) + '</p>' : '',
+ 12531:         '  </article>',
+ 12532:         '</section>'
+ 12533:       );
+ 12534:       return html.join("");
+ 12535:     }
+ 12536: 
+ 12537:     rows.forEach(function (row, index) {
+ 12538:       var id = r8zV5dFirst(row, ["aicm_human_review_item_id", "review_id", "id"], "");
+ 12539:       var title = r8zV5dFirst(row, ["review_title", "title"], "レビュー項目");
+ 12540:       var kind = r8zV5dFirst(row, ["review_kind_label", "review_kind_code"], "納品サマリー");
+ 12541:       var artifact = r8zV5dFirst(row, ["artifact_kind_label", "artifact_kind_code"], "delivery_package");
+ 12542:       var priority = r8zV5dFirst(row, ["priority_label", "priority_code"], "-");
+ 12543:       var summary = r8zV5dFirst(row, [
+ 12544:         "delivery_summary_text",
+ 12545:         "delivery_summary_preview",
+ 12546:         "result_summary_text",
+ 12547:         "ai_review_result_text",
+ 12548:         "review_summary_text",
+ 12549:         "summary"
+ 12550:       ], "要約未設定");
+ 12551:       var requestId = r8zV5dFirst(row, ["source_request_id", "request_id"], "");
+ 12552:       var workerUnitId = r8zV5dFirst(row, ["related_worker_work_unit_id"], "");
+ 12553: 
+ 12554:       html.push(
+ 12555:         '  <article class="aicm-core-card aicm-review-card">',
+ 12556:         '    <div class="aicm-review-head">',
+ 12557:         '      <div>',
+ 12558:         '        <p class="aicm-eyebrow">レビュー #' + r8zV5dEscape(String(index + 1)) + '</p>',
+ 12559:         '        <h3>' + r8zV5dEscape(title) + '</h3>',
+ 12560:         '      </div>',
+ 12561:         '      <strong>' + r8zV5dEscape(r8zV5dStatusLabel(row)) + '</strong>',
+ 12562:         '    </div>',
+ 12563:         '    <div class="aicm-review-meta">',
+ 12564:         '      <span>種別: ' + r8zV5dEscape(kind) + '</span>',
+ 12565:         '      <span>成果物: ' + r8zV5dEscape(artifact) + '</span>',
+ 12566:         '      <span>優先度: ' + r8zV5dEscape(priority) + '</span>',
+ 12567:         requestId ? '      <span>request_id: ' + r8zV5dEscape(requestId) + '</span>' : '',
+ 12568:         workerUnitId ? '      <span>worker_unit: ' + r8zV5dEscape(workerUnitId) + '</span>' : '',
+ 12569:         '    </div>',
+ 12570:         '    <section class="aicm-review-summary">',
+ 12571:         '      <h3>納品サマリー</h3>',
+ 12572:         '      <p>' + r8zV5dEscape(summary) + '</p>',
+ 12573:         '    </section>',
+ 12574:         '    <div class="aicm-dashboard-action-row">',
+ 12575:         '      <button type="button" data-core-action="human-review-approve" data-review-id="' + r8zV5dEscape(id) + '">承認</button>',
+ 12576:         '      <button type="button" data-core-action="human-review-return" data-review-id="' + r8zV5dEscape(id) + '">差し戻し</button>',
+ 12577:         '    </div>',
+ 12578:         '  </article>'
+ 12579:       );
+ 12580:     });
+ 12581: 
+ 12582:     html.push('</section>');
+ 12583:     return html.join("");
+ 12584:   };
+ 12585: 
+ 12586:   window.aicmR8zV5dReviewRows = r8zV5dReviewRows;
+ 12587:   window.aicmR8zV5dHydrateReviewContext = r8zV5dHydrateIfNeeded;
+ 12588: })();
+ 12589: // AICM_R8Z_V5D_REVIEW_LIST_APPEND_OVERRIDE_END
+ 12590: 
+ 12591: // AICM_R8Z_V7_REVIEW_LIST_ROUTE_BRIDGE_START
+ 12592: (function () {
+ 12593:   "use strict";
+ 12594: 
+ 12595:   function t(value) {
+ 12596:     if (value === null || typeof value === "undefined") return "";
+ 12597:     return String(value).trim();
+ 12598:   }
+ 12599: 
+ 12600:   function esc(value) {
+ 12601:     var s = t(value);
+ 12602:     if (typeof escapeHtml === "function") return escapeHtml(s);
+ 12603:     return s
+ 12604:       .replace(/&/g, "&amp;")
+ 12605:       .replace(/</g, "&lt;")
+ 12606:       .replace(/>/g, "&gt;")
+ 12607:       .replace(/"/g, "&quot;")
+ 12608:       .replace(/'/g, "&#39;");
+ 12609:   }
+ 12610: 
+ 12611:   function first(row, keys, fallback) {
+ 12612:     row = row || {};
+ 12613:     for (var i = 0; i < keys.length; i += 1) {
+ 12614:       var key = keys[i];
+ 12615:       if (Object.prototype.hasOwnProperty.call(row, key)) {
+
+============================================================
+FUNCTION=v10cRenderRow; LINES=13644-13687; SCORE=30; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,ACTION_HANDLER
+============================================================
+ 13644:     function v10cRenderRow(row, index) {
+ 13645:       var reviewId = v10cReviewId(row);
+ 13646:       var title = v10cText(row.review_title || row.title || row.delivery_title || "レビュー項目");
+ 13647:       var summary = v10cText(row.delivery_summary_text || row.summary || row.description || "");
+ 13648:       var aiReview = v10cText(row.ai_review_result_text || "");
+ 13649:       var kind = v10cText(row.review_kind_label || row.review_kind_code || "");
+ 13650:       var artifact = v10cText(row.artifact_kind_label || row.artifact_kind_code || "");
+ 13651:       var priority = v10cText(row.priority_code || "");
+ 13652:       var requested = v10cText(row.requested_at || row.created_at || "");
+ 13653:       var responsible = v10cText(row.responsible_ai_label || row.requested_by_ai_label || "");
+ 13654: 
+ 13655:       var buttons = reviewId
+ 13656:         ? [
+ 13657:             '<div class="aicm-dashboard-action-row">',
+ 13658:             '  <button type="button" data-core-action="human-review-approve" data-review-id="' + v10cEsc(reviewId) + '" data-human-review-id="' + v10cEsc(reviewId) + '">承認</button>',
+ 13659:             '  <button type="button" data-core-action="human-review-return" data-review-id="' + v10cEsc(reviewId) + '" data-human-review-id="' + v10cEsc(reviewId) + '">差し戻し</button>',
+ 13660:             '</div>'
+ 13661:           ].join("")
+ 13662:         : [
+ 13663:             '<p class="aicm-core-message aicm-core-message-error">',
+ 13664:             'レビューIDがcontextに含まれていないため、承認/差し戻しは次工程でID露出を確認します。',
+ 13665:             '</p>'
+ 13666:           ].join("");
+ 13667: 
+ 13668:       return [
+ 13669:         '<article class="aicm-core-card" style="border:1px solid #dbeafe;">',
+ 13670:         '  <p class="aicm-eyebrow">レビュー待ち #' + v10cEsc(String(index + 1)) + '</p>',
+ 13671:         '  <h3>' + v10cEsc(title) + '</h3>',
+ 13672:         summary ? '  <p class="aicm-selected-note">' + v10cEsc(summary) + '</p>' : '',
+ 13673:         aiReview ? '  <p class="aicm-selected-note"><strong>AIレビュー:</strong> ' + v10cEsc(aiReview) + '</p>' : '',
+ 13674:         '  <dl class="aicm-core-detail-list">',
+ 13675:         '    <dt>種別</dt><dd>' + v10cEsc(kind || "-") + '</dd>',
+ 13676:         '    <dt>成果物</dt><dd>' + v10cEsc(artifact || "-") + '</dd>',
+ 13677:         '    <dt>優先度</dt><dd>' + v10cEsc(priority || "-") + '</dd>',
+ 13678:         '    <dt>依頼日時</dt><dd>' + v10cEsc(requested || "-") + '</dd>',
+ 13679:         '    <dt>担当AI</dt><dd>' + v10cEsc(responsible || "-") + '</dd>',
+ 13680:         '    <dt>review_id</dt><dd>' + v10cEsc(reviewId || "-") + '</dd>',
+ 13681:         '  </dl>',
+ 13682:         buttons,
+ 13683:         '</article>'
+ 13684:       ].join("");
+ 13685:     }
+ 13686: 
+ 13687:     function v10cRenderReviewList(appState) {
+ 13688:       appState = v10cState(appState);
+ 13689: 
+ 13690:       var beforeRows = v10cRows(appState);
+ 13691:       if (!beforeRows.length) {
+ 13692:         v10cSyncFetch(appState);
+ 13693:       }
+ 13694: 
+ 13695:       var rows = v10cRows(appState);
+ 13696:       var debug = [
+ 13697:         "V10C",
+ 13698:         "selectedCompanyId=" + v10cCompanyId(appState),
+ 13699:         "owner=" + v10cOwnerId(appState),
+ 13700:         "rows=" + String(rows.length),
+ 13701:         "payloadRows=" + String(appState.aicmR8zV10cPayloadRows !== undefined ? appState.aicmR8zV10cPayloadRows : "na"),
+ 13702:         "http=" + String(appState.aicmR8zV10cHttpStatus !== undefined ? appState.aicmR8zV10cHttpStatus : "na"),
+ 13703:         "status=" + v10cText(appState.aicmR8zV10cFetchStatus || "none"),
+ 13704:         appState.aicmR8zV10cError ? "error=" + v10cText(appState.aicmR8zV10cError) : ""
+ 13705:       ].filter(Boolean).join(" / ");
+ 13706: 
+ 13707:       var body = rows.length
+
+============================================================
+FUNCTION=renderDetailCard; LINES=14001-14050; SCORE=30; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,ACTION_HANDLER
+============================================================
+ 14001:     function renderDetailCard(appState) {
+ 14002:       appState = app(appState);
+ 14003:       var row = findSelectedRow(appState);
+ 14004:       if (!row) return "";
+ 14005: 
+ 14006:       var id = reviewId(row);
+ 14007:       var m = meta(row);
+ 14008:       var title = t(row.review_title || row.title || "レビュー項目");
+ 14009: 
+ 14010:       return [
+ 14011:         '<section class="aicm-core-card" style="border:2px solid #f59e0b;">',
+ 14012:         '  <p class="aicm-eyebrow">成果物確認</p>',
+ 14013:         '  <h2>' + esc(title) + '</h2>',
+ 14014:         '  <p class="aicm-selected-note">承認/差し戻しの前に、成果物内容を確認してください。ここではDB更新しません。</p>',
+ 14015:         '  <dl class="aicm-core-detail-list">',
+ 14016:         renderField("review_id", id),
+ 14017:         renderField("レビュー種別", row.review_kind_label || row.review_kind_code),
+ 14018:         renderField("成果物種別", row.artifact_kind_label || row.artifact_kind_code),
+ 14019:         renderField("優先度", row.priority_code),
+ 14020:         renderField("依頼日時", row.requested_at || row.created_at),
+ 14021:         renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+ 14022:         renderField("会社", row.company_name),
+ 14023:         renderField("部門", row.department_name),
+ 14024:         renderField("課", row.section_name),
+ 14025:         '  </dl>',
+ 14026:         renderArtifactLink(row),
+ 14027:         '</section>',
+ 14028:         renderTextSection("納品サマリー", row.delivery_summary_text),
+ 14029:         renderTextSection("主な変更点", row.main_changes_text),
+ 14030:         renderTextSection("AIレビュー結果", row.ai_review_result_text),
+ 14031:         renderTextSection("未解決事項", row.unresolved_issues_text),
+ 14032:         nestedOutputs(row),
+ 14033:         '<section class="aicm-core-card" style="background:#fff7ed;border:1px solid #fdba74;">',
+ 14034:         '  <p class="aicm-eyebrow">次工程</p>',
+ 14035:         '  <h3>承認/差し戻しへ進む前の確認</h3>',
+ 14036:         '  <p class="aicm-selected-note">V10DではまだDB更新しません。次のV10Eでrollback smokeを行います。</p>',
+ 14037:         '  <div class="aicm-dashboard-action-row">',
+ 14038:         '    <button type="button" data-core-action="review-v10d-preview-approve" data-review-id="' + esc(id) + '">承認確認へ進む</button>',
+ 14039:         '    <button type="button" data-core-action="review-v10d-preview-return" data-review-id="' + esc(id) + '">差し戻し確認へ進む</button>',
+ 14040:         '    <button type="button" data-core-action="review-v10d-close-detail">一覧へ戻る</button>',
+ 14041:         '  </div>',
+ 14042:         '</section>',
+ 14043:         '<section class="aicm-core-card" style="background:#f8fafc;">',
+ 14044:         '  <p class="aicm-eyebrow">metadata_jsonb</p>',
+ 14045:         '  <pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + esc(jsonPreview(m, 3200)) + '</pre>',
+ 14046:         '</section>'
+ 14047:       ].join("");
+ 14048:     }
+ 14049: 
+ 14050:     function renderPreviewDecisionCard(appState) {
+ 14051:       appState = app(appState);
+ 14052:       var mode = t(appState.aicmR8zV10dDecisionPreviewMode || "");
+ 14053:       var row = findSelectedRow(appState);
+ 14054: 
+ 14055:       if (!mode || !row) return "";
+ 14056: 
+ 14057:       var title = mode === "approve" ? "承認確認プレビュー" : "差し戻し確認プレビュー";
+ 14058:       var note = mode === "approve"
+ 14059:         ? "次工程V10Eでrollback smoke後に承認DB更新を確認します。"
+ 14060:         : "次工程V10Eでrollback smoke後に差し戻しDB更新を確認します。";
+ 14061: 
+ 14062:       return [
+ 14063:         '<section class="aicm-core-card" style="border:2px solid #38bdf8;">',
+ 14064:         '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+ 14065:         '  <h2>' + esc(row.review_title || "レビュー項目") + '</h2>',
+ 14066:         '  <p class="aicm-selected-note">' + esc(note) + '</p>',
+ 14067:         '  <dl class="aicm-core-detail-list">',
+ 14068:         renderField("review_id", reviewId(row)),
+ 14069:         renderField("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+ 14070:         renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+
+============================================================
+FUNCTION=renderPreviewDecisionCard; LINES=14050-14079; SCORE=30; REASONS=REVIEW,APPROVE_HANDOFF,CONFIRM,ACTION_HANDLER
+============================================================
+ 14050:     function renderPreviewDecisionCard(appState) {
+ 14051:       appState = app(appState);
+ 14052:       var mode = t(appState.aicmR8zV10dDecisionPreviewMode || "");
+ 14053:       var row = findSelectedRow(appState);
+ 14054: 
+ 14055:       if (!mode || !row) return "";
+ 14056: 
+ 14057:       var title = mode === "approve" ? "承認確認プレビュー" : "差し戻し確認プレビュー";
+ 14058:       var note = mode === "approve"
+ 14059:         ? "次工程V10Eでrollback smoke後に承認DB更新を確認します。"
+ 14060:         : "次工程V10Eでrollback smoke後に差し戻しDB更新を確認します。";
+ 14061: 
+ 14062:       return [
+ 14063:         '<section class="aicm-core-card" style="border:2px solid #38bdf8;">',
+ 14064:         '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+ 14065:         '  <h2>' + esc(row.review_title || "レビュー項目") + '</h2>',
+ 14066:         '  <p class="aicm-selected-note">' + esc(note) + '</p>',
+ 14067:         '  <dl class="aicm-core-detail-list">',
+ 14068:         renderField("review_id", reviewId(row)),
+ 14069:         renderField("操作予定", mode === "approve" ? "承認" : "差し戻し"),
+ 14070:         renderField("担当AI", row.responsible_ai_label || row.requested_by_ai_label),
+ 14071:         '  </dl>',
+ 14072:         '  <div class="aicm-dashboard-action-row">',
+ 14073:         '    <button type="button" data-core-action="review-v10d-clear-preview">プレビューを閉じる</button>',
+ 14074:         '  </div>',
+ 14075:         '</section>'
+ 14076:       ].join("");
+ 14077:     }
+ 14078: 
+ 14079:     function renderListRow(row, index, currentId) {
+ 14080:       var id = reviewId(row);
+ 14081:       var title = t(row.review_title || row.title || "レビュー項目");
+ 14082:       var summary = t(row.delivery_summary_text || row.summary || row.description || "");
+ 14083:       var selected = id && id === currentId;
+ 14084: 
+ 14085:       return [
+ 14086:         '<article class="aicm-core-card" style="' + (selected ? 'border:2px solid #f59e0b;' : 'border:1px solid #dbeafe;') + '">',
+ 14087:         '  <p class="aicm-eyebrow">レビュー待ち #' + esc(String(index + 1)) + '</p>',
+ 14088:         '  <h3>' + esc(title) + '</h3>',
+ 14089:         summary ? '  <p class="aicm-selected-note">' + esc(summary) + '</p>' : '',
+ 14090:         '  <dl class="aicm-core-detail-list">',
+ 14091:         renderField("種別", row.review_kind_label || row.review_kind_code),
+ 14092:         renderField("成果物", row.artifact_kind_label || row.artifact_kind_code),
+ 14093:         renderField("優先度", row.priority_code),
+ 14094:         renderField("依頼日時", row.requested_at || row.created_at),
+ 14095:         renderField("review_id", id),
+ 14096:         '  </dl>',
+ 14097:         '  <div class="aicm-dashboard-action-row">',
+ 14098:         '    <button type="button" data-core-action="review-v10d-open-detail" data-review-id="' + esc(id) + '">成果物を確認</button>',
+ 14099:         '  </div>',

@@ -1,0 +1,107 @@
+AICompanyManager V10L-C2G-A3 actual review-list function
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+SERVER_PATCH=NO
+
+FUNCTION=aicmR8zV7RenderReviewList
+LINES=13355-13451
+EXTRACTED_WINDOW=13355-13451
+============================================================
+ 13355: window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) {
+ 13356:     appState = appState || {};
+ 13357:     var list = rows(appState);
+ 13358: 
+ 13359:     if (!list.length && typeof aicmR8zV9ReviewListScriptHydrate === "function") aicmR8zV9ReviewListScriptHydrate(appState);
+ 13360:     if (!list.length) hydrateIfNeeded(appState);
+ 13361: 
+ 13362:     var debug = [
+ 13363:       "selectedCompanyId=" + companyId(appState),
+ 13364:       "owner=" + ownerId(appState),
+ 13365:       "rows=" + String(list.length),
+ 13366:       appState.aicmR8zV7Hydrating ? "hydrating=YES" : "hydrating=NO",
+ 13367:       appState.aicmR8zV7HydrationError ? "error=" + t(appState.aicmR8zV7HydrationError) : "",
+ 13368:       // AICM_R8Z_V8K_VISIBLE_RUNTIME_DEBUG: visible debug fields
+ 13369:       "v8k=" + t(appState.aicmR8zV8kDebug || (typeof state !== "undefined" && state ? state.aicmR8zV8kDebug : "") || "none"),
+ 13370:       "payload=" + String(appState.aicmR8zV8kPayloadCount !== undefined ? appState.aicmR8zV8kPayloadCount : ((typeof state !== "undefined" && state && state.aicmR8zV8kPayloadCount !== undefined) ? state.aicmR8zV8kPayloadCount : "na")),
+ 13371:       "merged=" + String(appState.aicmR8zV8kMergedCount !== undefined ? appState.aicmR8zV8kMergedCount : ((typeof state !== "undefined" && state && state.aicmR8zV8kMergedCount !== undefined) ? state.aicmR8zV8kMergedCount : "na")),
+ 13372:       "stRows=" + String(appState.aicmR8zV8kAfterMergeStateRows !== undefined ? appState.aicmR8zV8kAfterMergeStateRows : ((typeof state !== "undefined" && state && state.aicmR8zV8kAfterMergeStateRows !== undefined) ? state.aicmR8zV8kAfterMergeStateRows : "na")),
+ 13373:       "ctxRows=" + String(appState.aicmR8zV8kAfterMergeContextRows !== undefined ? appState.aicmR8zV8kAfterMergeContextRows : ((typeof state !== "undefined" && state && state.aicmR8zV8kAfterMergeContextRows !== undefined) ? state.aicmR8zV8kAfterMergeContextRows : "na")),
+ 13374:       appState.aicmR8zV8kError ? "v8kError=" + t(appState.aicmR8zV8kError) : ""
+ 13375:     ].filter(Boolean).join(" / ");
+ 13376: 
+ 13377:     var html = [
+ 13378:       '<section class="aicm-core-card aicm-review-list-stable-r8z-v7">',
+ 13379:       '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+ 13380:       '  <h2>納品サマリー確認</h2>',
+ 13381:       '  <p class="aicm-selected-note">対象会社: <strong>' + esc(companyName(appState)) + '</strong></p>',
+ 13382:       '  <p class="aicm-selected-note">レビュー・承認待ち: <strong>' + esc(String(list.length)) + '件</strong></p>',
+ 13383:       '  <p class="aicm-selected-note">R8Z-V7: ' + esc(debug) + '</p>'
+ 13384:     ];
+ 13385: 
+ 13386:     if (!list.length) {
+ 13387:       html.push(
+ 13388:         '  <article class="aicm-core-card">',
+ 13389:         '    <strong>レビュー・承認待ちはありません</strong>',
+ 13390:         '    <p>context反映待ちです。数秒後に再描画されます。</p>',
+ 13391:         '  </article>',
+ 13392:         '</section>'
+ 13393:       );
+ 13394:       return html.join("");
+ 13395:     }
+ 13396: 
+ 13397:     list.forEach(function (row, index) {
+ 13398:       var id = first(row, ["aicm_human_review_item_id", "review_id", "id"], "");
+ 13399:       var title = first(row, ["review_title", "title"], "レビュー項目");
+ 13400:       var kind = first(row, ["review_kind_label", "review_kind_code"], "納品サマリー");
+ 13401:       var artifact = first(row, ["artifact_kind_label", "artifact_kind_code"], "delivery_package");
+ 13402:       var priority = first(row, ["priority_label", "priority_code"], "-");
+ 13403:       var summary = first(row, [
+ 13404:         "delivery_summary_text",
+ 13405:         "delivery_summary_preview",
+ 13406:         "result_summary_text",
+ 13407:         "ai_review_result_text",
+ 13408:         "review_summary_text",
+ 13409:         "summary"
+ 13410:       ], "要約未設定");
+ 13411:       var requestId = first(row, ["source_request_id", "request_id"], "");
+ 13412:       var workerUnitId = first(row, ["related_worker_work_unit_id"], "");
+ 13413: 
+ 13414:       html.push(
+ 13415:         '  <article class="aicm-core-card aicm-review-card">',
+ 13416:         '    <div class="aicm-review-head">',
+ 13417:         '      <div>',
+ 13418:         '        <p class="aicm-eyebrow">レビュー #' + esc(String(index + 1)) + '</p>',
+ 13419:         '        <h3>' + esc(title) + '</h3>',
+ 13420:         '      </div>',
+ 13421:         '      <strong>' + esc(statusLabel(row)) + '</strong>',
+ 13422:         '    </div>',
+ 13423:         '    <div class="aicm-review-meta">',
+ 13424:         '      <span>種別: ' + esc(kind) + '</span>',
+ 13425:         '      <span>成果物: ' + esc(artifact) + '</span>',
+ 13426:         '      <span>優先度: ' + esc(priority) + '</span>',
+ 13427:         requestId ? '      <span>request_id: ' + esc(requestId) + '</span>' : '',
+ 13428:         workerUnitId ? '      <span>worker_unit: ' + esc(workerUnitId) + '</span>' : '',
+ 13429:         '    </div>',
+ 13430:         '    <section class="aicm-review-summary">',
+ 13431:         '      <h3>納品サマリー</h3>',
+ 13432:         '      <p>' + esc(summary) + '</p>',
+ 13433:         '    </section>',
+ 13434:         '    <div class="aicm-dashboard-action-row">',
+ 13435:         '      <button type="button" data-core-action="human-review-approve" data-review-id="' + esc(id) + '">承認</button>',
+ 13436:         '      <button type="button" data-core-action="human-review-return" data-review-id="' + esc(id) + '">差し戻し</button>',
+ 13437:         '    </div>',
+ 13438:         '  </article>'
+ 13439:       );
+ 13440:     });
+ 13441: 
+ 13442:     html.push('</section>');
+ 13443:     return html.join("");
+ 13444:   };
+ 13445: })();
+ 13446: 
+ 13447: 
+ 13448:   // AICM_R8Z_V10C_REVIEW_LIST_DIRECT_CONTEXT_RENDERER_START
+ 13449:   // Final review-list renderer override. Scope is review-list display only.
+ 13450:   // It does not touch task ledger / leader handoff / delete paths.
+ 13451:   (function installAicmR8zV10cReviewListDirectContextRenderer() {

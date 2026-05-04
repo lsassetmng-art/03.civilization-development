@@ -1,0 +1,1349 @@
+AICompanyManager V10L-C2F-D2B-R2B leader autofill suspect windows
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+SERVER_PATCH=NO
+
+============================================================
+WINDOW=5772-5850; CENTER=5790; SCORE=45
+HIT=var leaders = aicmR8zC2cLeaderCandidatesForSection(bag.handoffBatchRoute.sectionId);
+============================================================
+  5772:       departmentId = "";
+  5773:     }
+  5774: 
+  5775:     bag.handoffBatchRoute = {
+  5776:       sectionId: aicmR8zC2cText(section.sectionId || sectionId),
+  5777:       sectionLabel: aicmR8zC2cText(section.sectionLabel || ""),
+  5778:       departmentId: departmentId,
+  5779:       departmentLabel: departmentLabel,
+  5780:       departmentSource: ledgerDept.ok ? "selected-ledger-row" : "section-candidate",
+  5781:       departmentAmbiguous: !!ledgerDept.ambiguous,
+  5782:       leaderPlacementId: "",
+  5783:       leaderId: "",
+  5784:       leaderLabel: "",
+  5785:       routeApplied: true,
+  5786:       routeAppliedAt: Date.now(),
+  5787:       routeSource: "c2d2-ledger-department-section-select"
+  5788:     };
+  5789: 
+  5790:     var leaders = aicmR8zC2cLeaderCandidatesForSection(bag.handoffBatchRoute.sectionId);
+  5791:     if (leaders.length === 1) {
+  5792:       bag.handoffBatchRoute.leaderPlacementId = leaders[0].leaderPlacementId;
+  5793:       bag.handoffBatchRoute.leaderId = leaders[0].leaderId;
+  5794:       bag.handoffBatchRoute.leaderLabel = leaders[0].leaderLabel;
+  5795:     }
+  5796: 
+  5797:     return bag.handoffBatchRoute;
+  5798:   }
+  5799: 
+  5800: 
+  5801:   
+  5802:   
+  5803:   function aicmR8zC2cApplyLeaderChoice(leaderPlacementId) {
+  5804:     var bag = aicmR8zC2cBag();
+  5805:     var choice = bag.handoffBatchRoute || {};
+  5806:     var leader = aicmR8zC2cFindLeader(choice.sectionId, leaderPlacementId);
+  5807: 
+  5808:     if (leader) {
+  5809:       choice.leaderPlacementId = leader.leaderPlacementId;
+  5810:       choice.leaderId = leader.leaderId;
+  5811:       choice.leaderLabel = leader.leaderLabel;
+  5812:       choice.routeApplied = true;
+  5813:       choice.routeAppliedAt = Date.now();
+  5814:       choice.routeSource = "c2d2-canonical-leader-select";
+  5815:     }
+  5816: 
+  5817:     bag.handoffBatchRoute = choice;
+  5818:     return choice;
+  5819:   }
+  5820: 
+  5821: 
+  5822:   
+  5823:   
+  5824:   function aicmR8zC2cClearRouteChoice() {
+  5825:     var bag = aicmR8zC2cBag();
+  5826:     bag.handoffBatchRoute = {
+  5827:       sectionId: "",
+  5828:       sectionLabel: "",
+  5829:       departmentId: "",
+  5830:       departmentLabel: "",
+  5831:       departmentSource: "",
+  5832:       departmentAmbiguous: false,
+  5833:       leaderPlacementId: "",
+  5834:       leaderId: "",
+  5835:       leaderLabel: "",
+  5836:       routeApplied: false,
+  5837:       routeSource: "c2d2-canonical-cleared"
+  5838:     };
+  5839:     return bag.handoffBatchRoute;
+  5840:   }
+  5841: 
+  5842: 
+  5843:   
+  5844:   
+  5845:   
+  5846:   function aicmR8zC2cEffectiveRoute() {
+  5847:     var choice = aicmR8zC2cChoice();
+  5848: 
+  5849:     var sectionId = aicmR8zC2cText(choice.sectionId || "");
+  5850:     var sectionLabel = aicmR8zC2cText(choice.sectionLabel || "");
+
+============================================================
+WINDOW=5836-5914; CENTER=5854; SCORE=45
+HIT=if (sectionId && !sectionLabel) {
+============================================================
+  5836:       routeApplied: false,
+  5837:       routeSource: "c2d2-canonical-cleared"
+  5838:     };
+  5839:     return bag.handoffBatchRoute;
+  5840:   }
+  5841: 
+  5842: 
+  5843:   
+  5844:   
+  5845:   
+  5846:   function aicmR8zC2cEffectiveRoute() {
+  5847:     var choice = aicmR8zC2cChoice();
+  5848: 
+  5849:     var sectionId = aicmR8zC2cText(choice.sectionId || "");
+  5850:     var sectionLabel = aicmR8zC2cText(choice.sectionLabel || "");
+  5851:     var departmentId = aicmR8zC2cText(choice.departmentId || "");
+  5852:     var departmentLabel = aicmR8zC2cText(choice.departmentLabel || "");
+  5853: 
+  5854:     if (sectionId && !sectionLabel) {
+  5855:       var foundSection = aicmR8zC2cFindSection(sectionId);
+  5856:       if (foundSection) {
+  5857:         sectionLabel = aicmR8zC2cText(foundSection.sectionLabel || "");
+  5858:       }
+  5859:     }
+  5860: 
+  5861:     if (!departmentLabel && typeof aicmR8zC2d2LedgerDepartmentFromSelectedRows === "function") {
+  5862:       var ledgerDept = aicmR8zC2d2LedgerDepartmentFromSelectedRows();
+  5863:       if (ledgerDept.ok) {
+  5864:         departmentId = ledgerDept.departmentId;
+  5865:         departmentLabel = ledgerDept.departmentLabel;
+  5866:       } else if (ledgerDept.ambiguous) {
+  5867:         departmentId = "";
+  5868:         departmentLabel = "複数部門";
+  5869:       }
+  5870:     }
+  5871: 
+  5872:     var leaders = sectionId ? aicmR8zC2cLeaderCandidatesForSection(sectionId) : [];
+  5873:     var leaderPlacementId = aicmR8zC2cText(choice.leaderPlacementId || "");
+  5874:     var leaderId = aicmR8zC2cText(choice.leaderId || "");
+  5875:     var leaderLabel = aicmR8zC2cText(choice.leaderLabel || "");
+  5876: 
+  5877:     if (!leaderPlacementId && !leaderId && !leaderLabel && leaders.length === 1) {
+  5878:       leaderPlacementId = leaders[0].leaderPlacementId;
+  5879:       leaderId = leaders[0].leaderId;
+  5880:       leaderLabel = leaders[0].leaderLabel;
+  5881:     }
+  5882: 
+  5883:     return {
+  5884:       clear: !!sectionId && !!departmentLabel && departmentLabel !== "複数部門" && !!(leaderPlacementId || leaderId || leaderLabel) && leaders.length > 0,
+  5885:       sectionId: sectionId,
+  5886:       sectionLabel: sectionLabel,
+  5887:       departmentId: departmentId,
+  5888:       departmentLabel: departmentLabel,
+  5889:       departmentSource: choice.departmentSource || "",
+  5890:       departmentAmbiguous: !!choice.departmentAmbiguous || departmentLabel === "複数部門",
+  5891:       leaderPlacementId: leaderPlacementId,
+  5892:       leaderId: leaderId,
+  5893:       leaderLabel: leaderLabel,
+  5894:       leaderCount: leaders.length,
+  5895:       displayDepartment: departmentLabel || "-",
+  5896:       displaySection: sectionLabel || sectionId || "-",
+  5897:       displayLeader: leaderLabel || leaderPlacementId || leaderId || "-",
+  5898:       routeApplied: !!choice.routeApplied,
+  5899:       routeAppliedAt: choice.routeAppliedAt || null,
+  5900:       routeSource: choice.routeSource || ""
+  5901:     };
+  5902:   }
+  5903: 
+  5904: 
+  5905:   function aicmR8zC2cText(value) {
+  5906:     if (value === null || typeof value === "undefined") return "";
+  5907:     return String(value).trim();
+  5908:   }
+  5909: 
+  5910:   
+  5911:   
+  5912:   
+  5913:   
+  5914:   
+
+============================================================
+WINDOW=6574-6652; CENTER=6592; SCORE=42
+HIT=if (!leaderLabel || !leaderPlacementId) {
+============================================================
+  6574:             .concat(c2d11r1Arr(c2d11r1Ctx.departmentList));
+  6575: 
+  6576:           if (departmentId && !departmentLabel) {
+  6577:             for (var di = 0; di < departments.length; di += 1) {
+  6578:               var d = departments[di] || {};
+  6579:               var did = c2d11r1Get(d, ["aicm_user_company_department_id", "department_id", "id", "departmentId"]);
+  6580:               if (did === departmentId) {
+  6581:                 departmentLabel = c2d11r1Get(d, ["department_name", "name", "department_label", "departmentLabel"]);
+  6582:                 break;
+  6583:               }
+  6584:             }
+  6585:           }
+  6586: 
+  6587:           var placements = []
+  6588:             .concat(c2d11r1Arr(c2d11r1Ctx.placements))
+  6589:             .concat(c2d11r1Arr(c2d11r1Ctx.robot_placements))
+  6590:             .concat(c2d11r1Arr(c2d11r1Ctx.organization_placements));
+  6591: 
+  6592:           if (!leaderLabel || !leaderPlacementId) {
+  6593:             for (var pi = 0; pi < placements.length; pi += 1) {
+  6594:               var p = placements[pi] || {};
+  6595:               var psid = c2d11r1Get(p, ["section_id", "organization_id", "aicm_user_company_section_id", "sectionId"]);
+  6596:               var pslabel = c2d11r1Get(p, ["section_name", "organization_name", "section_label", "sectionLabel"]);
+  6597:               var role = c2d11r1Get(p, ["role_code", "placement_role_code", "assigned_role_code", "roleCode"]).toLowerCase();
+  6598:               var roleLabel = c2d11r1Get(p, ["role_label", "placement_role_label"]);
+  6599: 
+  6600:               var sameSection =
+  6601:                 (sectionId && psid === sectionId) ||
+  6602:                 (sectionLabel && pslabel === sectionLabel);
+  6603: 
+  6604:               var isLeader =
+  6605:                 role === "leader" ||
+  6606:                 role === "section_leader" ||
+  6607:                 role === "課長" ||
+  6608:                 roleLabel.indexOf("Leader") >= 0 ||
+  6609:                 roleLabel.indexOf("課長") >= 0;
+  6610: 
+  6611:               if (sameSection && isLeader) {
+  6612:                 leaderLabel = leaderLabel || c2d11r1Get(p, [
+  6613:                   "internal_nickname",
+  6614:                   "robot_internal_nickname",
+  6615:                   "placement_label",
+  6616:                   "robot_display_name",
+  6617:                   "robot_name",
+  6618:                   "display_name",
+  6619:                   "name"
+  6620:                 ]);
+  6621:                 leaderPlacementId = leaderPlacementId || c2d11r1Get(p, [
+  6622:                   "placement_id",
+  6623:                   "robot_placement_id",
+  6624:                   "aicm_robot_placement_id",
+  6625:                   "id"
+  6626:                 ]);
+  6627:                 break;
+  6628:               }
+  6629:             }
+  6630:           }
+  6631: 
+  6632:           var selectionState = null;
+  6633:           if (typeof aicmR8zMgrMajorCardSelectionState === "function") {
+  6634:             try {
+  6635:               selectionState = aicmR8zMgrMajorCardSelectionState();
+  6636:             } catch (_) {
+  6637:               selectionState = null;
+  6638:             }
+  6639:           }
+  6640: 
+  6641:           if (!selectionState) {
+  6642:             if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+  6643:               state.r8zMgrMajorCardSelection = {};
+  6644:             }
+  6645:             selectionState = state.r8zMgrMajorCardSelection;
+  6646:           }
+  6647: 
+  6648:           if (!selectionState.handoffBatchRoute || typeof selectionState.handoffBatchRoute !== "object") {
+  6649:             selectionState.handoffBatchRoute = {};
+  6650:           }
+  6651: 
+  6652:           var route = selectionState.handoffBatchRoute;
+
+============================================================
+WINDOW=6641-6719; CENTER=6659; SCORE=42
+HIT=route.sectionId = sectionId;
+============================================================
+  6641:           if (!selectionState) {
+  6642:             if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+  6643:               state.r8zMgrMajorCardSelection = {};
+  6644:             }
+  6645:             selectionState = state.r8zMgrMajorCardSelection;
+  6646:           }
+  6647: 
+  6648:           if (!selectionState.handoffBatchRoute || typeof selectionState.handoffBatchRoute !== "object") {
+  6649:             selectionState.handoffBatchRoute = {};
+  6650:           }
+  6651: 
+  6652:           var route = selectionState.handoffBatchRoute;
+  6653: 
+  6654:           route.applied = true;
+  6655:           route.applied_flag = true;
+  6656:           route.appliedLabel = "適用済み";
+  6657:           route.applied_label = "適用済み";
+  6658: 
+  6659:           route.sectionId = sectionId;
+  6660:           route.section_id = sectionId;
+  6661:           route.sectionLabel = sectionLabel;
+  6662:           route.section_label = sectionLabel;
+  6663:           route.sectionName = sectionLabel;
+  6664:           route.section_name = sectionLabel;
+  6665: 
+  6666:           route.departmentId = departmentId;
+  6667:           route.department_id = departmentId;
+  6668:           route.departmentLabel = departmentLabel;
+  6669:           route.department_label = departmentLabel;
+  6670:           route.departmentName = departmentLabel;
+  6671:           route.department_name = departmentLabel;
+  6672: 
+  6673:           route.leaderPlacementId = leaderPlacementId;
+  6674:           route.leader_placement_id = leaderPlacementId;
+  6675:           route.leaderLabel = leaderLabel;
+  6676:           route.leader_label = leaderLabel;
+  6677:           route.assigned_leader_label = leaderLabel;
+  6678: 
+  6679:           route.departmentMissing = !departmentLabel;
+  6680:           route.leaderMissing = !leaderLabel;
+  6681:           route.lastAppliedAt = (new Date()).toISOString();
+  6682: 
+  6683:           state.r8zMgrMajorCardRouteEnrichmentDebug = {
+  6684:             marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY",
+  6685:             at: route.lastAppliedAt,
+  6686:             action: c2d11r1Action,
+  6687:             sectionId: sectionId,
+  6688:             sectionLabel: sectionLabel,
+  6689:             departmentId: departmentId,
+  6690:             departmentLabel: departmentLabel,
+  6691:             leaderPlacementId: leaderPlacementId,
+  6692:             leaderLabel: leaderLabel,
+  6693:             matchedSection: !!matchedSection,
+  6694:             selectedRows: c2d11r1Rows.length
+  6695:           };
+  6696: 
+  6697:           if (typeof setMessage === "function") {
+  6698:             if (departmentLabel && leaderLabel) {
+  6699:               setMessage("ok", "課・部門・Leaderを一括引き渡し先へ適用しました。");
+  6700:             } else if (departmentLabel) {
+  6701:               setMessage("ok", "課と部門を一括引き渡し先へ適用しました。Leaderは未設定です。");
+  6702:             } else {
+  6703:               setMessage("error", "課は適用しましたが、部門情報を特定できません。課設定または台帳行を確認してください。");
+  6704:             }
+  6705:           }
+  6706: 
+  6707:           if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  6708:             aicmRenderTaskLedgerSafeR8V4("c2d11r1-route-enrichment");
+  6709:             return;
+  6710:           }
+  6711: 
+  6712:           if (typeof render === "function") {
+  6713:             render();
+  6714:             return;
+  6715:           }
+  6716: 
+  6717:           return;
+  6718:         }
+  6719:       } catch (c2d11r1Error) {
+
+============================================================
+WINDOW=6070-6148; CENTER=6088; SCORE=40
+HIT=var route = typeof aicmR8zC2cEffectiveRoute === "function"
+============================================================
+  6070:   return aicmC2d12FilterGenericLeaderOptions(aicmC2d12Html);
+  6071:   // AICM_R8Z_MGR_MAJOR_CARD_C2D12_LEADER_GENERIC_OPTION_FILTER_END
+  6072: }
+  6073: 
+  6074: 
+  6075:   // AICM_R8Z_MGR_MAJOR_CARD_C2C_BATCH_SECTION_LEADER_ROUTE_HELPERS_END
+  6076: 
+  6077: 
+  6078:   
+  6079:   
+  6080:   
+  6081:   function aicmR8zC2bBuildLeaderHandoffPayload(row, index) {
+  6082:     row = row && typeof row === "object" ? row : {};
+  6083: 
+  6084:     var majorId = typeof aicmR8zMgrMajorCardRowId === "function"
+  6085:       ? aicmR8zMgrMajorCardRowId(row, index)
+  6086:       : "";
+  6087: 
+  6088:     var route = typeof aicmR8zC2cEffectiveRoute === "function"
+  6089:       ? aicmR8zC2cEffectiveRoute()
+  6090:       : { sectionId: "", leaderPlacementId: "", leaderId: "", displayLeader: "" };
+  6091: 
+  6092:     var payload = {
+  6093:       owner_civilization_id: aicmR8zC2bOwnerId(row),
+  6094:       aicm_manager_major_work_item_id: majorId,
+  6095:       assigned_leader_label: route.displayLeader && route.displayLeader !== "-" ? route.displayLeader : "",
+  6096:       decomposition_status_code: "assigned_to_leader",
+  6097:       handoff_status_code: "handed_off",
+  6098:       note: aicmR8zC2bText(row.note || "")
+  6099:     };
+  6100: 
+  6101:     if (route.departmentId) payload.department_id = route.departmentId;
+  6102:     if (route.sectionId) payload.section_id = route.sectionId;
+  6103:     if (route.leaderPlacementId) payload.leader_placement_id = route.leaderPlacementId;
+  6104:     if (route.leaderId) payload.assigned_leader_id = route.leaderId;
+  6105: 
+  6106:     return payload;
+  6107:   }
+  6108: 
+  6109: 
+  6110:   
+  6111:   
+  6112:   
+  6113:   
+  6114:   function aicmR8zC2bValidateLeaderHandoffRows(rows) {
+  6115:     rows = Array.isArray(rows) ? rows : [];
+  6116: 
+  6117:     var errors = [];
+  6118:     var items = [];
+  6119:     var payloads = [];
+  6120:     var route = typeof aicmR8zC2cEffectiveRoute === "function"
+  6121:       ? aicmR8zC2cEffectiveRoute()
+  6122:       : { clear: false, leaderCount: 0, displayLeader: "", displaySection: "", displayDepartment: "" };
+  6123: 
+  6124:     if (!rows.length) {
+  6125:       errors.push("対象の大項目を選択してください。");
+  6126:     }
+  6127: 
+  6128:     if (route.departmentAmbiguous) {
+  6129:       errors.push("選択済み大項目の部門が複数あります。対象大項目の部門を揃えてください。");
+  6130:     }
+  6131: 
+  6132:     if (!route.displayDepartment || route.displayDepartment === "-") {
+  6133:       errors.push("台帳行から引き渡し先部門を特定できません。");
+  6134:     }
+  6135: 
+  6136:     if (!route.sectionId) {
+  6137:       errors.push("引き渡し先の課を一括選択してください。");
+  6138:     } else if (route.leaderCount === 0) {
+  6139:       errors.push("選択した課にLeaderが配置されていません。");
+  6140:     } else if (route.leaderCount > 1 && !route.leaderPlacementId && !route.leaderId && (!route.leaderLabel || route.leaderLabel === "-")) {
+  6141:       errors.push("選択した課にLeaderが複数います。Leaderを1人選択してください。");
+  6142:     } else if (!route.clear) {
+  6143:       errors.push("引き渡し先の課/Leaderが未確定です。");
+  6144:     }
+  6145: 
+  6146:     rows.forEach(function (row, index) {
+  6147:       var title = typeof aicmR8zMgrMajorCardTitle === "function"
+  6148:         ? aicmR8zMgrMajorCardTitle(row)
+
+============================================================
+WINDOW=5235-5313; CENTER=5253; SCORE=37
+HIT=var clear = !!(leaderPlacementId || leaderId || leaderLabel) && !!(sectionId || sectionLabel);
+============================================================
+  5235: 
+  5236:     var sectionLabel = aicmR8zC2bFirstText(row, [
+  5237:       "section_name",
+  5238:       "section_label",
+  5239:       "organization_name",
+  5240:       "organization_label"
+  5241:     ]);
+  5242: 
+  5243:     var departmentId = aicmR8zC2bFirstText(row, [
+  5244:       "department_id",
+  5245:       "aicm_department_id"
+  5246:     ]);
+  5247: 
+  5248:     var departmentLabel = aicmR8zC2bFirstText(row, [
+  5249:       "department_name",
+  5250:       "department_label"
+  5251:     ]);
+  5252: 
+  5253:     var clear = !!(leaderPlacementId || leaderId || leaderLabel) && !!(sectionId || sectionLabel);
+  5254: 
+  5255:     return {
+  5256:       clear: clear,
+  5257:       leaderPlacementId: leaderPlacementId,
+  5258:       leaderId: leaderId,
+  5259:       leaderLabel: leaderLabel,
+  5260:       sectionId: sectionId,
+  5261:       sectionLabel: sectionLabel,
+  5262:       departmentId: departmentId,
+  5263:       departmentLabel: departmentLabel,
+  5264:       displayLeader: leaderLabel || leaderPlacementId || leaderId || "",
+  5265:       displaySection: sectionLabel || sectionId || "",
+  5266:       displayDepartment: departmentLabel || departmentId || ""
+  5267:     };
+  5268:   }
+  5269: 
+  5270:   
+  5271:   // AICM_R8Z_MGR_MAJOR_CARD_C2C_BATCH_SECTION_LEADER_ROUTE_HELPERS_START
+  5272:   // C2C: selected major items share one batch section route. DB_WRITE=NO / API_POST=NO.
+  5273:   function aicmR8zC2cAttr(target, name) {
+  5274:     if (!target || !target.getAttribute) return "";
+  5275:     return String(target.getAttribute(name) || "").trim();
+  5276:   }
+  5277: 
+  5278:   
+  5279:   
+  5280:   function aicmR8zC2cBag() {
+  5281:     var bag = null;
+  5282: 
+  5283:     if (typeof aicmR8zMgrMajorCardState === "function") {
+  5284:       bag = aicmR8zMgrMajorCardState();
+  5285:     }
+  5286: 
+  5287:     if (!bag || typeof bag !== "object") {
+  5288:       if (state && typeof state === "object") {
+  5289:         if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+  5290:           state.r8zMgrMajorCardSelection = {};
+  5291:         }
+  5292:         bag = state.r8zMgrMajorCardSelection;
+  5293:       } else {
+  5294:         bag = {};
+  5295:       }
+  5296:     }
+  5297: 
+  5298:     if (state && typeof state === "object") {
+  5299:       if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+  5300:         state.r8zMgrMajorCardSelection = bag;
+  5301:       }
+  5302:       bag = state.r8zMgrMajorCardSelection;
+  5303:     }
+  5304: 
+  5305:     if (!bag.handoffBatchRoute || typeof bag.handoffBatchRoute !== "object") {
+  5306:       bag.handoffBatchRoute = {
+  5307:         sectionId: "",
+  5308:         sectionLabel: "",
+  5309:         departmentId: "",
+  5310:         departmentLabel: "",
+  5311:         leaderPlacementId: "",
+  5312:         leaderId: "",
+  5313:         leaderLabel: "",
+
+============================================================
+WINDOW=5308-5386; CENTER=5326; SCORE=37
+HIT=return aicmR8zC2cBag().handoffBatchRoute;
+============================================================
+  5308:         sectionLabel: "",
+  5309:         departmentId: "",
+  5310:         departmentLabel: "",
+  5311:         leaderPlacementId: "",
+  5312:         leaderId: "",
+  5313:         leaderLabel: "",
+  5314:         routeApplied: false,
+  5315:         routeSource: "c2d2-canonical"
+  5316:       };
+  5317:     }
+  5318: 
+  5319:     return bag;
+  5320:   }
+  5321: 
+  5322: 
+  5323:   
+  5324:   
+  5325:   function aicmR8zC2cChoice() {
+  5326:     return aicmR8zC2cBag().handoffBatchRoute;
+  5327:   }
+  5328: 
+  5329: 
+  5330:   function aicmR8zC2cAsArray(value) {
+  5331:     return Array.isArray(value) ? value : [];
+  5332:   }
+  5333: 
+  5334:   function aicmR8zC2cContext() {
+  5335:     return state && state.context && typeof state.context === "object" ? state.context : {};
+  5336:   }
+  5337: 
+  5338:   function aicmR8zC2cField(row, keys) {
+  5339:     row = row && typeof row === "object" ? row : {};
+  5340:     for (var i = 0; i < keys.length; i += 1) {
+  5341:       var key = keys[i];
+  5342:       if (row[key] !== null && typeof row[key] !== "undefined" && String(row[key]).trim() !== "") {
+  5343:         return String(row[key]).trim();
+  5344:       }
+  5345:     }
+  5346:     return "";
+  5347:   }
+  5348: 
+  5349:   
+  5350:   
+  5351:   
+  5352:   function aicmR8zC2d2LedgerDepartmentFromSelectedRows() {
+  5353:     var rows = typeof aicmR8zMgrMajorCardSelectedRows === "function"
+  5354:       ? aicmR8zMgrMajorCardSelectedRows()
+  5355:       : [];
+  5356: 
+  5357:     var seen = {};
+  5358:     var list = [];
+  5359: 
+  5360:     function field(row, keys) {
+  5361:       row = row && typeof row === "object" ? row : {};
+  5362:       for (var i = 0; i < keys.length; i += 1) {
+  5363:         var key = keys[i];
+  5364:         if (row[key] !== null && typeof row[key] !== "undefined" && String(row[key]).trim() !== "") {
+  5365:           return String(row[key]).trim();
+  5366:         }
+  5367:       }
+  5368:       return "";
+  5369:     }
+  5370: 
+  5371:     rows.forEach(function (row) {
+  5372:       var id = field(row, [
+  5373:         "department_id",
+  5374:         "aicm_department_id",
+  5375:         "responsible_department_id",
+  5376:         "assigned_department_id"
+  5377:       ]);
+  5378: 
+  5379:       var label = field(row, [
+  5380:         "department_name",
+  5381:         "department_label",
+  5382:         "responsible_department_name",
+  5383:         "assigned_department_name"
+  5384:       ]);
+  5385: 
+  5386:       if (!id && !label) return;
+
+============================================================
+WINDOW=5697-5775; CENTER=5715; SCORE=37
+HIT=var key = leader.leaderPlacementId || leader.leaderId || leader.leaderLabel;
+============================================================
+  5697:     var ctx = aicmR8zC2cContext();
+  5698:     var source = []
+  5699:       .concat(aicmR8zC2cAsArray(ctx.placements))
+  5700:       .concat(aicmR8zC2cAsArray(ctx.robotPlacements))
+  5701:       .concat(aicmR8zC2cAsArray(ctx.robot_placements))
+  5702:       .concat(aicmR8zC2cAsArray(ctx.organizationPlacements))
+  5703:       .concat(aicmR8zC2cAsArray(ctx.section_placements));
+  5704: 
+  5705:     var list = [];
+  5706:     var seen = {};
+  5707: 
+  5708:     source.forEach(function (row, index) {
+  5709:       if (!aicmR8zC2cIsLeaderPlacement(row)) return;
+  5710: 
+  5711:       var placementSectionId = aicmR8zC2cPlacementSectionId(row);
+  5712:       if (sectionId && placementSectionId && placementSectionId !== sectionId) return;
+  5713: 
+  5714:       var leader = aicmR8zC2cNormalizeLeader(row, index);
+  5715:       var key = leader.leaderPlacementId || leader.leaderId || leader.leaderLabel;
+  5716:       if (!key || seen[key]) return;
+  5717: 
+  5718:       seen[key] = true;
+  5719:       list.push(leader);
+  5720:     });
+  5721: 
+  5722:     list.sort(function (a, b) {
+  5723:       return String(a.leaderLabel || "").localeCompare(String(b.leaderLabel || ""), "ja");
+  5724:     });
+  5725: 
+  5726:     return list;
+  5727:   }
+  5728: 
+  5729:   function aicmR8zC2cFindSection(sectionId) {
+  5730:     var sections = aicmR8zC2cSectionCandidates();
+  5731:     for (var i = 0; i < sections.length; i += 1) {
+  5732:       if (String(sections[i].sectionId || "") === String(sectionId || "")) return sections[i];
+  5733:     }
+  5734:     return null;
+  5735:   }
+  5736: 
+  5737:   function aicmR8zC2cFindLeader(sectionId, leaderPlacementId) {
+  5738:     var leaders = aicmR8zC2cLeaderCandidatesForSection(sectionId);
+  5739:     for (var i = 0; i < leaders.length; i += 1) {
+  5740:       if (String(leaders[i].leaderPlacementId || "") === String(leaderPlacementId || "")) return leaders[i];
+  5741:     }
+  5742:     return null;
+  5743:   }
+  5744: 
+  5745:   
+  5746:   
+  5747:   
+  5748:   function aicmR8zC2cApplySectionChoice(sectionId, sectionSnapshot) {
+  5749:     var bag = aicmR8zC2cBag();
+  5750:     var section = sectionSnapshot && typeof sectionSnapshot === "object"
+  5751:       ? sectionSnapshot
+  5752:       : aicmR8zC2cFindSection(sectionId);
+  5753: 
+  5754:     if (!section) {
+  5755:       return null;
+  5756:     }
+  5757: 
+  5758:     var ledgerDept = typeof aicmR8zC2d2LedgerDepartmentFromSelectedRows === "function"
+  5759:       ? aicmR8zC2d2LedgerDepartmentFromSelectedRows()
+  5760:       : { ok: false, ambiguous: false, departmentId: "", departmentLabel: "" };
+  5761: 
+  5762:     var departmentId = ledgerDept.ok
+  5763:       ? ledgerDept.departmentId
+  5764:       : aicmR8zC2cText(section.departmentId || "");
+  5765: 
+  5766:     var departmentLabel = ledgerDept.ok
+  5767:       ? ledgerDept.departmentLabel
+  5768:       : aicmR8zC2cText(section.departmentLabel || "");
+  5769: 
+  5770:     if (ledgerDept.ambiguous) {
+  5771:       departmentLabel = "複数部門";
+  5772:       departmentId = "";
+  5773:     }
+  5774: 
+  5775:     bag.handoffBatchRoute = {
+
+============================================================
+WINDOW=6016-6094; CENTER=6034; SCORE=35
+HIT=leaderSelectHtml = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+============================================================
+  6016: 
+  6017:     var sectionSelectHtml = sections.length
+  6018:       ? [
+  6019:           '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+  6020:           '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-section-select">課</label>',
+  6021:           '  <select id="aicm-r8z-mgr-major-card-route-section-select" data-r8z-mgr-major-card-route-section-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + sectionOptions + '</select>',
+  6022:           '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-section">課を適用</button>',
+  6023:           '</div>'
+  6024:         ].join("")
+  6025:       : '<p class="aicm-selected-note">選択できる課がありません。部門/課の設定またはcontext読込を確認してください。</p>';
+  6026: 
+  6027:     var leaderSelectHtml = "";
+  6028: 
+  6029:     if (!selectedSectionId) {
+  6030:       leaderSelectHtml = '<p class="aicm-selected-note">先に課を選択してください。</p>';
+  6031:     } else if (!leaders.length) {
+  6032:       leaderSelectHtml = '<p class="aicm-selected-note">この課にLeaderが配置されていません。</p>';
+  6033:     } else if (leaders.length === 1) {
+  6034:       leaderSelectHtml = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+  6035:     } else {
+  6036:       var selectedLeaderId = aicmR8zC2cText(choice.leaderPlacementId || "");
+  6037:       var leaderOptions = ['<option value="">Leaderを選択してください</option>'].concat(
+  6038:         leaders.map(function (leader) {
+  6039:           var selected = selectedLeaderId && leader.leaderPlacementId === selectedLeaderId ? " selected" : "";
+  6040:           return '<option value="' + escapeHtml(leader.leaderPlacementId) + '"' + selected + '>' + escapeHtml(leader.leaderLabel) + '</option>';
+  6041:         })
+  6042:       ).join("");
+  6043: 
+  6044:       leaderSelectHtml = [
+  6045:         '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+  6046:         '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-leader-select">Leader</label>',
+  6047:         '  <select id="aicm-r8z-mgr-major-card-route-leader-select" data-r8z-mgr-major-card-route-leader-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + leaderOptions + '</select>',
+  6048:         '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-leader">Leaderを適用</button>',
+  6049:         '</div>'
+  6050:       ].join("");
+  6051:     }
+  6052: 
+  6053:     return [
+  6054:       '<div class="aicm-core-card" data-r8z-mgr-major-card-route-picker="1" style="margin:12px 0;border:1px solid #c7d2fe;">',
+  6055:       '  <p class="aicm-eyebrow">引き渡し先 一括選択</p>',
+  6056:       '  <h4>選択済み大項目をまとめて送る課を選択</h4>',
+  6057:       '  <p class="aicm-selected-note">大項目ごとの個別課選択は行いません。ここで選んだ課/Leaderを、選択済み大項目すべてに適用します。</p>',
+  6058:       departmentHint,
+  6059:       sectionSelectHtml,
+  6060:       '  <h4>Leader</h4>',
+  6061:       leaderSelectHtml,
+  6062:       '  <div class="aicm-dashboard-action-row">',
+  6063:       '    <button type="button" data-core-action="r8z-mgr-major-card-route-clear">引き渡し先を解除</button>',
+  6064:       '  </div>',
+  6065:       '</div>'
+  6066:     ].join("");
+  6067:   
+  6068:   }).apply(this, aicmC2d12Args);
+  6069: 
+  6070:   return aicmC2d12FilterGenericLeaderOptions(aicmC2d12Html);
+  6071:   // AICM_R8Z_MGR_MAJOR_CARD_C2D12_LEADER_GENERIC_OPTION_FILTER_END
+  6072: }
+  6073: 
+  6074: 
+  6075:   // AICM_R8Z_MGR_MAJOR_CARD_C2C_BATCH_SECTION_LEADER_ROUTE_HELPERS_END
+  6076: 
+  6077: 
+  6078:   
+  6079:   
+  6080:   
+  6081:   function aicmR8zC2bBuildLeaderHandoffPayload(row, index) {
+  6082:     row = row && typeof row === "object" ? row : {};
+  6083: 
+  6084:     var majorId = typeof aicmR8zMgrMajorCardRowId === "function"
+  6085:       ? aicmR8zMgrMajorCardRowId(row, index)
+  6086:       : "";
+  6087: 
+  6088:     var route = typeof aicmR8zC2cEffectiveRoute === "function"
+  6089:       ? aicmR8zC2cEffectiveRoute()
+  6090:       : { sectionId: "", leaderPlacementId: "", leaderId: "", displayLeader: "" };
+  6091: 
+  6092:     var payload = {
+  6093:       owner_civilization_id: aicmR8zC2bOwnerId(row),
+  6094:       aicm_manager_major_work_item_id: majorId,
+
+============================================================
+WINDOW=5189-5267; CENTER=5207; SCORE=32
+HIT=var leaderPlacementId = aicmR8zC2bFirstText(row, [
+============================================================
+  5189: 
+  5190:   function aicmR8zC2bOwnerId(row) {
+  5191:     row = row && typeof row === "object" ? row : {};
+  5192: 
+  5193:     return aicmR8zC2bText(
+  5194:       row.owner_civilization_id ||
+  5195:       row.ownerCivilizationId ||
+  5196:       (state && state.ownerCivilizationId) ||
+  5197:       (state && state.owner_civilization_id) ||
+  5198:       (state && state.context && state.context.owner_civilization_id) ||
+  5199:       (state && state.context && state.context.ownerCivilizationId) ||
+  5200:       "00000000-0000-4000-8000-000000000001"
+  5201:     );
+  5202:   }
+  5203: 
+  5204:   function aicmR8zC2bLeaderRoute(row) {
+  5205:     row = row && typeof row === "object" ? row : {};
+  5206: 
+  5207:     var leaderPlacementId = aicmR8zC2bFirstText(row, [
+  5208:       "leader_placement_id",
+  5209:       "assigned_leader_placement_id",
+  5210:       "leader_robot_placement_id",
+  5211:       "responsible_leader_placement_id"
+  5212:     ]);
+  5213: 
+  5214:     var leaderId = aicmR8zC2bFirstText(row, [
+  5215:       "assigned_leader_id",
+  5216:       "leader_id",
+  5217:       "leader_robot_id",
+  5218:       "responsible_leader_id"
+  5219:     ]);
+  5220: 
+  5221:     var leaderLabel = aicmR8zC2bFirstText(row, [
+  5222:       "assigned_leader_label",
+  5223:       "leader_robot_label",
+  5224:       "responsible_robot_label",
+  5225:       "responsible_role_code",
+  5226:       "leader_label"
+  5227:     ]);
+  5228: 
+  5229:     var sectionId = aicmR8zC2bFirstText(row, [
+  5230:       "section_id",
+  5231:       "aicm_section_id",
+  5232:       "organization_id",
+  5233:       "department_section_id"
+  5234:     ]);
+  5235: 
+  5236:     var sectionLabel = aicmR8zC2bFirstText(row, [
+  5237:       "section_name",
+  5238:       "section_label",
+  5239:       "organization_name",
+  5240:       "organization_label"
+  5241:     ]);
+  5242: 
+  5243:     var departmentId = aicmR8zC2bFirstText(row, [
+  5244:       "department_id",
+  5245:       "aicm_department_id"
+  5246:     ]);
+  5247: 
+  5248:     var departmentLabel = aicmR8zC2bFirstText(row, [
+  5249:       "department_name",
+  5250:       "department_label"
+  5251:     ]);
+  5252: 
+  5253:     var clear = !!(leaderPlacementId || leaderId || leaderLabel) && !!(sectionId || sectionLabel);
+  5254: 
+  5255:     return {
+  5256:       clear: clear,
+  5257:       leaderPlacementId: leaderPlacementId,
+  5258:       leaderId: leaderId,
+  5259:       leaderLabel: leaderLabel,
+  5260:       sectionId: sectionId,
+  5261:       sectionLabel: sectionLabel,
+  5262:       departmentId: departmentId,
+  5263:       departmentLabel: departmentLabel,
+  5264:       displayLeader: leaderLabel || leaderPlacementId || leaderId || "",
+  5265:       displaySection: sectionLabel || sectionId || "",
+  5266:       displayDepartment: departmentLabel || departmentId || ""
+  5267:     };
+
+============================================================
+WINDOW=5630-5708; CENTER=5648; SCORE=32
+HIT="section_id",
+============================================================
+  5630:       aicmR8zC2cField(row, [
+  5631:         "placement_role_label",
+  5632:         "role_label",
+  5633:         "internal_nickname",
+  5634:         "display_name",
+  5635:         "robot_display_name",
+  5636:         "robot_model_name"
+  5637:       ])
+  5638:     ).toLowerCase();
+  5639: 
+  5640:     return role.indexOf("leader") >= 0 ||
+  5641:       role.indexOf("課長") >= 0 ||
+  5642:       label.indexOf("leader") >= 0 ||
+  5643:       label.indexOf("課長") >= 0;
+  5644:   }
+  5645: 
+  5646:   function aicmR8zC2cPlacementSectionId(row) {
+  5647:     return aicmR8zC2cField(row, [
+  5648:       "section_id",
+  5649:       "aicm_section_id",
+  5650:       "organization_id",
+  5651:       "department_section_id",
+  5652:       "assigned_section_id"
+  5653:     ]);
+  5654:   }
+  5655: 
+  5656:   function aicmR8zC2cNormalizeLeader(row, index) {
+  5657:     row = row && typeof row === "object" ? row : {};
+  5658:     var leaderPlacementId = aicmR8zC2cField(row, [
+  5659:       "placement_id",
+  5660:       "robot_placement_id",
+  5661:       "leader_placement_id",
+  5662:       "aicm_robot_placement_id",
+  5663:       "id"
+  5664:     ]);
+  5665: 
+  5666:     var leaderId = aicmR8zC2cField(row, [
+  5667:       "robot_id",
+  5668:       "leader_id",
+  5669:       "assigned_leader_id",
+  5670:       "worker_robot_id",
+  5671:       "aiworker_robot_id"
+  5672:     ]);
+  5673: 
+  5674:     var leaderLabel = aicmR8zC2cField(row, [
+  5675:       "internal_nickname",
+  5676:       "placement_label",
+  5677:       "robot_display_name",
+  5678:       "robot_model_name",
+  5679:       "display_name",
+  5680:       "name",
+  5681:       "leader_label"
+  5682:     ]);
+  5683: 
+  5684:     var sectionId = aicmR8zC2cPlacementSectionId(row);
+  5685: 
+  5686:     if (!leaderPlacementId && leaderLabel) leaderPlacementId = "leader-label-" + String(index);
+  5687: 
+  5688:     return {
+  5689:       leaderPlacementId: leaderPlacementId,
+  5690:       leaderId: leaderId,
+  5691:       leaderLabel: leaderLabel || leaderPlacementId || leaderId || "Leader",
+  5692:       sectionId: sectionId
+  5693:     };
+  5694:   }
+  5695: 
+  5696:   function aicmR8zC2cLeaderCandidatesForSection(sectionId) {
+  5697:     var ctx = aicmR8zC2cContext();
+  5698:     var source = []
+  5699:       .concat(aicmR8zC2cAsArray(ctx.placements))
+  5700:       .concat(aicmR8zC2cAsArray(ctx.robotPlacements))
+  5701:       .concat(aicmR8zC2cAsArray(ctx.robot_placements))
+  5702:       .concat(aicmR8zC2cAsArray(ctx.organizationPlacements))
+  5703:       .concat(aicmR8zC2cAsArray(ctx.section_placements));
+  5704: 
+  5705:     var list = [];
+  5706:     var seen = {};
+  5707: 
+  5708:     source.forEach(function (row, index) {
+
+============================================================
+WINDOW=6477-6555; CENTER=6495; SCORE=32
+HIT=var sectionId =
+============================================================
+  6477: 
+  6478:           var c2d11r1Option = null;
+  6479:           if (c2d11r1Select && c2d11r1Select.options && c2d11r1Select.selectedIndex >= 0) {
+  6480:             c2d11r1Option = c2d11r1Select.options[c2d11r1Select.selectedIndex];
+  6481:           }
+  6482: 
+  6483:           var c2d11r1Ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+  6484: 
+  6485:           var c2d11r1Rows = [];
+  6486:           if (typeof aicmR8zMgrMajorCardSelectedRows === "function") {
+  6487:             try {
+  6488:               c2d11r1Rows = aicmR8zMgrMajorCardSelectedRows() || [];
+  6489:             } catch (_) {
+  6490:               c2d11r1Rows = [];
+  6491:             }
+  6492:           }
+  6493:           var c2d11r1Row = c2d11r1Rows.length ? (c2d11r1Rows[0] || {}) : {};
+  6494: 
+  6495:           var sectionId =
+  6496:             c2d11r1Attr(c2d11r1Option, ["data-section-id", "data-aicm-section-id", "value"]) ||
+  6497:             c2d11r1Text(c2d11r1Select && c2d11r1Select.value) ||
+  6498:             c2d11r1Get(c2d11r1Row, ["section_id", "sectionId"]);
+  6499: 
+  6500:           var sectionLabel =
+  6501:             c2d11r1Attr(c2d11r1Option, ["data-section-label", "data-section-name", "data-label"]) ||
+  6502:             c2d11r1Text(c2d11r1Option && (c2d11r1Option.textContent || c2d11r1Option.innerText)) ||
+  6503:             c2d11r1Get(c2d11r1Row, ["section_name", "section_label", "sectionLabel"]);
+  6504: 
+  6505:           var departmentId =
+  6506:             c2d11r1Attr(c2d11r1Option, ["data-department-id", "data-aicm-department-id"]) ||
+  6507:             c2d11r1Get(c2d11r1Row, ["department_id", "departmentId"]);
+  6508: 
+  6509:           var departmentLabel =
+  6510:             c2d11r1Attr(c2d11r1Option, ["data-department-label", "data-department-name"]) ||
+  6511:             c2d11r1Get(c2d11r1Row, ["department_name", "department_label", "departmentLabel"]);
+  6512: 
+  6513:           var leaderLabel =
+  6514:             c2d11r1Attr(c2d11r1Option, ["data-leader-label", "data-assigned-leader-label", "data-leader-name"]) ||
+  6515:             c2d11r1Get(c2d11r1Row, ["assigned_leader_label", "leader_robot_label", "responsible_robot_label", "leaderLabel"]);
+  6516: 
+  6517:           var leaderPlacementId =
+  6518:             c2d11r1Attr(c2d11r1Option, ["data-leader-placement-id", "data-placement-id"]) ||
+  6519:             c2d11r1Get(c2d11r1Row, ["leader_placement_id", "leaderPlacementId", "assigned_leader_placement_id"]);
+  6520: 
+  6521:           var sections = []
+  6522:             .concat(c2d11r1Arr(c2d11r1Ctx.sections))
+  6523:             .concat(c2d11r1Arr(c2d11r1Ctx.organizations))
+  6524:             .concat(c2d11r1Arr(c2d11r1Ctx.department_sections));
+  6525: 
+  6526:           var matchedSection = null;
+  6527:           for (var si = 0; si < sections.length; si += 1) {
+  6528:             var s = sections[si] || {};
+  6529:             var sid = c2d11r1Get(s, ["aicm_user_company_section_id", "section_id", "organization_id", "id", "sectionId"]);
+  6530:             var slabel = c2d11r1Get(s, ["section_name", "organization_name", "name", "section_label", "sectionLabel"]);
+  6531: 
+  6532:             if ((sectionId && sid === sectionId) || (sectionLabel && slabel === sectionLabel)) {
+  6533:               matchedSection = s;
+  6534:               break;
+  6535:             }
+  6536:           }
+  6537: 
+  6538:           if (matchedSection) {
+  6539:             sectionId = sectionId || c2d11r1Get(matchedSection, ["aicm_user_company_section_id", "section_id", "organization_id", "id", "sectionId"]);
+  6540:             sectionLabel = sectionLabel || c2d11r1Get(matchedSection, ["section_name", "organization_name", "name", "section_label", "sectionLabel"]);
+  6541: 
+  6542:             departmentId = departmentId || c2d11r1Get(matchedSection, [
+  6543:               "department_id",
+  6544:               "parent_department_id",
+  6545:               "aicm_user_company_department_id",
+  6546:               "departmentId"
+  6547:             ]);
+  6548: 
+  6549:             departmentLabel = departmentLabel || c2d11r1Get(matchedSection, [
+  6550:               "department_name",
+  6551:               "parent_department_name",
+  6552:               "department_label",
+  6553:               "departmentLabel"
+  6554:             ]);
+  6555: 
+
+============================================================
+WINDOW=6538-6616; CENTER=6556; SCORE=32
+HIT=leaderLabel = leaderLabel || c2d11r1Get(matchedSection, [
+============================================================
+  6538:           if (matchedSection) {
+  6539:             sectionId = sectionId || c2d11r1Get(matchedSection, ["aicm_user_company_section_id", "section_id", "organization_id", "id", "sectionId"]);
+  6540:             sectionLabel = sectionLabel || c2d11r1Get(matchedSection, ["section_name", "organization_name", "name", "section_label", "sectionLabel"]);
+  6541: 
+  6542:             departmentId = departmentId || c2d11r1Get(matchedSection, [
+  6543:               "department_id",
+  6544:               "parent_department_id",
+  6545:               "aicm_user_company_department_id",
+  6546:               "departmentId"
+  6547:             ]);
+  6548: 
+  6549:             departmentLabel = departmentLabel || c2d11r1Get(matchedSection, [
+  6550:               "department_name",
+  6551:               "parent_department_name",
+  6552:               "department_label",
+  6553:               "departmentLabel"
+  6554:             ]);
+  6555: 
+  6556:             leaderLabel = leaderLabel || c2d11r1Get(matchedSection, [
+  6557:               "assigned_leader_label",
+  6558:               "leader_robot_label",
+  6559:               "leader_label",
+  6560:               "responsible_robot_label",
+  6561:               "responsible_role_label",
+  6562:               "leaderLabel"
+  6563:             ]);
+  6564: 
+  6565:             leaderPlacementId = leaderPlacementId || c2d11r1Get(matchedSection, [
+  6566:               "leader_placement_id",
+  6567:               "leaderPlacementId",
+  6568:               "assigned_leader_placement_id"
+  6569:             ]);
+  6570:           }
+  6571: 
+  6572:           var departments = []
+  6573:             .concat(c2d11r1Arr(c2d11r1Ctx.departments))
+  6574:             .concat(c2d11r1Arr(c2d11r1Ctx.departmentList));
+  6575: 
+  6576:           if (departmentId && !departmentLabel) {
+  6577:             for (var di = 0; di < departments.length; di += 1) {
+  6578:               var d = departments[di] || {};
+  6579:               var did = c2d11r1Get(d, ["aicm_user_company_department_id", "department_id", "id", "departmentId"]);
+  6580:               if (did === departmentId) {
+  6581:                 departmentLabel = c2d11r1Get(d, ["department_name", "name", "department_label", "departmentLabel"]);
+  6582:                 break;
+  6583:               }
+  6584:             }
+  6585:           }
+  6586: 
+  6587:           var placements = []
+  6588:             .concat(c2d11r1Arr(c2d11r1Ctx.placements))
+  6589:             .concat(c2d11r1Arr(c2d11r1Ctx.robot_placements))
+  6590:             .concat(c2d11r1Arr(c2d11r1Ctx.organization_placements));
+  6591: 
+  6592:           if (!leaderLabel || !leaderPlacementId) {
+  6593:             for (var pi = 0; pi < placements.length; pi += 1) {
+  6594:               var p = placements[pi] || {};
+  6595:               var psid = c2d11r1Get(p, ["section_id", "organization_id", "aicm_user_company_section_id", "sectionId"]);
+  6596:               var pslabel = c2d11r1Get(p, ["section_name", "organization_name", "section_label", "sectionLabel"]);
+  6597:               var role = c2d11r1Get(p, ["role_code", "placement_role_code", "assigned_role_code", "roleCode"]).toLowerCase();
+  6598:               var roleLabel = c2d11r1Get(p, ["role_label", "placement_role_label"]);
+  6599: 
+  6600:               var sameSection =
+  6601:                 (sectionId && psid === sectionId) ||
+  6602:                 (sectionLabel && pslabel === sectionLabel);
+  6603: 
+  6604:               var isLeader =
+  6605:                 role === "leader" ||
+  6606:                 role === "section_leader" ||
+  6607:                 role === "課長" ||
+  6608:                 roleLabel.indexOf("Leader") >= 0 ||
+  6609:                 roleLabel.indexOf("課長") >= 0;
+  6610: 
+  6611:               if (sameSection && isLeader) {
+  6612:                 leaderLabel = leaderLabel || c2d11r1Get(p, [
+  6613:                   "internal_nickname",
+  6614:                   "robot_internal_nickname",
+  6615:                   "placement_label",
+  6616:                   "robot_display_name",
+
+============================================================
+WINDOW=8943-9021; CENTER=8961; SCORE=32
+HIT="section_id",
+============================================================
+  8943:         "managerMajorItemId",
+  8944:         "pmlw_major_item_id",
+  8945:         "major_item_id",
+  8946:         "majorItemId",
+  8947:         "id",
+  8948:         "uuid"
+  8949:       ], 0);
+  8950: 
+  8951:       var aicmC2fD2Department = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+  8952:         "department_id",
+  8953:         "departmentId",
+  8954:         "department_label",
+  8955:         "departmentLabel",
+  8956:         "department_name",
+  8957:         "departmentName"
+  8958:       ], 0);
+  8959: 
+  8960:       var aicmC2fD2Section = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+  8961:         "section_id",
+  8962:         "sectionId",
+  8963:         "section_label",
+  8964:         "sectionLabel",
+  8965:         "section_name",
+  8966:         "sectionName"
+  8967:       ], 0);
+  8968: 
+  8969:       var aicmC2fD2Leader = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+  8970:         "leader_label",
+  8971:         "leaderLabel",
+  8972:         "assigned_leader_label",
+  8973:         "leader_name",
+  8974:         "leaderName"
+  8975:       ], 0);
+  8976: 
+  8977:       var aicmC2fD2LeaderPlacement = aicmC2fD2FindFirst(aicmC2fD2Payload, [
+  8978:         "leader_placement_id",
+  8979:         "leaderPlacementId",
+  8980:         "assigned_leader_placement_id",
+  8981:         "placement_id",
+  8982:         "placementId"
+  8983:       ], 0);
+  8984: 
+  8985:       if (!aicmC2fD2Ids.length && !aicmC2fD2SingleId) aicmC2fD2Missing.push("対象大項目IDがありません");
+  8986:       if (!aicmC2fD2Department) aicmC2fD2Missing.push("部門がありません");
+  8987:       if (!aicmC2fD2Section) aicmC2fD2Missing.push("課がありません");
+  8988:       if (!aicmC2fD2Leader) aicmC2fD2Missing.push("Leaderがありません");
+  8989:       if (!aicmC2fD2LeaderPlacement) aicmC2fD2Missing.push("Leader配置IDがありません");
+  8990: 
+  8991:       var aicmC2fD2Summary = {
+  8992:         ok: aicmC2fD2Missing.length === 0,
+  8993:         missing: aicmC2fD2Missing,
+  8994:         selected_count: aicmC2fD2Ids.length || (aicmC2fD2SingleId ? 1 : 0),
+  8995:         department: aicmC2fD2Department || "",
+  8996:         section: aicmC2fD2Section || "",
+  8997:         leader: aicmC2fD2Leader || "",
+  8998:         leader_placement_id: aicmC2fD2LeaderPlacement || "",
+  8999:         api_post: "LOCKED_BY_C2F_D2_EXECUTE_GATE",
+  9000:         db_write: "NO"
+  9001:       };
+  9002: 
+  9003:       if (typeof state !== "undefined" && state && typeof state === "object") {
+  9004:         state.managerMajorLeaderHandoffConfirm = state.managerMajorLeaderHandoffConfirm || {};
+  9005:         state.managerMajorLeaderHandoffConfirm.executeValidation = aicmC2fD2Summary;
+  9006:         state.managerMajorLeaderHandoffConfirm.executeLocked = true;
+  9007:       }
+  9008: 
+  9009:       if (typeof window !== "undefined" && window && typeof window.alert === "function") {
+  9010:         window.alert(
+  9011:           aicmC2fD2Missing.length
+  9012:             ? "実行前チェックNG: " + aicmC2fD2Missing.join(" / ")
+  9013:             : "実行前チェックOK。API POSTはまだ未解放です。"
+  9014:         );
+  9015:       }
+  9016: 
+  9017:       if (typeof aicmR8zMgrMajorCardRerender === "function") {
+  9018:         try {
+  9019:           aicmR8zMgrMajorCardRerender("c2f-d2-execute-payload-validation-gate");
+  9020:         } catch (_) {}
+  9021:       }
+
+============================================================
+WINDOW=5964-6042; CENTER=5982; SCORE=27
+HIT=var selectedSectionId = aicmR8zC2cText(choice.sectionId || "");
+============================================================
+  5964:   }
+  5965: 
+  5966:   function aicmC2d12FilterGenericLeaderOptions(html) {
+  5967:     if (typeof html !== "string") return html;
+  5968: 
+  5969:     return html.replace(/<option\b([^>]*)>([\s\S]*?)<\/option>/gi, function (match, attrs, label) {
+  5970:       if (aicmC2d12IsGenericLeaderOption(label, attrs)) {
+  5971:         return "";
+  5972:       }
+  5973:       return match;
+  5974:     });
+  5975:   }
+  5976: 
+  5977:   var aicmC2d12Args = arguments;
+  5978:   var aicmC2d12Html = (function () {
+  5979: 
+  5980:     var sections = aicmR8zC2cSectionCandidates();
+  5981:     var choice = aicmR8zC2cChoice();
+  5982:     var selectedSectionId = aicmR8zC2cText(choice.sectionId || "");
+  5983:     var leaders = selectedSectionId ? aicmR8zC2cLeaderCandidatesForSection(selectedSectionId) : [];
+  5984:     var ledgerDept = typeof aicmR8zC2d2LedgerDepartmentFromSelectedRows === "function"
+  5985:       ? aicmR8zC2d2LedgerDepartmentFromSelectedRows()
+  5986:       : { ok: false, ambiguous: false, departmentLabel: "" };
+  5987: 
+  5988:     var sectionOptions = ['<option value="">課を選択してください</option>'].concat(
+  5989:       sections.map(function (section) {
+  5990:         var selected = selectedSectionId && section.sectionId === selectedSectionId ? " selected" : "";
+  5991:         var departmentLabelForDisplay = ledgerDept.ok ? ledgerDept.departmentLabel : (section.departmentLabel || "");
+  5992:         var label = (departmentLabelForDisplay ? departmentLabelForDisplay + " / " : "") + section.sectionLabel;
+  5993:         return [
+  5994:           '<option',
+  5995:           ' value="' + escapeHtml(section.sectionId) + '"',
+  5996:           selected,
+  5997:           ' data-section-id="' + escapeHtml(section.sectionId || "") + '"',
+  5998:           ' data-section-label="' + escapeHtml(section.sectionLabel || "") + '"',
+  5999:           ' data-department-id="' + escapeHtml(ledgerDept.ok ? ledgerDept.departmentId : (section.departmentId || "")) + '"',
+  6000:           ' data-department-label="' + escapeHtml(ledgerDept.ok ? ledgerDept.departmentLabel : (section.departmentLabel || "")) + '"',
+  6001:           '>',
+  6002:           escapeHtml(label),
+  6003:           '</option>'
+  6004:         ].join("");
+  6005:       })
+  6006:     ).join("");
+  6007: 
+  6008:     var departmentHint = "";
+  6009:     if (ledgerDept.ok) {
+  6010:       departmentHint = '<p class="aicm-selected-note">部門は選択済み台帳行から取得: ' + escapeHtml(ledgerDept.departmentLabel) + '</p>';
+  6011:     } else if (ledgerDept.ambiguous) {
+  6012:       departmentHint = '<p class="aicm-selected-note">選択済み台帳行の部門が複数あります。対象大項目の部門を揃えてください。</p>';
+  6013:     } else {
+  6014:       departmentHint = '<p class="aicm-selected-note">部門は台帳行から取得します。台帳行に部門がない場合は課候補の情報を使います。</p>';
+  6015:     }
+  6016: 
+  6017:     var sectionSelectHtml = sections.length
+  6018:       ? [
+  6019:           '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+  6020:           '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-section-select">課</label>',
+  6021:           '  <select id="aicm-r8z-mgr-major-card-route-section-select" data-r8z-mgr-major-card-route-section-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + sectionOptions + '</select>',
+  6022:           '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-section">課を適用</button>',
+  6023:           '</div>'
+  6024:         ].join("")
+  6025:       : '<p class="aicm-selected-note">選択できる課がありません。部門/課の設定またはcontext読込を確認してください。</p>';
+  6026: 
+  6027:     var leaderSelectHtml = "";
+  6028: 
+  6029:     if (!selectedSectionId) {
+  6030:       leaderSelectHtml = '<p class="aicm-selected-note">先に課を選択してください。</p>';
+  6031:     } else if (!leaders.length) {
+  6032:       leaderSelectHtml = '<p class="aicm-selected-note">この課にLeaderが配置されていません。</p>';
+  6033:     } else if (leaders.length === 1) {
+  6034:       leaderSelectHtml = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+  6035:     } else {
+  6036:       var selectedLeaderId = aicmR8zC2cText(choice.leaderPlacementId || "");
+  6037:       var leaderOptions = ['<option value="">Leaderを選択してください</option>'].concat(
+  6038:         leaders.map(function (leader) {
+  6039:           var selected = selectedLeaderId && leader.leaderPlacementId === selectedLeaderId ? " selected" : "";
+  6040:           return '<option value="' + escapeHtml(leader.leaderPlacementId) + '"' + selected + '>' + escapeHtml(leader.leaderLabel) + '</option>';
+  6041:         })
+  6042:       ).join("");
+
+============================================================
+WINDOW=5584-5662; CENTER=5602; SCORE=22
+HIT=var ak = String((a.departmentLabel || "") + " " + (a.sectionLabel || ""));
+============================================================
+  5584:       });
+  5585:     }
+  5586: 
+  5587:     var seen = {};
+  5588:     var list = [];
+  5589: 
+  5590:     raw.forEach(function (row, index) {
+  5591:       var section = row && row.sectionId && row.sectionLabel ? row : aicmR8zC2cNormalizeSection(row, index, null);
+  5592:       if (!section) return;
+  5593: 
+  5594:       var key = section.sectionId || section.sectionLabel;
+  5595:       if (!key || seen[key]) return;
+  5596: 
+  5597:       seen[key] = true;
+  5598:       list.push(section);
+  5599:     });
+  5600: 
+  5601:     list.sort(function (a, b) {
+  5602:       var ak = String((a.departmentLabel || "") + " " + (a.sectionLabel || ""));
+  5603:       var bk = String((b.departmentLabel || "") + " " + (b.sectionLabel || ""));
+  5604:       return ak.localeCompare(bk, "ja");
+  5605:     });
+  5606: 
+  5607:     return list;
+  5608:   }
+  5609: 
+  5610: 
+  5611:   function aicmR8zC2cPlacementRole(row) {
+  5612:     return String(
+  5613:       aicmR8zC2cField(row, [
+  5614:         "placement_role_code",
+  5615:         "role_code",
+  5616:         "assigned_role_code",
+  5617:         "worker_role_code",
+  5618:         "aicm_role_code",
+  5619:         "placement_role_code_1",
+  5620:         "placement_role_code_2",
+  5621:         "placement_role_code_3",
+  5622:         "role_label"
+  5623:       ])
+  5624:     ).toLowerCase();
+  5625:   }
+  5626: 
+  5627:   function aicmR8zC2cIsLeaderPlacement(row) {
+  5628:     var role = aicmR8zC2cPlacementRole(row);
+  5629:     var label = String(
+  5630:       aicmR8zC2cField(row, [
+  5631:         "placement_role_label",
+  5632:         "role_label",
+  5633:         "internal_nickname",
+  5634:         "display_name",
+  5635:         "robot_display_name",
+  5636:         "robot_model_name"
+  5637:       ])
+  5638:     ).toLowerCase();
+  5639: 
+  5640:     return role.indexOf("leader") >= 0 ||
+  5641:       role.indexOf("課長") >= 0 ||
+  5642:       label.indexOf("leader") >= 0 ||
+  5643:       label.indexOf("課長") >= 0;
+  5644:   }
+  5645: 
+  5646:   function aicmR8zC2cPlacementSectionId(row) {
+  5647:     return aicmR8zC2cField(row, [
+  5648:       "section_id",
+  5649:       "aicm_section_id",
+  5650:       "organization_id",
+  5651:       "department_section_id",
+  5652:       "assigned_section_id"
+  5653:     ]);
+  5654:   }
+  5655: 
+  5656:   function aicmR8zC2cNormalizeLeader(row, index) {
+  5657:     row = row && typeof row === "object" ? row : {};
+  5658:     var leaderPlacementId = aicmR8zC2cField(row, [
+  5659:       "placement_id",
+  5660:       "robot_placement_id",
+  5661:       "leader_placement_id",
+  5662:       "aicm_robot_placement_id",

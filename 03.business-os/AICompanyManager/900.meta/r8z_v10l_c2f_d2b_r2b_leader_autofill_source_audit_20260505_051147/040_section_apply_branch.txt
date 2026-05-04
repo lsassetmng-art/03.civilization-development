@@ -1,0 +1,342 @@
+AICompanyManager V10L-C2F-D2B-R2B section apply action occurrences
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+SERVER_PATCH=NO
+
+ACTION=r8z-mgr-major-card-route-apply-section
+ACTION_HIT_COUNT=3
+ACTION_HIT_LINES=6022,6427,6864
+
+============================================================
+CENTER=6022
+HIT='  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-section">課を適用</button>',
+============================================================
+  5997:           ' data-section-id="' + escapeHtml(section.sectionId || "") + '"',
+  5998:           ' data-section-label="' + escapeHtml(section.sectionLabel || "") + '"',
+  5999:           ' data-department-id="' + escapeHtml(ledgerDept.ok ? ledgerDept.departmentId : (section.departmentId || "")) + '"',
+  6000:           ' data-department-label="' + escapeHtml(ledgerDept.ok ? ledgerDept.departmentLabel : (section.departmentLabel || "")) + '"',
+  6001:           '>',
+  6002:           escapeHtml(label),
+  6003:           '</option>'
+  6004:         ].join("");
+  6005:       })
+  6006:     ).join("");
+  6007: 
+  6008:     var departmentHint = "";
+  6009:     if (ledgerDept.ok) {
+  6010:       departmentHint = '<p class="aicm-selected-note">部門は選択済み台帳行から取得: ' + escapeHtml(ledgerDept.departmentLabel) + '</p>';
+  6011:     } else if (ledgerDept.ambiguous) {
+  6012:       departmentHint = '<p class="aicm-selected-note">選択済み台帳行の部門が複数あります。対象大項目の部門を揃えてください。</p>';
+  6013:     } else {
+  6014:       departmentHint = '<p class="aicm-selected-note">部門は台帳行から取得します。台帳行に部門がない場合は課候補の情報を使います。</p>';
+  6015:     }
+  6016: 
+  6017:     var sectionSelectHtml = sections.length
+  6018:       ? [
+  6019:           '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+  6020:           '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-section-select">課</label>',
+  6021:           '  <select id="aicm-r8z-mgr-major-card-route-section-select" data-r8z-mgr-major-card-route-section-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + sectionOptions + '</select>',
+  6022:           '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-section">課を適用</button>',
+  6023:           '</div>'
+  6024:         ].join("")
+  6025:       : '<p class="aicm-selected-note">選択できる課がありません。部門/課の設定またはcontext読込を確認してください。</p>';
+  6026: 
+  6027:     var leaderSelectHtml = "";
+  6028: 
+  6029:     if (!selectedSectionId) {
+  6030:       leaderSelectHtml = '<p class="aicm-selected-note">先に課を選択してください。</p>';
+  6031:     } else if (!leaders.length) {
+  6032:       leaderSelectHtml = '<p class="aicm-selected-note">この課にLeaderが配置されていません。</p>';
+  6033:     } else if (leaders.length === 1) {
+  6034:       leaderSelectHtml = '<p class="aicm-selected-note">Leaderは1人のため自動確定: ' + escapeHtml(leaders[0].leaderLabel) + '</p>';
+  6035:     } else {
+  6036:       var selectedLeaderId = aicmR8zC2cText(choice.leaderPlacementId || "");
+  6037:       var leaderOptions = ['<option value="">Leaderを選択してください</option>'].concat(
+  6038:         leaders.map(function (leader) {
+  6039:           var selected = selectedLeaderId && leader.leaderPlacementId === selectedLeaderId ? " selected" : "";
+  6040:           return '<option value="' + escapeHtml(leader.leaderPlacementId) + '"' + selected + '>' + escapeHtml(leader.leaderLabel) + '</option>';
+  6041:         })
+  6042:       ).join("");
+  6043: 
+  6044:       leaderSelectHtml = [
+  6045:         '<div class="aicm-form-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">',
+  6046:         '  <label class="aicm-selected-note" for="aicm-r8z-mgr-major-card-route-leader-select">Leader</label>',
+  6047:         '  <select id="aicm-r8z-mgr-major-card-route-leader-select" data-r8z-mgr-major-card-route-leader-select="1" style="min-width:260px;max-width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;">' + leaderOptions + '</select>',
+  6048:         '  <button type="button" data-core-action="r8z-mgr-major-card-route-apply-leader">Leaderを適用</button>',
+  6049:         '</div>'
+  6050:       ].join("");
+  6051:     }
+  6052: 
+  6053:     return [
+  6054:       '<div class="aicm-core-card" data-r8z-mgr-major-card-route-picker="1" style="margin:12px 0;border:1px solid #c7d2fe;">',
+  6055:       '  <p class="aicm-eyebrow">引き渡し先 一括選択</p>',
+  6056:       '  <h4>選択済み大項目をまとめて送る課を選択</h4>',
+  6057:       '  <p class="aicm-selected-note">大項目ごとの個別課選択は行いません。ここで選んだ課/Leaderを、選択済み大項目すべてに適用します。</p>',
+  6058:       departmentHint,
+  6059:       sectionSelectHtml,
+  6060:       '  <h4>Leader</h4>',
+  6061:       leaderSelectHtml,
+  6062:       '  <div class="aicm-dashboard-action-row">',
+  6063:       '    <button type="button" data-core-action="r8z-mgr-major-card-route-clear">引き渡し先を解除</button>',
+  6064:       '  </div>',
+  6065:       '</div>'
+  6066:     ].join("");
+  6067:   
+  6068:   }).apply(this, aicmC2d12Args);
+  6069: 
+  6070:   return aicmC2d12FilterGenericLeaderOptions(aicmC2d12Html);
+  6071:   // AICM_R8Z_MGR_MAJOR_CARD_C2D12_LEADER_GENERIC_OPTION_FILTER_END
+  6072: }
+  6073: 
+  6074: 
+  6075:   // AICM_R8Z_MGR_MAJOR_CARD_C2C_BATCH_SECTION_LEADER_ROUTE_HELPERS_END
+  6076: 
+  6077: 
+  6078:   
+  6079:   
+  6080:   
+  6081:   function aicmR8zC2bBuildLeaderHandoffPayload(row, index) {
+  6082:     row = row && typeof row === "object" ? row : {};
+  6083: 
+  6084:     var majorId = typeof aicmR8zMgrMajorCardRowId === "function"
+  6085:       ? aicmR8zMgrMajorCardRowId(row, index)
+  6086:       : "";
+  6087: 
+  6088:     var route = typeof aicmR8zC2cEffectiveRoute === "function"
+  6089:       ? aicmR8zC2cEffectiveRoute()
+  6090:       : { sectionId: "", leaderPlacementId: "", leaderId: "", displayLeader: "" };
+  6091: 
+  6092:     var payload = {
+  6093:       owner_civilization_id: aicmR8zC2bOwnerId(row),
+  6094:       aicm_manager_major_work_item_id: majorId,
+  6095:       assigned_leader_label: route.displayLeader && route.displayLeader !== "-" ? route.displayLeader : "",
+  6096:       decomposition_status_code: "assigned_to_leader",
+  6097:       handoff_status_code: "handed_off",
+  6098:       note: aicmR8zC2bText(row.note || "")
+  6099:     };
+  6100: 
+  6101:     if (route.departmentId) payload.department_id = route.departmentId;
+  6102:     if (route.sectionId) payload.section_id = route.sectionId;
+
+============================================================
+CENTER=6427
+HIT=if (c2d11r1Action === "r8z-mgr-major-card-route-apply-section") {
+============================================================
+  6402:       try {
+  6403:         var c2d11r1Action = "";
+  6404:         var c2d11r1Event = null;
+  6405:         var c2d11r1Target = null;
+  6406: 
+  6407:         for (var c2d11r1I = 0; c2d11r1I < arguments.length; c2d11r1I += 1) {
+  6408:           var c2d11r1Arg = arguments[c2d11r1I];
+  6409: 
+  6410:           if (!c2d11r1Event && c2d11r1Arg && c2d11r1Arg.preventDefault) c2d11r1Event = c2d11r1Arg;
+  6411:           if (!c2d11r1Action && typeof c2d11r1Arg === "string") c2d11r1Action = String(c2d11r1Arg || "").trim();
+  6412:           if (!c2d11r1Target && c2d11r1Arg && c2d11r1Arg.getAttribute) c2d11r1Target = c2d11r1Arg;
+  6413: 
+  6414:           if (!c2d11r1Target && c2d11r1Arg && c2d11r1Arg.target) {
+  6415:             if (c2d11r1Arg.target.closest) {
+  6416:               c2d11r1Target = c2d11r1Arg.target.closest("[data-core-action]");
+  6417:             } else if (c2d11r1Arg.target.getAttribute) {
+  6418:               c2d11r1Target = c2d11r1Arg.target;
+  6419:             }
+  6420:           }
+  6421:         }
+  6422: 
+  6423:         if (!c2d11r1Action && c2d11r1Target && c2d11r1Target.getAttribute) {
+  6424:           c2d11r1Action = String(c2d11r1Target.getAttribute("data-core-action") || "").trim();
+  6425:         }
+  6426: 
+  6427:         if (c2d11r1Action === "r8z-mgr-major-card-route-apply-section") {
+  6428:           if (c2d11r1Event && c2d11r1Event.preventDefault) c2d11r1Event.preventDefault();
+  6429:           if (c2d11r1Event && c2d11r1Event.stopPropagation) c2d11r1Event.stopPropagation();
+  6430: 
+  6431:           function c2d11r1Text(v) {
+  6432:             if (v === null || typeof v === "undefined") return "";
+  6433:             return String(v).trim();
+  6434:           }
+  6435: 
+  6436:           function c2d11r1Get(obj, keys) {
+  6437:             if (!obj || typeof obj !== "object") return "";
+  6438:             for (var gi = 0; gi < keys.length; gi += 1) {
+  6439:               var k = keys[gi];
+  6440:               if (obj[k] !== null && typeof obj[k] !== "undefined" && String(obj[k]).trim() !== "") {
+  6441:                 return String(obj[k]).trim();
+  6442:               }
+  6443:             }
+  6444:             return "";
+  6445:           }
+  6446: 
+  6447:           function c2d11r1Arr(v) {
+  6448:             return Array.isArray(v) ? v : [];
+  6449:           }
+  6450: 
+  6451:           function c2d11r1Attr(el, keys) {
+  6452:             if (!el || !el.getAttribute) return "";
+  6453:             for (var ai = 0; ai < keys.length; ai += 1) {
+  6454:               var av = c2d11r1Text(el.getAttribute(keys[ai]));
+  6455:               if (av) return av;
+  6456:             }
+  6457:             return "";
+  6458:           }
+  6459: 
+  6460:           var c2d11r1Root = null;
+  6461:           if (c2d11r1Target && c2d11r1Target.closest) {
+  6462:             c2d11r1Root =
+  6463:               c2d11r1Target.closest("[data-r8z-mgr-major-card-route-picker]") ||
+  6464:               c2d11r1Target.closest("[data-aicm-route-picker]") ||
+  6465:               c2d11r1Target.closest(".aicm-core-card") ||
+  6466:               c2d11r1Target.closest("section") ||
+  6467:               c2d11r1Target.closest("div");
+  6468:           }
+  6469: 
+  6470:           var c2d11r1Select = null;
+  6471:           if (c2d11r1Root && c2d11r1Root.querySelector) {
+  6472:             c2d11r1Select =
+  6473:               c2d11r1Root.querySelector("select[data-r8z-c2d-route-section-select]") ||
+  6474:               c2d11r1Root.querySelector("select[data-section-select]") ||
+  6475:               c2d11r1Root.querySelector("select");
+  6476:           }
+  6477: 
+  6478:           var c2d11r1Option = null;
+  6479:           if (c2d11r1Select && c2d11r1Select.options && c2d11r1Select.selectedIndex >= 0) {
+  6480:             c2d11r1Option = c2d11r1Select.options[c2d11r1Select.selectedIndex];
+  6481:           }
+  6482: 
+  6483:           var c2d11r1Ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+  6484: 
+  6485:           var c2d11r1Rows = [];
+  6486:           if (typeof aicmR8zMgrMajorCardSelectedRows === "function") {
+  6487:             try {
+  6488:               c2d11r1Rows = aicmR8zMgrMajorCardSelectedRows() || [];
+  6489:             } catch (_) {
+  6490:               c2d11r1Rows = [];
+  6491:             }
+  6492:           }
+  6493:           var c2d11r1Row = c2d11r1Rows.length ? (c2d11r1Rows[0] || {}) : {};
+  6494: 
+  6495:           var sectionId =
+  6496:             c2d11r1Attr(c2d11r1Option, ["data-section-id", "data-aicm-section-id", "value"]) ||
+  6497:             c2d11r1Text(c2d11r1Select && c2d11r1Select.value) ||
+  6498:             c2d11r1Get(c2d11r1Row, ["section_id", "sectionId"]);
+  6499: 
+  6500:           var sectionLabel =
+  6501:             c2d11r1Attr(c2d11r1Option, ["data-section-label", "data-section-name", "data-label"]) ||
+  6502:             c2d11r1Text(c2d11r1Option && (c2d11r1Option.textContent || c2d11r1Option.innerText)) ||
+  6503:             c2d11r1Get(c2d11r1Row, ["section_name", "section_label", "sectionLabel"]);
+  6504: 
+  6505:           var departmentId =
+  6506:             c2d11r1Attr(c2d11r1Option, ["data-department-id", "data-aicm-department-id"]) ||
+  6507:             c2d11r1Get(c2d11r1Row, ["department_id", "departmentId"]);
+
+============================================================
+CENTER=6864
+HIT=if (action === "r8z-mgr-major-card-route-apply-section") {
+============================================================
+  6839:       if (action === "r8z-mgr-major-card-open-handoff-confirm") {
+  6840:         aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+  6841:         return;
+  6842:       }
+  6843: 
+  6844:       if (action === "r8z-mgr-major-card-open-delete-confirm") {
+  6845:         aicmR8zMgrMajorCardOpenConfirm("delete");
+  6846:         return;
+  6847:       }
+  6848: 
+  6849:       if (action === "r8z-mgr-major-card-confirm-no") {
+  6850:         bag.confirm = null;
+  6851: 
+  6852:         if (typeof setMessage === "function") {
+  6853:           setMessage("ok", "操作をキャンセルしました。");
+  6854:         }
+  6855: 
+  6856:         aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_no");
+  6857:         return;
+  6858:       }
+  6859: 
+  6860:       
+  6861: 
+  6862: 
+  6863:       // AICM_R8Z_MGR_MAJOR_CARD_C2D2_LEDGER_DEPARTMENT_ROUTE_ACTION_ROUTE
+  6864:       if (action === "r8z-mgr-major-card-route-apply-section") {
+  6865:         var aicmR8zC2d5r2aDebug = {
+  6866:           phase: "branch-enter",
+  6867:           at: (new Date()).toISOString(),
+  6868:           action: String(action || ""),
+  6869:           targetTag: target && target.tagName ? String(target.tagName) : "",
+  6870:           targetAction: target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : "",
+  6871:           targetId: target && target.id ? String(target.id) : "",
+  6872:           targetClass: target && target.className ? String(target.className) : ""
+  6873:         };
+  6874: 
+  6875:         try {
+  6876:           if (state && typeof state === "object") {
+  6877:             state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+  6878:           }
+  6879:           if (typeof console !== "undefined" && console.info) {
+  6880:             console.info("AICM C2D5R2A route apply debug", aicmR8zC2d5r2aDebug);
+  6881:           }
+  6882:         } catch (_) {}
+  6883: 
+  6884:         var routeRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
+  6885:         var sectionSelect = routeRoot && routeRoot.querySelector
+  6886:           ? routeRoot.querySelector("[data-r8z-mgr-major-card-route-section-select]")
+  6887:           : (typeof document !== "undefined" ? document.getElementById("aicm-r8z-mgr-major-card-route-section-select") : null);
+  6888: 
+  6889:         var option = sectionSelect && sectionSelect.options
+  6890:           ? sectionSelect.options[sectionSelect.selectedIndex]
+  6891:           : null;
+  6892: 
+  6893:         var sectionId = sectionSelect ? String(sectionSelect.value || "").trim() : "";
+  6894:         try {
+  6895:           aicmR8zC2d5r2aDebug.phase = "after-select-read";
+  6896:           aicmR8zC2d5r2aDebug.routeRootFound = !!routeRoot;
+  6897:           aicmR8zC2d5r2aDebug.sectionSelectFound = !!sectionSelect;
+  6898:           aicmR8zC2d5r2aDebug.optionFound = !!option;
+  6899:           aicmR8zC2d5r2aDebug.selectedIndex = sectionSelect ? sectionSelect.selectedIndex : null;
+  6900:           aicmR8zC2d5r2aDebug.sectionId = sectionId;
+  6901:           aicmR8zC2d5r2aDebug.optionText = option ? String(option.textContent || "").trim() : "";
+  6902:           aicmR8zC2d5r2aDebug.optionSectionId = option && option.getAttribute ? String(option.getAttribute("data-section-id") || "") : "";
+  6903:           aicmR8zC2d5r2aDebug.optionSectionLabel = option && option.getAttribute ? String(option.getAttribute("data-section-label") || "") : "";
+  6904:           aicmR8zC2d5r2aDebug.optionDepartmentId = option && option.getAttribute ? String(option.getAttribute("data-department-id") || "") : "";
+  6905:           aicmR8zC2d5r2aDebug.optionDepartmentLabel = option && option.getAttribute ? String(option.getAttribute("data-department-label") || "") : "";
+  6906: 
+  6907:           if (state && typeof state === "object") {
+  6908:             state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+  6909:           }
+  6910:           if (typeof console !== "undefined" && console.info) {
+  6911:             console.info("AICM C2D5R2A route apply after select", aicmR8zC2d5r2aDebug);
+  6912:           }
+  6913:         } catch (_) {}
+  6914: 
+  6915: 
+  6916:         if (!sectionId || !option) {
+  6917:           if (typeof setMessage === "function") setMessage("error", "課を選択してください。");
+  6918:           aicmR8zMgrMajorCardRerender("r8z_c2d2_section_select_empty");
+  6919:           return;
+  6920:         }
+  6921: 
+  6922:         var sectionSnapshot = {
+  6923:           sectionId: String(option.getAttribute("data-section-id") || sectionId || "").trim(),
+  6924:           sectionLabel: String(option.getAttribute("data-section-label") || option.textContent || "").trim(),
+  6925:           departmentId: String(option.getAttribute("data-department-id") || "").trim(),
+  6926:           departmentLabel: String(option.getAttribute("data-department-label") || "").trim()
+  6927:         };
+  6928: 
+  6929:         var appliedRoute = aicmR8zC2cApplySectionChoice(sectionId, sectionSnapshot);
+  6930:         try {
+  6931:           aicmR8zC2d5r2aDebug.phase = "after-apply";
+  6932:           aicmR8zC2d5r2aDebug.appliedRouteOk = !!appliedRoute;
+  6933:           aicmR8zC2d5r2aDebug.appliedRoute = appliedRoute || null;
+  6934:           aicmR8zC2d5r2aDebug.choiceAfterApply = typeof aicmR8zC2cChoice === "function" ? aicmR8zC2cChoice() : null;
+  6935:           aicmR8zC2d5r2aDebug.stateSelectionAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection : null;
+  6936:           aicmR8zC2d5r2aDebug.confirmAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection.confirm || null : null;
+  6937: 
+  6938:           if (state && typeof state === "object") {
+  6939:             state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+  6940:           }
+  6941:           if (typeof console !== "undefined" && console.info) {
+  6942:             console.info("AICM C2D5R2A route apply after apply", aicmR8zC2d5r2aDebug);
+  6943:           }
+  6944:         } catch (_) {}

@@ -1,0 +1,509 @@
+AICompanyManager V10L-C2F-D2B-R2C exact sameSection window
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+SERVER_PATCH=NO
+
+WINDOW=6560-7060
+============================================================
+  6560:               "responsible_robot_label",
+  6561:               "responsible_role_label",
+  6562:               "leaderLabel"
+  6563:             ]);
+  6564: 
+  6565:             leaderPlacementId = leaderPlacementId || c2d11r1Get(matchedSection, [
+  6566:               "leader_placement_id",
+  6567:               "leaderPlacementId",
+  6568:               "assigned_leader_placement_id"
+  6569:             ]);
+  6570:           }
+  6571: 
+  6572:           var departments = []
+  6573:             .concat(c2d11r1Arr(c2d11r1Ctx.departments))
+  6574:             .concat(c2d11r1Arr(c2d11r1Ctx.departmentList));
+  6575: 
+  6576:           if (departmentId && !departmentLabel) {
+  6577:             for (var di = 0; di < departments.length; di += 1) {
+  6578:               var d = departments[di] || {};
+  6579:               var did = c2d11r1Get(d, ["aicm_user_company_department_id", "department_id", "id", "departmentId"]);
+  6580:               if (did === departmentId) {
+  6581:                 departmentLabel = c2d11r1Get(d, ["department_name", "name", "department_label", "departmentLabel"]);
+  6582:                 break;
+  6583:               }
+  6584:             }
+  6585:           }
+  6586: 
+  6587:           var placements = []
+  6588:             .concat(c2d11r1Arr(c2d11r1Ctx.placements))
+  6589:             .concat(c2d11r1Arr(c2d11r1Ctx.robot_placements))
+  6590:             .concat(c2d11r1Arr(c2d11r1Ctx.organization_placements));
+  6591: 
+  6592:           if (!leaderLabel || !leaderPlacementId) {
+  6593:             for (var pi = 0; pi < placements.length; pi += 1) {
+  6594:               var p = placements[pi] || {};
+  6595:               var psid = c2d11r1Get(p, ["section_id", "organization_id", "aicm_user_company_section_id", "sectionId"]);
+  6596:               var pslabel = c2d11r1Get(p, ["section_name", "organization_name", "section_label", "sectionLabel"]);
+  6597:               var role = c2d11r1Get(p, ["role_code", "placement_role_code", "assigned_role_code", "roleCode"]).toLowerCase();
+  6598:               var roleLabel = c2d11r1Get(p, ["role_label", "placement_role_label"]);
+  6599: 
+  6600:               var sameSection =
+  6601:                 (sectionId && psid === sectionId) ||
+  6602:                 (sectionLabel && pslabel === sectionLabel);
+  6603: 
+  6604:               var isLeader =
+  6605:                 role === "leader" ||
+  6606:                 role === "section_leader" ||
+  6607:                 role === "課長" ||
+  6608:                 roleLabel.indexOf("Leader") >= 0 ||
+  6609:                 roleLabel.indexOf("課長") >= 0;
+  6610: 
+  6611:               if (sameSection && isLeader) {
+  6612:                 leaderLabel = leaderLabel || c2d11r1Get(p, [
+  6613:                   "internal_nickname",
+  6614:                   "robot_internal_nickname",
+  6615:                   "placement_label",
+  6616:                   "robot_display_name",
+  6617:                   "robot_name",
+  6618:                   "display_name",
+  6619:                   "name"
+  6620:                 ]);
+  6621:                 leaderPlacementId = leaderPlacementId || c2d11r1Get(p, [
+  6622:                   "placement_id",
+  6623:                   "robot_placement_id",
+  6624:                   "aicm_robot_placement_id",
+  6625:                   "id"
+  6626:                 ]);
+  6627:                 break;
+  6628:               }
+  6629:             }
+  6630:           }
+  6631: 
+  6632:           var selectionState = null;
+  6633:           if (typeof aicmR8zMgrMajorCardSelectionState === "function") {
+  6634:             try {
+  6635:               selectionState = aicmR8zMgrMajorCardSelectionState();
+  6636:             } catch (_) {
+  6637:               selectionState = null;
+  6638:             }
+  6639:           }
+  6640: 
+  6641:           if (!selectionState) {
+  6642:             if (!state.r8zMgrMajorCardSelection || typeof state.r8zMgrMajorCardSelection !== "object") {
+  6643:               state.r8zMgrMajorCardSelection = {};
+  6644:             }
+  6645:             selectionState = state.r8zMgrMajorCardSelection;
+  6646:           }
+  6647: 
+  6648:           if (!selectionState.handoffBatchRoute || typeof selectionState.handoffBatchRoute !== "object") {
+  6649:             selectionState.handoffBatchRoute = {};
+  6650:           }
+  6651: 
+  6652:           var route = selectionState.handoffBatchRoute;
+  6653: 
+  6654:           route.applied = true;
+  6655:           route.applied_flag = true;
+  6656:           route.appliedLabel = "適用済み";
+  6657:           route.applied_label = "適用済み";
+  6658: 
+  6659:           route.sectionId = sectionId;
+  6660:           route.section_id = sectionId;
+  6661:           route.sectionLabel = sectionLabel;
+  6662:           route.section_label = sectionLabel;
+  6663:           route.sectionName = sectionLabel;
+  6664:           route.section_name = sectionLabel;
+  6665: 
+  6666:           route.departmentId = departmentId;
+  6667:           route.department_id = departmentId;
+  6668:           route.departmentLabel = departmentLabel;
+  6669:           route.department_label = departmentLabel;
+  6670:           route.departmentName = departmentLabel;
+  6671:           route.department_name = departmentLabel;
+  6672: 
+  6673:           route.leaderPlacementId = leaderPlacementId;
+  6674:           route.leader_placement_id = leaderPlacementId;
+  6675:           route.leaderLabel = leaderLabel;
+  6676:           route.leader_label = leaderLabel;
+  6677:           route.assigned_leader_label = leaderLabel;
+  6678: 
+  6679:           route.departmentMissing = !departmentLabel;
+  6680:           route.leaderMissing = !leaderLabel;
+  6681:           route.lastAppliedAt = (new Date()).toISOString();
+  6682: 
+  6683:           state.r8zMgrMajorCardRouteEnrichmentDebug = {
+  6684:             marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY",
+  6685:             at: route.lastAppliedAt,
+  6686:             action: c2d11r1Action,
+  6687:             sectionId: sectionId,
+  6688:             sectionLabel: sectionLabel,
+  6689:             departmentId: departmentId,
+  6690:             departmentLabel: departmentLabel,
+  6691:             leaderPlacementId: leaderPlacementId,
+  6692:             leaderLabel: leaderLabel,
+  6693:             matchedSection: !!matchedSection,
+  6694:             selectedRows: c2d11r1Rows.length
+  6695:           };
+  6696: 
+  6697:           if (typeof setMessage === "function") {
+  6698:             if (departmentLabel && leaderLabel) {
+  6699:               setMessage("ok", "課・部門・Leaderを一括引き渡し先へ適用しました。");
+  6700:             } else if (departmentLabel) {
+  6701:               setMessage("ok", "課と部門を一括引き渡し先へ適用しました。Leaderは未設定です。");
+  6702:             } else {
+  6703:               setMessage("error", "課は適用しましたが、部門情報を特定できません。課設定または台帳行を確認してください。");
+  6704:             }
+  6705:           }
+  6706: 
+  6707:           if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+  6708:             aicmRenderTaskLedgerSafeR8V4("c2d11r1-route-enrichment");
+  6709:             return;
+  6710:           }
+  6711: 
+  6712:           if (typeof render === "function") {
+  6713:             render();
+  6714:             return;
+  6715:           }
+  6716: 
+  6717:           return;
+  6718:         }
+  6719:       } catch (c2d11r1Error) {
+  6720:         if (typeof console !== "undefined" && console.warn) {
+  6721:           console.warn("C2D11R1 route enrichment failed", c2d11r1Error);
+  6722:         }
+  6723:       }
+  6724:       // AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY_END
+  6725: 
+  6726: 
+  6727:       try {
+  6728:         var aicmR8zC2d7Args = [];
+  6729:         for (var aicmR8zC2d7I = 0; aicmR8zC2d7I < arguments.length; aicmR8zC2d7I += 1) {
+  6730:           var aicmR8zC2d7Arg = arguments[aicmR8zC2d7I];
+  6731:           var aicmR8zC2d7Item = {
+  6732:             index: aicmR8zC2d7I,
+  6733:             type: typeof aicmR8zC2d7Arg,
+  6734:             stringValue: typeof aicmR8zC2d7Arg === "string" ? String(aicmR8zC2d7Arg) : "",
+  6735:             hasTarget: !!(aicmR8zC2d7Arg && aicmR8zC2d7Arg.target),
+  6736:             tagName: aicmR8zC2d7Arg && aicmR8zC2d7Arg.tagName ? String(aicmR8zC2d7Arg.tagName) : "",
+  6737:             id: aicmR8zC2d7Arg && aicmR8zC2d7Arg.id ? String(aicmR8zC2d7Arg.id) : "",
+  6738:             className: aicmR8zC2d7Arg && aicmR8zC2d7Arg.className ? String(aicmR8zC2d7Arg.className) : "",
+  6739:             dataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.getAttribute ? String(aicmR8zC2d7Arg.getAttribute("data-core-action") || "") : "",
+  6740:             targetDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.getAttribute
+  6741:               ? String(aicmR8zC2d7Arg.target.getAttribute("data-core-action") || "")
+  6742:               : "",
+  6743:             closestDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.closest
+  6744:               ? String((aicmR8zC2d7Arg.target.closest("[data-core-action]") || {}).getAttribute ? aicmR8zC2d7Arg.target.closest("[data-core-action]").getAttribute("data-core-action") || "" : "")
+  6745:               : ""
+  6746:           };
+  6747:           aicmR8zC2d7Args.push(aicmR8zC2d7Item);
+  6748:         }
+  6749: 
+  6750:         if (state && typeof state === "object") {
+  6751:           state.r8zMgrMajorCardHandlerEntryDebug = {
+  6752:             at: (new Date()).toISOString(),
+  6753:             phase: "handler-entry",
+  6754:             args: aicmR8zC2d7Args,
+  6755:             actionVar: typeof action !== "undefined" ? String(action || "") : "__ACTION_VAR_UNDEFINED__",
+  6756:             targetVarTag: typeof target !== "undefined" && target && target.tagName ? String(target.tagName) : "",
+  6757:             targetVarAction: typeof target !== "undefined" && target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : ""
+  6758:           };
+  6759:         }
+  6760: 
+  6761:         if (typeof console !== "undefined" && console.info) {
+  6762:         }
+  6763:       } catch (aicmR8zC2d7Error) {
+  6764:         if (typeof console !== "undefined" && console.warn) {
+  6765:         }
+  6766:       }
+  6767: 
+  6768: 
+  6769:     try {
+  6770:       if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
+  6771: 
+  6772:       target = target || null;
+  6773: 
+  6774:       if (!target && ev && ev.target && typeof ev.target.closest === "function") {
+  6775:         target = ev.target.closest("[data-core-action]");
+  6776:       }
+  6777: 
+  6778:       var bag = aicmR8zMgrMajorCardState();
+  6779: 
+  6780:       if (action === "r8z-mgr-major-card-toggle") {
+  6781:         var id = "";
+  6782: 
+  6783:         if (target && target.getAttribute) {
+  6784:           id = String(target.getAttribute("data-r8z-mgr-major-id") || "").trim();
+  6785:         }
+  6786: 
+  6787:         if (!id && target && target.dataset) {
+  6788:           id = String(target.dataset.r8zMgrMajorId || "").trim();
+  6789:         }
+  6790: 
+  6791:         if (!id) {
+  6792:           if (typeof setMessage === "function") setMessage("error", "選択対象の大項目IDを特定できません。");
+  6793:           aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_toggle_missing_id");
+  6794:           return;
+  6795:         }
+  6796: 
+  6797:         if (target && target.checked) {
+  6798:           bag.selectedIds[id] = true;
+  6799:         } else {
+  6800:           delete bag.selectedIds[id];
+  6801:         }
+  6802: 
+  6803:         bag.confirm = null;
+  6804:         aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_toggle");
+  6805:         return;
+  6806:       }
+  6807: 
+  6808:       if (action === "r8z-mgr-major-card-select-all") {
+  6809:         bag.selectedIds = {};
+  6810: 
+  6811:         aicmR8zMgrMajorCardAllRows().forEach(function (row, index) {
+  6812:           if (!aicmR8zMgrMajorCardIsSelectable(row)) return;
+  6813:           var id = aicmR8zMgrMajorCardRowId(row, index);
+  6814:           if (id) bag.selectedIds[id] = true;
+  6815:         });
+  6816: 
+  6817:         bag.confirm = null;
+  6818: 
+  6819:         if (typeof setMessage === "function") {
+  6820:           setMessage("ok", "未送信の大項目を全件選択しました。");
+  6821:         }
+  6822: 
+  6823:         aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_select_all");
+  6824:         return;
+  6825:       }
+  6826: 
+  6827:       if (action === "r8z-mgr-major-card-clear") {
+  6828:         bag.selectedIds = {};
+  6829:         bag.confirm = null;
+  6830: 
+  6831:         if (typeof setMessage === "function") {
+  6832:           setMessage("ok", "大項目の選択を解除しました。");
+  6833:         }
+  6834: 
+  6835:         aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_clear");
+  6836:         return;
+  6837:       }
+  6838: 
+  6839:       if (action === "r8z-mgr-major-card-open-handoff-confirm") {
+  6840:         aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+  6841:         return;
+  6842:       }
+  6843: 
+  6844:       if (action === "r8z-mgr-major-card-open-delete-confirm") {
+  6845:         aicmR8zMgrMajorCardOpenConfirm("delete");
+  6846:         return;
+  6847:       }
+  6848: 
+  6849:       if (action === "r8z-mgr-major-card-confirm-no") {
+  6850:         bag.confirm = null;
+  6851: 
+  6852:         if (typeof setMessage === "function") {
+  6853:           setMessage("ok", "操作をキャンセルしました。");
+  6854:         }
+  6855: 
+  6856:         aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_no");
+  6857:         return;
+  6858:       }
+  6859: 
+  6860:       
+  6861: 
+  6862: 
+  6863:       // AICM_R8Z_MGR_MAJOR_CARD_C2D2_LEDGER_DEPARTMENT_ROUTE_ACTION_ROUTE
+  6864:       if (action === "r8z-mgr-major-card-route-apply-section") {
+  6865:         var aicmR8zC2d5r2aDebug = {
+  6866:           phase: "branch-enter",
+  6867:           at: (new Date()).toISOString(),
+  6868:           action: String(action || ""),
+  6869:           targetTag: target && target.tagName ? String(target.tagName) : "",
+  6870:           targetAction: target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : "",
+  6871:           targetId: target && target.id ? String(target.id) : "",
+  6872:           targetClass: target && target.className ? String(target.className) : ""
+  6873:         };
+  6874: 
+  6875:         try {
+  6876:           if (state && typeof state === "object") {
+  6877:             state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+  6878:           }
+  6879:           if (typeof console !== "undefined" && console.info) {
+  6880:             console.info("AICM C2D5R2A route apply debug", aicmR8zC2d5r2aDebug);
+  6881:           }
+  6882:         } catch (_) {}
+  6883: 
+  6884:         var routeRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
+  6885:         var sectionSelect = routeRoot && routeRoot.querySelector
+  6886:           ? routeRoot.querySelector("[data-r8z-mgr-major-card-route-section-select]")
+  6887:           : (typeof document !== "undefined" ? document.getElementById("aicm-r8z-mgr-major-card-route-section-select") : null);
+  6888: 
+  6889:         var option = sectionSelect && sectionSelect.options
+  6890:           ? sectionSelect.options[sectionSelect.selectedIndex]
+  6891:           : null;
+  6892: 
+  6893:         var sectionId = sectionSelect ? String(sectionSelect.value || "").trim() : "";
+  6894:         try {
+  6895:           aicmR8zC2d5r2aDebug.phase = "after-select-read";
+  6896:           aicmR8zC2d5r2aDebug.routeRootFound = !!routeRoot;
+  6897:           aicmR8zC2d5r2aDebug.sectionSelectFound = !!sectionSelect;
+  6898:           aicmR8zC2d5r2aDebug.optionFound = !!option;
+  6899:           aicmR8zC2d5r2aDebug.selectedIndex = sectionSelect ? sectionSelect.selectedIndex : null;
+  6900:           aicmR8zC2d5r2aDebug.sectionId = sectionId;
+  6901:           aicmR8zC2d5r2aDebug.optionText = option ? String(option.textContent || "").trim() : "";
+  6902:           aicmR8zC2d5r2aDebug.optionSectionId = option && option.getAttribute ? String(option.getAttribute("data-section-id") || "") : "";
+  6903:           aicmR8zC2d5r2aDebug.optionSectionLabel = option && option.getAttribute ? String(option.getAttribute("data-section-label") || "") : "";
+  6904:           aicmR8zC2d5r2aDebug.optionDepartmentId = option && option.getAttribute ? String(option.getAttribute("data-department-id") || "") : "";
+  6905:           aicmR8zC2d5r2aDebug.optionDepartmentLabel = option && option.getAttribute ? String(option.getAttribute("data-department-label") || "") : "";
+  6906: 
+  6907:           if (state && typeof state === "object") {
+  6908:             state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+  6909:           }
+  6910:           if (typeof console !== "undefined" && console.info) {
+  6911:             console.info("AICM C2D5R2A route apply after select", aicmR8zC2d5r2aDebug);
+  6912:           }
+  6913:         } catch (_) {}
+  6914: 
+  6915: 
+  6916:         if (!sectionId || !option) {
+  6917:           if (typeof setMessage === "function") setMessage("error", "課を選択してください。");
+  6918:           aicmR8zMgrMajorCardRerender("r8z_c2d2_section_select_empty");
+  6919:           return;
+  6920:         }
+  6921: 
+  6922:         var sectionSnapshot = {
+  6923:           sectionId: String(option.getAttribute("data-section-id") || sectionId || "").trim(),
+  6924:           sectionLabel: String(option.getAttribute("data-section-label") || option.textContent || "").trim(),
+  6925:           departmentId: String(option.getAttribute("data-department-id") || "").trim(),
+  6926:           departmentLabel: String(option.getAttribute("data-department-label") || "").trim()
+  6927:         };
+  6928: 
+  6929:         var appliedRoute = aicmR8zC2cApplySectionChoice(sectionId, sectionSnapshot);
+  6930:         try {
+  6931:           aicmR8zC2d5r2aDebug.phase = "after-apply";
+  6932:           aicmR8zC2d5r2aDebug.appliedRouteOk = !!appliedRoute;
+  6933:           aicmR8zC2d5r2aDebug.appliedRoute = appliedRoute || null;
+  6934:           aicmR8zC2d5r2aDebug.choiceAfterApply = typeof aicmR8zC2cChoice === "function" ? aicmR8zC2cChoice() : null;
+  6935:           aicmR8zC2d5r2aDebug.stateSelectionAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection : null;
+  6936:           aicmR8zC2d5r2aDebug.confirmAfterApply = state && state.r8zMgrMajorCardSelection ? state.r8zMgrMajorCardSelection.confirm || null : null;
+  6937: 
+  6938:           if (state && typeof state === "object") {
+  6939:             state.r8zMgrMajorCardRouteApplyDebug = aicmR8zC2d5r2aDebug;
+  6940:           }
+  6941:           if (typeof console !== "undefined" && console.info) {
+  6942:             console.info("AICM C2D5R2A route apply after apply", aicmR8zC2d5r2aDebug);
+  6943:           }
+  6944:         } catch (_) {}
+  6945: 
+  6946: 
+  6947:         if (!appliedRoute || !appliedRoute.sectionId) {
+  6948:           if (typeof setMessage === "function") setMessage("error", "選択した課を適用できません。再読み込みしてください。");
+  6949:           aicmR8zMgrMajorCardRerender("r8z_c2d2_section_apply_failed");
+  6950:           return;
+  6951:         }
+  6952: 
+  6953:         if (typeof setMessage === "function") {
+  6954:           setMessage("ok", "引き渡し先の課を適用しました: " + appliedRoute.sectionLabel);
+  6955:         }
+  6956: 
+  6957:         aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+  6958:         return;
+  6959:       }
+  6960: 
+  6961:       if (action === "r8z-mgr-major-card-route-apply-leader") {
+  6962:         var leaderRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
+  6963:         var leaderSelect = leaderRoot && leaderRoot.querySelector
+  6964:           ? leaderRoot.querySelector("[data-r8z-mgr-major-card-route-leader-select]")
+  6965:           : (typeof document !== "undefined" ? document.getElementById("aicm-r8z-mgr-major-card-route-leader-select") : null);
+  6966: 
+  6967:         var leaderPlacementId = leaderSelect ? String(leaderSelect.value || "").trim() : "";
+  6968: 
+  6969:         if (!leaderPlacementId) {
+  6970:           if (typeof setMessage === "function") setMessage("error", "Leaderを選択してください。");
+  6971:           aicmR8zMgrMajorCardRerender("r8z_c2d2_leader_select_empty");
+  6972:           return;
+  6973:         }
+  6974: 
+  6975:         aicmR8zC2cApplyLeaderChoice(leaderPlacementId);
+  6976: 
+  6977:         if (typeof setMessage === "function") {
+  6978:           setMessage("ok", "Leaderを適用しました。");
+  6979:         }
+  6980: 
+  6981:         aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+  6982:         return;
+  6983:       }
+  6984: 
+  6985:       if (action === "r8z-mgr-major-card-route-clear") {
+  6986:         aicmR8zC2cClearRouteChoice();
+  6987:         aicmR8zMgrMajorCardOpenConfirm("leader-handoff");
+  6988:         return;
+  6989:       }
+  6990: 
+  6991: if (action === "r8z-mgr-major-card-confirm-yes") {
+  6992:         // AICM_R8Z_MGR_MAJOR_CARD_C2B_PAYLOAD_VALIDATION_CONFIRM_YES_VALIDATION_GUARD
+  6993:         if (bag.confirm && Array.isArray(bag.confirm.errors) && bag.confirm.errors.length) {
+  6994:           if (typeof setMessage === "function") {
+  6995:             setMessage("error", "実行前チェックが未解決のため、Yesは実行できません。");
+  6996:           }
+  6997:           aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_blocked_c2b");
+  6998:           return;
+  6999:         }
+  7000: 
+  7001:         var kind = bag.confirm && bag.confirm.kind ? bag.confirm.kind : "";
+  7002:         var count = bag.confirm && Array.isArray(bag.confirm.items) ? bag.confirm.items.length : 0;
+  7003: 
+  7004:         bag.confirm = null;
+  7005: 
+  7006:         if (typeof setMessage === "function") {
+  7007:           setMessage(
+  7008:             "ok",
+  7009:             (kind === "delete" ? "削除" : "課長へ送る") +
+  7010:             "のYesを受け付けました。ただしこの確認画面ではDB更新/API POSTは実行していません。対象件数: " +
+  7011:             String(count)
+  7012:           );
+  7013:         }
+  7014: 
+  7015:         aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_yes_no_write");
+  7016:         return;
+  7017:       }
+  7018:     } catch (error) {
+  7019:       try {
+  7020:         if (typeof setMessage === "function") {
+  7021:           setMessage("error", error && error.message ? error.message : "大項目選択操作に失敗しました。");
+  7022:         }
+  7023:         aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_action_error");
+  7024:       } catch (_) {}
+  7025:     }
+  7026:   }
+  7027:   // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_HELPER_END
+  7028: 
+  7029: function aicmRenderManagerMajorRows(rows) {
+  7030:     var sourceRows = Array.isArray(rows) ? rows : [];
+  7031:     var pendingRows = sourceRows.filter(function (row) {
+  7032:       // AICM_R8Z_V9D1_IS_PENDING_MAJOR_SCOPE_CALLSITE_FIX: use existing visible canonical helper, not the scope-local isPendingMajor
+  7033:       if (typeof aicmIsPendingManagerMajorRowR8V6 === "function") {
+  7034:         return aicmIsPendingManagerMajorRowR8V6(row);
+  7035:       }
+  7036:       return !!row;
+  7037:     });
+  7038: 
+  7039:     var confirmCard = aicmRenderMajorItemDeleteConfirmCardR8P();
+  7040: 
+  7041:     if (!pendingRows.length) {
+  7042:       return [
+  7043:         confirmCard,
+  7044:         '<div class="aicm-core-empty">',
+  7045:         '  <strong>登録済み大項目はまだありません</strong>',
+  7046:         '  <p>CSV取り込み後、未実行/未引き継ぎのManager大項目だけが表示されます。</p>',
+  7047:         '</div>'
+  7048:       ].join("");
+  7049:     }
+  7050: 
+  7051:     var pageSize = aicmMajorItemPageSizeR8O();
+  7052:     var totalRows = pendingRows.length;
+  7053:     var totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  7054:     var page = aicmMajorItemCurrentPageR8O(totalRows);
+  7055:     var start = (page - 1) * pageSize;
+  7056:     var pageRows = pendingRows.slice(start, start + pageSize);
+  7057: 
+  7058:     var pager = [
+  7059:       '<div class="aicm-dashboard-action-row">',
+  7060:       '<!-- AICM_R8Z_MGR_MAJOR_CARD_SELECTION_C1G_VISIBLE_PANEL_POLISH_PANEL -->',
