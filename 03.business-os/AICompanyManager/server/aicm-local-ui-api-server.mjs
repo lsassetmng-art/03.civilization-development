@@ -2156,6 +2156,26 @@ async function runWorkerAutoExecutionR8ZI(body) {
   const pairs = workerAutoExecutionCandidatesR8ZI(body || {});
   const executed = [];
   const failed = [];
+  // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_START
+  const aicmB6r7Log = (phase, data) => {
+    try {
+      console.info("AICM_B6R7_WORKER_AUTO_EXECUTION", JSON.stringify({
+        phase,
+        at: new Date().toISOString(),
+        dry_run: dryRun,
+        body_keys: body && typeof body === "object" ? Object.keys(body).sort() : [],
+        owner_civilization_id: body && body.owner_civilization_id || "",
+        aicm_user_company_id: body && body.aicm_user_company_id || "",
+        aicm_manager_major_work_item_id: body && body.aicm_manager_major_work_item_id || "",
+        candidate_count: Array.isArray(pairs) ? pairs.length : -1,
+        data: data || {}
+      }));
+    } catch (_) {}
+  };
+  aicmB6r7Log("start", {
+    candidate_ids: Array.isArray(pairs) ? pairs.map((pair) => pair && pair.worker_work_unit ? pair.worker_work_unit.aicm_worker_work_unit_id : "") : []
+  });
+  // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_END
 
   for (const pair of pairs) {
     const unit = pair && pair.worker_work_unit ? pair.worker_work_unit : {};
@@ -2165,7 +2185,15 @@ async function runWorkerAutoExecutionR8ZI(body) {
       const requestBody = buildWorkerRuntimeRequestBodyR8ZI(pair);
 
       if (dryRun) {
-        executed.push({
+        // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_MARK_RESULT_START
+      aicmB6r7Log("after_mark_worker_unit", {
+        aicm_worker_work_unit_id: unitId,
+        mark_result: markResult && markResult.result || "",
+        mark_keys: markResult && typeof markResult === "object" ? Object.keys(markResult).sort() : []
+      });
+      // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_MARK_RESULT_END
+
+      executed.push({
           aicm_worker_work_unit_id: unitId,
           dry_run: true,
           request_body: requestBody
@@ -2173,7 +2201,26 @@ async function runWorkerAutoExecutionR8ZI(body) {
         continue;
       }
 
+      // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_RUNTIME_START
+      aicmB6r7Log("before_runtime_request", {
+        aicm_worker_work_unit_id: unitId,
+        work_unit_name: unit.work_unit_name || "",
+        review_status_code: unit.review_status_code || "",
+        work_status_code: unit.work_status_code || "",
+        request_body_keys: requestBody && typeof requestBody === "object" ? Object.keys(requestBody).sort() : []
+      });
+      // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_RUNTIME_END
+
       const runtimeResult = await createWorkerRuntimeRequest(requestBody);
+      // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_RUNTIME_RESULT_START
+      aicmB6r7Log("after_runtime_request", {
+        aicm_worker_work_unit_id: unitId,
+        runtime_result: runtimeResult && runtimeResult.result || "",
+        runtime_error: runtimeResult && (runtimeResult.error_message || runtimeResult.message || runtimeResult.error) || "",
+        runtime_keys: runtimeResult && typeof runtimeResult === "object" ? Object.keys(runtimeResult).sort() : []
+      });
+      // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_RUNTIME_RESULT_END
+
       const ok = runtimeResult && runtimeResult.result === "ok";
 
       if (!ok) {
@@ -2203,6 +2250,12 @@ async function runWorkerAutoExecutionR8ZI(body) {
         review_result: reviewResult
       });
     } catch (error) {
+      // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_ERROR_START
+      aicmB6r7Log("worker_auto_error", {
+        aicm_worker_work_unit_id: unitId,
+        error_message: error && error.message ? error.message : String(error)
+      });
+      // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_ERROR_END
       failed.push({
         aicm_worker_work_unit_id: unitId,
         result: "error",
@@ -2211,6 +2264,14 @@ async function runWorkerAutoExecutionR8ZI(body) {
     }
   }
 
+  // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_RETURN_START
+  aicmB6r7Log("return", {
+    executed_count: executed.length,
+    failed_count: failed.length,
+    failed_ids: failed.map((row) => row && row.aicm_worker_work_unit_id || ""),
+    failed_messages: failed.map((row) => row && row.error_message || "")
+  });
+  // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_RETURN_END
   return {
     result: failed.length ? "partial_error" : "ok",
     api_identifier: SERVER_MARK,
