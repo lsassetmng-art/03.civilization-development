@@ -6258,6 +6258,27 @@ await aicmReloadTaskLedgerContext();
         ].join("");
     // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_RENDER_DEBUG_PANEL_END
 
+
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_RENDER_PANEL_START
+    var handlerEntryDebugData = state && state.r8zMgrMajorCardHandlerEntryDebug
+      ? state.r8zMgrMajorCardHandlerEntryDebug
+      : null;
+
+    var handlerEntryDebugHtml = handlerEntryDebugData
+      ? [
+          '<details class="aicm-selected-note" open style="margin:12px 0;border:1px dashed #334155;padding:10px;border-radius:10px;background:#f8fafc;">',
+          '<summary>C2D7 handler entry debug</summary>',
+          '<pre style="white-space:pre-wrap;max-height:340px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(handlerEntryDebugData, null, 2)) + '</pre>',
+          '</details>'
+        ].join("")
+      : [
+          '<details class="aicm-selected-note" open style="margin:12px 0;border:1px dashed #cbd5e1;padding:10px;border-radius:10px;">',
+          '<summary>C2D7 handler entry debug</summary>',
+          '<p>まだ aicmR8zMgrMajorCardHandleAction は呼ばれていません。</p>',
+          '</details>'
+        ].join("");
+    // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_RENDER_PANEL_END
+
     var summaryHtml = [
       '<div class="aicm-core-card" style="margin:12px 0;">',
       '<p class="aicm-eyebrow">一括引き渡し先</p>',
@@ -6287,6 +6308,7 @@ await aicmReloadTaskLedgerContext();
       '  <p class="aicm-selected-note">endpoint: ' + escapeHtml(confirm.endpoint || "/api/aicm/v2/manager-major/update") + '</p>',
       routePickerHtml,
       routeApplyDebugHtml,
+      handlerEntryDebugHtml,
       summaryHtml,
       '  <p class="aicm-eyebrow">対象大項目</p>',
       '  <ul class="aicm-selected-note">' + itemHtml + '</ul>',
@@ -6409,6 +6431,53 @@ await aicmReloadTaskLedgerContext();
 
 
   function aicmR8zMgrMajorCardHandleAction(ev, target, action) {
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_ENTRY_START
+      try {
+        var aicmR8zC2d7Args = [];
+        for (var aicmR8zC2d7I = 0; aicmR8zC2d7I < arguments.length; aicmR8zC2d7I += 1) {
+          var aicmR8zC2d7Arg = arguments[aicmR8zC2d7I];
+          var aicmR8zC2d7Item = {
+            index: aicmR8zC2d7I,
+            type: typeof aicmR8zC2d7Arg,
+            stringValue: typeof aicmR8zC2d7Arg === "string" ? String(aicmR8zC2d7Arg) : "",
+            hasTarget: !!(aicmR8zC2d7Arg && aicmR8zC2d7Arg.target),
+            tagName: aicmR8zC2d7Arg && aicmR8zC2d7Arg.tagName ? String(aicmR8zC2d7Arg.tagName) : "",
+            id: aicmR8zC2d7Arg && aicmR8zC2d7Arg.id ? String(aicmR8zC2d7Arg.id) : "",
+            className: aicmR8zC2d7Arg && aicmR8zC2d7Arg.className ? String(aicmR8zC2d7Arg.className) : "",
+            dataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.getAttribute ? String(aicmR8zC2d7Arg.getAttribute("data-core-action") || "") : "",
+            targetDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.getAttribute
+              ? String(aicmR8zC2d7Arg.target.getAttribute("data-core-action") || "")
+              : "",
+            closestDataCoreAction: aicmR8zC2d7Arg && aicmR8zC2d7Arg.target && aicmR8zC2d7Arg.target.closest
+              ? String((aicmR8zC2d7Arg.target.closest("[data-core-action]") || {}).getAttribute ? aicmR8zC2d7Arg.target.closest("[data-core-action]").getAttribute("data-core-action") || "" : "")
+              : ""
+          };
+          aicmR8zC2d7Args.push(aicmR8zC2d7Item);
+        }
+
+        if (state && typeof state === "object") {
+          state.r8zMgrMajorCardHandlerEntryDebug = {
+            marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG",
+            at: (new Date()).toISOString(),
+            phase: "handler-entry",
+            args: aicmR8zC2d7Args,
+            actionVar: typeof action !== "undefined" ? String(action || "") : "__ACTION_VAR_UNDEFINED__",
+            targetVarTag: typeof target !== "undefined" && target && target.tagName ? String(target.tagName) : "",
+            targetVarAction: typeof target !== "undefined" && target && target.getAttribute ? String(target.getAttribute("data-core-action") || "") : ""
+          };
+        }
+
+        if (typeof console !== "undefined" && console.info) {
+          console.info("AICM C2D7 handler entry debug", state && state.r8zMgrMajorCardHandlerEntryDebug);
+        }
+      } catch (aicmR8zC2d7Error) {
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("AICM C2D7 handler entry debug failed", aicmR8zC2d7Error);
+        }
+      }
+      // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_ENTRY_END
+
+
     try {
       if (ev && typeof ev.preventDefault === "function") ev.preventDefault();
 
