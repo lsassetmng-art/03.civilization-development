@@ -7435,6 +7435,36 @@ if (action === "r8z-mgr-major-card-confirm-yes") {
                   );
                 }
 
+                // AICM_V10L_C2G_B6R4B_CONFIRM_YES_AUTO_CHAIN_START
+                if (kind === "leader-handoff") {
+                  var aicmB6r4bMajorId = String(
+                    body.aicm_manager_major_work_item_id ||
+                    item.id ||
+                    item.majorId ||
+                    item.aicm_manager_major_work_item_id ||
+                    item.manager_major_work_item_id ||
+                    ""
+                  ).trim();
+
+                  if (!aicmB6r4bMajorId) {
+                    throw new Error("自動連携対象のManager大項目IDを特定できません。");
+                  }
+
+                  if (typeof aicmRunLeaderAutoDecompositionAfterHandoffR8ZB !== "function") {
+                    throw new Error("Leader自動分解関数が見つかりません。");
+                  }
+
+                  var aicmB6r4bLeaderAutoResult = await aicmRunLeaderAutoDecompositionAfterHandoffR8ZB(aicmB6r4bMajorId);
+
+                  if (aicmB6r4bLeaderAutoResult && aicmB6r4bLeaderAutoResult.ok === false) {
+                    throw new Error(aicmB6r4bLeaderAutoResult.message || "Leader自動分解に失敗しました。");
+                  }
+
+                  if (typeof aicmRunWorkerAutoExecutionAfterDecompositionR8ZI === "function") {
+                    await aicmRunWorkerAutoExecutionAfterDecompositionR8ZI(aicmB6r4bMajorId);
+                  }
+                }
+                // AICM_V10L_C2G_B6R4B_CONFIRM_YES_AUTO_CHAIN_END
                 ok += 1;
               } catch (oneErr) {
                 ng.push((item.title || body.aicm_manager_major_work_item_id || "対象") + ": " + (oneErr && oneErr.message ? oneErr.message : "失敗"));
