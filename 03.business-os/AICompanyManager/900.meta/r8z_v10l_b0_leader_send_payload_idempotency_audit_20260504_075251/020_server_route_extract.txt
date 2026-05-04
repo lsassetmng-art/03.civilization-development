@@ -1,0 +1,156 @@
+ROUTE_FOUND=true
+ROUTE_LINE=2100
+
+---- route nearby ----
+nst requestBody = buildWorkerRuntimeRequestBodyR8ZI(pair);
+
+      if (dryRun) {
+        executed.push({
+          aicm_worker_work_unit_id: unitId,
+          dry_run: true,
+          request_body: requestBody
+        });
+        continue;
+      }
+
+      const runtimeResult = await createWorkerRuntimeRequest(requestBody);
+      const ok = runtimeResult && runtimeResult.result === "ok";
+
+      if (!ok) {
+        throw new Error(runtimeResult && (runtimeResult.error_message || runtimeResult.message || runtimeResult.error) ? (runtimeResult.error_message || runtimeResult.message || runtimeResult.error) : "runtime request failed");
+      }
+
+      const markResult = markWorkerUnitAutoExecutionStartedR8ZI(unitId, {
+        result: runtimeResult.result,
+        request_body: requestBody,
+        runtime_request: runtimeResult.runtime_request || {},
+        aiworker_response: runtimeResult.aiworker_response || {}
+      });
+
+      executed.push({
+        aicm_worker_work_unit_id: unitId,
+        result: "ok",
+        request_body: requestBody,
+        runtime_result: runtimeResult,
+        mark_result: markResult
+      });
+    } catch (error) {
+      failed.push({
+        aicm_worker_work_unit_id: unitId,
+        result: "error",
+        error_message: error && error.message ? error.message : String(error)
+      });
+    }
+  }
+
+  return {
+    result: failed.length ? "partial_error" : "ok",
+    api_identifier: SERVER_MARK,
+    dry_run: dryRun,
+    candidate_count: pairs.length,
+    executed_count: executed.length,
+    failed_count: failed.length,
+    executed,
+    failed
+  };
+}
+// AICM_R8Z_I_WORKER_AUTO_EXECUTION_SERVER_END
+
+
+async function handleApi(req, res, url) {
+  const route = url.pathname;
+
+  try {
+    if (req.method === "OPTIONS") {
+      sendJson(res, 200, { result: "ok", api_identifier: SERVER_MARK });
+      return true;
+    }
+
+    
+    if (route === "/api/aicm/v2/president-policy/create" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, createPresidentPolicy(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/manager-major/create" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, createManagerMajorItem(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/manager-major/update" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, updateManagerMajorItem(body));
+      return true;
+    }
+
+    
+    if (route === "/api/aicm/v2/leader-auto-decomposition/run" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, runLeaderAutoDecomposition(body));
+      return true;
+    }
+if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, archiveManagerMajorItem(body));
+      return true;
+    }
+
+// AICM_AXU_CSV_R4C_EXACT_LITERAL_NEWLINE_REPAIR_V1: repaired literal backslash-n near CSV import SQL assembly
+    if (route === "/api/aicm/v2/manager-major/import-csv" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, importManagerMajorItemsCsv(body));
+      return true;
+    }
+
+
+    if (route === "/api/aicm/v2/human-review/create" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, createHumanReviewItem(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/human-review/approve" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, approveHumanReviewItem(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/human-review/return" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, returnHumanReviewItem(body));
+      return true;
+    }
+
+
+    if (route === "/api/aicm/v2/company/update" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, updateCompany(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/department/update" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, updateDepartment(body));
+      return true;
+    }
+
+    // AICM_ORGANIZATION_UPDATE_DELEGATES_TO_SECTION_UPDATE
+    // UI label "組織変更" is connected to the current section/k課 update responsibility.
+    // Keep this as an explicit compatibility route so future split can be handled here.
+    if (route === "/api/aicm/v2/organization/update" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, updateSection(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/section/update" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, updateSection(body));
+      return true;
+    }
+
+
+    // AICM_R8Z_V9_CONTEXT_SCRIPT_ROUTE: review-list script transport for local browser hydration
+    if (route === "/api/aicm/v2/context-script" && req.method === "G

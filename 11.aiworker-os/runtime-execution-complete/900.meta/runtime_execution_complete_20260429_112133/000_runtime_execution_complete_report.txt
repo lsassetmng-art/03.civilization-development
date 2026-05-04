@@ -1,0 +1,135 @@
+Pager usage is off.
+============================================================
+AIWORKER RUNTIME EXECUTION COMPLETE
+request -> worker output -> leader review -> manager gate -> president approval -> internal delivery ready
+AIWorkerOS only / Sato DB review target
+============================================================
+BEGIN
+NOTICE:  schema "aiworker" already exists, skipping
+CREATE SCHEMA
+NOTICE:  extension "pgcrypto" already exists, skipping
+CREATE EXTENSION
+NOTICE:  Function regclass lookup may not resolve overloaded signature, continuing because function may still exist.
+DO
+CREATE TABLE
+INSERT 0 9
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE VIEW
+CREATE VIEW
+CREATE VIEW
+CREATE VIEW
+CREATE VIEW
+CREATE VIEW
+COMMIT
+
+============================================================
+[VERIFY] runtime execution complete objects
+============================================================
+         worker_output          |         output_artifact          |         leader_review          |         manager_gate          |         president_approval          |         delivery_package          |                   full_pipeline_board                   
+--------------------------------+----------------------------------+--------------------------------+-------------------------------+-------------------------------------+-----------------------------------+---------------------------------------------------------
+ aiworker.runtime_worker_output | aiworker.runtime_output_artifact | aiworker.runtime_leader_review | aiworker.runtime_manager_gate | aiworker.runtime_president_approval | aiworker.runtime_delivery_package | aiworker.vw_app_aiworker_runtime_full_pipeline_board_v1
+(1 row)
+
+
+============================================================
+[ROLLBACK SMOKE] full runtime execution pipeline
+============================================================
+BEGIN
+SELECT 1
+  fn_runtime_execution_start_request  
+--------------------------------------
+ 5dba5b99-b606-493f-bae8-98bc8e9f925a
+(1 row)
+
+ fn_runtime_execution_submit_worker_output 
+-------------------------------------------
+ 1659aeef-0b61-47db-bcb9-cc93d8f5fc8c
+(1 row)
+
+ fn_runtime_execution_submit_leader_review 
+-------------------------------------------
+ 6fc05c5c-6fa6-4ce7-89d6-02aea9bd878b
+(1 row)
+
+ fn_runtime_execution_submit_manager_gate 
+------------------------------------------
+ 1741c9ee-88e7-462c-b1c9-2bdcab204a66
+(1 row)
+
+ fn_runtime_execution_submit_president_approval 
+------------------------------------------------
+ 39ce3676-6c03-4809-9484-a173fd9ec7d1
+(1 row)
+
+ fn_runtime_execution_mark_delivery_ready 
+------------------------------------------
+ 79152ec0-133e-4c28-8560-d80f5c110a5b
+(1 row)
+
+
+[SMOKE] full pipeline board
+             request_code             |    app_surface_code    | model_no | model_name_ja |   request_status_code   | output_status_code | leader_review_result_code | manager_gate_result_code | president_approval_result_code |  delivery_status_code   | human_go_confirmed_flag | full_pipeline_safe_internal_flag 
+--------------------------------------+------------------------+----------+---------------+-------------------------+--------------------+---------------------------+--------------------------+--------------------------------+-------------------------+-------------------------+----------------------------------
+ RER_4e150e6b49de401e8383039ba93adba0 | pg_development_support | BYD1-003 | ASIC Workers3 | INTERNAL_DELIVERY_READY | DONE               | REVIEW_OK_INTERNAL_ONLY   | PASS_INTERNAL_ONLY       | APPROVED_INTERNAL_ONLY         | INTERNAL_DELIVERY_READY | t                       | t
+(1 row)
+
+
+[SMOKE] transition log
+    from_status_code     |     to_status_code      |      transition_type_code      |  transition_summary_ja   
+-------------------------+-------------------------+--------------------------------+--------------------------
+ PRESIDENT_APPROVED      | INTERNAL_DELIVERY_READY | INTERNAL_DELIVERY_READY_MARKED | 内部納品READYにした
+ MANAGER_GATE_OK         | PRESIDENT_APPROVED      | PRESIDENT_APPROVAL_SUBMITTED   | President承認を登録した
+ LEADER_REVIEW_OK        | MANAGER_GATE_OK         | MANAGER_GATE_SUBMITTED         | Managerゲートを登録した
+ WORKER_OUTPUT_DONE      | LEADER_REVIEW_OK        | LEADER_REVIEW_SUBMITTED        | Leaderレビューを登録した
+ IN_PROGRESS_INTERNAL    | WORKER_OUTPUT_DONE      | WORKER_OUTPUT_SUBMITTED        | Worker出力を登録した
+ REQUESTED_INTERNAL_ONLY | IN_PROGRESS_INTERNAL    | REQUEST_STARTED                | 内部実行要求を開始した
+(6 rows)
+
+
+[SMOKE] output artifact
+ artifact_kind_code | artifact_title_ja  | artifact_status_code 
+--------------------+--------------------+----------------------
+ markdown           | PG開発支援ドラフト | ACTIVE_INTERNAL
+(1 row)
+
+
+[SMOKE] delivery board
+  delivery_status_code   | delivery_result_code | delivery_safe_internal_flag | external_execution_performed_flag | pg_apply_performed_flag | destructive_action_performed_flag 
+-------------------------+----------------------+-----------------------------+-----------------------------------+-------------------------+-----------------------------------
+ INTERNAL_DELIVERY_READY | READY_INTERNAL_ONLY  | t                           | f                                 | f                       | f
+(1 row)
+
+ROLLBACK
+
+============================================================
+[VERIFY] smoke rollback
+============================================================
+ request_persisted_count 
+-------------------------
+                       0
+(1 row)
+
+
+============================================================
+AIWORKER RUNTIME EXECUTION COMPLETE DONE
+============================================================

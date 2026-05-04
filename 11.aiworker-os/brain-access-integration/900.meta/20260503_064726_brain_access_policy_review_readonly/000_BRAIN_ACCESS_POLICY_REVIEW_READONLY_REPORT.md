@@ -1,0 +1,110 @@
+# AIWorker Brain Access Policy Review Read-only Report
+
+RUN_TS=20260503_064726
+RUN_DIR=/data/data/com.termux/files/home/03.civilization-development/11.aiworker-os/brain-access-integration/900.meta/20260503_064726_brain_access_policy_review_readonly
+DB_ENV=PERSONA_DATABASE_URL
+DB_WRITE=NO
+AICM_TOUCH=NO
+REVIEWER=佐藤(DB担当)
+
+## Purpose
+- Review current robot brain readable domains.
+- Detect questionable access such as Security/Specialist reading business/professional domains.
+- Detect missing CX registry sources.
+- No database write.
+
+## Output
+```
+          section           |  model_code   | role_code  | candidate_count | readable_count | denied_count 
+----------------------------+---------------+------------+-----------------+----------------+--------------
+ 01_policy_summary_by_model | BYD2-003      | Manager    |              14 |              8 |            6
+ 01_policy_summary_by_model | HD-R1A        | Lover      |              14 |              3 |           11
+ 01_policy_summary_by_model | HD-R1C        | Friend     |              14 |              3 |           11
+ 01_policy_summary_by_model | HD-R2         | Security   |              14 |              4 |           10
+ 01_policy_summary_by_model | HD-R2G        | Specialist |              14 |              4 |           10
+ 01_policy_summary_by_model | HD-R2S        | Specialist |              14 |              4 |           10
+ 01_policy_summary_by_model | HD-R3         | Worker     |              14 |              5 |            9
+ 01_policy_summary_by_model | HD-R5         | Manager    |              14 |              8 |            6
+ 01_policy_summary_by_model | HD-R5P        | President  |              14 |              6 |            8
+ 01_policy_summary_by_model | MG-NORN-001   | Worker     |              14 |              7 |            7
+ 01_policy_summary_by_model | MG-NORN-002   | Worker     |              14 |              7 |            7
+ 01_policy_summary_by_model | MG-NORN-003   | Worker     |              14 |              7 |            7
+ 01_policy_summary_by_model | SERIES:Beyond | Worker     |              14 |              7 |            7
+ 01_policy_summary_by_model | SERIES:HD     | Worker     |              14 |              5 |            9
+ 01_policy_summary_by_model | SERIES:LoVerS | Lover      |              14 |              3 |           11
+ 01_policy_summary_by_model | SERIES:MEGAMI | Worker     |              14 |              7 |            7
+(16 rows)
+
+           section            |  model_code   | role_code  |                                                        readable_domains                                                        
+------------------------------+---------------+------------+--------------------------------------------------------------------------------------------------------------------------------
+ 02_readable_domains_by_model | BYD2-003      | Manager    | business_operation, civilization_foundation_history, education_learning, history_worldview, professional_basic, robot_aiworker
+ 02_readable_domains_by_model | HD-R1A        | Lover      | culture_region, food_nutrition, season_calendar
+ 02_readable_domains_by_model | HD-R1C        | Friend     | culture_region, food_nutrition, season_calendar
+ 02_readable_domains_by_model | HD-R2         | Security   | city_art_game, robot_aiworker, security_crisis
+ 02_readable_domains_by_model | HD-R2G        | Specialist | business_operation, robot_aiworker, security_crisis
+ 02_readable_domains_by_model | HD-R2S        | Specialist | professional_basic, robot_aiworker, security_crisis
+ 02_readable_domains_by_model | HD-R3         | Worker     | business_operation, education_learning, robot_aiworker
+ 02_readable_domains_by_model | HD-R5         | Manager    | business_operation, civilization_foundation_history, education_learning, history_worldview, professional_basic, robot_aiworker
+ 02_readable_domains_by_model | HD-R5P        | President  | business_operation, civilization_foundation_history, history_worldview, professional_basic, robot_aiworker
+ 02_readable_domains_by_model | MG-NORN-001   | Worker     | business_operation, civilization_foundation_history, education_learning, history_worldview, robot_aiworker
+ 02_readable_domains_by_model | MG-NORN-002   | Worker     | business_operation, culture_region, education_learning, history_worldview, robot_aiworker
+ 02_readable_domains_by_model | MG-NORN-003   | Worker     | business_operation, education_learning, history_worldview, professional_basic, robot_aiworker
+ 02_readable_domains_by_model | SERIES:Beyond | Worker     | business_operation, education_learning, history_worldview, professional_basic, robot_aiworker
+ 02_readable_domains_by_model | SERIES:HD     | Worker     | business_operation, education_learning, robot_aiworker
+ 02_readable_domains_by_model | SERIES:LoVerS | Lover      | culture_region, food_nutrition, season_calendar
+ 02_readable_domains_by_model | SERIES:MEGAMI | Worker     | business_operation, civilization_foundation_history, education_learning, history_worldview, robot_aiworker
+(16 rows)
+
+                            section                             | model_code | role_code  | brain_domain_code  |       brain_data_code        | can_read_flag | access_decision_code |             effective_use_purpose_codes              |                       profile_safety_note_ja                        | model_policy_safety_note_ja | role_policy_safety_note_ja 
+----------------------------------------------------------------+------------+------------+--------------------+------------------------------+---------------+----------------------+------------------------------------------------------+---------------------------------------------------------------------+-----------------------------+----------------------------
+ 03_security_specialist_business_professional_review_candidates | HD-R2G     | Specialist | business_operation | business_operation_reference | t             | allow_focus_domain   | {risk_check,design_reference,safety_training,review} | ジェネラル系。統制・安全レビュー向け。                              |                             | 
+ 03_security_specialist_business_professional_review_candidates | HD-R2S     | Specialist | professional_basic | professional_basic_reference | t             | allow_focus_domain   | {risk_check,design_reference,safety_training,review} | スナイパー/特殊系。安全レビュー・フィクション・危機管理参照に限定。 |                             | 
+(2 rows)
+
+                section                 |  model_code   | role_code | brain_domain_code  |        brain_data_code         | can_read_flag | access_decision_code 
+----------------------------------------+---------------+-----------+--------------------+--------------------------------+---------------+----------------------
+ 04_friend_lover_forbidden_domain_check | HD-R1A        | Lover     | business_operation | business_operation_reference   | f             | deny_depth
+ 04_friend_lover_forbidden_domain_check | HD-R1A        | Lover     | professional_basic | professional_basic_reference   | f             | deny_depth
+ 04_friend_lover_forbidden_domain_check | HD-R1A        | Lover     | security_crisis    | security_crisis_reference_safe | f             | deny_depth
+ 04_friend_lover_forbidden_domain_check | HD-R1C        | Friend    | business_operation | business_operation_reference   | f             | deny_depth
+ 04_friend_lover_forbidden_domain_check | HD-R1C        | Friend    | professional_basic | professional_basic_reference   | f             | deny_depth
+ 04_friend_lover_forbidden_domain_check | HD-R1C        | Friend    | security_crisis    | security_crisis_reference_safe | f             | deny_depth
+ 04_friend_lover_forbidden_domain_check | SERIES:LoVerS | Lover     | business_operation | business_operation_reference   | f             | deny_depth
+ 04_friend_lover_forbidden_domain_check | SERIES:LoVerS | Lover     | professional_basic | professional_basic_reference   | f             | deny_depth
+ 04_friend_lover_forbidden_domain_check | SERIES:LoVerS | Lover     | security_crisis    | security_crisis_reference_safe | f             | deny_depth
+(9 rows)
+
+           section           | model_code | role_code  | brain_domain_code |        brain_data_code         | risk_class_code | can_read_flag | access_decision_code |             effective_use_purpose_codes              |                                              registry_safety_boundary_ja                                               
+-----------------------------+------------+------------+-------------------+--------------------------------+-----------------+---------------+----------------------+------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------
+ 05_high_risk_readable_check | HD-R2      | Security   | security_crisis   | security_crisis_reference_safe | high            | t             | allow_model_policy   | {risk_check,design_reference,safety_training,review} | 防災・危機管理・安全設計・フィクション/ゲーム/世界観参照に限定する。現実の攻撃・破壊・監視・強制・違法行為支援は禁止。
+ 05_high_risk_readable_check | HD-R2G     | Specialist | security_crisis   | security_crisis_reference_safe | high            | t             | allow_model_policy   | {risk_check,design_reference,safety_training,review} | 防災・危機管理・安全設計・フィクション/ゲーム/世界観参照に限定する。現実の攻撃・破壊・監視・強制・違法行為支援は禁止。
+ 05_high_risk_readable_check | HD-R2S     | Specialist | security_crisis   | security_crisis_reference_safe | high            | t             | allow_model_policy   | {risk_check,design_reference,safety_training,review} | 防災・危機管理・安全設計・フィクション/ゲーム/世界観参照に限定する。現実の攻撃・破壊・監視・強制・違法行為支援は禁止。
+(3 rows)
+
+         section          |         brain_data_code         | brain_domain_code | source_schema_name |  source_object_name  | source_record_code |   source_title_ja    | source_exists_flag 
+--------------------------+---------------------------------+-------------------+--------------------+----------------------+--------------------+----------------------+--------------------
+ 06_source_missing_review | robot_aiworker_model_reference  | robot_aiworker    | aiworker           | robot_model_catalog  |                    | AIWorker機種参照     | f
+ 06_source_missing_review | robot_aiworker_series_reference | robot_aiworker    | aiworker           | robot_series_catalog |                    | AIWorkerシリーズ参照 | f
+(2 rows)
+
+             section             | access_decision_code | count 
+---------------------------------+----------------------+-------
+ 07_access_decision_distribution | allow_focus_domain   |    24
+ 07_access_decision_distribution | allow_model_policy   |     3
+ 07_access_decision_distribution | allow_role_policy    |    61
+ 07_access_decision_distribution | deny_depth           |    44
+ 07_access_decision_distribution | deny_no_allow_policy |    92
+(5 rows)
+
+           section            |                    anomaly_code                    | candidate_count |  review_status  
+------------------------------+----------------------------------------------------+-----------------+-----------------
+ 08_anomaly_candidate_summary | cx_registry_source_missing                         |               2 | REVIEW_REQUIRED
+ 08_anomaly_candidate_summary | friend_lover_reads_forbidden_domain                |               0 | OK
+ 08_anomaly_candidate_summary | high_risk_readable_without_safe_purpose            |               0 | OK
+ 08_anomaly_candidate_summary | security_specialist_reads_business_or_professional |               2 | REVIEW_REQUIRED
+(4 rows)
+
+```
+
+FINAL_STATUS=POLICY_REVIEW_DONE_REVIEW_REQUIRED
+NEXT=If needed, apply focused policy cleanup for HD-R2S/HD-R2G and source registry alignment

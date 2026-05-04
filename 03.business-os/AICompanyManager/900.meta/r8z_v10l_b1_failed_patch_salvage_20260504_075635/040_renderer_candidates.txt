@@ -1,0 +1,581 @@
+CANDIDATE_COUNT=84
+TOP_CANDIDATES=aicmRenderTaskLedgerSafeR8V4@5151:score34,renderTaskLedgerPlaceholder@6080:score34,renderTaskLedgerCreateForm@3087:score30,createTaskLedgerFromForm@3162:score30,h@4265:score30,aicmOpenTaskLedgerScreenR8V3Clean@5197:score30,go@495:score26,taskLedgerCsvTemplateText@3264:score26,renderAicmBusinessStartScreen@8269:score24,v10cRenderReviewList@11344:score24
+
+============================================================
+name=aicmRenderTaskLedgerSafeR8V4
+line=5151
+score=34
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=true
+hasTaskLedgerArray=false
+---- snippet ----
+function aicmRenderTaskLedgerSafeR8V4(sourceLabel) {
+    state.screen = "task-ledger";
+
+    try {
+      if (!root) return;
+
+      var html = renderTaskLedgerPlaceholder();
+      root.innerHTML = html;
+
+      return true;
+    } catch (error) {
+      var message = error && error.message ? error.message : String(error || "unknown error");
+      var stack = error && error.stack ? String(error.stack) : "";
+
+      if (typeof console !== "undefined" && console && console.error) {
+        console.error("AICM task-ledger render failed", {
+          sourceLabel: sourceLabel || "",
+          message: message,
+          stack: stack
+        });
+      }
+
+      if (root) {
+        root.innerHTML = renderShell([
+          '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
+          '  <p class="aicm-eyebrow">TASK LEDGER RENDER ERROR</p>',
+          '  <h2>部門別タスク台帳の描画でエラーが発生しました</h2>',
+          '  <p class="aicm-selected-note">クリック処理と画面遷移は動いています。以下はブラウザ側の描画エラーです。</p>',
+          '  <dl class="aicm-core-detail-list">',
+          '    <dt>source</dt><dd>' + escapeHtml(sourceLabel || "") + '</dd>',
+          '    <dt>message</dt><dd>' + escapeHtml(message) + '</dd>',
+          '  </dl>',
+          stack ? '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(stack) + '</pre>' : '',
+          '  <div class="aicm-dashboard-action-row">',
+          '    <button type="button" data-core-action="task-ledger-refresh">再読み込み</button>',
+          '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
+          '  </div>',
+          '</section>'
+        ].join(""));
+      }
+
+      return false;
+    }
+  }
+
+============================================================
+name=renderTaskLedgerPlaceholder
+line=6080
+score=34
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=true
+hasTaskLedgerArray=false
+---- snippet ----
+function renderTaskLedgerPlaceholder() {
+    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: screen
+    var company = typeof selectedCompany === "function" ? selectedCompany() : null;
+    var companyId = company && company.aicm_user_company_id ? company.aicm_user_company_id : "";
+    var rows = aicmGetManagerMajorRowsForSelectedCompany(companyId);
+    
+
+    // AICM_R8V_REMOVE_LEADER_INBOX_UI_START
+  // Leader受信箱 routine section removed.
+  // Manager大項目サマリの Leader受信済み 件数/詳細を正面表示として使う。
+// AICM_R8V_REMOVE_LEADER_INBOX_UI_END
+return renderShell([
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">部門別タスク台帳</p>',
+      '  <h2>部門別タスク台帳</h2>',
+      company ? '<p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name) + '</strong></p>' : '<p class="aicm-core-empty">AI企業を選択してください。</p>',
+      '  <p class="aicm-selected-note">未実行のManager大項目だけをDB/contextから表示します。CSV取り込みは部長/Manager分解済み大項目の新規追加です。</p>',
+'  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="task-ledger-refresh">登録済み大項目をリロード</button>',
+      '  </div>',
+      '</section>',
+      aicmRenderManagerMajorSummarySectionR8U(),
+      aicmRenderLeaderAutoFlowStatusR8W(),
+      renderCsvImportCard(company),
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">Manager大項目</p>',
+      '  <h2>登録済み大項目</h2>',
+      aicmRenderManagerMajorRows(rows),
+      '</section>'
+    ].join(""));
+  }
+
+============================================================
+name=renderTaskLedgerCreateForm
+line=3087
+score=30
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=false
+hasTaskLedgerArray=false
+---- snippet ----
+function renderTaskLedgerCreateForm(company, departments) {
+    if (!company) {
+      return [
+        '<div class="aicm-empty-state">',
+        '  <strong>AI企業が未選択です</strong>',
+        '  <p>ダッシュボードでAI企業を選択してください。</p>',
+        '  <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボードへ</button>',
+        '</div>'
+      ].join("");
+    }
+
+    if (!departments.length) {
+      return [
+        '<div class="aicm-empty-state">',
+        '  <strong>部門がありません</strong>',
+        '  <p>部門別タスク台帳を作るには、先に部門が必要です。</p>',
+        '  <button type="button" data-core-action="go" data-screen="department-new">部門新規追加へ</button>',
+        '</div>'
+      ].join("");
+    }
+
+    var firstDepartment = departments[0];
+    var sections = sectionsForDepartment(firstDepartment.aicm_user_company_department_id);
+
+    return [
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">台帳行追加</p>',
+      '  <h2>部門別タスクを追加</h2>',
+      '  <div class="aicm-form-grid">',
+      '    <label>部門<select id="aicm-ledger-department">',
+      departments.map(function (department) {
+        return '<option value="' + escapeHtml(department.aicm_user_company_department_id) + '">' + escapeHtml(department.department_name) + '</option>';
+      }).join(""),
+      '    </select></label>',
+      '    <label>課<select id="aicm-ledger-section">',
+      '      <option value="">部門直下</option>',
+      sections.map(function (section) {
+        return '<option value="' + escapeHtml(section.aicm_user_company_section_id) + '">' + escapeHtml(section.section_name) + '</option>';
+      }).join(""),
+      '    </select></label>',
+      '    <label>成果物名<input id="aicm-ledger-deliverable" type="text" placeholder="例: 部門別タスク台帳UI"></label>',
+      '    <label>作業名<input id="aicm-ledger-task" type="text" pl
+
+============================================================
+name=createTaskLedgerFromForm
+line=3162
+score=30
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=false
+hasTaskLedgerArray=false
+---- snippet ----
+async function createTaskLedgerFromForm() {
+    var company = selectedCompany();
+    if (!company) {
+      setMessage("error", "先にAI企業を選択してください。");
+      render();
+      return;
+    }
+
+    var departmentEl = document.getElementById("aicm-ledger-department");
+    var sectionEl = document.getElementById("aicm-ledger-section");
+    var deliverableEl = document.getElementById("aicm-ledger-deliverable");
+    var taskEl = document.getElementById("aicm-ledger-task");
+
+    var deliverableName = deliverableEl ? deliverableEl.value.trim() : "";
+    var taskName = taskEl ? taskEl.value.trim() : "";
+
+    if (!departmentEl || !departmentEl.value) {
+      setMessage("error", "部門を選択してください。");
+      render();
+      return;
+    }
+
+    if (!deliverableName || !taskName) {
+      setMessage("error", "成果物名と作業名を入力してください。");
+      render();
+      return;
+    }
+
+    var payload = {
+      owner_civilization_id: ownerCivilizationId(),
+      aicm_user_company_id: company.aicm_user_company_id,
+      aicm_user_company_department_id: departmentEl.value,
+      aicm_user_company_section_id: sectionEl ? sectionEl.value : "",
+      deliverable_name: deliverableName,
+      task_name: taskName,
+      work_type_code: valueOf("aicm-ledger-work-type") || "design",
+      responsible_role_code: valueOf("aicm-ledger-role") || "Manager",
+      priority_code: valueOf("aicm-ledger-priority") || "normal",
+      task_status_code: valueOf("aicm-ledger-status") || "todo",
+      note: valueOf("aicm-ledger-note")
+    };
+
+    try {
+      var response = await fetch("/api/aicm/v2/task-ledger/create", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      var json = await response.json();
+
+      if (!response.ok || !json || json.result !== "o
+
+============================================================
+name=h
+line=4265
+score=30
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=true
+hasTaskLedgerArray=true
+---- snippet ----
+function h(value) {
+      if (typeof escapeHtml === "function") return escapeHtml(value);
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function value(row, keys, fallback) {
+      for (var i = 0; i < keys.length; i += 1) {
+        var key = keys[i];
+        if (row && row[key] != null && String(row[key]) !== "") return row[key];
+      }
+      return fallback == null ? "" : fallback;
+    }
+
+    function rowId(row, index) {
+      if (typeof aicmAxuR1MajorId === "function") {
+        var id = aicmAxuR1MajorId(row);
+        if (id) return id;
+      }
+
+      return String(
+        value(row, [
+          "aicm_manager_major_work_item_id",
+          "manager_major_work_item_id",
+          "pmlw_major_item_id",
+          "major_item_id",
+          "id"
+        ], "row-" + String(index))
+      );
+    }
+
+    var list = Array.isArray(rows) ? rows : [];
+
+    if (!list.length && typeof selectedCompany === "function" && typeof pmlwMajorRowsForCompany === "function") {
+      var company = selectedCompany();
+      list = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+    }
+
+    if (!Array.isArray(list) || list.length === 0) {
+      return [
+        '<div class="aicm-empty-state">',
+        '  <strong>登録済み大項目はまだありません</strong>',
+        '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+        '</div>'
+      ].join("");
+    }
+
+    return [
+      '<div class="aicm-table-wrap">',
+      '  <table class="aicm-table">',
+      '    <thead>',
+      '      <tr>',
+      '        <th>大項目</th>',
+      '        <th>部門</th>',
+      '        <th>課</th>',
+      '        <th>優先度</th>'
+
+============================================================
+name=aicmOpenTaskLedgerScreenR8V3Clean
+line=5197
+score=30
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=false
+hasTaskLedgerArray=false
+---- snippet ----
+function aicmOpenTaskLedgerScreenR8V3Clean() {
+    state.screen = "task-ledger";
+    state.managerMajorDeleteConfirm = null;
+
+    if (typeof setMessage === "function") {
+      setMessage("ok", "部門別タスク台帳を表示します。");
+    }
+
+    aicmRenderTaskLedgerSafeR8V4("open:initial");
+
+    Promise.resolve()
+      .then(function () {
+        if (typeof aicmReloadTaskLedgerContext === "function") {
+          return aicmReloadTaskLedgerContext();
+        }
+        return null;
+      })
+      .then(function () {
+        state.screen = "task-ledger";
+        render();
+      })
+      .catch(function (error) {
+        state.screen = "task-ledger";
+
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "部門別タスク台帳の読込に失敗しました。");
+        }
+
+        aicmRenderTaskLedgerSafeR8V4("open:error");
+      });
+  }
+
+============================================================
+name=go
+line=495
+score=26
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=false
+hasTaskLedgerArray=true
+---- snippet ----
+function go(screen) {
+    // AICM_TASK_LEDGER_FRESH_CONTEXT_NAV_CANONICAL_V1
+    var nextScreen = String(screen || "dashboard");
+
+    state.screen = nextScreen;
+    state.errorMessage = "";
+
+    if (nextScreen !== "task-ledger") {
+      render();
+      return;
+    }
+
+    render();
+
+    if (state.__taskLedgerContextRefreshing) {
+      return;
+    }
+
+    if (typeof loadContext !== "function") {
+      render();
+      return;
+    }
+
+    state.__taskLedgerContextRefreshing = true;
+
+    Promise.resolve()
+      .then(function () {
+        return loadContext();
+      })
+      .catch(function (error) {
+        state.errorMessage = error && error.message ? error.message : "部門別タスク台帳の最新情報取得に失敗しました。";
+      })
+      .then(function () {
+        state.__taskLedgerContextRefreshing = false;
+        state.screen = "task-ledger";
+        render();
+      });
+  }
+
+============================================================
+name=taskLedgerCsvTemplateText
+line=3264
+score=26
+hasTaskLedgerScreen=false
+hasJapaneseTitle=true
+hasRenderShell=false
+hasTaskLedgerArray=true
+---- snippet ----
+function taskLedgerCsvTemplateText() {
+    return [
+      taskLedgerCsvColumns().join(","),
+      [
+        "開発部",
+        "UI課",
+        "部門別タスク台帳UI",
+        "CSV取り込み画面を実装",
+        "implementation",
+        "Leader",
+        "todo",
+        "normal",
+        "",
+        "",
+        "画面スクショ",
+        "会社共通ルール",
+        "CSV作成後に取り込み",
+        ""
+      ].join(",")
+    ].join("\n");
+  }
+
+============================================================
+name=renderAicmBusinessStartScreen
+line=8269
+score=24
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=true
+hasTaskLedgerArray=false
+---- snippet ----
+function renderAicmBusinessStartScreen() {
+    var company = null;
+    if (typeof selectedCompany === "function") company = selectedCompany();
+    if (!company && typeof aicmOrgSelectedCompany === "function") company = aicmOrgSelectedCompany();
+
+    return renderShell([
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">AI企業業務開始</p>',
+      '  <h2>President起点で業務を開始</h2>',
+      company ? '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || "") + '</strong></p>' : '  <p class="aicm-core-empty">AI企業を選択してください。</p>',
+      '  <p class="aicm-selected-note">Presidentが会社方針・事業方針から業務を送り、Manager/部長が大項目へ分解し、課長へ引き継ぎます。</p>',
+      '</section>',
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">正本ルート</p>',
+      '  <h2>業務開始ルート</h2>',
+      '  <div class="aicm-confirm-row"><strong>1. President</strong><p>会社方針・事業方針から業務を送ります。</p></div>',
+      '  <div class="aicm-confirm-row"><strong>2. Manager/部長</strong><p>受け取った業務を大項目レベルへ分解します。</p></div>',
+      '  <div class="aicm-confirm-row"><strong>3. 課長</strong><p>大項目を受け取り、中項目・作業単位へ分解します。</p></div>',
+      '  <div class="aicm-confirm-row"><strong>4. Worker</strong><p>作業単位を実行し、成果物を作成します。</p></div>',
+      '</section>',
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">CSV代替ルート</p>',
+      '  <h2>部長分解済み大項目の取り込み</h2>',
+      '  <p class="aicm-selected-note">CSVは、Manager/部長による大項目分解結果を代替入力するルートです。CSV取り込み後、登録済み大項目から課長へ引き継ぎます。</p>',
+      '</section>',
+      '<section class="aicm-core-card aicm-operation-card">',
+      '  <p class="aicm-eyebrow">操作</p>',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="task-ledger-open">部門別タスク台帳へ</button>',
+      '    <button type="button" data-core-action="go" 
+
+============================================================
+name=v10cRenderReviewList
+line=11344
+score=24
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=true
+hasTaskLedgerArray=false
+---- snippet ----
+function v10cRenderReviewList(appState) {
+      appState = v10cState(appState);
+
+      var beforeRows = v10cRows(appState);
+      if (!beforeRows.length) {
+        v10cSyncFetch(appState);
+      }
+
+      var rows = v10cRows(appState);
+      var debug = [
+        "V10C",
+        "selectedCompanyId=" + v10cCompanyId(appState),
+        "owner=" + v10cOwnerId(appState),
+        "rows=" + String(rows.length),
+        "payloadRows=" + String(appState.aicmR8zV10cPayloadRows !== undefined ? appState.aicmR8zV10cPayloadRows : "na"),
+        "http=" + String(appState.aicmR8zV10cHttpStatus !== undefined ? appState.aicmR8zV10cHttpStatus : "na"),
+        "status=" + v10cText(appState.aicmR8zV10cFetchStatus || "none"),
+        appState.aicmR8zV10cError ? "error=" + v10cText(appState.aicmR8zV10cError) : ""
+      ].filter(Boolean).join(" / ");
+
+      var body = rows.length
+        ? [
+            '<section class="aicm-core-card">',
+            '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+            '  <h2>レビュー・承認待ち: ' + v10cEsc(String(rows.length)) + '件</h2>',
+            '  <p class="aicm-selected-note">' + v10cEsc(debug) + '</p>',
+            '</section>',
+            rows.map(v10cRenderRow).join("")
+          ].join("")
+        : [
+            '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
+            '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+            '  <h2>レビュー・承認待ち: 0件</h2>',
+            '  <p class="aicm-selected-note">' + v10cEsc(debug) + '</p>',
+            '  <p class="aicm-core-message aicm-core-message-error">context APIからレビュー・承認待ちはありませんでした。</p>',
+            '  <div class="aicm-dashboard-action-row">',
+            '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
+            '    <button type="button
+
+============================================================
+name=renderShell
+line=545
+score=21
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=true
+hasTaskLedgerArray=false
+---- snippet ----
+function renderShell(content) {
+    return [
+      '<div class="aicm-core" data-core-mark="' + CORE_MARK + '">',
+      '  <header class="aicm-core-header">',
+      '    <h1>AI企業運営アプリ</h1>',
+      '  </header>',
+      '  <nav class="aicm-core-tabs" aria-label="AICompanyManager navigation">',
+      '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
+      '    <button type="button" data-core-action="task-ledger-open">部門別タスク台帳</button>',
+      '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
+      '  <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
+      '  </nav>',
+      renderMessages(),
+      '  <main class="aicm-core-main">',
+      content,
+      '  </main>',
+      '</div>'
+    ].join("");
+  }
+
+============================================================
+name=aicmRenderLeaderHandoffConfirmCardR8SV9F4B
+line=7048
+score=21
+hasTaskLedgerScreen=true
+hasJapaneseTitle=true
+hasRenderShell=true
+hasTaskLedgerArray=false
+---- snippet ----
+function aicmRenderLeaderHandoffConfirmCardR8SV9F4B() {
+  var payload = state && state.managerMajorLeaderHandoffConfirm;
+  if (!payload || typeof payload !== "object") return "";
+
+  var esc = typeof escapeHtml === "function" ? escapeHtml : function(value) {
+    return String(value === undefined || value === null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
+  var majorId = String(
+    payload.majorId ||
+    payload.aicm_manager_major_work_item_id ||
+    (payload.body && payload.body.aicm_manager_major_work_item_id) ||
+    ""
+  ).trim();
+
+  var row = payload.row || {};
+  var title = String(
+    payload.major_item_name ||
+    payload.targetTitle ||
+    row.major_item_name ||
+    row.task_name ||
+    row.deliverable_name ||
+    "Manager大項目"
+  ).trim();
+
+  var leader = String(
+    payload.leaderLabel ||
+    payload.leaderRaw ||
+    payload.assigned_leader_label ||
+    (payload.body && payload.body.assigned_leader_label) ||
+    row.assigned_leader_label ||
+    row.leader_robot_label ||
+    "課長/Leader"
+  ).trim();
+
+  return [
+    '<section class="aicm-core-card aicm-leader-handoff-confirm-r8s" style="border:2px solid #f59e0b;">',
+    '  <p class="aicm-eyebrow">課長へ送る確認</p>',
+    '  <h2>このManager大項目を課長へ送りますか？</h2>',
+    '  <p class="aicm-selected-note">DB更新前の確認カードです。内容を確認してから確定してください。</p>',
+    '  <dl class="aicm-core-detail-list">',
+    '    <dt>対象</dt><dd>' + esc(title) + '</dd>',
+    '    <dt>課長/Leader</dt><dd>' + esc(leader) + '</dd>',
+    '    <dt>Manager大項目ID</dt><dd>' + esc(majorId || '-') + '</dd>',
+    '  </dl>',
+    '  <div class="aicm-dashboard-action-row">',
+    '    <button type="button" data-core-action="r8z-v9f4b-leader-handoff-confirm-canc
+

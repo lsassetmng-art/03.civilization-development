@@ -1,0 +1,76 @@
+function aicmRenderManagerMajorRows(rows) {
+    var sourceRows = Array.isArray(rows) ? rows : [];
+    var pendingRows = sourceRows.filter(function (row) {
+      // AICM_R8Z_V9D1_IS_PENDING_MAJOR_SCOPE_CALLSITE_FIX: use existing visible canonical helper, not the scope-local isPendingMajor
+      if (typeof aicmIsPendingManagerMajorRowR8V6 === "function") {
+        return aicmIsPendingManagerMajorRowR8V6(row);
+      }
+      return !!row;
+    });
+
+    var confirmCard = aicmRenderMajorItemDeleteConfirmCardR8P();
+
+    if (!pendingRows.length) {
+      return [
+        confirmCard,
+        '<div class="aicm-core-empty">',
+        '  <strong>登録済み大項目はまだありません</strong>',
+        '  <p>CSV取り込み後、未実行/未引き継ぎのManager大項目だけが表示されます。</p>',
+        '</div>'
+      ].join("");
+    }
+
+    var pageSize = aicmMajorItemPageSizeR8O();
+    var totalRows = pendingRows.length;
+    var totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+    var page = aicmMajorItemCurrentPageR8O(totalRows);
+    var start = (page - 1) * pageSize;
+    var pageRows = pendingRows.slice(start, start + pageSize);
+
+    var pager = [
+      '<div class="aicm-dashboard-action-row">',
+      '<!-- AICM_R8Z_MGR_MAJOR_CARD_SELECTION_C1G_VISIBLE_PANEL_POLISH_PANEL -->',
+      aicmR8zMgrMajorCardRenderOperationPanel(rows),
+      '  <button type="button" data-core-action="pmlw-major-page-prev"' + (page <= 1 ? ' disabled' : '') + '>前ページ</button>',
+      '  <span class="aicm-selected-note">ページ ' + escapeHtml(String(page)) + ' / ' + escapeHtml(String(totalPages)) + '　表示 ' + escapeHtml(String(start + 1)) + '-' + escapeHtml(String(start + pageRows.length)) + ' / ' + escapeHtml(String(totalRows)) + '件</span>',
+      '  <button type="button" data-core-action="pmlw-major-page-next"' + (page >= totalPages ? ' disabled' : '') + '>次ページ</button>',
+      '</div>'
+    ].join("");
+
+    var cards = pageRows.map(function (row, index) {
+      // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_RENDERER_ROW_START
+      var r8zMgrMajorCardIndex = typeof index === "number" ? index : 0;
+      var r8zMgrMajorCardCheckboxHtml = aicmR8zMgrMajorCardRenderCheckbox(row, r8zMgrMajorCardIndex);
+      // AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_RENDERER_ROW_END
+      var majorId = aicmAxuR1MajorId(row);
+      var summary = aicmMajorItemSummaryR8O(row);
+      var displayNo = start + index + 1;
+
+      return [
+        '<article class="aicm-core-card aicm-major-item-row">',
+        '  <p class="aicm-eyebrow">Manager大項目 #' + escapeHtml(String(displayNo)) + '</p>',
+        '  <h3>' + escapeHtml(summary.title) + '</h3>',
+        summary.description ? '  <p class="aicm-selected-note">' + escapeHtml(summary.description) + '</p>' : '',
+        '  <dl class="aicm-core-detail-list">',
+        '    <dt>課長/Leader</dt><dd>' + escapeHtml(summary.leader) + '</dd>',
+        '    <dt>優先度</dt><dd>' + escapeHtml(summary.priority) + '</dd>',
+        '    <dt>期限</dt><dd>' + escapeHtml(summary.due) + '</dd>',
+        '    <dt>状態</dt><dd>' + escapeHtml(summary.status) + '</dd>',
+        '  </dl>',
+        '  <div class="aicm-dashboard-action-row">',
+        r8zMgrMajorCardCheckboxHtml,
+        '<!-- AICM_R8Z_MGR_MAJOR_CARD_SELECTION_CLEAN_V1_RENDERER_CHECKBOX -->',
+        '  </div>',
+        '</article>'
+      ].join("");
+    }).join("");
+
+    return [
+      confirmCard,
+      pager,
+      '<div class="aicm-manager-major-list">',
+      cards,
+      '</div>',
+      pager
+    ].join("");
+  }

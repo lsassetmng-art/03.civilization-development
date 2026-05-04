@@ -1,76 +1,69 @@
-import { buildAuthReturnRoute } from "../../lib/routing/routes";
 import type { PortalSessionSummary } from "../../types/auth";
 import type {
   PortalAuthMode,
   PortalAuthProfilePreset,
   PortalAuthRequestBase,
+  PortalAuthResponse,
   PortalAuthResponseData,
 } from "../../types/portal-api";
 
-const buildSessionFromPreset = (
-  preset: PortalAuthProfilePreset,
-  mode: PortalAuthMode,
-): PortalSessionSummary => {
-  if (preset === "business-operator") {
-    return {
-      isLoggedIn: true,
-      civilizationUserId: "mock-user-business-001",
-      displayName: "Portal Operator",
-      entityType: "human",
-      affiliations: ["public", "operator"],
-      contractTier: "business",
-      betaFlags: [],
-      region: "JP",
-    };
-  }
-
-  if (preset === "staticart-beta-creator") {
-    return {
-      isLoggedIn: true,
-      civilizationUserId:
-        mode === "signup"
-          ? "mock-user-staticart-signup-001"
-          : "mock-user-staticart-login-001",
-      displayName:
-        mode === "signup" ? "StaticArt Creator" : "StaticArt Beta Creator",
-      entityType: "human",
-      affiliations: ["public"],
-      contractTier: "pro",
-      betaFlags: ["staticart-beta"],
-      region: "JP",
-    };
-  }
-
-  return {
-    isLoggedIn: true,
-    civilizationUserId:
-      mode === "signup" ? "mock-user-free-signup-001" : "mock-user-free-login-001",
-    displayName: mode === "signup" ? "New Explorer" : "Free Member",
-    entityType: "human",
-    affiliations: ["public"],
-    contractTier: "free",
-    betaFlags: [],
-    region: "JP",
-  };
+const presetToTier = (preset?: PortalAuthProfilePreset): PortalSessionSummary["contractTier"] => {
+  if (preset === "business") return "business";
+  if (preset === "personal") return "personal";
+  return "free";
 };
 
+export const createMockPortalSession = (
+  input: Partial<PortalAuthRequestBase> = {},
+): PortalSessionSummary => ({
+  isLoggedIn: true,
+  civilizationUserId: "mock-user",
+  displayName: input.profilePreset === "business" ? "Business Operator" : "Portal User",
+  entityType: "human",
+  affiliations: input.profilePreset === "business" ? ["operator"] : [],
+  contractTier: presetToTier(input.profilePreset),
+  betaFlags: [],
+  region: "JP",
+});
+
+export const createMockPortalAuthResponseData = (
+  mode: PortalAuthMode,
+  input: Partial<PortalAuthRequestBase> = {},
+): PortalAuthResponseData => ({
+  session: createMockPortalSession(input),
+  redirectTo: input.returnTarget ?? "/me/launcher",
+});
+
+export const createMockPortalAuthResponse = (
+  mode: PortalAuthMode,
+  input: Partial<PortalAuthRequestBase> = {},
+): PortalAuthResponse => ({
+  meta: {
+    success: true,
+    requestId: `mock-${mode}`,
+    timestamp: new Date().toISOString(),
+  },
+  data: createMockPortalAuthResponseData(mode, input),
+});
+
+export const resolveMockPortalAuth = createMockPortalAuthResponse;
+export const startMockPortalAuth = createMockPortalAuthResponse;
+
+// COMPAT_PASS_C_START
 export const buildMockPortalAuthData = (
-  mode: PortalAuthMode,
-  request: PortalAuthRequestBase,
+  modeOrInput: PortalAuthMode | Partial<PortalAuthRequestBase> = "login",
+  maybeInput: Partial<PortalAuthRequestBase> = {},
 ): PortalAuthResponseData => {
-  const session = buildSessionFromPreset(request.profilePreset, mode);
-  const requestedOsCode = request.returnContext.requestedOsCode;
+  const mode =
+    typeof modeOrInput === "string"
+      ? modeOrInput
+      : modeOrInput.mode ?? "login";
 
-  return {
-    status: "authenticated",
-    mode,
-    session,
-    authReturnUrl: buildAuthReturnRoute(
-      mode,
-      request.returnContext.returnTarget,
-      requestedOsCode,
-      "success",
-    ),
-    returnContext: request.returnContext,
-  };
+  const input =
+    typeof modeOrInput === "string"
+      ? maybeInput
+      : modeOrInput;
+
+  return createMockPortalAuthResponseData(mode, input);
 };
+// COMPAT_PASS_C_END

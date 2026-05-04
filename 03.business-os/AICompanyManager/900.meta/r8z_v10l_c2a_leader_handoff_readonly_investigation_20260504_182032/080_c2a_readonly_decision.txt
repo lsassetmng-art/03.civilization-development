@@ -1,0 +1,43 @@
+AICompanyManager V10L-C2A readonly decision
+DB_WRITE=NO
+API_POST=NO
+CORE_PATCH=NO
+SERVER_PATCH=NO
+
+MAINTAINABILITY_POLICY
+- Existing structure first; no new bridge/helper/action route in C2A.
+- C1F manager-major-card-selection helpers are the UI source of truth for current card selection.
+- Do not reintroduce DOM afterpatch, setInterval, MutationObserver, or table/card mixed renderer patches.
+- C2B should reuse C1F selected rows and confirmation state instead of creating another parallel selection model.
+
+FINDINGS
+- C1F clean card selection UI exists: YES
+- C1F clean action route exists: YES
+- Current C1F Yes is UI-only: YES
+- Existing old leader handoff confirm function found: YES
+- Existing old leader handoff execute function found: YES
+- Existing endpoint references in core /api/aicm/v2/manager-major/update: 9
+- Existing endpoint references in server manager-major/update: 2
+- Old confirm payload appears to include manager major id / leader label / decomposition status / handoff status: YES
+
+C2B_PAYLOAD_CANDIDATE
+- endpoint candidate: /api/aicm/v2/manager-major/update
+- source candidate: selected rows from aicmR8zMgrMajorCardSelectedRows()
+- row id candidate: aicmR8zMgrMajorCardRowId(row, index)
+- title candidate: aicmR8zMgrMajorCardTitle(row)
+- eligible check candidate: aicmR8zMgrMajorCardIsSelectable(row)
+- old payload reference: aicmOpenLeaderHandoffConfirmR8S state.managerMajorLeaderHandoffConfirm.body
+
+C2B_REQUIRED_VALIDATION
+1. selected rows must be non-empty
+2. every selected row must have stable manager major id
+3. every selected row must still be selectable/pending
+4. target Leader / section must be clear before POST
+5. if assigned_leader_label / leader_placement_id / section_id is missing, stop before write
+6. if multiple Leader candidates are possible, stop before write and require explicit target selection
+7. confirmation screen must display target item titles and target Leader/section before POST unlock
+
+C2A_CONCLUSION
+- Do not enable API POST yet.
+- Next phase C2B should create payload exact canon and validation UI using existing C1F helpers.
+- Server/API/DB write remains locked.

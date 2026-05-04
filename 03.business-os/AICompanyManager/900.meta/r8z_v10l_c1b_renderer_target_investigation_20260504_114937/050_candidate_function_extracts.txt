@@ -1,0 +1,544 @@
+AICompanyManager V10L-C1B candidate function extracts
+PATCH=NO
+DB_WRITE=NO
+API_POST=NO
+SERVER_RESTART=NO
+
+============================================================
+FUNCTION=renderPmlwMajorRowsBaseAxuR1B
+FOUND=YES
+START_LINE=4213
+END_LINE=4261
+NOTE=FOUND_FUNCTION_BOUNDARY
+------------------------------------------------------------
+function renderPmlwMajorRowsBaseAxuR1B(rows) {
+    if (!rows.length) {
+      return [
+        '<div class="aicm-empty-state">',
+        '  <strong>登録済み大項目はまだありません</strong>',
+        '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+        '</div>'
+      ].join("");
+    }
+
+    return [
+      '<div class="aicm-table-wrap">',
+      '  <table class="aicm-core-table">',
+      '    <thead>',
+      '      <tr>',
+      '        <th>方針元</th>',
+      '        <th>大項目</th>',
+      '        <th>部門</th>',
+      '        <th>課</th>',
+      '        <th>Leader</th>',
+      '        <th>分解状態</th>',
+      '        <th>引渡し</th>',
+      '        <th>優先度</th>',
+      '        <th>期限</th>',
+      '        <th>操作</th>',
+      '      </tr>',
+      '    </thead>',
+      '    <tbody>',
+      rows.map(function (row) {
+        return [
+          '      <tr>',
+          '        <td>' + escapeHtml(pmlwValue(row.policy_title, row.source_route_code || "-")) + '</td>',
+          '        <td><strong>' + escapeHtml(pmlwValue(row.major_item_name, "-")) + '</strong><small>' + escapeHtml(pmlwValue(row.major_item_description, "")) + '</small></td>',
+          '        <td>' + escapeHtml(pmlwValue(row.department_name, "未割当")) + '</td>',
+          '        <td>' + escapeHtml(pmlwValue(row.section_name, "未割当")) + '</td>',
+          '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+          '        <td>' + escapeHtml(pmlwStatusLabel(row.decomposition_status_code)) + '</td>',
+          '        <td>' + escapeHtml(pmlwStatusLabel(row.handoff_status_code)) + '</td>',
+          '        <td>' + escapeHtml(pmlwStatusLabel(row.priority_code)) + '</td>',
+          '        <td>' + escapeHtml(pmlwValue(row.due_date, "-")) + '</td>',
+          '        <td><button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + escapeHtml(aicmAxuR1MajorId(row)) + '">課長へ送る</button></td>',
+          '      </tr>'
+        ].join("");
+      }).join(""),
+      '    </tbody>',
+      '  </table>',
+      '</div>'
+    ].join("");
+  }
+
+============================================================
+FUNCTION=renderPmlwMajorRows
+FOUND=YES
+START_LINE=4263
+END_LINE=-1
+NOTE=FOUND_START_BUT_CLOSE_BRACE_NOT_FOUND
+------------------------------------------------------------
+function renderPmlwMajorRows(rows) {
+    // AICM_AXU_CSV_R8_RENDER_PMLW_MAJOR_ROWS_REPAIR_V1
+    function h(value) {
+      if (typeof escapeHtml === "function") return escapeHtml(value);
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function value(row, keys, fallback) {
+      for (var i = 0; i < keys.length; i += 1) {
+        var key = keys[i];
+        if (row && row[key] != null && String(row[key]) !== "") return row[key];
+      }
+      return fallback == null ? "" : fallback;
+    }
+
+    function rowId(row, index) {
+      if (typeof aicmAxuR1MajorId === "function") {
+        var id = aicmAxuR1MajorId(row);
+        if (id) return id;
+      }
+
+      return String(
+        value(row, [
+          "aicm_manager_major_work_item_id",
+          "manager_major_work_item_id",
+          "pmlw_major_item_id",
+          "major_item_id",
+          "id"
+        ], "row-" + String(index))
+      );
+    }
+
+    var list = Array.isArray(rows) ? rows : [];
+
+    if (!list.length && typeof selectedCompany === "function" && typeof pmlwMajorRowsForCompany === "function") {
+      var company = selectedCompany();
+      list = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+    }
+
+    if (!Array.isArray(list) || list.length === 0) {
+      return [
+        '<div class="aicm-empty-state">',
+        '  <strong>登録済み大項目はまだありません</strong>',
+        '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+        '</div>'
+      ].join("");
+    }
+
+    return [
+      '<div class="aicm-table-wrap">',
+      '  <table class="aicm-table">',
+      '    <thead>',
+      '      <tr>',
+      '        <th>大項目</th>',
+      '        <th>部門</th>',
+      '        <th>課</th>',
+      '        <th>優先度</th>',
+      '        <th>期限</th>',
+      '        <th>状態</th>',
+      '        <th>操作</th>',
+      '      </tr>',
+      '    </thead>',
+      '    <tbody>',
+      list.map(function (row, index) {
+        var id = rowId(row, index);
+        var title = value(row, ["major_item_name", "title", "task_name", "deliverable_name"], "-");
+        var description = value(row, ["major_item_description", "description", "note"], "");
+        var department = value(row, ["department_name", "department_label"], "-");
+        var section = value(row, ["section_name", "section_label"], "-");
+        var priority = value(row, ["priority_code"], "normal");
+        var dueDate = value(row, ["due_date"], "-");
+        var status = value(row, ["handoff_status_code", "decomposition_status_code", "status_code"], "-");
+
+        return [
+          '      <tr>',
+          '        <td><strong>' + h(title) + '</strong>' + (description ? '<p class="aicm-selected-note">' + h(description) + '</p>' : '') + '</td>',
+          '        <td>' + h(department) + '</td>',
+          '        <td>' + h(section) + '</td>',
+          '        <td>' + h(priority) + '</td>',
+          '        <td>' + h(dueDate || "-") + '</td>',
+          '        <td>' + h(status || "-") + '</td>',
+          '        <td><button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + h(id) + '">課長へ送る</button></td>',
+          '      </tr>'
+        ].join("");
+      }).join(""),
+      '    </tbody>',
+      '  </table>',
+      '</div>'
+    ].join("");
+  }
+
+
+  
+
+
+
+
+
+
+
+  
+function aicmGetManagerMajorRowsForSelectedCompany(companyId) {
+    // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: rows
+    var ctx = state && state.context ? state.context : {};
+    var selectedId = String(companyId || "");
+
+    if (!selectedId && state && state.selectedCompanyId) {
+      selectedId = String(state.selectedCompanyId || "");
+    }
+
+    if (!selectedId && typeof selectedCompany === "function") {
+      var company = selectedCompany();
+      if (company && company.aicm_user_company_id) {
+        selectedId = String(company.aicm_user_company_id || "");
+      }
+    }
+
+    function asArray(value) {
+      return Array.isArray(value) ? value : [];
+    }
+
+    function rowCompanyId(row) {
+      return String(
+        row && (
+          row.aicm_user_company_id ||
+          row.company_id ||
+          row.user_company_id ||
+          row.companyId ||
+          ""
+        ) || ""
+      );
+    }
+
+    function statusText(row, keys) {
+      for (var i = 0; i < keys.length; i += 1) {
+        var key = keys[i];
+        if (row && row[key] != null && String(row[key]) !== "") {
+          return String(row[key]).toLowerCase();
+        }
+      }
+
+      return "";
+    }
+
+    function isPendingMajor(row) {
+      var handoff = statusText(row, ["handoff_status_code", "handoff_status", "leader_handoff_status_code"]);
+      var decomposition = statusText(row, ["decomposition_status_code", "work_status_code", "status_code"]);
+
+      var closed = {
+        sent: true,
+        handed_off: true,
+        leader_handoff_done: true,
+        submitted: true,
+        delivered: true,
+        done: true,
+        completed: true,
+        complete: true,
+        cancelled: true,
+        canceled: true,
+        archived: true
+      };
+
+      if (closed[handoff]) return false;
+      if (closed[decomposition]) return false;
+
+      return true;
+    }
+
+    function rowOrder(row) {
+      var n = Number(row && (row.display_order || row.sort_order || row.row_order || 0));
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    var rows = []
+      .concat(asArray(ctx.pmlw_major_items))
+      .concat(asArray(ctx.manager_major_items))
+      .concat(asArray(ctx.major_items));
+
+    rows = rows.filter(function (row) {
+      if (!row) return false;
+
+      var cid = rowCompanyId(row);
+
+      if (selectedId && cid && cid !== selectedId) return false;
+
+      return isPendingMajor(row);
+    });
+
+    rows.sort(function (a, b) {
+      var ao = rowOrder(a);
+      var bo = rowOrder(b);
+
+      if (ao !== bo) return ao - bo;
+
+      var an = String((a && (a.major_item_name || a.title || a.task_name || a.deliverable_name)) || "");
+      var bn = String((b && (b.major_item_name || b.title || b.task_name || b.deliverable_name)) || "");
+
+      return an.localeCompare(bn, "ja");
+    });
+
+    return rows;
+  }
+
+
+
+
+
+// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_START
+  function aicmIsPendingManagerMajorRowR8V6(row) {
+    if (!row || typeof row !== "object") return false;
+
+    var handoff = String(row.handoff_status_code || "").toLowerCase();
+    var decomposition = String(row.decomposition_status_code || "").toLowerCase();
+    var deleted = String(row.deleted_flag || row.is_deleted || "").toLowerCase();
+    var archived = String(row.archived_flag || row.is_archived || "").toLowerCase();
+
+    if (deleted === "true" || deleted === "1") return false;
+    if (archived === "true" || archived === "1") return false;
+
+    if (
+      handoff === "archived" ||
+      handoff === "deleted" ||
+      handoff === "cancelled" ||
+      handoff === "canceled" ||
+      handoff === "sent" ||
+      handoff === "handed_off" ||
+      handoff === "completed" ||
+      handoff === "done"
+    ) {
+      return false;
+    }
+
+    if (
+      decomposition === "completed" ||
+      decomposition === "complete" ||
+      decomposition === "done"
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+// AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_END
+
+
+  
+
+  // AICM_R8Z_V9F3_RESTORE_LEADER_HANDOFF_OPEN_CONFIRM_ONLY
+  // Restore only the missing open-confirm entrypoint for data-core-action="pmlw-major-leader-handoff".
+  // This function does not write DB and does not call any API.
+  function aicmOpenLeaderHandoffConfirmR8S(ev, btn) {
+    try {
+      btn = btn || (typeof aicmActionTargetSafe === "function" ? aicmActionTargetSafe(ev, null) : null);
+      if (!btn && ev && ev.target && typeof ev.target.closest === "function") {
+        btn = ev.target.closest("[data-core-action]");
+      }
+
+      var majorId = "";
+      if (btn && btn.getAttribute) {
+        majorId = String(btn.getAttribute("data-major-id") || btn.getAttribute("data-manager-major-id") || "").trim();
+      }
+
+      if (!majorId && btn && btn.dataset) {
+        majorId = String(btn.dataset.majorId || btn.dataset.managerMajorId || "").trim();
+      }
+
+      if (!majorId) {
+        if (typeof setMessage === "function") setMessage("error", "課長へ送る対象のManager大項目IDを特定できません。");
+        if (typeof render === "function") render();
+        return;
+      }
+
+      var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+      var rows = [];
+      function addRows(value) {
+        if (Array.isArray(value)) rows = rows.concat(value);
+      }
+
+      addRows(ctx.pmlw_major_items);
+      addRows(ctx.manager_major_items);
+      addRows(ctx.major_items);
+      addRows(state && state.pmlw_major_items);
+      addRows(state && state.manager_major_items);
+      addRows(state && state.major_items);
+
+      var row = null;
+      for (var i = 0; i < rows.length; i += 1) {
+        var candidate = rows[i] || {};
+        var candidateId = String(
+          candidate.aicm_manager_major_work_item_id ||
+          candidate.manager_major_work_item_id ||
+          candidate.major_work_item_id ||
+          candidate.major_id ||
+          candidate.id ||
+          ""
+        ).trim();
+
+        if (candidateId === majorId) {
+          row = candidate;
+          break;
+        }
+      }
+
+      row = row || {};
+
+      var title = String(
+        row.major_item_name ||
+        row.task_name ||
+        row.deliverable_name ||
+        row.title ||
+        "Manager大項目"
+      ).trim();
+
+      var leader = String(
+        row.assigned_leader_label ||
+        row.leader_robot_label ||
+        row.responsible_robot_label ||
+        row.responsible_role_code ||
+        "課長/Leader"
+      ).trim();
+
+      state.managerMajorLeaderHandoffConfirm = {
+        kind: "manager-major-leader-handoff",
+        title: "課長へ送る確認",
+        majorId: majorId,
+        aicm_manager_major_work_item_id: majorId,
+        major_item_name: title,
+        targetTitle: title,
+        leaderLabel: leader,
+        leaderRaw: leader,
+        row: row,
+        endpoint: "/api/aicm/v2/manager-major/update",
+        backScreen: "task-ledger",
+        body: {
+          owner_civilization_id: typeof aicmLeaderHandoffOwnerIdR8S === "function"
+            ? aicmLeaderHandoffOwnerIdR8S(row)
+            : ((state && state.ownerCivilizationId) || (state && state.owner_civilization_id) || (ctx && ctx.owner_civilization_id) || "00000000-0000-4000-8000-000000000001"),
+          aicm_manager_major_work_item_id: majorId,
+          assigned_leader_label: leader,
+          decomposition_status_code: "assigned_to_leader",
+          handoff_status_code: "handed_off",
+          note: String(row.note || "").trim()
+        }
+      };
+
+      state.screen = "task-ledger";
+
+      if (typeof aicmRenderTaskLedgerSafeR8V4 === "function") {
+        aicmRenderTaskLedgerSafeR8V4("r8z_v9f3_open_confirm");
+        return;
+      }
+
+      if (typeof render === "function") {
+        render();
+      }
+    } catch (error) {
+      try {
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "課長へ送る確認の表示に失敗しました。");
+        }
+        if (typeof render === "function") render();
+      } catch (_) {}
+    }
+  }
+
+// AICM_R8S_LEADER_HANDOFF_CONFIRM_FLOW_HELPER_START
+  function aicmLeaderHandoffTextR8S(value) {
+    if (value === null || typeof value === "undefined") return "";
+    return String(value).trim();
+  }
+
+  function aicmLeaderHandoffOwnerIdR8S(payload) {
+    var p = payload && typeof payload === "object" ? payload : {};
+    if (p.owner_civilization_id) return aicmLeaderHandoffTextR8S(p.owner_civilization_id);
+    if (p.ownerCivilizationId) return aicmLeaderHandoffTextR8S(p.ownerCivilizationId);
+    if (state && state.ownerCivilizationId) return aicmLeaderHandoffTextR8S(state.ownerCivilizationId);
+    if (state && state.owner_civilization_
+
+============================================================
+FUNCTION=aicmRenderTaskLedgerSafeR8V4
+FOUND=YES
+START_LINE=5151
+END_LINE=5194
+NOTE=FOUND_FUNCTION_BOUNDARY
+------------------------------------------------------------
+function aicmRenderTaskLedgerSafeR8V4(sourceLabel) {
+    state.screen = "task-ledger";
+
+    try {
+      if (!root) return;
+
+      var html = renderTaskLedgerPlaceholder();
+      root.innerHTML = html;
+
+      return true;
+    } catch (error) {
+      var message = error && error.message ? error.message : String(error || "unknown error");
+      var stack = error && error.stack ? String(error.stack) : "";
+
+      if (typeof console !== "undefined" && console && console.error) {
+        console.error("AICM task-ledger render failed", {
+          sourceLabel: sourceLabel || "",
+          message: message,
+          stack: stack
+        });
+      }
+
+      if (root) {
+        root.innerHTML = renderShell([
+          '<section class="aicm-core-card" style="border:2px solid #ef4444;">',
+          '  <p class="aicm-eyebrow">TASK LEDGER RENDER ERROR</p>',
+          '  <h2>部門別タスク台帳の描画でエラーが発生しました</h2>',
+          '  <p class="aicm-selected-note">クリック処理と画面遷移は動いています。以下はブラウザ側の描画エラーです。</p>',
+          '  <dl class="aicm-core-detail-list">',
+          '    <dt>source</dt><dd>' + escapeHtml(sourceLabel || "") + '</dd>',
+          '    <dt>message</dt><dd>' + escapeHtml(message) + '</dd>',
+          '  </dl>',
+          stack ? '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.45;max-height:320px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(stack) + '</pre>' : '',
+          '  <div class="aicm-dashboard-action-row">',
+          '    <button type="button" data-core-action="task-ledger-refresh">再読み込み</button>',
+          '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
+          '  </div>',
+          '</section>'
+        ].join(""));
+      }
+
+      return false;
+    }
+  }
+
+============================================================
+FUNCTION=aicmOpenTaskLedgerScreenR8V3Clean
+FOUND=YES
+START_LINE=5197
+END_LINE=5227
+NOTE=FOUND_FUNCTION_BOUNDARY
+------------------------------------------------------------
+function aicmOpenTaskLedgerScreenR8V3Clean() {
+    state.screen = "task-ledger";
+    state.managerMajorDeleteConfirm = null;
+
+    if (typeof setMessage === "function") {
+      setMessage("ok", "部門別タスク台帳を表示します。");
+    }
+
+    aicmRenderTaskLedgerSafeR8V4("open:initial");
+
+    Promise.resolve()
+      .then(function () {
+        if (typeof aicmReloadTaskLedgerContext === "function") {
+          return aicmReloadTaskLedgerContext();
+        }
+        return null;
+      })
+      .then(function () {
+        state.screen = "task-ledger";
+        render();
+      })
+      .catch(function (error) {
+        state.screen = "task-ledger";
+
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "部門別タスク台帳の読込に失敗しました。");
+        }
+
+        aicmRenderTaskLedgerSafeR8V4("open:error");
+      });
+  }
+

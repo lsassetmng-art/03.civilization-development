@@ -3,6 +3,7 @@ import type { PortalApiMeta } from "./portal-api";
 
 export type PortalNoticeLevel = "info" | "warning" | "success";
 export type PortalNoticeVisibility = "public" | "member" | "operator";
+export type PortalContentVisibility = PortalNoticeVisibility;
 
 export type PortalNoticeItem = {
   id: string;
@@ -21,7 +22,7 @@ export type PortalListingItem = {
   title: string;
   summary: string;
   href: string;
-  visibility: PortalNoticeVisibility;
+  visibility: PortalContentVisibility;
   sortOrder: number;
   lastUpdatedAt: string;
 };
@@ -32,9 +33,38 @@ export type PortalMaintenanceItem = {
   title: string;
   summary: string;
   status: "scheduled" | "active" | "resolved";
-  visibility: PortalNoticeVisibility;
+  visibility: PortalContentVisibility;
   startsAt?: string;
   endsAt?: string;
+  lastUpdatedAt: string;
+};
+
+export type PortalCmsPageItem = {
+  id: string;
+  slug: string;
+  title: string;
+  body: string;
+  summary: string;
+  visibility: PortalContentVisibility;
+  lastUpdatedAt: string;
+};
+
+export type PortalAssetManifestItem = {
+  id: string;
+  code: string;
+  title: string;
+  href: string;
+  assetType: "image" | "document" | "other";
+  visibility: PortalContentVisibility;
+  lastUpdatedAt: string;
+};
+
+export type PortalSeoPageItem = {
+  id: string;
+  path: string;
+  title: string;
+  description: string;
+  noindex: boolean;
   lastUpdatedAt: string;
 };
 
@@ -44,9 +74,7 @@ export type PortalPublicListingListRequest = {
 
 export type PortalPublicListingListResponse = {
   meta: PortalApiMeta;
-  data: {
-    items: PortalListingItem[];
-  };
+  data: { items: PortalListingItem[] };
 };
 
 export type PortalAdminListingListRequest = {
@@ -56,9 +84,7 @@ export type PortalAdminListingListRequest = {
 
 export type PortalAdminListingListResponse = {
   meta: PortalApiMeta;
-  data: {
-    items: PortalListingItem[];
-  };
+  data: { items: PortalListingItem[] };
 };
 
 export type PortalAdminListingUpsertRequest = {
@@ -68,15 +94,13 @@ export type PortalAdminListingUpsertRequest = {
   title: string;
   summary: string;
   href: string;
-  visibility: PortalNoticeVisibility;
+  visibility: PortalContentVisibility;
   sortOrder: number;
 };
 
 export type PortalAdminListingUpsertResponse = {
   meta: PortalApiMeta;
-  data: {
-    item: PortalListingItem;
-  };
+  data: { item: PortalListingItem };
 };
 
 export type PortalPublicMaintenanceListRequest = {
@@ -85,9 +109,7 @@ export type PortalPublicMaintenanceListRequest = {
 
 export type PortalPublicMaintenanceListResponse = {
   meta: PortalApiMeta;
-  data: {
-    items: PortalMaintenanceItem[];
-  };
+  data: { items: PortalMaintenanceItem[] };
 };
 
 export type PortalAdminMaintenanceListRequest = {
@@ -97,9 +119,7 @@ export type PortalAdminMaintenanceListRequest = {
 
 export type PortalAdminMaintenanceListResponse = {
   meta: PortalApiMeta;
-  data: {
-    items: PortalMaintenanceItem[];
-  };
+  data: { items: PortalMaintenanceItem[] };
 };
 
 export type PortalAdminMaintenanceUpsertRequest = {
@@ -109,16 +129,14 @@ export type PortalAdminMaintenanceUpsertRequest = {
   title: string;
   summary: string;
   status: "scheduled" | "active" | "resolved";
-  visibility: PortalNoticeVisibility;
+  visibility: PortalContentVisibility;
   startsAt?: string;
   endsAt?: string;
 };
 
 export type PortalAdminMaintenanceUpsertResponse = {
   meta: PortalApiMeta;
-  data: {
-    item: PortalMaintenanceItem;
-  };
+  data: { item: PortalMaintenanceItem };
 };
 
 export type PortalPublicNoticesListRequest = {
@@ -127,9 +145,7 @@ export type PortalPublicNoticesListRequest = {
 
 export type PortalPublicNoticesListResponse = {
   meta: PortalApiMeta;
-  data: {
-    items: PortalNoticeItem[];
-  };
+  data: { items: PortalNoticeItem[] };
 };
 
 export type PortalAdminNoticesListRequest = {
@@ -139,9 +155,7 @@ export type PortalAdminNoticesListRequest = {
 
 export type PortalAdminNoticesListResponse = {
   meta: PortalApiMeta;
-  data: {
-    items: PortalNoticeItem[];
-  };
+  data: { items: PortalNoticeItem[] };
 };
 
 export type PortalAdminNoticePublishRequest = {
@@ -156,7 +170,108 @@ export type PortalAdminNoticePublishRequest = {
 
 export type PortalAdminNoticePublishResponse = {
   meta: PortalApiMeta;
-  data: {
-    item: PortalNoticeItem;
-  };
+  data: { item: PortalNoticeItem };
+};
+
+export type PortalPublicCmsPageGetRequest = {
+  slug: string;
+  session?: PortalSessionSummary;
+};
+
+export type PortalPublicCmsPageGetResponse = {
+  meta: PortalApiMeta;
+  data: { item: PortalCmsPageItem | null };
+};
+
+export type PortalAdminCmsPageListRequest = {
+  scope: "admin";
+  session: PortalSessionSummary;
+};
+
+export type PortalAdminCmsPageListResponse = {
+  meta: PortalApiMeta;
+  data: { items: PortalCmsPageItem[] };
+};
+
+export type PortalAdminCmsPageUpsertRequest = {
+  scope: "admin";
+  session: PortalSessionSummary;
+  slug: string;
+  title: string;
+  summary: string;
+  body: string;
+  visibility: PortalContentVisibility;
+};
+
+export type PortalAdminCmsPageUpsertResponse = {
+  meta: PortalApiMeta;
+  data: { item: PortalCmsPageItem };
+};
+
+export type PortalPublicAssetManifestListRequest = {
+  session?: PortalSessionSummary;
+};
+
+export type PortalPublicAssetManifestListResponse = {
+  meta: PortalApiMeta;
+  data: { items: PortalAssetManifestItem[] };
+};
+
+export type PortalAdminAssetManifestListRequest = {
+  scope: "admin";
+  session: PortalSessionSummary;
+};
+
+export type PortalAdminAssetManifestListResponse = {
+  meta: PortalApiMeta;
+  data: { items: PortalAssetManifestItem[] };
+};
+
+export type PortalAdminAssetManifestUpsertRequest = {
+  scope: "admin";
+  session: PortalSessionSummary;
+  code: string;
+  title: string;
+  href: string;
+  assetType: "image" | "document" | "other";
+  visibility: PortalContentVisibility;
+};
+
+export type PortalAdminAssetManifestUpsertResponse = {
+  meta: PortalApiMeta;
+  data: { item: PortalAssetManifestItem };
+};
+
+export type PortalPublicSeoPageGetRequest = {
+  path: string;
+  session?: PortalSessionSummary;
+};
+
+export type PortalPublicSeoPageGetResponse = {
+  meta: PortalApiMeta;
+  data: { item: PortalSeoPageItem | null };
+};
+
+export type PortalAdminSeoPageListRequest = {
+  scope: "admin";
+  session: PortalSessionSummary;
+};
+
+export type PortalAdminSeoPageListResponse = {
+  meta: PortalApiMeta;
+  data: { items: PortalSeoPageItem[] };
+};
+
+export type PortalAdminSeoPageUpsertRequest = {
+  scope: "admin";
+  session: PortalSessionSummary;
+  path: string;
+  title: string;
+  description: string;
+  noindex: boolean;
+};
+
+export type PortalAdminSeoPageUpsertResponse = {
+  meta: PortalApiMeta;
+  data: { item: PortalSeoPageItem };
 };

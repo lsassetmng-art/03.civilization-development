@@ -1,0 +1,177 @@
+# BusinessOS Civilization Scope Audit Report
+
+## Result
+- RESULT: PASS
+- FINAL_STATUS: BUSINESSOS_SCOPE_REVIEW_REQUIRED
+- PASS_COUNT: 5
+- WARN_COUNT: 3
+- FAIL_COUNT: 0
+
+## Canonical correction
+BusinessOS is civilization_id / user scoped.
+BusinessOS is not company scoped.
+
+company_id is optional target context for:
+- ERP integration
+- AICompanyManager company object
+- company-related display/placement target
+
+company_id must not be the sole primary access boundary for BusinessOS user-owned data.
+
+## Files
+- CANON_FILE: /data/data/com.termux/files/home/03.civilization-development/03.business-os/_businessos/docs/002_BUSINESSOS_SCOPE_RULE_CIVILIZATION_ID_CANON.md
+- COLUMN_INVENTORY: /data/data/com.termux/files/home/03.civilization-development/03.business-os/_businessos/docs/verification/20260430_084951_businessos_civilization_scope_audit/010_business_scope_column_inventory.txt
+- TABLE_SCOPE_CLASSIFICATION: /data/data/com.termux/files/home/03.civilization-development/03.business-os/_businessos/docs/verification/20260430_084951_businessos_civilization_scope_audit/020_table_scope_classification.txt
+- RLS_POLICY_SCOPE_INVENTORY: /data/data/com.termux/files/home/03.civilization-development/03.business-os/_businessos/docs/verification/20260430_084951_businessos_civilization_scope_audit/030_rls_policy_scope_inventory.txt
+- FUNCTION_SCOPE_INVENTORY: /data/data/com.termux/files/home/03.civilization-development/03.business-os/_businessos/docs/verification/20260430_084951_businessos_civilization_scope_audit/040_function_scope_inventory.txt
+- RENTAL_SCOPE_INVENTORY: /data/data/com.termux/files/home/03.civilization-development/03.business-os/_businessos/docs/verification/20260430_084951_businessos_civilization_scope_audit/050_rental_specific_scope_inventory.txt
+- REVIEW_SUMMARY: /data/data/com.termux/files/home/03.civilization-development/03.business-os/_businessos/docs/verification/20260430_084951_businessos_civilization_scope_audit/060_review_summary.md
+
+## Review summary
+# BusinessOS civilization scope review summary
+
+## Company-only tables requiring review
+TABLE_SCOPE|business|ai_company_manager_company|false|true|true|company_only_review_required|company_id,owner_user_id,company_name,display_name,description,status,aiworker_org_ref,created_at,updated_at
+TABLE_SCOPE|business|ai_company_manager_project|false|true|true|company_only_review_required|project_id,company_id,owner_user_id,project_title,project_summary,project_status,priority,due_at,delivery_format,human_approval_required,current_pipeline_run_id,created_at,updated_at
+TABLE_SCOPE|business|aicm_aiworker_api_audit_log|false|true|false|company_only_review_required|api_audit_log_id,request_id,api_client_id,client_code,company_id,endpoint_code,action_code,dry_run_flag,allowed_flag,status_code,error_code,reason,actor_type,request_jsonb,response_jsonb,request_ip,user_agent,metadata_jsonb,created_at
+TABLE_SCOPE|business|aicm_company|false|true|false|company_only_review_required|company_id,company_name,business_domain,company_status,company_common_rules_text,created_at,updated_at
+TABLE_SCOPE|business|aicm_organization_robot_assignment|false|true|false|company_only_review_required|assignment_id,company_id,department_id,organization_id,aiworker_robot_id,role_name,display_name,assignment_status,created_at,updated_at
+TABLE_SCOPE|business|company_robot_entitlement|false|true|false|company_only_review_required|company_robot_entitlement_id,company_id,robot_pool_id,aiworker_model_code,business_offer_code,entitlement_scope_code,contracted_quantity,usable_quantity,assignment_mode_code,status_code,starts_at,ends_at,metadata_jsonb,created_at,updated_at
+TABLE_SCOPE|business|company_robot_placement|false|true|false|company_only_review_required|company_robot_placement_id,company_id,company_robot_entitlement_id,robot_pool_id,aiworker_model_code,target_level_code,target_id,app_code,role_code,internal_nickname,placement_quantity,placement_mode_code,status_code,metadata_jsonb,created_at,updated_at
+TABLE_SCOPE|business|company_robot_placement_event|false|true|false|company_only_review_required|company_robot_placement_event_id,company_robot_placement_id,company_id,event_code,reason,before_jsonb,after_jsonb,metadata_jsonb,created_at
+TABLE_SCOPE|business|vw_ai_company_manager_system_robot_selector_options|false|true|false|company_only_review_required|company_robot_entitlement_id,company_id,robot_pool_id,aiworker_model_code,display_name,selector_label,aiworker_series_code,manufacturer_code,app_code,entitlement_scope_code,contracted_quantity,usable_quantity,assignment_mode_code,status_code,recommended_role_codes,updated_at
+TABLE_SCOPE|business|vw_aicm_aiworker_api_audit_recent|false|true|false|company_only_review_required|api_audit_log_id,request_id,client_code,company_id,endpoint_code,action_code,dry_run_flag,allowed_flag,status_code,error_code,reason,created_at
+TABLE_SCOPE|business|vw_aicm_company_robot_active_assignment_display|false|true|false|company_only_review_required|company_robot_placement_id,company_id,target_level_code,target_id,app_code,role_code,internal_nickname,display_label,aiworker_model_code,model_display_name,selector_label,aiworker_series_code,manufacturer_code,placement_quantity,status_code,created_at,updated_at,metadata_jsonb
+TABLE_SCOPE|business|vw_aicm_company_robot_assignment_display|false|true|false|company_only_review_required|company_robot_placement_id,company_id,target_level_code,target_id,app_code,role_code,internal_nickname,display_label,aiworker_model_code,model_display_name,selector_label,aiworker_series_code,manufacturer_code,placement_quantity,status_code,created_at,updated_at,metadata_jsonb
+TABLE_SCOPE|business|vw_company_robot_placement_display|false|true|false|company_only_review_required|company_robot_placement_id,company_id,target_level_code,target_id,app_code,role_code,internal_nickname,display_label,aiworker_model_code,model_display_name,aiworker_series_code,manufacturer_code,placement_quantity,status_code,created_at,updated_at
+TABLE_SCOPE|business|vw_company_robot_placement_status|false|true|false|company_only_review_required|company_robot_placement_id,company_id,target_level_code,target_id,app_code,role_code,internal_nickname,display_label,aiworker_model_code,placement_quantity,status_code,assignment_mode_code,contracted_quantity,usable_quantity,pool_display_name,aiworker_series_code,manufacturer_code,created_at,updated_at
+TABLE_SCOPE|business|vw_company_robot_selector_options|false|true|false|company_only_review_required|company_robot_entitlement_id,company_id,robot_pool_id,aiworker_model_code,display_name,selector_label,aiworker_series_code,manufacturer_code,business_offer_code,entitlement_scope_code,contracted_quantity,usable_quantity,assignment_mode_code,status_code,recommended_role_codes,updated_at
+
+## User-id-only tables requiring review
+TABLE_SCOPE|business|ai_company_manager_audit_log|false|false|true|user_id_only_review_required|audit_log_id,owner_user_id,project_id,pipeline_run_id,actor_type,actor_ref,action_code,before_json,after_json,reason,created_at
+TABLE_SCOPE|business|ai_company_manager_queue_item|false|false|true|user_id_only_review_required|queue_item_id,owner_user_id,project_id,pipeline_run_id,queue_type,payload_json,queue_status,retry_count,last_error_code,last_error_message,created_at,updated_at
+TABLE_SCOPE|business|pocketsecretary_briefing_support|false|false|true|user_id_only_review_required|briefing_item_id,user_id,briefing_date,timezone,item_type_code,item_title,item_summary,urgency_code,overdue,actionable,due_at,source_occurred_at,created_at,updated_at
+TABLE_SCOPE|business|pocketsecretary_follow_through_queue_support|false|false|true|user_id_only_review_required|follow_through_queue_item_id,user_id,queue_date,timezone,item_type_code,item_title,item_summary,follow_through_state_code,urgency_code,overdue,conversation_linked,related_conversation_id,related_action_id,due_at,updated_at,created_at
+TABLE_SCOPE|business|secretary_tool_usage|false|false|true|user_id_only_review_required|id,user_id,tool_name,metadata,created_at
+TABLE_SCOPE|business|v_worker_rental_contract_summary|false|false|true|user_id_only_review_required|rental_contract_id,app_code,service_code,user_id,worker_owner_schema,worker_id,worker_type,worker_snapshot_id,rental_unit_kind,rental_unit_count,rental_total_minutes,rental_starts_at,rental_ends_at,base_price_jpy,applied_entitlement_count,free_unit_count,paid_unit_count,final_price_jpy,contract_status,price_version,locale,created_at,updated_at
+TABLE_SCOPE|business|v_worker_rental_entitlement_balance_active|false|false|true|user_id_only_review_required|entitlement_balance_id,entitlement_grant_id,app_code,service_code,user_id,grant_period,entitlement_kind,entitlement_source_rule,entitlement_unit_kind,entitlement_unit_count,entitlement_minutes_each,granted_quantity,used_quantity,remaining_quantity,remaining_total_units,remaining_total_minutes,balance_status,created_at,updated_at
+TABLE_SCOPE|business|worker_rental_contract|false|false|true|user_id_only_review_required|rental_contract_id,app_code,service_code,user_id,worker_owner_schema,worker_id,worker_type,worker_snapshot_id,rental_unit_kind,rental_unit_count,rental_starts_at,rental_ends_at,base_price_jpy,applied_entitlement_count,free_unit_count,paid_unit_count,final_price_jpy,contract_status,price_version,locale,created_at,updated_at
+TABLE_SCOPE|business|worker_rental_end_summary|false|false|true|user_id_only_review_required|rental_end_summary_id,rental_contract_id,rental_period_id,app_code,service_code,user_id,worker_owner_schema,worker_id,worker_type,ended_reason,used_seconds,summary_text,created_at
+TABLE_SCOPE|business|worker_rental_entitlement_balance|false|false|true|user_id_only_review_required|entitlement_balance_id,entitlement_grant_id,app_code,service_code,user_id,grant_period,entitlement_kind,entitlement_source_rule,entitlement_unit_kind,entitlement_unit_count,granted_quantity,used_quantity,remaining_quantity,remaining_total_units,balance_status,created_at,updated_at
+TABLE_SCOPE|business|worker_rental_entitlement_grant|false|false|true|user_id_only_review_required|entitlement_grant_id,app_code,service_code,user_id,grant_period,entitlement_kind,entitlement_source_rule,entitlement_unit_kind,entitlement_unit_count,granted_quantity,total_granted_units,carryover_enabled,grant_status,granted_at,expires_at,created_at,updated_at
+TABLE_SCOPE|business|worker_rental_entitlement_usage|false|false|true|user_id_only_review_required|entitlement_usage_id,entitlement_grant_id,entitlement_balance_id,rental_contract_id,rental_period_id,app_code,service_code,user_id,entitlement_kind,entitlement_source_rule,used_quantity,used_unit_kind,used_unit_count,discounted_amount_jpy,final_price_jpy,usage_status,used_at,created_at
+TABLE_SCOPE|business|worker_rental_payment_intent|false|false|true|user_id_only_review_required|rental_payment_intent_id,rental_contract_id,user_id,amount_jpy,currency_code,payment_status,provider_code,provider_reference,created_at,updated_at
+TABLE_SCOPE|business|worker_rental_period|false|false|true|user_id_only_review_required|rental_period_id,rental_contract_id,user_id,worker_owner_schema,worker_id,worker_type,period_status,starts_at,ends_at,actual_started_at,actual_ended_at,remaining_seconds_snapshot,created_at,updated_at
+TABLE_SCOPE|business|worker_rental_safety_event|false|false|true|user_id_only_review_required|rental_safety_event_id,rental_contract_id,rental_period_id,app_code,service_code,user_id,worker_owner_schema,worker_id,worker_type,safety_state,safety_code,event_summary,created_at
+TABLE_SCOPE|business|worker_rental_usage_log|false|false|true|user_id_only_review_required|rental_usage_log_id,rental_contract_id,rental_period_id,app_code,service_code,user_id,worker_owner_schema,worker_id,worker_type,usage_unit_kind,usage_unit_count,usage_seconds,event_count,safety_event_count,created_at
+
+## No-owner-scope tables requiring review
+TABLE_SCOPE|business|ai_company_manager_approval|false|false|false|no_owner_scope_review_required|approval_id,project_id,pipeline_run_id,deliverable_id,approver_user_id,approval_status,approval_comment,approved_at,created_at,updated_at
+TABLE_SCOPE|business|ai_company_manager_deliverable|false|false|false|no_owner_scope_review_required|deliverable_id,pipeline_run_id,parent_deliverable_id,produced_by_role,produced_by_ref,deliverable_title,deliverable_type,content_ref,content_text,deliverable_status,version_no,created_at,updated_at
+TABLE_SCOPE|business|ai_company_manager_delivery|false|false|false|no_owner_scope_review_required|delivery_id,project_id,pipeline_run_id,approval_id,deliverable_id,delivery_status,delivery_format,delivery_ref,delivered_at,accepted_at,created_at,updated_at
+TABLE_SCOPE|business|ai_company_manager_pipeline_run|false|false|false|no_owner_scope_review_required|pipeline_run_id,project_id,policy_id,aiworker_run_ref,run_status,current_role_code,current_stage,started_at,completed_at,cancelled_at,last_sync_at,created_at,updated_at
+TABLE_SCOPE|business|ai_company_manager_policy|false|false|false|no_owner_scope_review_required|policy_id,project_id,policy_title,business_goal,expected_output,target_audience,constraints_text,forbidden_text,quality_standard,review_policy,delivery_requirement,policy_status,submitted_at,created_at,updated_at
+TABLE_SCOPE|business|ai_company_manager_return_request|false|false|false|no_owner_scope_review_required|return_id,review_id,deliverable_id,pipeline_run_id,from_role,to_role,reason,correction_target,correction_instruction,due_at,return_status,return_count,created_at,updated_at
+TABLE_SCOPE|business|ai_company_manager_review|false|false|false|no_owner_scope_review_required|review_id,deliverable_id,pipeline_run_id,reviewer_role,reviewer_ref,review_status,review_comment,quality_score,reviewed_at,created_at,updated_at
+TABLE_SCOPE|business|ai_company_manager_role_assignment|false|false|false|no_owner_scope_review_required|assignment_id,pipeline_run_id,role_code,aiworker_ref,display_name,assigned_domain,assignment_status,created_at,updated_at
+TABLE_SCOPE|business|ai_company_manager_stage|false|false|false|no_owner_scope_review_required|stage_id,pipeline_run_id,stage_code,role_code,stage_status,input_summary,output_summary,started_at,completed_at,created_at,updated_at
+TABLE_SCOPE|business|aicm_aiworker_api_client|false|false|false|no_owner_scope_review_required|api_client_id,client_code,display_name,token_sha256,token_hint,status_code,allowed_scope_code,note,metadata_jsonb,created_at,updated_at
+TABLE_SCOPE|business|pocketsecretary_conversation_action_support|false|false|false|no_owner_scope_review_required|action_id,actor_user_id,target_user_id,conversation_id,action_type_code,action_title,action_summary,priority_code,action_state_code,due_at,follow_through_required,queue_link_created,queue_state_code,created_at,updated_at
+TABLE_SCOPE|business|robot_pool_sync_ledger|false|false|false|no_owner_scope_review_required|robot_pool_sync_ledger_id,sync_source_code,aiworker_model_code,robot_pool_id,sync_status_code,note,metadata_jsonb,created_at
+TABLE_SCOPE|business|v_worker_rental_monthly_free_ticket_rule|false|false|false|no_owner_scope_review_required|app_code,service_code,service_name,monthly_free_ticket_enabled,monthly_free_ticket_quantity,monthly_free_ticket_source_rule,monthly_free_ticket_unit_kind,monthly_free_ticket_unit_count,free_ticket_minutes_each,free_ticket_minutes_total,monthly_free_ticket_carryover_enabled
+TABLE_SCOPE|business|vw_aicm_robot_role_duplicate_rule|false|false|false|no_owner_scope_review_required|role_code,duplicate_guard_flag,max_active_count,duplicate_scope_code,note
+TABLE_SCOPE|business|vw_aicm_screen_robot_route_definition|false|false|false|no_owner_scope_review_required|route_code,screen_label,target_level_code,role_code,default_model_code,default_internal_nickname
+TABLE_SCOPE|business|vw_business_robot_pool_status|false|false|false|no_owner_scope_review_required|robot_pool_id,aiworker_model_code,aiworker_series_code,manufacturer_code,display_name,business_offer_code,pool_scope_code,available_quantity,reserved_quantity,visible_available_quantity,unlimited_assignment_flag,rental_unit_code,status_code,active_placement_count,created_at,updated_at
+TABLE_SCOPE|business|vw_business_robot_selector_options|false|false|false|no_owner_scope_review_required|robot_pool_id,aiworker_model_code,aiworker_series_code,manufacturer_code,display_name,selector_label,business_offer_code,pool_scope_code,available_quantity,reserved_quantity,visible_available_quantity,unlimited_assignment_flag,rental_unit_code,status_code,recommended_role_codes,metadata_jsonb,updated_at
+TABLE_SCOPE|business|worker_rental_contract_line|false|false|false|no_owner_scope_review_required|rental_contract_line_id,rental_contract_id,line_type,rental_unit_kind,rental_unit_count,quantity,unit_price_jpy,amount_jpy,note,created_at
+TABLE_SCOPE|business|worker_rental_status_history|false|false|false|no_owner_scope_review_required|rental_status_history_id,rental_contract_id,from_status,to_status,reason,created_at
+TABLE_SCOPE|business|worker_rental_unit_policy|false|false|false|no_owner_scope_review_required|rental_unit_kind,display_name,max_unit_count,max_total_minutes,max_human_label,is_active,created_at,updated_at
+
+## Company-scoped policies requiring review
+POLICY_SCOPE|business|aicm_actor_membership|aicm_membership_manage_admin|ALL|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text])|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_actor_membership|aicm_membership_select|SELECT|((actor_user_id = auth.uid()) OR business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text]))||company_scoped_review_required
+POLICY_SCOPE|business|aicm_company|aicm_company_insert_strict|INSERT||((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_is_company_admin())|company_scoped_review_required
+POLICY_SCOPE|business|aicm_company|aicm_company_select|SELECT|business.aicm_can_access_company(company_id)||company_scoped_review_required
+POLICY_SCOPE|business|aicm_company|aicm_company_select_strict|SELECT|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text, 'Worker'::text, 'Reviewer'::text]))||company_scoped_review_required
+POLICY_SCOPE|business|aicm_company|aicm_company_update_admin|UPDATE|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text])|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_company|aicm_company_update_strict|UPDATE|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_is_company_admin())|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_is_company_admin())|company_scoped_review_required
+POLICY_SCOPE|business|aicm_department|aicm_department_access|ALL|business.aicm_can_access_company(company_id)|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_department|aicm_department_insert_strict|INSERT||((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_department|aicm_department_select_strict|SELECT|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_department(department_id) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text, 'Worker'::text, 'Reviewer'::text]))||company_scoped_review_required
+POLICY_SCOPE|business|aicm_department|aicm_department_update_strict|UPDATE|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text]))|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_department_task_ledger|aicm_ledger_insert_strict|INSERT||((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_department(department_id) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_department_task_ledger|aicm_ledger_select_strict|SELECT|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_department(department_id) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text, 'Worker'::text, 'Reviewer'::text]))||company_scoped_review_required
+POLICY_SCOPE|business|aicm_department_task_ledger|aicm_ledger_update_strict|UPDATE|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_department(department_id) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text]))|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_department(department_id) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_department_task_ledger|aicm_task_ledger_access|ALL|business.aicm_can_access_company(company_id)|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text, 'Leader'::text, 'Worker'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_organization|aicm_organization_access|ALL|business.aicm_can_access_company(company_id)|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_organization|aicm_organization_insert_strict|INSERT||((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_department(department_id) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_organization|aicm_organization_select_strict|SELECT|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_department(department_id) AND business.aicm_jwt_has_organization(organization_id) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text, 'Worker'::text, 'Reviewer'::text]))||company_scoped_review_required
+POLICY_SCOPE|business|aicm_organization|aicm_organization_update_strict|UPDATE|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_department(department_id) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text]))|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_department(department_id) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_organization_robot_assignment|aicm_robot_assignment_access|ALL|business.aicm_can_access_company(company_id)|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text, 'Leader'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_review_action|aicm_review_action_access|ALL|business.aicm_can_access_company(company_id)|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text, 'Leader'::text, 'Reviewer'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_review_action|aicm_review_action_insert_strict|INSERT||((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Reviewer'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_review_action|aicm_review_action_select_strict|SELECT|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text, 'Reviewer'::text]))||company_scoped_review_required
+POLICY_SCOPE|business|aicm_review_item|aicm_review_item_access|ALL|business.aicm_can_access_company(company_id)|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text, 'Leader'::text, 'Reviewer'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_review_item|aicm_review_item_insert_strict|INSERT||((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text, 'Reviewer'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_review_item|aicm_review_item_select_strict|SELECT|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text, 'Reviewer'::text]))||company_scoped_review_required
+POLICY_SCOPE|business|aicm_review_item|aicm_review_item_update_strict|UPDATE|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Reviewer'::text]))|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Reviewer'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_task_file_metadata|aicm_task_file_metadata_access|ALL|business.aicm_can_access_company(company_id)|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text, 'Leader'::text, 'Worker'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_task_ledger_csv_import_batch|aicm_csv_batch_access|ALL|business.aicm_can_access_company(company_id)|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text, 'Leader'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_workflow_run|aicm_workflow_run_access|ALL|business.aicm_can_access_company(company_id)|business.aicm_has_company_role(company_id, ARRAY['Owner'::text, 'Admin'::text, 'Manager'::text, 'Leader'::text])|company_scoped_review_required
+POLICY_SCOPE|business|aicm_workflow_run|aicm_workflow_run_insert_strict|INSERT||((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|aicm_workflow_run|aicm_workflow_run_select_strict|SELECT|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text, 'Worker'::text, 'Reviewer'::text]))||company_scoped_review_required
+POLICY_SCOPE|business|aicm_workflow_run|aicm_workflow_run_update_strict|UPDATE|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text]))|((company_id = business.aicm_jwt_company_id()) AND business.aicm_jwt_has_any_role(ARRAY['Admin'::text, 'Manager'::text, 'Leader'::text]))|company_scoped_review_required
+POLICY_SCOPE|business|company_robot_entitlement|company_robot_entitlement_company_insert|INSERT||((company_id)::text = current_setting('app.current_company_id'::text, true))|company_scoped_review_required
+POLICY_SCOPE|business|company_robot_entitlement|company_robot_entitlement_company_select|SELECT|((company_id)::text = current_setting('app.current_company_id'::text, true))||company_scoped_review_required
+POLICY_SCOPE|business|company_robot_entitlement|company_robot_entitlement_company_update|UPDATE|((company_id)::text = current_setting('app.current_company_id'::text, true))|((company_id)::text = current_setting('app.current_company_id'::text, true))|company_scoped_review_required
+POLICY_SCOPE|business|company_robot_placement|company_robot_placement_company_insert|INSERT||((company_id)::text = current_setting('app.current_company_id'::text, true))|company_scoped_review_required
+POLICY_SCOPE|business|company_robot_placement|company_robot_placement_company_select|SELECT|((company_id)::text = current_setting('app.current_company_id'::text, true))||company_scoped_review_required
+POLICY_SCOPE|business|company_robot_placement|company_robot_placement_company_update|UPDATE|((company_id)::text = current_setting('app.current_company_id'::text, true))|((company_id)::text = current_setting('app.current_company_id'::text, true))|company_scoped_review_required
+
+## Company-related functions requiring review
+FUNCTION_SCOPE|business|aicm_apply_review_action|p_review_item_id uuid, p_action_type text, p_comment text, p_idempotency_key text|company_related_review_required
+FUNCTION_SCOPE|business|aicm_can_access_company|p_company_id uuid|company_related_review_required
+FUNCTION_SCOPE|business|aicm_create_company_with_owner|p_company_name text, p_business_domain text|company_related_review_required
+FUNCTION_SCOPE|business|aicm_has_company_role|p_company_id uuid, p_roles text[]|company_related_review_required
+FUNCTION_SCOPE|business|aicm_jwt_company_id||company_related_review_required
+FUNCTION_SCOPE|business|aicm_start_workflow_local_stub|p_company_id uuid, p_department_id uuid, p_ledger_row_id uuid, p_request_payload jsonb|company_related_review_required
+FUNCTION_SCOPE|business|fn_aicm_aiworker_api_audit_write|p_request_id uuid, p_api_client_id uuid, p_client_code text, p_company_id uuid, p_endpoint_code text, p_action_code text, p_dry_run_flag boolean, p_allowed_flag boolean, p_status_code text, p_error_code text, p_reason text, p_request_jsonb jsonb, p_response_jsonb jsonb, p_request_ip inet, p_user_agent text, p_metadata_jsonb jsonb|company_related_review_required
+FUNCTION_SCOPE|business|fn_aicm_aiworker_api_auth_check|p_token text, p_company_id uuid, p_endpoint_code text, p_action_code text, p_dry_run_flag boolean, p_request_jsonb jsonb, p_request_ip inet, p_user_agent text|company_related_review_required
+FUNCTION_SCOPE|business|fn_aicm_aiworker_company_context_check|p_company_id uuid|company_related_review_required
+FUNCTION_SCOPE|business|fn_aicm_aiworker_current_company_id||company_related_review_required
+FUNCTION_SCOPE|business|fn_aicm_aiworker_require_company_context|p_company_id uuid, p_action_code text|company_related_review_required
+FUNCTION_SCOPE|business|fn_aicm_company_robot_placements_filtered|p_company_id uuid, p_role_code text, p_target_level_code text, p_target_id uuid, p_status_code text|company_related_review_required
+FUNCTION_SCOPE|business|fn_aicm_robot_placement_duplicate_guard|p_company_id uuid, p_role_code text, p_target_level_code text, p_target_id uuid, p_exclude_company_robot_placement_id uuid|company_related_review_required
+FUNCTION_SCOPE|business|fn_aicm_robot_placement_duplicate_guard_from_payload|p_payload jsonb|company_related_review_required
+FUNCTION_SCOPE|business|fn_aicm_robot_setting_preview|p_company_id uuid, p_aiworker_model_code text, p_target_level_code text, p_role_code text, p_internal_nickname text, p_target_id uuid, p_app_code text|company_related_review_required
+FUNCTION_SCOPE|business|fn_company_robot_grant_entitlement|p_company_id uuid, p_aiworker_model_code text, p_quantity integer, p_business_offer_code text, p_entitlement_scope_code text, p_assignment_mode_code text|company_related_review_required
+FUNCTION_SCOPE|business|fn_company_robot_grant_entitlement_ctx|p_company_id uuid, p_aiworker_model_code text, p_quantity integer, p_business_offer_code text, p_entitlement_scope_code text, p_assignment_mode_code text|company_related_review_required
+FUNCTION_SCOPE|business|fn_company_robot_place|p_company_id uuid, p_aiworker_model_code text, p_target_level_code text, p_role_code text, p_internal_nickname text, p_target_id uuid, p_app_code text, p_placement_quantity integer, p_metadata_jsonb jsonb|company_related_review_required
+FUNCTION_SCOPE|business|fn_company_robot_place_ctx|p_company_id uuid, p_aiworker_model_code text, p_target_level_code text, p_role_code text, p_internal_nickname text, p_target_id uuid, p_app_code text, p_placement_quantity integer, p_metadata_jsonb jsonb|company_related_review_required
+FUNCTION_SCOPE|business|fn_company_robot_placement_deactivate|p_company_robot_placement_id uuid, p_reason text, p_metadata_patch_jsonb jsonb|company_related_review_required
+FUNCTION_SCOPE|business|fn_company_robot_placement_deactivate_ctx|p_company_robot_placement_id uuid, p_reason text, p_metadata_patch_jsonb jsonb|company_related_review_required
+FUNCTION_SCOPE|business|fn_company_robot_placement_update|p_company_robot_placement_id uuid, p_internal_nickname text, p_role_code text, p_target_level_code text, p_target_id uuid, p_metadata_patch_jsonb jsonb|company_related_review_required
+FUNCTION_SCOPE|business|fn_company_robot_placement_update_ctx|p_company_robot_placement_id uuid, p_internal_nickname text, p_role_code text, p_target_level_code text, p_target_id uuid, p_metadata_patch_jsonb jsonb|company_related_review_required
+FUNCTION_SCOPE|business|fn_company_robot_selector_options_for_role|p_company_id uuid, p_role_code text|company_related_review_required
+
+## Rental tables not civilization-scoped
+
+## Required design direction
+- user-owned BusinessOS tables need civilization_id or owner_civilization_id
+- company_id may remain only as target_company_id / erp_company_id / optional context
+- RLS should use app.current_civilization_id
+- company matching can be additional validation, not sole ownership validation
+- global catalog tables can remain global/read-only
+
+## Safety
+- DB write: none
+- RLS change: none
+- API change: none
+- DELETE: none
+- ERP DATABASE_URL: not used
+
+## Next
+If WARN_COUNT > 0:
+- create separate migration design to add civilization_id / owner_civilization_id where needed
+- do not apply until佐藤(DB担当)レビュー
+- update API context from current_company_id-only to current_civilization_id-first

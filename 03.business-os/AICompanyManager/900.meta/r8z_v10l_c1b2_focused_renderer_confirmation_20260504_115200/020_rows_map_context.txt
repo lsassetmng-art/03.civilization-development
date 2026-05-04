@@ -1,0 +1,690 @@
+AICompanyManager V10L-C1B2 rows.map focused context
+
+============================================================
+FUNCTION=aicmRenderTaskLedgerSafeR8V4
+------------------------------------------------------------
+NO_CONTEXT_HITS
+
+
+============================================================
+FUNCTION=renderPmlwMajorRows
+------------------------------------------------------------
+--- context around local line 31:           "pmlw_major_item_id",
+   17:       }
+   18:       return fallback == null ? "" : fallback;
+   19:     }
+   20: 
+   21:     function rowId(row, index) {
+   22:       if (typeof aicmAxuR1MajorId === "function") {
+   23:         var id = aicmAxuR1MajorId(row);
+   24:         if (id) return id;
+   25:       }
+   26: 
+   27:       return String(
+   28:         value(row, [
+   29:           "aicm_manager_major_work_item_id",
+   30:           "manager_major_work_item_id",
+   31:           "pmlw_major_item_id",
+   32:           "major_item_id",
+   33:           "id"
+   34:         ], "row-" + String(index))
+   35:       );
+   36:     }
+   37: 
+   38:     var list = Array.isArray(rows) ? rows : [];
+   39: 
+   40:     if (!list.length && typeof selectedCompany === "function" && typeof pmlwMajorRowsForCompany === "function") {
+   41:       var company = selectedCompany();
+   42:       list = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+   43:     }
+   44: 
+   45:     if (!Array.isArray(list) || list.length === 0) {
+
+--- context around local line 40:     if (!list.length && typeof selectedCompany === "function" && typeof pmlwMajorRowsForCompany === "function") {
+   26: 
+   27:       return String(
+   28:         value(row, [
+   29:           "aicm_manager_major_work_item_id",
+   30:           "manager_major_work_item_id",
+   31:           "pmlw_major_item_id",
+   32:           "major_item_id",
+   33:           "id"
+   34:         ], "row-" + String(index))
+   35:       );
+   36:     }
+   37: 
+   38:     var list = Array.isArray(rows) ? rows : [];
+   39: 
+   40:     if (!list.length && typeof selectedCompany === "function" && typeof pmlwMajorRowsForCompany === "function") {
+   41:       var company = selectedCompany();
+   42:       list = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+   43:     }
+   44: 
+   45:     if (!Array.isArray(list) || list.length === 0) {
+   46:       return [
+   47:         '<div class="aicm-empty-state">',
+   48:         '  <strong>登録済み大項目はまだありません</strong>',
+   49:         '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+   50:         '</div>'
+   51:       ].join("");
+   52:     }
+   53: 
+   54:     return [
+
+--- context around local line 42:       list = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+   28:         value(row, [
+   29:           "aicm_manager_major_work_item_id",
+   30:           "manager_major_work_item_id",
+   31:           "pmlw_major_item_id",
+   32:           "major_item_id",
+   33:           "id"
+   34:         ], "row-" + String(index))
+   35:       );
+   36:     }
+   37: 
+   38:     var list = Array.isArray(rows) ? rows : [];
+   39: 
+   40:     if (!list.length && typeof selectedCompany === "function" && typeof pmlwMajorRowsForCompany === "function") {
+   41:       var company = selectedCompany();
+   42:       list = company ? pmlwMajorRowsForCompany(company.aicm_user_company_id) : [];
+   43:     }
+   44: 
+   45:     if (!Array.isArray(list) || list.length === 0) {
+   46:       return [
+   47:         '<div class="aicm-empty-state">',
+   48:         '  <strong>登録済み大項目はまだありません</strong>',
+   49:         '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+   50:         '</div>'
+   51:       ].join("");
+   52:     }
+   53: 
+   54:     return [
+   55:       '<div class="aicm-table-wrap">',
+   56:       '  <table class="aicm-table">',
+
+--- context around local line 69:       list.map(function (row, index) {
+   55:       '<div class="aicm-table-wrap">',
+   56:       '  <table class="aicm-table">',
+   57:       '    <thead>',
+   58:       '      <tr>',
+   59:       '        <th>大項目</th>',
+   60:       '        <th>部門</th>',
+   61:       '        <th>課</th>',
+   62:       '        <th>優先度</th>',
+   63:       '        <th>期限</th>',
+   64:       '        <th>状態</th>',
+   65:       '        <th>操作</th>',
+   66:       '      </tr>',
+   67:       '    </thead>',
+   68:       '    <tbody>',
+   69:       list.map(function (row, index) {
+   70:         var id = rowId(row, index);
+   71:         var title = value(row, ["major_item_name", "title", "task_name", "deliverable_name"], "-");
+   72:         var description = value(row, ["major_item_description", "description", "note"], "");
+   73:         var department = value(row, ["department_name", "department_label"], "-");
+   74:         var section = value(row, ["section_name", "section_label"], "-");
+   75:         var priority = value(row, ["priority_code"], "normal");
+   76:         var dueDate = value(row, ["due_date"], "-");
+   77:         var status = value(row, ["handoff_status_code", "decomposition_status_code", "status_code"], "-");
+   78: 
+   79:         return [
+   80:           '      <tr>',
+   81:           '        <td><strong>' + h(title) + '</strong>' + (description ? '<p class="aicm-selected-note">' + h(description) + '</p>' : '') + '</td>',
+   82:           '        <td>' + h(department) + '</td>',
+   83:           '        <td>' + h(section) + '</td>',
+
+--- context around local line 180:       .concat(asArray(ctx.pmlw_major_items))
+  166:       };
+  167: 
+  168:       if (closed[handoff]) return false;
+  169:       if (closed[decomposition]) return false;
+  170: 
+  171:       return true;
+  172:     }
+  173: 
+  174:     function rowOrder(row) {
+  175:       var n = Number(row && (row.display_order || row.sort_order || row.row_order || 0));
+  176:       return Number.isFinite(n) ? n : 0;
+  177:     }
+  178: 
+  179:     var rows = []
+  180:       .concat(asArray(ctx.pmlw_major_items))
+  181:       .concat(asArray(ctx.manager_major_items))
+  182:       .concat(asArray(ctx.major_items));
+  183: 
+  184:     rows = rows.filter(function (row) {
+  185:       if (!row) return false;
+  186: 
+  187:       var cid = rowCompanyId(row);
+  188: 
+  189:       if (selectedId && cid && cid !== selectedId) return false;
+  190: 
+  191:       return isPendingMajor(row);
+  192:     });
+  193: 
+  194:     rows.sort(function (a, b) {
+
+--- context around local line 181:       .concat(asArray(ctx.manager_major_items))
+  167: 
+  168:       if (closed[handoff]) return false;
+  169:       if (closed[decomposition]) return false;
+  170: 
+  171:       return true;
+  172:     }
+  173: 
+  174:     function rowOrder(row) {
+  175:       var n = Number(row && (row.display_order || row.sort_order || row.row_order || 0));
+  176:       return Number.isFinite(n) ? n : 0;
+  177:     }
+  178: 
+  179:     var rows = []
+  180:       .concat(asArray(ctx.pmlw_major_items))
+  181:       .concat(asArray(ctx.manager_major_items))
+  182:       .concat(asArray(ctx.major_items));
+  183: 
+  184:     rows = rows.filter(function (row) {
+  185:       if (!row) return false;
+  186: 
+  187:       var cid = rowCompanyId(row);
+  188: 
+  189:       if (selectedId && cid && cid !== selectedId) return false;
+  190: 
+  191:       return isPendingMajor(row);
+  192:     });
+  193: 
+  194:     rows.sort(function (a, b) {
+  195:       var ao = rowOrder(a);
+
+--- context around local line 182:       .concat(asArray(ctx.major_items));
+  168:       if (closed[handoff]) return false;
+  169:       if (closed[decomposition]) return false;
+  170: 
+  171:       return true;
+  172:     }
+  173: 
+  174:     function rowOrder(row) {
+  175:       var n = Number(row && (row.display_order || row.sort_order || row.row_order || 0));
+  176:       return Number.isFinite(n) ? n : 0;
+  177:     }
+  178: 
+  179:     var rows = []
+  180:       .concat(asArray(ctx.pmlw_major_items))
+  181:       .concat(asArray(ctx.manager_major_items))
+  182:       .concat(asArray(ctx.major_items));
+  183: 
+  184:     rows = rows.filter(function (row) {
+  185:       if (!row) return false;
+  186: 
+  187:       var cid = rowCompanyId(row);
+  188: 
+  189:       if (selectedId && cid && cid !== selectedId) return false;
+  190: 
+  191:       return isPendingMajor(row);
+  192:     });
+  193: 
+  194:     rows.sort(function (a, b) {
+  195:       var ao = rowOrder(a);
+  196:       var bo = rowOrder(b);
+
+--- context around local line 269:         majorId = String(btn.dataset.majorId || btn.dataset.managerMajorId || "").trim();
+  255:   // This function does not write DB and does not call any API.
+  256:   function aicmOpenLeaderHandoffConfirmR8S(ev, btn) {
+  257:     try {
+  258:       btn = btn || (typeof aicmActionTargetSafe === "function" ? aicmActionTargetSafe(ev, null) : null);
+  259:       if (!btn && ev && ev.target && typeof ev.target.closest === "function") {
+  260:         btn = ev.target.closest("[data-core-action]");
+  261:       }
+  262: 
+  263:       var majorId = "";
+  264:       if (btn && btn.getAttribute) {
+  265:         majorId = String(btn.getAttribute("data-major-id") || btn.getAttribute("data-manager-major-id") || "").trim();
+  266:       }
+  267: 
+  268:       if (!majorId && btn && btn.dataset) {
+  269:         majorId = String(btn.dataset.majorId || btn.dataset.managerMajorId || "").trim();
+  270:       }
+  271: 
+  272:       if (!majorId) {
+  273:         if (typeof setMessage === "function") setMessage("error", "課長へ送る対象のManager大項目IDを特定できません。");
+  274:         if (typeof render === "function") render();
+  275:         return;
+  276:       }
+  277: 
+  278:       var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+  279:       var rows = [];
+  280:       function addRows(value) {
+  281:         if (Array.isArray(value)) rows = rows.concat(value);
+  282:       }
+  283: 
+
+--- context around local line 284:       addRows(ctx.pmlw_major_items);
+  270:       }
+  271: 
+  272:       if (!majorId) {
+  273:         if (typeof setMessage === "function") setMessage("error", "課長へ送る対象のManager大項目IDを特定できません。");
+  274:         if (typeof render === "function") render();
+  275:         return;
+  276:       }
+  277: 
+  278:       var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+  279:       var rows = [];
+  280:       function addRows(value) {
+  281:         if (Array.isArray(value)) rows = rows.concat(value);
+  282:       }
+  283: 
+  284:       addRows(ctx.pmlw_major_items);
+  285:       addRows(ctx.manager_major_items);
+  286:       addRows(ctx.major_items);
+  287:       addRows(state && state.pmlw_major_items);
+  288:       addRows(state && state.manager_major_items);
+  289:       addRows(state && state.major_items);
+  290: 
+  291:       var row = null;
+  292:       for (var i = 0; i < rows.length; i += 1) {
+  293:         var candidate = rows[i] || {};
+  294:         var candidateId = String(
+  295:           candidate.aicm_manager_major_work_item_id ||
+  296:           candidate.manager_major_work_item_id ||
+  297:           candidate.major_work_item_id ||
+  298:           candidate.major_id ||
+
+--- context around local line 285:       addRows(ctx.manager_major_items);
+  271: 
+  272:       if (!majorId) {
+  273:         if (typeof setMessage === "function") setMessage("error", "課長へ送る対象のManager大項目IDを特定できません。");
+  274:         if (typeof render === "function") render();
+  275:         return;
+  276:       }
+  277: 
+  278:       var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+  279:       var rows = [];
+  280:       function addRows(value) {
+  281:         if (Array.isArray(value)) rows = rows.concat(value);
+  282:       }
+  283: 
+  284:       addRows(ctx.pmlw_major_items);
+  285:       addRows(ctx.manager_major_items);
+  286:       addRows(ctx.major_items);
+  287:       addRows(state && state.pmlw_major_items);
+  288:       addRows(state && state.manager_major_items);
+  289:       addRows(state && state.major_items);
+  290: 
+  291:       var row = null;
+  292:       for (var i = 0; i < rows.length; i += 1) {
+  293:         var candidate = rows[i] || {};
+  294:         var candidateId = String(
+  295:           candidate.aicm_manager_major_work_item_id ||
+  296:           candidate.manager_major_work_item_id ||
+  297:           candidate.major_work_item_id ||
+  298:           candidate.major_id ||
+  299:           candidate.id ||
+
+--- context around local line 286:       addRows(ctx.major_items);
+  272:       if (!majorId) {
+  273:         if (typeof setMessage === "function") setMessage("error", "課長へ送る対象のManager大項目IDを特定できません。");
+  274:         if (typeof render === "function") render();
+  275:         return;
+  276:       }
+  277: 
+  278:       var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+  279:       var rows = [];
+  280:       function addRows(value) {
+  281:         if (Array.isArray(value)) rows = rows.concat(value);
+  282:       }
+  283: 
+  284:       addRows(ctx.pmlw_major_items);
+  285:       addRows(ctx.manager_major_items);
+  286:       addRows(ctx.major_items);
+  287:       addRows(state && state.pmlw_major_items);
+  288:       addRows(state && state.manager_major_items);
+  289:       addRows(state && state.major_items);
+  290: 
+  291:       var row = null;
+  292:       for (var i = 0; i < rows.length; i += 1) {
+  293:         var candidate = rows[i] || {};
+  294:         var candidateId = String(
+  295:           candidate.aicm_manager_major_work_item_id ||
+  296:           candidate.manager_major_work_item_id ||
+  297:           candidate.major_work_item_id ||
+  298:           candidate.major_id ||
+  299:           candidate.id ||
+  300:           ""
+
+--- context around local line 287:       addRows(state && state.pmlw_major_items);
+  273:         if (typeof setMessage === "function") setMessage("error", "課長へ送る対象のManager大項目IDを特定できません。");
+  274:         if (typeof render === "function") render();
+  275:         return;
+  276:       }
+  277: 
+  278:       var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+  279:       var rows = [];
+  280:       function addRows(value) {
+  281:         if (Array.isArray(value)) rows = rows.concat(value);
+  282:       }
+  283: 
+  284:       addRows(ctx.pmlw_major_items);
+  285:       addRows(ctx.manager_major_items);
+  286:       addRows(ctx.major_items);
+  287:       addRows(state && state.pmlw_major_items);
+  288:       addRows(state && state.manager_major_items);
+  289:       addRows(state && state.major_items);
+  290: 
+  291:       var row = null;
+  292:       for (var i = 0; i < rows.length; i += 1) {
+  293:         var candidate = rows[i] || {};
+  294:         var candidateId = String(
+  295:           candidate.aicm_manager_major_work_item_id ||
+  296:           candidate.manager_major_work_item_id ||
+  297:           candidate.major_work_item_id ||
+  298:           candidate.major_id ||
+  299:           candidate.id ||
+  300:           ""
+  301:         ).trim();
+
+--- context around local line 288:       addRows(state && state.manager_major_items);
+  274:         if (typeof render === "function") render();
+  275:         return;
+  276:       }
+  277: 
+  278:       var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+  279:       var rows = [];
+  280:       function addRows(value) {
+  281:         if (Array.isArray(value)) rows = rows.concat(value);
+  282:       }
+  283: 
+  284:       addRows(ctx.pmlw_major_items);
+  285:       addRows(ctx.manager_major_items);
+  286:       addRows(ctx.major_items);
+  287:       addRows(state && state.pmlw_major_items);
+  288:       addRows(state && state.manager_major_items);
+  289:       addRows(state && state.major_items);
+  290: 
+  291:       var row = null;
+  292:       for (var i = 0; i < rows.length; i += 1) {
+  293:         var candidate = rows[i] || {};
+  294:         var candidateId = String(
+  295:           candidate.aicm_manager_major_work_item_id ||
+  296:           candidate.manager_major_work_item_id ||
+  297:           candidate.major_work_item_id ||
+  298:           candidate.major_id ||
+  299:           candidate.id ||
+  300:           ""
+  301:         ).trim();
+  302: 
+
+--- context around local line 289:       addRows(state && state.major_items);
+  275:         return;
+  276:       }
+  277: 
+  278:       var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+  279:       var rows = [];
+  280:       function addRows(value) {
+  281:         if (Array.isArray(value)) rows = rows.concat(value);
+  282:       }
+  283: 
+  284:       addRows(ctx.pmlw_major_items);
+  285:       addRows(ctx.manager_major_items);
+  286:       addRows(ctx.major_items);
+  287:       addRows(state && state.pmlw_major_items);
+  288:       addRows(state && state.manager_major_items);
+  289:       addRows(state && state.major_items);
+  290: 
+  291:       var row = null;
+  292:       for (var i = 0; i < rows.length; i += 1) {
+  293:         var candidate = rows[i] || {};
+  294:         var candidateId = String(
+  295:           candidate.aicm_manager_major_work_item_id ||
+  296:           candidate.manager_major_work_item_id ||
+  297:           candidate.major_work_item_id ||
+  298:           candidate.major_id ||
+  299:           candidate.id ||
+  300:           ""
+  301:         ).trim();
+  302: 
+  303:         if (candidateId === majorId) {
+
+--- context around local line 327:       state.managerMajorLeaderHandoffConfirm = {
+  313:         row.task_name ||
+  314:         row.deliverable_name ||
+  315:         row.title ||
+  316:         "Manager大項目"
+  317:       ).trim();
+  318: 
+  319:       var leader = String(
+  320:         row.assigned_leader_label ||
+  321:         row.leader_robot_label ||
+  322:         row.responsible_robot_label ||
+  323:         row.responsible_role_code ||
+  324:         "課長/Leader"
+  325:       ).trim();
+  326: 
+  327:       state.managerMajorLeaderHandoffConfirm = {
+  328:         kind: "manager-major-leader-handoff",
+  329:         title: "課長へ送る確認",
+  330:         majorId: majorId,
+  331:         aicm_manager_major_work_item_id: majorId,
+  332:         major_item_name: title,
+  333:         targetTitle: title,
+  334:         leaderLabel: leader,
+  335:         leaderRaw: leader,
+  336:         row: row,
+  337:         endpoint: "/api/aicm/v2/manager-major/update",
+  338:         backScreen: "task-ledger",
+  339:         body: {
+  340:           owner_civilization_id: typeof aicmLeaderHandoffOwnerIdR8S === "function"
+  341:             ? aicmLeaderHandoffOwnerIdR8S(row)
+
+--- context around local line 434:     add(ctx.pmlw_major_items);
+  420:     var id = aicmLeaderHandoffTextR8S(majorId);
+  421:     if (!id) return null;
+  422: 
+  423:     if (typeof aicmAxuR1FindMajorById === "function") {
+  424:       var found = aicmAxuR1FindMajorById(id);
+  425:       if (found) return found;
+  426:     }
+  427: 
+  428:     var ctx = state && state.context ? state.context : {};
+  429:     var rows = [];
+  430:     function add(list) {
+  431:       if (Array.isArray(list)) rows = rows.concat(list);
+  432:     }
+  433: 
+  434:     add(ctx.pmlw_major_items);
+  435:     add(ctx.pmlwMajorItems);
+  436:     add(ctx.manager_major_items);
+  437:     add(ctx.managerMajorItems);
+  438:     add(ctx.major_items);
+  439:     add(ctx.majorItems);
+  440: 
+  441:     for (var i = 0; i < rows.length; i += 1) {
+  442:       var row = rows[i] || {};
+  443:       var rowId = aicmLeaderHandoffTextR8S(
+  444:         row.aicm_manager_major_work_item_id ||
+  445:         row.manager_major_work_item_id ||
+  446:         row.majorId ||
+  447:         row.major_id ||
+  448:         row.id
+
+--- context around local line 435:     add(ctx.pmlwMajorItems);
+  421:     if (!id) return null;
+  422: 
+  423:     if (typeof aicmAxuR1FindMajorById === "function") {
+  424:       var found = aicmAxuR1FindMajorById(id);
+  425:       if (found) return found;
+  426:     }
+  427: 
+  428:     var ctx = state && state.context ? state.context : {};
+  429:     var rows = [];
+  430:     function add(list) {
+  431:       if (Array.isArray(list)) rows = rows.concat(list);
+  432:     }
+  433: 
+  434:     add(ctx.pmlw_major_items);
+  435:     add(ctx.pmlwMajorItems);
+  436:     add(ctx.manager_major_items);
+  437:     add(ctx.managerMajorItems);
+  438:     add(ctx.major_items);
+  439:     add(ctx.majorItems);
+  440: 
+  441:     for (var i = 0; i < rows.length; i += 1) {
+  442:       var row = rows[i] || {};
+  443:       var rowId = aicmLeaderHandoffTextR8S(
+  444:         row.aicm_manager_major_work_item_id ||
+  445:         row.manager_major_work_item_id ||
+  446:         row.majorId ||
+  447:         row.major_id ||
+  448:         row.id
+  449:       );
+
+--- context around local line 436:     add(ctx.manager_major_items);
+  422: 
+  423:     if (typeof aicmAxuR1FindMajorById === "function") {
+  424:       var found = aicmAxuR1FindMajorById(id);
+  425:       if (found) return found;
+  426:     }
+  427: 
+  428:     var ctx = state && state.context ? state.context : {};
+  429:     var rows = [];
+  430:     function add(list) {
+  431:       if (Array.isArray(list)) rows = rows.concat(list);
+  432:     }
+  433: 
+  434:     add(ctx.pmlw_major_items);
+  435:     add(ctx.pmlwMajorItems);
+  436:     add(ctx.manager_major_items);
+  437:     add(ctx.managerMajorItems);
+  438:     add(ctx.major_items);
+  439:     add(ctx.majorItems);
+  440: 
+  441:     for (var i = 0; i < rows.length; i += 1) {
+  442:       var row = rows[i] || {};
+  443:       var rowId = aicmLeaderHandoffTextR8S(
+  444:         row.aicm_manager_major_work_item_id ||
+  445:         row.manager_major_work_item_id ||
+  446:         row.majorId ||
+  447:         row.major_id ||
+  448:         row.id
+  449:       );
+  450:       if (rowId === id) return row;
+
+--- context around local line 437:     add(ctx.managerMajorItems);
+  423:     if (typeof aicmAxuR1FindMajorById === "function") {
+  424:       var found = aicmAxuR1FindMajorById(id);
+  425:       if (found) return found;
+  426:     }
+  427: 
+  428:     var ctx = state && state.context ? state.context : {};
+  429:     var rows = [];
+  430:     function add(list) {
+  431:       if (Array.isArray(list)) rows = rows.concat(list);
+  432:     }
+  433: 
+  434:     add(ctx.pmlw_major_items);
+  435:     add(ctx.pmlwMajorItems);
+  436:     add(ctx.manager_major_items);
+  437:     add(ctx.managerMajorItems);
+  438:     add(ctx.major_items);
+  439:     add(ctx.majorItems);
+  440: 
+  441:     for (var i = 0; i < rows.length; i += 1) {
+  442:       var row = rows[i] || {};
+  443:       var rowId = aicmLeaderHandoffTextR8S(
+  444:         row.aicm_manager_major_work_item_id ||
+  445:         row.manager_major_work_item_id ||
+  446:         row.majorId ||
+  447:         row.major_id ||
+  448:         row.id
+  449:       );
+  450:       if (rowId === id) return row;
+  451:     }
+
+--- context around local line 438:     add(ctx.major_items);
+  424:       var found = aicmAxuR1FindMajorById(id);
+  425:       if (found) return found;
+  426:     }
+  427: 
+  428:     var ctx = state && state.context ? state.context : {};
+  429:     var rows = [];
+  430:     function add(list) {
+  431:       if (Array.isArray(list)) rows = rows.concat(list);
+  432:     }
+  433: 
+  434:     add(ctx.pmlw_major_items);
+  435:     add(ctx.pmlwMajorItems);
+  436:     add(ctx.manager_major_items);
+  437:     add(ctx.managerMajorItems);
+  438:     add(ctx.major_items);
+  439:     add(ctx.majorItems);
+  440: 
+  441:     for (var i = 0; i < rows.length; i += 1) {
+  442:       var row = rows[i] || {};
+  443:       var rowId = aicmLeaderHandoffTextR8S(
+  444:         row.aicm_manager_major_work_item_id ||
+  445:         row.manager_major_work_item_id ||
+  446:         row.majorId ||
+  447:         row.major_id ||
+  448:         row.id
+  449:       );
+  450:       if (rowId === id) return row;
+  451:     }
+  452: 
+
+
+============================================================
+FUNCTION=renderPmlwMajorRowsBaseAxuR1B
+------------------------------------------------------------
+--- context around local line 29:       rows.map(function (row) {
+   15:       '      <tr>',
+   16:       '        <th>方針元</th>',
+   17:       '        <th>大項目</th>',
+   18:       '        <th>部門</th>',
+   19:       '        <th>課</th>',
+   20:       '        <th>Leader</th>',
+   21:       '        <th>分解状態</th>',
+   22:       '        <th>引渡し</th>',
+   23:       '        <th>優先度</th>',
+   24:       '        <th>期限</th>',
+   25:       '        <th>操作</th>',
+   26:       '      </tr>',
+   27:       '    </thead>',
+   28:       '    <tbody>',
+   29:       rows.map(function (row) {
+   30:         return [
+   31:           '      <tr>',
+   32:           '        <td>' + escapeHtml(pmlwValue(row.policy_title, row.source_route_code || "-")) + '</td>',
+   33:           '        <td><strong>' + escapeHtml(pmlwValue(row.major_item_name, "-")) + '</strong><small>' + escapeHtml(pmlwValue(row.major_item_description, "")) + '</small></td>',
+   34:           '        <td>' + escapeHtml(pmlwValue(row.department_name, "未割当")) + '</td>',
+   35:           '        <td>' + escapeHtml(pmlwValue(row.section_name, "未割当")) + '</td>',
+   36:           '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+   37:           '        <td>' + escapeHtml(pmlwStatusLabel(row.decomposition_status_code)) + '</td>',
+   38:           '        <td>' + escapeHtml(pmlwStatusLabel(row.handoff_status_code)) + '</td>',
+   39:           '        <td>' + escapeHtml(pmlwStatusLabel(row.priority_code)) + '</td>',
+   40:           '        <td>' + escapeHtml(pmlwValue(row.due_date, "-")) + '</td>',
+   41:           '        <td><button type="button" data-core-action="pmlw-major-leader-handoff" data-pmlw-major-id="' + escapeHtml(aicmAxuR1MajorId(row)) + '">課長へ送る</button></td>',
+   42:           '      </tr>'
+   43:         ].join("");
+
+
+============================================================
+FUNCTION=aicmOpenTaskLedgerScreenR8V3Clean
+------------------------------------------------------------
+--- context around local line 3:     state.managerMajorDeleteConfirm = null;
+    1: function aicmOpenTaskLedgerScreenR8V3Clean() {
+    2:     state.screen = "task-ledger";
+    3:     state.managerMajorDeleteConfirm = null;
+    4: 
+    5:     if (typeof setMessage === "function") {
+    6:       setMessage("ok", "部門別タスク台帳を表示します。");
+    7:     }
+    8: 
+    9:     aicmRenderTaskLedgerSafeR8V4("open:initial");
+   10: 
+   11:     Promise.resolve()
+   12:       .then(function () {
+   13:         if (typeof aicmReloadTaskLedgerContext === "function") {
+   14:           return aicmReloadTaskLedgerContext();
+   15:         }
+   16:         return null;
+   17:       })
+
+

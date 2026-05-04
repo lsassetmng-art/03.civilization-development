@@ -1,0 +1,151 @@
+function renderPmlwMajorRowsBaseAxuR1B(rows) {
+    if (!rows.length) {
+      return [
+        '<div class="aicm-empty-state">',
+        '  <strong>登録済み大項目はまだありません</strong>',
+        '  <p>President起点でAI企業業務を開始するか、CSVで部長/Manager分解済みの大項目を取り込むと、ここに表示されます。</p>',
+        '</div>'
+      ].join("");
+    }
+
+    // AICM_V10L_C1B_MINIMAL_RENDERER_PATCH_RENDERER
+
+
+    var v10lC1bSelectionState = typeof aicmV10lC1bMajorSelectionState === "function"
+
+
+      ? aicmV10lC1bMajorSelectionState()
+
+
+      : { selectedIds: {}, confirm: null };
+
+
+    var v10lC1bSelectedIds = v10lC1bSelectionState.selectedIds || {};
+
+
+    var v10lC1bEligibleCount = rows.filter(function (row) {
+
+
+      return typeof aicmV10lC1bIsPendingMajorRow === "function" ? aicmV10lC1bIsPendingMajorRow(row) : true;
+
+
+    }).length;
+
+
+    var v10lC1bSelectedCount = rows.filter(function (row) {
+
+
+      var id = typeof aicmV10lC1bMajorId === "function" ? aicmV10lC1bMajorId(row) : aicmAxuR1MajorId(row);
+
+
+      return !!(id && v10lC1bSelectedIds[id]);
+
+
+    }).length;
+
+
+    var v10lC1bConfirm = v10lC1bSelectionState.confirm || null;
+
+
+    var v10lC1bConfirmHtml = "";
+
+
+    if (v10lC1bConfirm && Array.isArray(v10lC1bConfirm.items) && v10lC1bConfirm.items.length) {
+
+
+      v10lC1bConfirmHtml = [
+
+
+        '<div class="aicm-core-card" data-v10l-c1b-confirm="1" style="margin-top:12px;border:1px solid #f59e0b;">',
+
+
+        '  <p class="aicm-eyebrow">確認</p>',
+
+
+        '  <h3>' + escapeHtml(v10lC1bConfirm.title || "確認") + '</h3>',
+
+
+        '  <ul class="aicm-selected-note">' + v10lC1bConfirm.items.map(function (item) { return '<li>' + escapeHtml(item.title || item.id || "Manager大項目") + '</li>'; }).join("") + '</ul>',
+
+
+        '  <div class="aicm-dashboard-action-row">',
+
+
+        '    <button type="button" data-core-action="v10l-c1b-major-confirm-yes">Yes</button>',
+
+
+        '    <button type="button" data-core-action="v10l-c1b-major-confirm-no">No</button>',
+
+
+        '  </div>',
+
+
+        '  <p class="aicm-selected-note">V10L-C1BではYes押下時もDB更新/API POSTは実行しません。</p>',
+
+
+        '</div>'
+
+
+      ].join("");
+
+
+    }
+
+
+
+    return [
+      '<!-- AICM_V10L_C1B_MINIMAL_RENDERER_PATCH_RENDERER -->',
+      '<div class="aicm-core-card" data-v10l-c1b-major-operation-panel="1" style="margin-bottom:12px;">',
+      '  <p class="aicm-eyebrow">登録済み大項目 操作</p>',
+      '  <h3>選択操作</h3>',
+      '  <p class="aicm-selected-note">選択 ' + String(v10lC1bSelectedCount) + ' / 未送信 ' + String(v10lC1bEligibleCount) + ' / 全件 ' + String(rows.length) + '</p>',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="v10l-c1b-major-open-handoff-confirm">課長へ送る</button>',
+      '    <button type="button" data-core-action="v10l-c1b-major-open-delete-confirm">削除</button>',
+      '    <button type="button" data-core-action="v10l-c1b-major-select-all">全件選択</button>',
+      '    <button type="button" data-core-action="v10l-c1b-major-clear">解除</button>',
+      '  </div>',
+      v10lC1bConfirmHtml,
+      '</div>',
+      '<div class="aicm-table-wrap">',
+      '  <table class="aicm-core-table">',
+      '    <thead>',
+      '      <tr>',
+      '        <th>方針元</th>',
+      '        <th>大項目</th>',
+      '        <th>部門</th>',
+      '        <th>課</th>',
+      '        <th>Leader</th>',
+      '        <th>分解状態</th>',
+      '        <th>引渡し</th>',
+      '        <th>優先度</th>',
+      '        <th>期限</th>',
+      '        <th>選択</th>',
+      '      </tr>',
+      '    </thead>',
+      '    <tbody>',
+      rows.map(function (row) {
+        var v10lC1bMajorId = typeof aicmV10lC1bMajorId === "function" ? aicmV10lC1bMajorId(row) : aicmAxuR1MajorId(row);
+        var v10lC1bSelectable = typeof aicmV10lC1bIsPendingMajorRow === "function" ? aicmV10lC1bIsPendingMajorRow(row) : true;
+        var v10lC1bCheckedAttr = v10lC1bMajorId && v10lC1bSelectedIds[v10lC1bMajorId] ? " checked" : "";
+        var v10lC1bDisabledAttr = v10lC1bSelectable ? "" : " disabled";
+        return [
+          '      <tr>',
+          '        <td>' + escapeHtml(pmlwValue(row.policy_title, row.source_route_code || "-")) + '</td>',
+          '        <td><strong>' + escapeHtml(pmlwValue(row.major_item_name, "-")) + '</strong><small>' + escapeHtml(pmlwValue(row.major_item_description, "")) + '</small></td>',
+          '        <td>' + escapeHtml(pmlwValue(row.department_name, "未割当")) + '</td>',
+          '        <td>' + escapeHtml(pmlwValue(row.section_name, "未割当")) + '</td>',
+          '        <td>' + escapeHtml(pmlwValue(row.assigned_leader_label, "-")) + '</td>',
+          '        <td>' + escapeHtml(pmlwStatusLabel(row.decomposition_status_code)) + '</td>',
+          '        <td>' + escapeHtml(pmlwStatusLabel(row.handoff_status_code)) + '</td>',
+          '        <td>' + escapeHtml(pmlwStatusLabel(row.priority_code)) + '</td>',
+          '        <td>' + escapeHtml(pmlwValue(row.due_date, "-")) + '</td>',
+          '        <td><label class="aicm-selected-note"><input type="checkbox" data-core-action="v10l-c1b-major-toggle" data-pmlw-major-id="' + escapeHtml(v10lC1bMajorId) + '"' + v10lC1bCheckedAttr + v10lC1bDisabledAttr + '> 選択</label></td>',
+          '      </tr>'
+        ].join("");
+      }).join(""),
+      '    </tbody>',
+      '  </table>',
+      '</div>'
+    ].join("");
+  }

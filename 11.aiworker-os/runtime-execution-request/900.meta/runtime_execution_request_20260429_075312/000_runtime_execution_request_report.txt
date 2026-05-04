@@ -1,0 +1,84 @@
+Pager usage is off.
+============================================================
+AIWORKER RUNTIME EXECUTION REQUEST
+runtime control profile -> execution request snapshot
+AIWorkerOS only / Sato DB review target
+============================================================
+BEGIN
+NOTICE:  schema "aiworker" already exists, skipping
+CREATE SCHEMA
+NOTICE:  extension "pgcrypto" already exists, skipping
+CREATE EXTENSION
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE VIEW
+CREATE VIEW
+CREATE VIEW
+CREATE VIEW
+COMMIT
+
+============================================================
+[VERIFY] runtime execution objects
+============================================================
+         execution_request          |              event_log               |             gate_log             |         handoff_packet          | create_function |                        request_board                        
+------------------------------------+--------------------------------------+----------------------------------+---------------------------------+-----------------+-------------------------------------------------------------
+ aiworker.runtime_execution_request | aiworker.runtime_execution_event_log | aiworker.runtime_review_gate_log | aiworker.runtime_handoff_packet |                 | aiworker.vw_app_aiworker_runtime_execution_request_board_v1
+(1 row)
+
+
+============================================================
+[ROLLBACK SMOKE] create runtime execution request
+============================================================
+BEGIN
+SELECT 1
+
+[SMOKE] request board
+             request_code             |    app_surface_code    | model_no | model_name_ja |    operation_mode_code    | self_review_pass_count | proposal_count_max | review_required_flag | human_go_required_flag | external_execution_allowed_flag | pg_apply_allowed_flag | destructive_action_allowed_flag | internal_safe_flag 
+--------------------------------------+------------------------+----------+---------------+---------------------------+------------------------+--------------------+----------------------+------------------------+---------------------------------+-----------------------+---------------------------------+--------------------
+ RER_b54713b6fc564573bc7eb834776f8f59 | pg_development_support | BYD1-003 | ASIC Workers3 | complex_high_quality_work |                      3 |                  5 | t                    | t                      | f                               | f                     | f                               | t
+(1 row)
+
+
+[SMOKE] gate board
+  gate_type_code   | gate_status_code | gate_result_code | reviewer_role_layer_code |                 review_summary_ja                 
+-------------------+------------------+------------------+--------------------------+---------------------------------------------------
+ HUMAN_GO_REQUIRED | WAITING          | PENDING          | HUMAN                    | Runtime Control Profileにより人間GOが必要
+ REVIEW_REQUIRED   | TODO             | PENDING          | LEADER                   | Runtime Control Profileによりレビューゲートが必要
+(2 rows)
+
+
+[SMOKE] handoff packet
+             handoff_code             | to_role_layer_code | handoff_status_code |  handoff_format_code   |           handoff_title_ja            
+--------------------------------------+--------------------+---------------------+------------------------+---------------------------------------
+ RHP_a4088f2d31f84405bc8f897a45e696dc | WORKER             | READY_INTERNAL      | complex_output_handoff | Runtime実行要求の初期引き継ぎパケット
+(1 row)
+
+
+[SMOKE] intake payload safety
+                                                                                    safety_jsonb                                                                                    
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"review_required_flag": true, "pg_apply_allowed_flag": false, "human_go_required_flag": true, "destructive_action_allowed_flag": false, "external_execution_allowed_flag": false}
+(1 row)
+
+ROLLBACK
+
+============================================================
+[VERIFY] smoke was rollbacked
+============================================================
+ smoke_persisted_count 
+-----------------------
+                     0
+(1 row)
+
+
+============================================================
+AIWORKER RUNTIME EXECUTION REQUEST DONE
+============================================================

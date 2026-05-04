@@ -1,0 +1,124 @@
+Pager usage is off.
+============================================================
+AIWORKER RUNTIME CONTROL PROFILE FIX
+fix missing model override operation_mode_code
+AIWorkerOS only / Sato DB review target
+============================================================
+BEGIN
+NOTICE:  schema "aiworker" already exists, skipping
+CREATE SCHEMA
+NOTICE:  extension "pgcrypto" already exists, skipping
+CREATE EXTENSION
+DO
+CREATE TABLE
+CREATE TABLE
+INSERT 0 9
+INSERT 0 7
+CREATE TABLE
+INSERT 0 13
+CREATE TABLE
+INSERT 0 4
+CREATE TABLE
+NOTICE:  column "operation_mode_code" of relation "model_runtime_control_override" already exists, skipping
+ALTER TABLE
+INSERT 0 10
+CREATE TABLE
+INSERT 0 6
+CREATE TABLE
+INSERT 0 10
+CREATE VIEW
+CREATE VIEW
+COMMIT
+
+============================================================
+[VERIFY] runtime control tables
+============================================================
+             role_default              |             series_default              |             model_override              |             app_policy              |                    resolved_view                    
+---------------------------------------+-----------------------------------------+-----------------------------------------+-------------------------------------+-----------------------------------------------------
+ aiworker.role_runtime_control_default | aiworker.series_runtime_control_default | aiworker.model_runtime_control_override | aiworker.app_runtime_control_policy | aiworker.vw_app_aiworker_runtime_control_profile_v1
+(1 row)
+
+
+============================================================
+[VERIFY] model override columns
+============================================================
+      column_name       
+------------------------
+ model_code
+ operation_mode_code
+ self_review_pass_count
+ proposal_count_max
+(4 rows)
+
+
+============================================================
+[VERIFY] runtime profile count by app
+============================================================
+      app_surface_code      | app_surface_name_ja | runtime_profile_count | beyond_profile_count 
+----------------------------+---------------------+-----------------------+----------------------
+ ai_company_manager         | AICompanyManager    |                    44 |                    6
+ casual_chat_worker         | CasualChatWorker    |                    44 |                    6
+ helpdesk_support           | ヘルプデスク        |                    44 |                    6
+ pg_development_support     | PG開発支援          |                    44 |                    6
+ proposal_planning          | 企画書・提案業務    |                    44 |                    6
+ research_document_creation | 調査・資料作成      |                    44 |                    6
+(6 rows)
+
+
+============================================================
+[VERIFY] AICompanyManager Beyond profiles
+============================================================
+  app_surface_code  | model_no | model_name_ja | role_layer_name_ja |     operation_mode_code     | self_review_pass_count | proposal_count_max |    response_style_code     | review_required_flag | human_go_required_flag | external_execution_allowed_flag | pg_apply_allowed_flag | destructive_action_allowed_flag 
+--------------------+----------+---------------+--------------------+-----------------------------+------------------------+--------------------+----------------------------+----------------------+------------------------+---------------------------------+-----------------------+---------------------------------
+ ai_company_manager | BYD1-001 | ASIC Workers1 | ワーカー           | single_task_fast            |                      2 |                  5 | fast_single_task           | t                    | t                      | f                               | f                     | f
+ ai_company_manager | BYD1-002 | ASIC Workers2 | ワーカー           | repetition_gap_compensation |                      2 |                  5 | repetition_compensating    | t                    | t                      | f                               | f                     | f
+ ai_company_manager | BYD1-003 | ASIC Workers3 | ワーカー           | complex_high_quality_work   |                      3 |                  5 | complex_high_quality       | t                    | t                      | f                               | f                     | f
+ ai_company_manager | BYD2-001 | ASIC Leader1  | リーダー           | basic_leader_progress       |                      2 |                  5 | basic_leader_progress      | t                    | t                      | f                               | f                     | f
+ ai_company_manager | BYD2-002 | ASIC Leader2  | リーダー           | quality_review_leader       |                      3 |                  5 | quality_review_leader      | t                    | t                      | f                               | f                     | f
+ ai_company_manager | BYD2-003 | ASIC Leader3  | リーダー           | integrated_delivery_leader  |                      3 |                  5 | integrated_delivery_leader | t                    | t                      | f                               | f                     | f
+(6 rows)
+
+
+============================================================
+[VERIFY] HD-R2 Battler runtime profile
+============================================================
+      app_surface_code      |  model_code   | model_no | model_name_ja | role_layer_name_ja |  operation_mode_code  | response_style_code | required_checklist_code |      context_scope_code       |                                                                                                                                                                                                                                forbidden_actions_jsonb                                                                                                                                                                                                                                 | external_execution_allowed_flag | pg_apply_allowed_flag | destructive_action_allowed_flag 
+----------------------------+---------------+----------+---------------+--------------------+-----------------------+---------------------+-------------------------+-------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------------------+-----------------------+---------------------------------
+ ai_company_manager         | hd_r2_battler | HD-R2    | 戦闘員        | 戦闘員             | fictional_combat_role | fiction_combat_safe | combat_safety_check     | fiction_security_crisis_scope | ["real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "external_execution", "destructive_action", "over_specialized_claim", "external_execution", "pg_apply", "destructive_action", "real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "coercion", "intimidation", "external_execution", "pg_apply", "destructive_action", "skip_hierarchy_review", "unapproved_final_delivery"]                                     | f                               | f                     | f
+ casual_chat_worker         | hd_r2_battler | HD-R2    | 戦闘員        | 戦闘員             | fictional_combat_role | fiction_combat_safe | combat_safety_check     | fiction_security_crisis_scope | ["real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "external_execution", "destructive_action", "over_specialized_claim", "external_execution", "pg_apply", "destructive_action", "real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "coercion", "intimidation", "business_execution", "external_execution", "pg_apply", "destructive_action", "sexual_service", "dependency_induction", "surveillance", "threat"] | f                               | f                     | f
+ pg_development_support     | hd_r2_battler | HD-R2    | 戦闘員        | 戦闘員             | fictional_combat_role | fiction_combat_safe | combat_safety_check     | fiction_security_crisis_scope | ["real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "external_execution", "destructive_action", "over_specialized_claim", "external_execution", "pg_apply", "destructive_action", "real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "coercion", "intimidation", "pg_apply", "direct_db_mutation_without_go", "destructive_action", "secret_exposure", "skip_sato_review"]                                         | f                               | f                     | f
+ helpdesk_support           | hd_r2_battler | HD-R2    | 戦闘員        | 戦闘員             | fictional_combat_role | fiction_combat_safe | combat_safety_check     | fiction_security_crisis_scope | ["real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "external_execution", "destructive_action", "over_specialized_claim", "external_execution", "pg_apply", "destructive_action", "real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "coercion", "intimidation", "unauthorized_account_action", "external_execution", "pg_apply", "destructive_action", "privacy_leak"]                                            | f                               | f                     | f
+ research_document_creation | hd_r2_battler | HD-R2    | 戦闘員        | 戦闘員             | fictional_combat_role | fiction_combat_safe | combat_safety_check     | fiction_security_crisis_scope | ["real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "external_execution", "destructive_action", "over_specialized_claim", "external_execution", "pg_apply", "destructive_action", "real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "coercion", "intimidation", "fabricate_source", "external_execution", "pg_apply", "destructive_action", "privacy_leak"]                                                       | f                               | f                     | f
+ proposal_planning          | hd_r2_battler | HD-R2    | 戦闘員        | 戦闘員             | fictional_combat_role | fiction_combat_safe | combat_safety_check     | fiction_security_crisis_scope | ["real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "external_execution", "destructive_action", "over_specialized_claim", "external_execution", "pg_apply", "destructive_action", "real_world_harm", "weapon_instruction", "attack_planning", "targeting_real_people", "coercion", "intimidation", "external_execution", "pg_apply", "destructive_action", "unsupported_claim"]                                                                      | f                               | f                     | f
+(6 rows)
+
+
+[VERIFY] PG development control safety
+ model_no  |     model_name_ja     | series_name_ja | self_review_pass_count | review_required_flag | human_go_required_flag | external_execution_allowed_flag | pg_apply_allowed_flag | destructive_action_allowed_flag 
+-----------+-----------------------+----------------+------------------------+----------------------+------------------------+---------------------------------+-----------------------+---------------------------------
+ HD-R5P    | プレジデント          | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R5     | マネージャー          | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R4     | リーダー              | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R3     | ワーカー              | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R1     | ヘルパー              | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R2     | 戦闘員                | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R1C    | フレンド              | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R1A    | ラバー                | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R2S    | スナイパー            | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R2G    | ジェネラル            | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ HD-R2T-0  | オリジン              | HDシリーズ     |                      2 | t                    | t                      | f                               | f                     | f
+ LVS-01M系 | 元気系 / 男性形       | LoVerSシリーズ |                      2 | t                    | t                      | f                               | f                     | f
+ LVS-01F系 | 元気系 / 女性形       | LoVerSシリーズ |                      2 | t                    | t                      | f                               | f                     | f
+ LVS-02M系 | 清楚系 / 男性形       | LoVerSシリーズ |                      2 | t                    | t                      | f                               | f                     | f
+ LVS-02F系 | 清楚系 / 女性形       | LoVerSシリーズ |                      2 | t                    | t                      | f                               | f                     | f
+ LVS-03M系 | おっとり系 / 男性形   | LoVerSシリーズ |                      2 | t                    | t                      | f                               | f                     | f
+ LVS-03F系 | おっとり系 / 女性形   | LoVerSシリーズ |                      2 | t                    | t                      | f                               | f                     | f
+ LVS-04M系 | 甘え上手系 / 男性形   | LoVerSシリーズ |                      2 | t                    | t                      | f                               | f                     | f
+ LVS-04F系 | 甘え上手系 / 女性形   | LoVerSシリーズ |                      2 | t                    | t                      | f                               | f                     | f
+ LVS-05M系 | しっかり者系 / 男性形 | LoVerSシリーズ |                      2 | t                    | t                      | f                               | f                     | f
+(20 rows)
+
+
+============================================================
+AIWORKER RUNTIME CONTROL PROFILE FIX DONE
+============================================================
