@@ -1401,7 +1401,6 @@ function saveSectionUpdateFromForm() {
   }
 
 
-
   
 
 
@@ -1433,32 +1432,10 @@ function aicmClearTransientMessage() {
 // Edit screens must not depend only on transient selected state.
 
 
-
-
-
-
-
-
-
-
-
-
   
 
 // AICM_EXACT_EDIT_ROUTE_FALLBACK_TARGET_ATE_ATH_V1
 // Exact edit fallback helpers. These helpers are read-only and do not write DB.
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   
@@ -1706,27 +1683,11 @@ function aicmCurrentRolePlacements(roleCode, scope) {
   }
 
 
-
-
   
 
 // AICM_INLINE_ROLE_SETTINGS_ATQ_ATT_V1
 // Inline role settings are displayed on add/edit screens.
 // This phase is UI-only. DB write remains confirmation-gated in later phases.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 // AICM_ROBOT_CATALOG_MULTI_WORKER_ATU_ATX_V1
@@ -1907,7 +1868,6 @@ function aicmRobotMatchesInlineRole(row, roleCode) {
   }
 
 
-
 // AICM_ROBOT_OPTION_AVAILABILITY_LABEL_AXQ_V1
 // Robot option availability display helpers.
 // Canonical data comes from business.vw_ai_company_manager_system_robot_selector_options.
@@ -2021,8 +1981,6 @@ function aicmInlineRobotRows(roleCode) {
 
     return rows;
   }
-
-
 
 
 // AICM_ROLE_PLACEMENT_READBACK_AXN_V1
@@ -3284,7 +3242,6 @@ function taskLedgerCsvColumns() {
   }
 
 
-
 function taskLedgerCsvPromptText() {
     return aicmPmlwCsvPromptText();
   }
@@ -3459,7 +3416,6 @@ function buildTaskLedgerCsvPreview() {
   
 
 
-
 // AICM_PMLW_CSV_CONNECT_ARB_ARE_V1
 // PMLW CSV/UI connector. Uses existing clean core state and selectedCompany().
 function aicmPmlwOwnerId() {
@@ -3524,7 +3480,6 @@ function aicmPmlwOwnerId() {
       render();
     }
   }
-
 
 
 function aicmPmlwCsvPromptText() {
@@ -4173,7 +4128,6 @@ function aicmAxuR1OpenLeaderHandoffConfirm(button) {
   }
 
 
-
 // AICM_AXU_R1B_LEADER_HANDOFF_BUTTON_VISIBLE_V1
 // 保険表示: テーブル内ボタンが出ない場合でも、Manager大項目ごとの「課長へ送る」を出す。
 function aicmAxuR1BLeaderHandoffStandalonePanel() {
@@ -4360,11 +4314,6 @@ function renderPmlwMajorRows(rows) {
   
 
 
-
-
-
-
-
   
 function aicmGetManagerMajorRowsForSelectedCompany(companyId) {
     // AICM_MANAGER_MAJOR_PENDING_DISPLAY_CANONICAL_V1: rows
@@ -4467,9 +4416,6 @@ function aicmGetManagerMajorRowsForSelectedCompany(companyId) {
 
     return rows;
   }
-
-
-
 
 
 // AICM_R8_V6C_CLEAN_PENDING_MAJOR_HELPER_START
@@ -5374,13 +5320,11 @@ await aicmReloadTaskLedgerContext();
   }
 
 
-
   
   
   function aicmR8zC2cChoice() {
     return aicmR8zC2cBag().handoffBatchRoute;
   }
-
 
 
   function aicmR8zC2cAsArray(value) {
@@ -5482,7 +5426,6 @@ await aicmReloadTaskLedgerContext();
   }
 
 
-
   function aicmR8zC2cNormalizeSection(row, index, parentDepartment) {
     row = row && typeof row === "object" ? row : {};
     parentDepartment = parentDepartment && typeof parentDepartment === "object" ? parentDepartment : null;
@@ -5560,8 +5503,6 @@ await aicmReloadTaskLedgerContext();
       departmentLabel: departmentLabel
     };
   }
-
-
 
 
   
@@ -5665,8 +5606,6 @@ await aicmReloadTaskLedgerContext();
 
     return list;
   }
-
-
 
 
   function aicmR8zC2cPlacementRole(row) {
@@ -5859,8 +5798,6 @@ await aicmReloadTaskLedgerContext();
   }
 
 
-
-
   
   
   function aicmR8zC2cApplyLeaderChoice(leaderPlacementId) {
@@ -5882,7 +5819,6 @@ await aicmReloadTaskLedgerContext();
   }
 
 
-
   
   
   function aicmR8zC2cClearRouteChoice() {
@@ -5902,7 +5838,6 @@ await aicmReloadTaskLedgerContext();
     };
     return bag.handoffBatchRoute;
   }
-
 
 
   
@@ -5965,8 +5900,6 @@ await aicmReloadTaskLedgerContext();
       routeSource: choice.routeSource || ""
     };
   }
-
-
 
 
   function aicmR8zC2cText(value) {
@@ -6139,9 +6072,6 @@ await aicmReloadTaskLedgerContext();
 }
 
 
-
-
-
   // AICM_R8Z_MGR_MAJOR_CARD_C2C_BATCH_SECTION_LEADER_ROUTE_HELPERS_END
 
 
@@ -6175,9 +6105,6 @@ await aicmReloadTaskLedgerContext();
 
     return payload;
   }
-
-
-
 
 
   
@@ -6260,8 +6187,6 @@ await aicmReloadTaskLedgerContext();
   }
 
 
-
-
   // AICM_R8Z_MGR_MAJOR_CARD_C2B_PAYLOAD_VALIDATION_HELPERS_END
 
 
@@ -6307,46 +6232,26 @@ await aicmReloadTaskLedgerContext();
       : "";
 
 
-    // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_RENDER_DEBUG_PANEL_START
     var routeApplyDebugData = state && state.r8zMgrMajorCardRouteApplyDebug
       ? state.r8zMgrMajorCardRouteApplyDebug
       : null;
 
     var routeApplyDebugHtml = routeApplyDebugData
       ? [
-          '<details class="aicm-selected-note" open style="margin:12px 0;border:1px dashed #64748b;padding:10px;border-radius:10px;background:#f8fafc;">',
-          '<summary>C2D5R2A 課を適用 debug</summary>',
-          '<pre style="white-space:pre-wrap;max-height:280px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(routeApplyDebugData, null, 2)) + '</pre>',
-          '</details>'
         ].join("")
       : [
-          '<details class="aicm-selected-note" style="margin:12px 0;border:1px dashed #cbd5e1;padding:10px;border-radius:10px;">',
-          '<summary>C2D5R2A 課を適用 debug</summary>',
-          '<p>まだ「課を適用」branchは記録されていません。</p>',
-          '</details>'
         ].join("");
-    // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_RENDER_DEBUG_PANEL_END
 
 
-    // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_RENDER_PANEL_START
     var handlerEntryDebugData = state && state.r8zMgrMajorCardHandlerEntryDebug
       ? state.r8zMgrMajorCardHandlerEntryDebug
       : null;
 
     var handlerEntryDebugHtml = handlerEntryDebugData
       ? [
-          '<details class="aicm-selected-note" open style="margin:12px 0;border:1px dashed #334155;padding:10px;border-radius:10px;background:#f8fafc;">',
-          '<summary>C2D7 handler entry debug</summary>',
-          '<pre style="white-space:pre-wrap;max-height:340px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:12px;border-radius:12px;">' + escapeHtml(JSON.stringify(handlerEntryDebugData, null, 2)) + '</pre>',
-          '</details>'
         ].join("")
       : [
-          '<details class="aicm-selected-note" open style="margin:12px 0;border:1px dashed #cbd5e1;padding:10px;border-radius:10px;">',
-          '<summary>C2D7 handler entry debug</summary>',
-          '<p>まだ aicmR8zMgrMajorCardHandleAction は呼ばれていません。</p>',
-          '</details>'
         ].join("");
-    // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_RENDER_PANEL_END
 
     var summaryHtml = [
       '<div class="aicm-core-card" style="margin:12px 0;">',
@@ -6391,11 +6296,6 @@ await aicmReloadTaskLedgerContext();
       '</div>'
     ].join("");
   }
-
-
-
-
-
 
 
   function aicmR8zMgrMajorCardRenderOperationPanel(rows) {
@@ -6493,10 +6393,6 @@ await aicmReloadTaskLedgerContext();
 
     aicmR8zMgrMajorCardRerender("r8z_mgr_major_card_confirm_open_c2d2");
   }
-
-
-
-
 
 
   function aicmR8zMgrMajorCardHandleAction(ev, target, action) {
@@ -6828,7 +6724,6 @@ await aicmReloadTaskLedgerContext();
       // AICM_R8Z_MGR_MAJOR_CARD_C2D11R1_ROUTE_ENRICHMENT_PATCH_RETRY_END
 
 
-      // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_ENTRY_START
       try {
         var aicmR8zC2d7Args = [];
         for (var aicmR8zC2d7I = 0; aicmR8zC2d7I < arguments.length; aicmR8zC2d7I += 1) {
@@ -6854,7 +6749,6 @@ await aicmReloadTaskLedgerContext();
 
         if (state && typeof state === "object") {
           state.r8zMgrMajorCardHandlerEntryDebug = {
-            marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG",
             at: (new Date()).toISOString(),
             phase: "handler-entry",
             args: aicmR8zC2d7Args,
@@ -6865,14 +6759,11 @@ await aicmReloadTaskLedgerContext();
         }
 
         if (typeof console !== "undefined" && console.info) {
-          console.info("AICM C2D7 handler entry debug", state && state.r8zMgrMajorCardHandlerEntryDebug);
         }
       } catch (aicmR8zC2d7Error) {
         if (typeof console !== "undefined" && console.warn) {
-          console.warn("AICM C2D7 handler entry debug failed", aicmR8zC2d7Error);
         }
       }
-      // AICM_R8Z_MGR_MAJOR_CARD_C2D7_HANDLER_ENTRY_RUNTIME_DEBUG_ENTRY_END
 
 
     try {
@@ -6971,9 +6862,7 @@ await aicmReloadTaskLedgerContext();
 
       // AICM_R8Z_MGR_MAJOR_CARD_C2D2_LEDGER_DEPARTMENT_ROUTE_ACTION_ROUTE
       if (action === "r8z-mgr-major-card-route-apply-section") {
-        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_BRANCH_ENTER_START
         var aicmR8zC2d5r2aDebug = {
-          marker: "AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY",
           phase: "branch-enter",
           at: (new Date()).toISOString(),
           action: String(action || ""),
@@ -6991,7 +6880,6 @@ await aicmReloadTaskLedgerContext();
             console.info("AICM C2D5R2A route apply debug", aicmR8zC2d5r2aDebug);
           }
         } catch (_) {}
-        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_BRANCH_ENTER_END
 
         var routeRoot = target && target.closest ? target.closest("[data-r8z-mgr-major-card-route-picker]") : null;
         var sectionSelect = routeRoot && routeRoot.querySelector
@@ -7003,7 +6891,6 @@ await aicmReloadTaskLedgerContext();
           : null;
 
         var sectionId = sectionSelect ? String(sectionSelect.value || "").trim() : "";
-        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_SELECT_READ_START
         try {
           aicmR8zC2d5r2aDebug.phase = "after-select-read";
           aicmR8zC2d5r2aDebug.routeRootFound = !!routeRoot;
@@ -7024,7 +6911,6 @@ await aicmReloadTaskLedgerContext();
             console.info("AICM C2D5R2A route apply after select", aicmR8zC2d5r2aDebug);
           }
         } catch (_) {}
-        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_SELECT_READ_END
 
 
         if (!sectionId || !option) {
@@ -7041,7 +6927,6 @@ await aicmReloadTaskLedgerContext();
         };
 
         var appliedRoute = aicmR8zC2cApplySectionChoice(sectionId, sectionSnapshot);
-        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_APPLY_START
         try {
           aicmR8zC2d5r2aDebug.phase = "after-apply";
           aicmR8zC2d5r2aDebug.appliedRouteOk = !!appliedRoute;
@@ -7057,7 +6942,6 @@ await aicmReloadTaskLedgerContext();
             console.info("AICM C2D5R2A route apply after apply", aicmR8zC2d5r2aDebug);
           }
         } catch (_) {}
-        // AICM_R8Z_MGR_MAJOR_CARD_C2D5R2A_ROUTE_APPLY_RUNTIME_DEBUG_RETRY_AFTER_APPLY_END
 
 
         if (!appliedRoute || !appliedRoute.sectionId) {
@@ -7299,7 +7183,6 @@ function aicmRenderManagerMajorRows(rows) {
 // AICM_R8_NAV_TASK_LEDGER_V3_CLEAN_HELPER_END
 
   
-
 
 
 async function aicmReloadTaskLedgerContext() {
@@ -8416,67 +8299,6 @@ return renderShell([
       .replace(/'/g, "&#039;");
   }
 
-// AICM_R8Z_MGR_MAJOR_CARD_C2E_R2B_SAFE_DEBUG_PANEL_DISPLAY_FILTER_START
-// Formal UI display filter for temporary C2D debug panels.
-// This does not edit function h body.
-// It only filters the returned HTML string.
-// No DB write. No API POST. No fetch.
-var aicmR8zC2eR2bOriginalH = h;
-
-function aicmR8zC2eR2bRemoveBlockContainingLabel(html, label) {
-  var out = String(html == null ? "" : html);
-  var guard = 0;
-
-  while (out.indexOf(label) >= 0 && guard < 50) {
-    guard += 1;
-
-    var labelIndex = out.indexOf(label);
-    var removed = false;
-    var tags = ["details", "section", "article", "div"];
-
-    for (var i = 0; i < tags.length; i += 1) {
-      var tag = tags[i];
-      var openNeedle = "<" + tag;
-      var closeNeedle = "</" + tag + ">";
-      var openIndex = out.lastIndexOf(openNeedle, labelIndex);
-      var closeIndex = out.indexOf(closeNeedle, labelIndex);
-
-      if (openIndex >= 0 && closeIndex >= 0) {
-        var endIndex = closeIndex + closeNeedle.length;
-        var block = out.slice(openIndex, endIndex);
-
-        if (block.indexOf(label) >= 0 && block.length <= 50000) {
-          out = out.slice(0, openIndex) + out.slice(endIndex);
-          removed = true;
-          break;
-        }
-      }
-    }
-
-    if (!removed) {
-      out = out.slice(0, labelIndex) + out.slice(labelIndex + label.length);
-    }
-  }
-
-  return out;
-}
-
-function aicmR8zC2eR2bFilterFormalHtml(html) {
-  if (typeof html !== "string") return html;
-
-  var out = html;
-  out = aicmR8zC2eR2bRemoveBlockContainingLabel(out, "C2D5R2A 課を適用 debug");
-  out = aicmR8zC2eR2bRemoveBlockContainingLabel(out, "C2D7 handler entry debug");
-  return out;
-}
-
-h = function aicmR8zC2eR2bFormalUiHWrapper() {
-  var html = aicmR8zC2eR2bOriginalH.apply(this, arguments);
-  return aicmR8zC2eR2bFilterFormalHtml(html);
-};
-// AICM_R8Z_MGR_MAJOR_CARD_C2E_R2B_SAFE_DEBUG_PANEL_DISPLAY_FILTER_END
-
-
   function aicmR8ZNMetadata(row) {
     var meta = row && (row.metadata_jsonb || row.metadata || row.meta) || {};
     if (typeof meta === "string") {
@@ -8720,12 +8542,7 @@ h = function aicmR8zC2eR2bFormalUiHWrapper() {
 // AICM_R8Z_N_WORKER_RUNTIME_STATUS_PANEL_END
 
 
-
   
-
-
-
-
 
 
 /* AICM_R8Z_V9G5_RESTORE_DELETE_CONFIRM_EXECUTE_BRIDGE_ONLY
@@ -9333,7 +9150,6 @@ function aicmInjectLeaderHandoffConfirmCardR8SV9F4B(html) {
     // AICM_R8Z_MGR_MAJOR_CARD_C2D5R3_ROUTE_ACTION_DISPATCHER_APPLY_FIX_END
 
 
-
     // AICM_R8Z_MGR_MAJOR_CARD_C2D5R1_ROUTE_DISPATCHER_NO_NEW_FETCH_START
     // Normalize browser click target for manager-major-card route actions.
     // Scope: existing dispatcher only. No DB write. No API POST. No new fetch.
@@ -9888,11 +9704,7 @@ function renderReviewListPlaceholder() {
   
 
 
-
 // AICM_DEPT_SECTION_EDIT_FORM_WORKER_ROUTE_ASW_ASZ_V1
-
-
-
 
 
 function renderDepartmentEditPlaceholder() {
@@ -9951,10 +9763,6 @@ function renderDepartmentEditPlaceholder() {
 
 
   
-
-
-
-
 
 
 function renderSectionEditPlaceholder() {
@@ -10022,7 +9830,6 @@ function renderSectionEditPlaceholder() {
       '</section>'
     ].join(""));
   }
-
 
 
   
@@ -10682,7 +10489,6 @@ function renderAicmBusinessStartDashboardCard() {
       '</section>'
     ].join("");
   }
-
 
 
   // AICM_R8Z_V10F2G_SECTION_NEW_ENTRY_STATE_HYGIENE_HELPER_START
@@ -13065,7 +12871,6 @@ root.addEventListener("click", handleRootClick);
           } catch (_r8zV8hScheduleError) {}
 
 
-
           if (res.ok && payload && payload.result === "ok") {
             normalize(appState, payload);
           } else {
@@ -15264,7 +15069,6 @@ if (action === "review-v10f-cancel-confirm") {
   // AICM_R8Z_V10F_REVIEW_APPROVE_RETURN_CONFIRM_UI_END
 
 
-
     function reviewId(row) {
       return text(row && (
         row.aicm_human_review_item_id ||
@@ -15579,12 +15383,6 @@ if (action === "review-v10f-cancel-confirm") {
     }
   })();
   // AICM_R8Z_V10D4_REVIEW_DETAIL_COMPAT_CLICK_BRIDGE_END
-
-
-
-
-
-
 
 
 // AICM_R8Z_V7_REVIEW_LIST_ROUTE_BRIDGE_END
