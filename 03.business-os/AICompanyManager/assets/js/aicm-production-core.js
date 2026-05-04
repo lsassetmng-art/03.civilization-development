@@ -6670,6 +6670,11 @@ await aicmReloadTaskLedgerContext();
           route.departmentName = departmentLabel;
           route.department_name = departmentLabel;
 
+          // AICM_R8Z_MGR_MAJOR_CARD_C2F_D2B_R3_SECTION_APPLY_CLEAR_AUTO_LEADER_START
+          // Section apply must not auto-confirm Leader. Leader is confirmed only by the dedicated Leader apply action.
+          leaderPlacementId = "";
+          leaderLabel = "";
+          // AICM_R8Z_MGR_MAJOR_CARD_C2F_D2B_R3_SECTION_APPLY_CLEAR_AUTO_LEADER_END
           route.leaderPlacementId = leaderPlacementId;
           route.leader_placement_id = leaderPlacementId;
           route.leaderLabel = leaderLabel;
