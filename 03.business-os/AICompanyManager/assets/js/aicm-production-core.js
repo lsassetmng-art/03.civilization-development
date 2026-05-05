@@ -16808,15 +16808,39 @@ if (typeof window !== "undefined") {
 
   console.info(MARK + "_READY");
 
-  // AICM_V10L_C2G_B6R18_REVIEW_DECISION_REFRESH_START
-  function aicmB6R18Text(value) {
+
+
+  // AICM_V10L_C2G_B6R19_REVIEW_DECISION_REFRESH_START
+  function aicmB6R19Text(value) {
     if (value === null || typeof value === "undefined") return "";
     return String(value).trim();
   }
 
-  function aicmB6R18ReviewId(row) {
+  function aicmB6R19OwnerId() {
+    if (typeof state !== "undefined" && state && state.ownerCivilizationId) {
+      return aicmB6R19Text(state.ownerCivilizationId);
+    }
+    if (typeof state !== "undefined" && state && state.context && state.context.owner_civilization_id) {
+      return aicmB6R19Text(state.context.owner_civilization_id);
+    }
+    return "00000000-0000-4000-8000-000000000001";
+  }
+
+  function aicmB6R19SelectedCompanyId() {
+    if (typeof state !== "undefined" && state && state.selectedCompanyId) {
+      return aicmB6R19Text(state.selectedCompanyId);
+    }
+
+    try {
+      return aicmB6R19Text(window.localStorage.getItem("AICM_V2_SELECTED_COMPANY_ID"));
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function aicmB6R19ReviewId(row) {
     if (!row || typeof row !== "object") return "";
-    return aicmB6R18Text(
+    return aicmB6R19Text(
       row.aicm_human_review_item_id ||
       row.human_review_item_id ||
       row.review_id ||
@@ -16825,9 +16849,9 @@ if (typeof window !== "undefined") {
     );
   }
 
-  function aicmB6R18ReviewStatus(row) {
+  function aicmB6R19ReviewStatus(row) {
     if (!row || typeof row !== "object") return "";
-    return aicmB6R18Text(
+    return aicmB6R19Text(
       row.human_review_status_code ||
       row.review_status_code ||
       row.review_status ||
@@ -16835,174 +16859,332 @@ if (typeof window !== "undefined") {
     ).toLowerCase();
   }
 
-  function aicmB6R18FilterPendingRows(rows, decidedReviewId) {
-    if (!Array.isArray(rows)) return rows;
+  function aicmB6R19CompanyId(row) {
+    if (!row || typeof row !== "object") return "";
+    return aicmB6R19Text(row.aicm_user_company_id || row.company_id || row.companyId);
+  }
+
+  function aicmB6R19ExtractRows(payload) {
+    if (!payload || typeof payload !== "object") return [];
+
+    var candidates = [
+      payload.review_wait_items,
+      payload.human_review_wait_items,
+      payload.context && payload.context.review_wait_items,
+      payload.context && payload.context.human_review_wait_items,
+      payload.data && payload.data.review_wait_items,
+      payload.data && payload.data.human_review_wait_items
+    ];
+
+    for (var i = 0; i < candidates.length; i += 1) {
+      if (Array.isArray(candidates[i])) return candidates[i];
+    }
+
+    return [];
+  }
+
+  function aicmB6R19NormalizeRows(rows, removedId) {
+    var selectedCompanyId = aicmB6R19SelectedCompanyId();
+
+    if (!Array.isArray(rows)) return [];
 
     return rows.filter(function (row) {
-      var id = aicmB6R18ReviewId(row);
-      var status = aicmB6R18ReviewStatus(row);
+      var id = aicmB6R19ReviewId(row);
+      var status = aicmB6R19ReviewStatus(row);
+      var companyId = aicmB6R19CompanyId(row);
 
-      if (decidedReviewId && id && id === decidedReviewId) return false;
-      if (!status) return true;
+      if (removedId && id && id === removedId) return false;
+      if (selectedCompanyId && companyId && companyId !== selectedCompanyId) return false;
 
-      return status === "pending" || status === "承認待ち";
+      return !status || status === "pending" || status === "承認待ち";
     });
   }
 
-  function aicmB6R18ApplyReviewDecisionToState(reviewId, decision) {
-    var decidedReviewId = aicmB6R18Text(reviewId);
-    var roots = [];
+  function aicmB6R19ClearReviewDetailState() {
+    if (typeof state === "undefined" || !state || typeof state !== "object") return;
 
-    if (typeof state !== "undefined" && state && typeof state === "object") {
-      roots.push(state);
-      if (state.context && typeof state.context === "object") roots.push(state.context);
-      if (state.contextData && typeof state.contextData === "object") roots.push(state.contextData);
-      if (state.data && typeof state.data === "object") roots.push(state.data);
-    }
-
-    roots.forEach(function (root) {
-      [
-        "review_wait_items",
-        "human_review_wait_items",
-        "human_review_items"
-      ].forEach(function (key) {
-        if (Array.isArray(root[key])) {
-          root[key] = aicmB6R18FilterPendingRows(root[key], decidedReviewId);
-        }
-      });
+    [
+      "selectedReviewItemId",
+      "selectedHumanReviewItemId",
+      "activeReviewItemId",
+      "activeHumanReviewItemId",
+      "reviewDetailId",
+      "reviewDecisionId",
+      "reviewDecisionMode",
+      "pendingReviewDecision",
+      "pendingHumanReviewDecision",
+      "reviewDecisionPayload",
+      "reviewConfirm",
+      "humanReviewConfirm",
+      "reviewDetailRow",
+      "selectedReviewRow",
+      "currentReviewRow"
+    ].forEach(function (key) {
+      if (Object.prototype.hasOwnProperty.call(state, key)) {
+        state[key] = null;
+      }
     });
+  }
+
+  function aicmB6R19ApplyRows(rows, removedId) {
+    var normalized = aicmB6R19NormalizeRows(rows, removedId);
 
     if (typeof state !== "undefined" && state && typeof state === "object") {
-      [
-        "selectedReviewItemId",
-        "selectedHumanReviewItemId",
-        "activeReviewItemId",
-        "activeHumanReviewItemId",
-        "reviewDetailId",
-        "reviewDecisionId",
-        "reviewDecisionMode",
-        "pendingReviewDecision",
-        "pendingHumanReviewDecision",
-        "reviewDecisionPayload",
-        "reviewConfirm",
-        "humanReviewConfirm",
-        "reviewDetailRow",
-        "selectedReviewRow",
-        "currentReviewRow"
-      ].forEach(function (key) {
-        if (Object.prototype.hasOwnProperty.call(state, key)) {
-          state[key] = null;
-        }
-      });
-
+      state.review_wait_items = normalized;
+      state.human_review_wait_items = normalized;
       state.screen = "review-list";
+
+      if (!state.context || typeof state.context !== "object") state.context = {};
+      state.context.review_wait_items = normalized;
+      state.context.human_review_wait_items = normalized;
+
+      if (state.data && typeof state.data === "object") {
+        state.data.review_wait_items = normalized;
+        state.data.human_review_wait_items = normalized;
+      }
     }
 
-    return {
-      review_id: decidedReviewId,
-      decision: aicmB6R18Text(decision),
-      applied: true
-    };
+    aicmB6R19ClearReviewDetailState();
+
+    return normalized;
   }
 
-  function aicmB6R18RenderReviewListAfterDecision(reviewId, decision) {
-    aicmB6R18ApplyReviewDecisionToState(reviewId, decision);
+  function aicmB6R19ContextUrl() {
+    return "/api/aicm/v2/context?owner_civilization_id=" + encodeURIComponent(aicmB6R19OwnerId());
+  }
 
-    if (typeof setMessage === "function") {
-      setMessage("ok", decision === "returned" ? "差し戻しました。" : "承認しました。");
-    }
+  function aicmB6R19RemoveVisibleDetailById(reviewId) {
+    if (typeof document === "undefined") return;
+    var id = aicmB6R19Text(reviewId);
+    if (!id) return;
 
+    var selectors = [
+      '[data-review-id="' + id + '"]',
+      '[data-human-review-id="' + id + '"]',
+      '[data-review-item-id="' + id + '"]'
+    ];
+
+    selectors.forEach(function (selector) {
+      var nodes = document.querySelectorAll(selector);
+      for (var i = 0; i < nodes.length; i += 1) {
+        var card = nodes[i].closest(".aicm-core-card, section, article");
+        if (card && !card.matches(".aicm-review-list-top-nav-b6r13")) {
+          card.parentNode && card.parentNode.removeChild(card);
+        }
+      }
+    });
+  }
+
+  function aicmB6R19Render() {
     if (typeof render === "function") {
       render();
+      return;
+    }
+
+    if (typeof rerender === "function") {
+      rerender();
     }
   }
 
-  function aicmB6R18RefreshReviewListAfterDecision(reviewId, decision) {
-    aicmB6R18RenderReviewListAfterDecision(reviewId, decision);
+  function aicmB6R19RefreshFromContext(reviewId, source) {
+    var removedId = aicmB6R19Text(reviewId);
 
-    if (typeof loadContext === "function") {
-      Promise.resolve()
-        .then(function () {
-          return loadContext();
-        })
-        .then(function () {
-          aicmB6R18RenderReviewListAfterDecision(reviewId, decision);
-        })
-        .catch(function () {
-          aicmB6R18RenderReviewListAfterDecision(reviewId, decision);
-        });
+    if (typeof fetch !== "function") {
+      aicmB6R19RemoveVisibleDetailById(removedId);
+      aicmB6R19Render();
+      return Promise.resolve({ ok: false, source: source || "no-fetch" });
     }
 
-    setTimeout(function () {
-      aicmB6R18RenderReviewListAfterDecision(reviewId, decision);
-    }, 120);
+    return fetch(aicmB6R19ContextUrl(), { method: "GET", cache: "no-store" })
+      .then(function (response) {
+        if (!response || !response.ok) throw new Error("context refresh failed");
+        return response.json();
+      })
+      .then(function (payload) {
+        var rows = aicmB6R19ExtractRows(payload);
+        aicmB6R19ApplyRows(rows, removedId);
+        aicmB6R19RemoveVisibleDetailById(removedId);
+        aicmB6R19Render();
+        return { ok: true, source: source || "context", rows: rows.length };
+      })
+      .catch(function () {
+        aicmB6R19RemoveVisibleDetailById(removedId);
+        aicmB6R19Render();
+        return { ok: false, source: source || "context-error" };
+      });
   }
 
-  function aicmB6R18ParseJsonBody(body) {
-    if (!body) return {};
+  function aicmB6R19ReviewIdFromElement(el) {
+    var cur = el;
+    while (cur && cur !== document.body) {
+      if (cur.getAttribute) {
+        var id = cur.getAttribute("data-review-item-id") ||
+          cur.getAttribute("data-review-id") ||
+          cur.getAttribute("data-human-review-id");
+
+        if (id) return aicmB6R19Text(id);
+      }
+      cur = cur.parentNode;
+    }
+    return "";
+  }
+
+  function aicmB6R19DecisionFromElement(el) {
+    var cur = el;
+    while (cur && cur !== document.body) {
+      if (cur.getAttribute) {
+        var d = cur.getAttribute("data-review-decision");
+        var action = cur.getAttribute("data-core-action") || "";
+
+        if (d) return aicmB6R19Text(d);
+        if (action.indexOf("return") >= 0) return "returned";
+        if (action.indexOf("approve") >= 0) return "approved";
+      }
+      cur = cur.parentNode;
+    }
+    return "";
+  }
+
+  function aicmB6R19ScheduleRefresh(reviewId, source) {
+    var id = aicmB6R19Text(reviewId);
+    if (!id) return;
+
+    [250, 800, 1600].forEach(function (delay) {
+      setTimeout(function () {
+        aicmB6R19RefreshFromContext(id, source || "scheduled");
+      }, delay);
+    });
+  }
+
+  function aicmB6R19BodyReviewId(body) {
+    if (!body) return "";
+
     if (typeof body === "string") {
-      try { return JSON.parse(body); } catch (_) { return {}; }
-    }
-    return {};
-  }
-
-  function aicmB6R18InstallHumanReviewDecisionFinalizer() {
-    if (typeof window === "undefined") return;
-    if (window.__AICM_B6R18_REVIEW_DECISION_REFRESH_INSTALLED__) return;
-    if (typeof window.fetch !== "function") return;
-
-    var originalFetch = window.fetch;
-
-    window.fetch = function aicmB6R18Fetch(input, init) {
-      var url = "";
-      var method = "GET";
-      var body = {};
-
       try {
-        url = typeof input === "string" ? input : (input && input.url ? String(input.url) : "");
-        method = init && init.method ? String(init.method).toUpperCase() : "GET";
-        body = aicmB6R18ParseJsonBody(init && init.body);
+        body = JSON.parse(body);
       } catch (_) {
-        url = "";
-        method = "GET";
         body = {};
       }
+    }
 
-      var isReviewDecisionPost =
-        method === "POST" &&
-        (
-          url.indexOf("/api/aicm/v2/human-review/approve") >= 0 ||
-          url.indexOf("/api/aicm/v2/human-review/return") >= 0
-        );
+    if (!body || typeof body !== "object") return "";
 
-      var decision = url.indexOf("/api/aicm/v2/human-review/return") >= 0 ? "returned" : "approved";
-      var reviewId = aicmB6R18Text(
-        body.aicm_human_review_item_id ||
-        body.human_review_item_id ||
-        body.review_id ||
-        body.reviewId
-      );
-
-      return originalFetch.apply(this, arguments).then(function (response) {
-        if (isReviewDecisionPost && response && response.ok) {
-          try {
-            response.clone().json().then(function (json) {
-              if (json && json.result === "ok") {
-                aicmB6R18RefreshReviewListAfterDecision(reviewId, decision);
-              }
-            }).catch(function () {});
-          } catch (_) {}
-        }
-
-        return response;
-      });
-    };
-
-    window.__AICM_B6R18_REVIEW_DECISION_REFRESH_INSTALLED__ = true;
+    return aicmB6R19Text(
+      body.aicm_human_review_item_id ||
+      body.human_review_item_id ||
+      body.review_id ||
+      body.reviewId
+    );
   }
 
-  aicmB6R18InstallHumanReviewDecisionFinalizer();
-  // AICM_V10L_C2G_B6R18_REVIEW_DECISION_REFRESH_END
+  function aicmB6R19InstallDecisionRefresh() {
+    if (typeof window === "undefined") return;
+    if (window.__AICM_B6R19_REVIEW_DECISION_REFRESH_INSTALLED__) return;
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", function (event) {
+        var target = event && event.target ? event.target : null;
+        if (!target) return;
+
+        var id = aicmB6R19ReviewIdFromElement(target);
+        var decision = aicmB6R19DecisionFromElement(target);
+
+        if (!id || !decision) return;
+
+        aicmB6R19ScheduleRefresh(id, "click-" + decision);
+      }, true);
+
+      document.addEventListener("touchend", function (event) {
+        var target = event && event.target ? event.target : null;
+        if (!target) return;
+
+        var id = aicmB6R19ReviewIdFromElement(target);
+        var decision = aicmB6R19DecisionFromElement(target);
+
+        if (!id || !decision) return;
+
+        aicmB6R19ScheduleRefresh(id, "touchend-" + decision);
+      }, true);
+    }
+
+    if (typeof window.fetch === "function") {
+      var originalFetch = window.fetch;
+
+      window.fetch = function aicmB6R19Fetch(input, init) {
+        var url = "";
+        var method = "GET";
+        var reviewId = "";
+
+        try {
+          url = typeof input === "string" ? input : (input && input.url ? String(input.url) : "");
+          method = init && init.method ? String(init.method).toUpperCase() : "GET";
+          reviewId = aicmB6R19BodyReviewId(init && init.body);
+        } catch (_) {}
+
+        var isDecision =
+          method === "POST" &&
+          (
+            url.indexOf("/api/aicm/v2/human-review/approve") >= 0 ||
+            url.indexOf("/api/aicm/v2/human-review/return") >= 0
+          );
+
+        return originalFetch.apply(this, arguments).then(function (response) {
+          if (isDecision && response && response.ok) {
+            aicmB6R19ScheduleRefresh(reviewId, "fetch-decision");
+          }
+          return response;
+        });
+      };
+    }
+
+    if (typeof window.XMLHttpRequest === "function") {
+      var OriginalXHR = window.XMLHttpRequest;
+
+      window.XMLHttpRequest = function aicmB6R19XHR() {
+        var xhr = new OriginalXHR();
+        var method = "GET";
+        var url = "";
+        var reviewId = "";
+
+        var originalOpen = xhr.open;
+        var originalSend = xhr.send;
+
+        xhr.open = function (m, u) {
+          method = aicmB6R19Text(m).toUpperCase();
+          url = aicmB6R19Text(u);
+          return originalOpen.apply(xhr, arguments);
+        };
+
+        xhr.send = function (body) {
+          reviewId = aicmB6R19BodyReviewId(body);
+
+          xhr.addEventListener("load", function () {
+            var isDecision =
+              method === "POST" &&
+              xhr.status >= 200 &&
+              xhr.status < 300 &&
+              (
+                url.indexOf("/api/aicm/v2/human-review/approve") >= 0 ||
+                url.indexOf("/api/aicm/v2/human-review/return") >= 0
+              );
+
+            if (isDecision) {
+              aicmB6R19ScheduleRefresh(reviewId, "xhr-decision");
+            }
+          });
+
+          return originalSend.apply(xhr, arguments);
+        };
+
+        return xhr;
+      };
+    }
+
+    window.__AICM_B6R19_REVIEW_DECISION_REFRESH_INSTALLED__ = true;
+  }
+
+  aicmB6R19InstallDecisionRefresh();
+  // AICM_V10L_C2G_B6R19_REVIEW_DECISION_REFRESH_END
 
 }());
 // AICM_V10L_C2G_B6R12_REVIEW_LIST_FINAL_API_FALLBACK_END
