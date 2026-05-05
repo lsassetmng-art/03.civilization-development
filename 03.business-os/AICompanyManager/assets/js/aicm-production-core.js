@@ -16274,6 +16274,68 @@ async function aicmR8zV10gc3iExecuteReviewDecision(button) {
 
     aicmR8zV10gc3iSetMessage("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
 
+    // AICM_V10L_C2G_B6R21_REVIEW_DECISION_SUCCESS_REFRESH_START
+    var aicmB6r21ReviewId = aicmR8zV10gc3iText(id || payload.aicm_human_review_item_id || payload.review_id || "");
+    function aicmB6r21FilterReviewRows(rows) {
+      if (!Array.isArray(rows)) return rows;
+      return rows.filter(function (row) {
+        var rowId = aicmR8zV10gc3iText(
+          row && (
+            row.aicm_human_review_item_id ||
+            row.human_review_item_id ||
+            row.review_id ||
+            row.id
+          )
+        );
+        return !aicmB6r21ReviewId || rowId !== aicmB6r21ReviewId;
+      });
+    }
+    if (aicmB6r21ReviewId) {
+      if (state) {
+        state.review_wait_items = aicmB6r21FilterReviewRows(state.review_wait_items);
+        state.human_review_wait_items = aicmB6r21FilterReviewRows(state.human_review_wait_items);
+        state.human_review_items = aicmB6r21FilterReviewRows(state.human_review_items);
+        if (state.context) {
+          state.context.review_wait_items = aicmB6r21FilterReviewRows(state.context.review_wait_items);
+          state.context.human_review_wait_items = aicmB6r21FilterReviewRows(state.context.human_review_wait_items);
+          state.context.human_review_items = aicmB6r21FilterReviewRows(state.context.human_review_items);
+        }
+      }
+      if (typeof appState !== "undefined" && appState) {
+        appState.review_wait_items = aicmB6r21FilterReviewRows(appState.review_wait_items);
+        appState.human_review_wait_items = aicmB6r21FilterReviewRows(appState.human_review_wait_items);
+        appState.human_review_items = aicmB6r21FilterReviewRows(appState.human_review_items);
+        if (appState.context) {
+          appState.context.review_wait_items = aicmB6r21FilterReviewRows(appState.context.review_wait_items);
+          appState.context.human_review_wait_items = aicmB6r21FilterReviewRows(appState.context.human_review_wait_items);
+          appState.context.human_review_items = aicmB6r21FilterReviewRows(appState.context.human_review_items);
+        }
+      }
+    }
+    if (state) {
+      state.reviewDetailId = "";
+      state.reviewPreviewId = "";
+      state.reviewConfirmId = "";
+      state.reviewDecisionConfirm = null;
+      state.currentReviewDetailId = "";
+      state.currentReviewDecisionId = "";
+      state.screen = "review-list";
+    }
+    if (typeof appState !== "undefined" && appState) {
+      appState.reviewDetailId = "";
+      appState.reviewPreviewId = "";
+      appState.reviewConfirmId = "";
+      appState.reviewDecisionConfirm = null;
+      appState.currentReviewDetailId = "";
+      appState.currentReviewDecisionId = "";
+      appState.screen = "review-list";
+    }
+    if (typeof render === "function") {
+      render();
+    } else if (typeof rerender === "function") {
+      rerender();
+    }
+    // AICM_V10L_C2G_B6R21_REVIEW_DECISION_SUCCESS_REFRESH_END
     await aicmR8zV10gc3iRefreshReviewList(payload.aicm_human_review_item_id);
   } catch (error) {
     button.disabled = false;
