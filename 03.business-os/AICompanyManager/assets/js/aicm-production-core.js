@@ -16812,7 +16812,6 @@ if (typeof window !== "undefined") {
         if (typeof appState !== "undefined" && appState) appState.screen = "review-list";
       } catch (_) {}
 
-      setTimeout(showReviewListB6R12, 0);
       return;
     }
   }, true);
@@ -16823,13 +16822,11 @@ if (typeof window !== "undefined") {
 
   try {
     if (typeof state !== "undefined" && state && state.screen === "review-list") {
-      setTimeout(showReviewListB6R12, 0);
     }
   } catch (_) {}
 
   try {
     if (typeof appState !== "undefined" && appState && appState.screen === "review-list") {
-      setTimeout(showReviewListB6R12, 0);
     }
   } catch (_) {}
 
