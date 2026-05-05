@@ -13946,7 +13946,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
       '  <h2>納品サマリー確認</h2>',
       '  <p class="aicm-selected-note">対象会社: <strong>' + esc(companyName(appState)) + '</strong></p>',
       '  <p class="aicm-selected-note">レビュー・承認待ち: <strong>' + esc(String(list.length)) + '件</strong></p>',
-      '  <p class="aicm-selected-note">R8Z-V7: ' + esc(debug) + '</p>'
+      ''
     ];
 
     if (!list.length) {
@@ -14275,7 +14275,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
             '<section class="aicm-core-card">',
             '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
             '  <h2>レビュー・承認待ち: ' + v10cEsc(String(rows.length)) + '件</h2>',
-            '  <p class="aicm-selected-note">' + v10cEsc(debug) + '</p>',
+            '' ,
             '</section>',
             rows.map(v10cRenderRow).join("")
           ].join("")
@@ -14283,7 +14283,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
             '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
             '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
             '  <h2>レビュー・承認待ち: 0件</h2>',
-            '  <p class="aicm-selected-note">' + v10cEsc(debug) + '</p>',
+            '' ,
             '  <p class="aicm-core-message aicm-core-message-error">context APIからレビュー・承認待ちはありませんでした。</p>',
             '  <div class="aicm-dashboard-action-row">',
             '    <button type="button" data-core-action="go" data-screen="dashboard">ダッシュボードへ戻る</button>',
@@ -14693,7 +14693,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         '<section class="aicm-core-card">',
         '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
         '  <h2>レビュー・承認待ち: ' + esc(String(r.length)) + '件</h2>',
-        '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
+        '' ,
         '  <p class="aicm-selected-note">成果物を確認してから、次工程で承認/差し戻しを行います。</p>',
         '</section>',
         renderDetailCard(appState),
@@ -14703,7 +14703,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
           : [
               '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
               '  <h3>レビュー・承認待ちはありません</h3>',
-              '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
+              '' ,
               '</section>'
             ].join("")
       ].join("");
@@ -15156,7 +15156,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
         '<section class="aicm-core-card">',
         '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
         '  <h2>レビュー・承認待ち: ' + esc(String(r.length)) + '件</h2>',
-        '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
+        '' ,
         '  <p class="aicm-selected-note">「成果物を確認」を押すと、その項目の直下に詳細カードを表示します。</p>',
         '</section>',
         r.length
@@ -15164,7 +15164,7 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
           : [
               '<section class="aicm-core-card" style="border:1px solid #e5e7eb;">',
               '  <h3>レビュー・承認待ちはありません</h3>',
-              '  <p class="aicm-selected-note">' + esc(debug) + '</p>',
+              '' ,
               '</section>'
             ].join("")
       ].join("");
@@ -15958,6 +15958,11 @@ if (action === "review-v10f-cancel-confirm") {
     }
 
     function setVisibleDebug(message) {
+
+    // AICM_V10L_C2G_B6R27_VISIBLE_DEBUG_DISPLAY_PURGE
+    var existingDebugNodeB6R27 = typeof document !== "undefined" ? document.getElementById("aicm-v10d4-visible-debug") : null;
+    if (existingDebugNodeB6R27 && existingDebugNodeB6R27.parentNode) existingDebugNodeB6R27.parentNode.removeChild(existingDebugNodeB6R27);
+    return;
       var s = app();
       s.aicmR8zV10d4Debug = message;
       s.aicmR8zV10d4ClickedAt = new Date().toISOString();
