@@ -2149,6 +2149,79 @@ function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
     ? safeDetail.runtime_request
     : {};
 
+  // AICM_V10L_C2G_B6R43R4_ROUTE_METADATA_SQL_VARS_START
+  const b6r43r4RuntimeRequestId = aicmB6r7Text(
+    runtimeRequest.request_id ||
+    runtimeRequest.runtime_execution_request_id ||
+    ""
+  );
+  const b6r43r4RuntimeRequestIdSql = sqlLiteral(b6r43r4RuntimeRequestId);
+  const b6r43r4WorkerMetaExpr = "COALESCE(w.metadata_jsonb, '{}'::jsonb)";
+  const b6r43r4MetaTextExpr = function b6r43r4MetaTextExpr(key) {
+    return b6r43r4WorkerMetaExpr + "->>" + sqlLiteral(key);
+  };
+  const b6r43r4MetaNullIfExpr = function b6r43r4MetaNullIfExpr(key) {
+    return "NULLIF(" + b6r43r4MetaTextExpr(key) + ", '')";
+  };
+  const b6r43r4RouteIndividualSql = sqlLiteral("individual_instruction");
+  const b6r43r4RoutePresidentSql = sqlLiteral("president_route_worker");
+  const b6r43r4ReviewRouteExpr = [
+    "COALESCE(",
+    b6r43r4MetaNullIfExpr("source_route_code"),
+    ", CASE ",
+    "WHEN " + b6r43r4MetaNullIfExpr("source_president_policy_id") + " IS NOT NULL THEN " + b6r43r4RoutePresidentSql + " ",
+    "WHEN " + b6r43r4MetaNullIfExpr("source_manager_major_work_item_id") + " IS NOT NULL THEN " + sqlLiteral("task_ledger_worker") + " ",
+    "WHEN NULLIF(" + b6r43r4RuntimeRequestIdSql + ", '') IS NOT NULL THEN " + b6r43r4RouteIndividualSql + " ",
+    "ELSE " + sqlLiteral("worker_auto_execution") + " END)",
+  ].join("");
+  const b6r43r4ReturnTargetTypeExpr = [
+    "COALESCE(",
+    b6r43r4MetaNullIfExpr("return_target_type"),
+    ", CASE WHEN " + b6r43r4ReviewRouteExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN " + sqlLiteral("workbench_runtime_request"),
+    " ELSE " + sqlLiteral("worker_work_unit") + " END)",
+  ].join("");
+  const b6r43r4ReturnTargetIdExpr = [
+    "COALESCE(",
+    b6r43r4MetaNullIfExpr("return_target_id"),
+    ", CASE WHEN " + b6r43r4ReviewRouteExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN NULLIF(" + b6r43r4RuntimeRequestIdSql + ", '')",
+    " ELSE w.aicm_worker_work_unit_id::text END)",
+  ].join("");
+  const b6r43r4ReexecuteTargetTypeExpr = [
+    "COALESCE(",
+    b6r43r4MetaNullIfExpr("reexecute_target_type"),
+    ", CASE WHEN " + b6r43r4ReviewRouteExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN " + sqlLiteral("runtime_request"),
+    " ELSE " + sqlLiteral("worker_work_unit") + " END)",
+  ].join("");
+  const b6r43r4ReexecuteTargetIdExpr = [
+    "COALESCE(",
+    b6r43r4MetaNullIfExpr("reexecute_target_id"),
+    ", CASE WHEN " + b6r43r4ReviewRouteExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN NULLIF(" + b6r43r4RuntimeRequestIdSql + ", '')",
+    " ELSE w.aicm_worker_work_unit_id::text END)",
+  ].join("");
+  const b6r43r4ContextRestoreTypeExpr = [
+    "COALESCE(",
+    b6r43r4MetaNullIfExpr("context_restore_type"),
+    ", CASE WHEN " + b6r43r4ReviewRouteExpr + " = " + b6r43r4RoutePresidentSql,
+    " THEN " + sqlLiteral("president_route"),
+    " WHEN " + b6r43r4ReviewRouteExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN " + sqlLiteral("workbench"),
+    " ELSE " + sqlLiteral("task_ledger") + " END)",
+  ].join("");
+  const b6r43r4ContextRestoreIdExpr = [
+    "COALESCE(",
+    b6r43r4MetaNullIfExpr("context_restore_id"),
+    ", " + b6r43r4MetaNullIfExpr("source_manager_major_work_item_id"),
+    ", " + b6r43r4MetaNullIfExpr("source_president_policy_id"),
+    ", CASE WHEN " + b6r43r4ReviewRouteExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN NULLIF(" + b6r43r4RuntimeRequestIdSql + ", '')",
+    " ELSE w.aicm_worker_work_unit_id::text END)",
+  ].join("");
+  // AICM_V10L_C2G_B6R43R4_ROUTE_METADATA_SQL_VARS_END
+
   const responseSummary = aicmB6r7Text(
     aiworkerResponse.result_summary_text ||
     aiworkerResponse.delivery_summary_text ||
@@ -2202,6 +2275,17 @@ function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
     "      review_status_code = " + sqlLiteral("waiting") + ",",
     "      result_summary_text = (SELECT delivery_summary_text FROM summary_value),",
     "      metadata_jsonb = COALESCE(w.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+          // AICM_V10L_C2G_B6R43R4_ROUTE_METADATA_JSONB_MERGE_START
+          sqlLiteral("source_route_code") + ", " + b6r43r4ReviewRouteExpr + ",",
+          sqlLiteral("return_target_type") + ", " + b6r43r4ReturnTargetTypeExpr + ",",
+          sqlLiteral("return_target_id") + ", " + b6r43r4ReturnTargetIdExpr + ",",
+          sqlLiteral("reexecute_target_type") + ", " + b6r43r4ReexecuteTargetTypeExpr + ",",
+          sqlLiteral("reexecute_target_id") + ", " + b6r43r4ReexecuteTargetIdExpr + ",",
+          sqlLiteral("context_restore_type") + ", " + b6r43r4ContextRestoreTypeExpr + ",",
+          sqlLiteral("context_restore_id") + ", " + b6r43r4ContextRestoreIdExpr + ",",
+          sqlLiteral("source_app_ref") + ", " + sqlLiteral("AICompanyManager") + ",",
+          sqlLiteral("source_screen_code") + ", COALESCE(" + b6r43r4MetaNullIfExpr("source_screen_code") + ", CASE WHEN " + b6r43r4ReviewRouteExpr + " = " + b6r43r4RoutePresidentSql + " THEN " + sqlLiteral("president_route") + " WHEN " + b6r43r4ReviewRouteExpr + " = " + b6r43r4RouteIndividualSql + " THEN " + sqlLiteral("ai_execution_workbench") + " ELSE " + sqlLiteral("task_ledger") + " END),",
+          // AICM_V10L_C2G_B6R43R4_ROUTE_METADATA_JSONB_MERGE_END
     "        " + sqlLiteral("worker_auto_execution_source") + ", " + sqlLiteral("worker-auto-execution/run") + ",",
     "        " + sqlLiteral("worker_auto_execution_completed_at") + ", now()::text,",
     "        " + sqlLiteral("worker_auto_execution_result") + ", " + sqlLiteral(detailJson) + "::jsonb",
@@ -2881,6 +2965,33 @@ if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
     }
     if (route === "/api/aicm/v2/worker-runtime/request" && req.method === "POST") {
       const payload = await createWorkerRuntimeRequest(await readBody(req));
+
+      // AICM_V10L_C2G_B6R44C_WORKBENCH_SOURCE_ROUTE_METADATA_START
+      const aicmB6R44cRuntimeRequestSourceRouteMetadata = {
+        source_app_ref: "AICompanyManager",
+        source_route_code: "individual_instruction",
+        source_screen_code: "ai_execution_workbench",
+        source_entity_type: "runtime_request",
+        source_entity_id: "",
+        return_target_type: "workbench_runtime_request",
+        reexecute_target_type: "runtime_request",
+        context_restore_type: "workbench"
+      };
+      if (payload && typeof payload === "object") {
+        payload.source_app_ref = payload.source_app_ref || aicmB6R44cRuntimeRequestSourceRouteMetadata.source_app_ref;
+        payload.source_route_code = payload.source_route_code || aicmB6R44cRuntimeRequestSourceRouteMetadata.source_route_code;
+        payload.source_screen_code = payload.source_screen_code || aicmB6R44cRuntimeRequestSourceRouteMetadata.source_screen_code;
+        payload.source_entity_type = payload.source_entity_type || aicmB6R44cRuntimeRequestSourceRouteMetadata.source_entity_type;
+        payload.return_target_type = payload.return_target_type || aicmB6R44cRuntimeRequestSourceRouteMetadata.return_target_type;
+        payload.reexecute_target_type = payload.reexecute_target_type || aicmB6R44cRuntimeRequestSourceRouteMetadata.reexecute_target_type;
+        payload.context_restore_type = payload.context_restore_type || aicmB6R44cRuntimeRequestSourceRouteMetadata.context_restore_type;
+        payload.metadata_jsonb = Object.assign({}, payload.metadata_jsonb && typeof payload.metadata_jsonb === "object" ? payload.metadata_jsonb : {}, aicmB6R44cRuntimeRequestSourceRouteMetadata);
+        payload.app_read_payload_jsonb = Object.assign({}, payload.app_read_payload_jsonb && typeof payload.app_read_payload_jsonb === "object" ? payload.app_read_payload_jsonb : {}, {
+          source: aicmB6R44cRuntimeRequestSourceRouteMetadata
+        });
+      }
+      // AICM_V10L_C2G_B6R44C_WORKBENCH_SOURCE_ROUTE_METADATA_END
+
       sendJson(res, payload && payload.result === "ok" ? 200 : 400, payload);
       return true;
     }

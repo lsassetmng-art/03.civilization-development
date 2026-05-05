@@ -10894,6 +10894,137 @@ function aicmRuntimeStatusIsCurrentAppRow(row) {
     return false;
   }
 
+
+
+// AICM_V10L_C2G_B6R44C_WORKBENCH_SOURCE_ROUTE_FILTER_START
+function aicmB6R44cText(value) {
+  return value == null ? "" : String(value).trim();
+}
+
+function aicmB6R44cLower(value) {
+  return aicmB6R44cText(value).toLowerCase();
+}
+
+function aicmB6R44cGetPath(row, path) {
+  var cur = row;
+  for (var i = 0; i < path.length; i += 1) {
+    if (!cur || typeof cur !== "object") return "";
+    cur = cur[path[i]];
+  }
+  return cur;
+}
+
+function aicmB6R44cRuntimeRouteCode(row) {
+  var direct = aicmB6R44cText(
+    row && (
+      row.source_route_code ||
+      row.route_code ||
+      row.request_source_route_code ||
+      row.runtime_source_route_code
+    )
+  );
+  if (direct) return direct;
+
+  var payload = row && row.app_read_payload_jsonb && typeof row.app_read_payload_jsonb === "object"
+    ? row.app_read_payload_jsonb
+    : null;
+
+  var candidates = [
+    payload && payload.source && payload.source.source_route_code,
+    payload && payload.request && payload.request.source_route_code,
+    payload && payload.request && payload.request.metadata_jsonb && payload.request.metadata_jsonb.source_route_code,
+    payload && payload.metadata_jsonb && payload.metadata_jsonb.source_route_code,
+    aicmB6R44cGetPath(row, ["metadata_jsonb", "source_route_code"]),
+    aicmB6R44cGetPath(row, ["payload", "source", "source_route_code"]),
+    aicmB6R44cGetPath(row, ["payload", "request", "source_route_code"])
+  ];
+
+  for (var i = 0; i < candidates.length; i += 1) {
+    var v = aicmB6R44cText(candidates[i]);
+    if (v) return v;
+  }
+
+  return "";
+}
+
+function aicmB6R44cLooksLikeTaskLedgerWorker(row) {
+  var title = aicmB6R44cText(
+    row && (
+      row.task_title ||
+      row.title ||
+      row.work_unit_name ||
+      row.output_title_ja
+    )
+  );
+
+  var modelCode = aicmB6R44cLower(
+    row && (
+      row.model_code ||
+      row.aiworker_model_code ||
+      row.model_no
+    )
+  );
+
+  var role = aicmB6R44cLower(
+    row && (
+      row.role_layer_code ||
+      row.role_layer_name_ja
+    )
+  );
+
+  var payloadText = "";
+  try {
+    payloadText = JSON.stringify(row && row.app_read_payload_jsonb ? row.app_read_payload_jsonb : {});
+  } catch (_e) {
+    payloadText = "";
+  }
+
+  /*
+    Legacy fallback:
+    既存データで source_route_code が無いものだけを救済する。
+    台帳/President由来の自動Workerは「... 作業」になりやすく、BYD系/WORKER系に寄る。
+    個別指示は今後 source_route_code=individual_instruction で明示される。
+  */
+  if (/\s作業$/.test(title) && (modelCode.indexOf("byd") >= 0 || role.indexOf("worker") >= 0 || role.indexOf("ワーカー") >= 0)) {
+    return true;
+  }
+
+  if (
+    payloadText.indexOf("source_manager_major_work_item_id") >= 0 ||
+    payloadText.indexOf("source_leader_middle_work_item_id") >= 0 ||
+    payloadText.indexOf("source_deliverable_requirement_id") >= 0 ||
+    payloadText.indexOf("source_president_policy_id") >= 0
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function aicmB6R44cIsWorkbenchIndividualRuntimeRow(row) {
+  var route = aicmB6R44cRuntimeRouteCode(row);
+  if (route) {
+    return route === "individual_instruction";
+  }
+
+  /*
+    source_route_code導入前の既存データ用fallback。
+    台帳WorkerっぽいものはWorkbenchから外す。
+  */
+  return !aicmB6R44cLooksLikeTaskLedgerWorker(row);
+}
+
+function aicmB6R44cFilterWorkbenchRuntimeRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.filter(function(row) {
+    return aicmB6R44cIsWorkbenchIndividualRuntimeRow(row);
+  });
+}
+
+function aicmB6R44cRuntimeSourceNote() {
+  return '<p class="aicm-selected-note">表示対象: 個別ロボット指示のみ。台帳Worker / PresidentルートWorker はレビュー・承認待ち一覧側で扱います。</p>';
+}
+// AICM_V10L_C2G_B6R44C_WORKBENCH_SOURCE_ROUTE_FILTER_END
 function aicmRuntimeStatusFilterRowsForCurrentApp(rows) {
     rows = Array.isArray(rows) ? rows : [];
 
@@ -10904,6 +11035,18 @@ function aicmRuntimeStatusFilterRowsForCurrentApp(rows) {
     return filtered;
   }
 
+
+
+// AICM_V10L_C2G_B6R44C_WORKBENCH_SOURCE_ROUTE_FILTER_START_WRAP_FILTER
+if (typeof aicmRuntimeStatusFilterRowsForCurrentApp === "function" && !aicmRuntimeStatusFilterRowsForCurrentApp.__b6r44cWorkbenchOnly) {
+  var aicmB6R44cFilterRowsBefore = aicmRuntimeStatusFilterRowsForCurrentApp;
+  aicmRuntimeStatusFilterRowsForCurrentApp = function aicmRuntimeStatusFilterRowsForCurrentApp(rows) {
+    var baseRows = aicmB6R44cFilterRowsBefore(rows);
+    return aicmB6R44cFilterWorkbenchRuntimeRows(baseRows);
+  };
+  aicmRuntimeStatusFilterRowsForCurrentApp.__b6r44cWorkbenchOnly = true;
+}
+// AICM_V10L_C2G_B6R44C_WORKBENCH_SOURCE_ROUTE_FILTER_END_WRAP_FILTER
 
 function aicmRuntimeStatusPanelRender() {
     var loading = !!state.runtimeStatusLoading;
@@ -10916,6 +11059,7 @@ function aicmRuntimeStatusPanelRender() {
       '  <p class="aicm-eyebrow">AIWorkerOS 実行状況</p>',
       '  <h2>Runtime request / pipeline</h2>',
       '  <p class="aicm-selected-note">AIWorkerOSの app-read-payload / pipeline-board をAICM server経由で読みます。DB書込は行いません。</p>',
+      aicmB6R44cRuntimeSourceNote(),
       error ? '  <p class="aicm-core-error">' + escapeHtml(error) + '</p>' : '',
       lastUpdated ? '  <p class="aicm-core-empty">最終更新: ' + escapeHtml(lastUpdated) + '</p>' : '',
       '  <div class="aicm-dashboard-action-row">',

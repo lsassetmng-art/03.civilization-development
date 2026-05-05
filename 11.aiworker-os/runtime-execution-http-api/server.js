@@ -1,3 +1,191 @@
+
+// AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_START
+/*
+  B6R44F:
+  Preserve source route metadata from app callers.
+  AICompanyManager Workbench uses this to separate:
+  - individual_instruction
+  - task_ledger_worker
+  - president_route_worker
+
+  This helper is intentionally generic and side-effect-free.
+*/
+function aiwB6R44fPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function aiwB6R44fText(value) {
+  return value == null ? "" : String(value).trim();
+}
+
+function aiwB6R44fExtractSourceRouteMetadata(input) {
+  const body = aiwB6R44fPlainObject(input);
+  const metadata = aiwB6R44fPlainObject(body.metadata_jsonb);
+  const appRead = aiwB6R44fPlainObject(body.app_read_payload_jsonb);
+  const source = aiwB6R44fPlainObject(appRead.source);
+
+  const sourceAppRef = aiwB6R44fText(
+    body.source_app_ref ||
+    metadata.source_app_ref ||
+    source.source_app_ref ||
+    body.app_surface_code ||
+    "AICompanyManager"
+  );
+
+  const sourceRouteCode = aiwB6R44fText(
+    body.source_route_code ||
+    metadata.source_route_code ||
+    source.source_route_code
+  );
+
+  const sourceScreenCode = aiwB6R44fText(
+    body.source_screen_code ||
+    metadata.source_screen_code ||
+    source.source_screen_code
+  );
+
+  const sourceEntityType = aiwB6R44fText(
+    body.source_entity_type ||
+    metadata.source_entity_type ||
+    source.source_entity_type
+  );
+
+  const sourceEntityId = aiwB6R44fText(
+    body.source_entity_id ||
+    metadata.source_entity_id ||
+    source.source_entity_id ||
+    body.request_id ||
+    body.runtime_execution_request_id
+  );
+
+  const route = {};
+  if (sourceAppRef) route.source_app_ref = sourceAppRef;
+  if (sourceRouteCode) route.source_route_code = sourceRouteCode;
+  if (sourceScreenCode) route.source_screen_code = sourceScreenCode;
+  if (sourceEntityType) route.source_entity_type = sourceEntityType;
+  if (sourceEntityId) route.source_entity_id = sourceEntityId;
+
+  const returnTargetType = aiwB6R44fText(body.return_target_type || metadata.return_target_type || source.return_target_type);
+  const returnTargetId = aiwB6R44fText(body.return_target_id || metadata.return_target_id || source.return_target_id);
+  const reexecuteTargetType = aiwB6R44fText(body.reexecute_target_type || metadata.reexecute_target_type || source.reexecute_target_type);
+  const reexecuteTargetId = aiwB6R44fText(body.reexecute_target_id || metadata.reexecute_target_id || source.reexecute_target_id);
+  const contextRestoreType = aiwB6R44fText(body.context_restore_type || metadata.context_restore_type || source.context_restore_type);
+  const contextRestoreId = aiwB6R44fText(body.context_restore_id || metadata.context_restore_id || source.context_restore_id);
+
+  if (returnTargetType) route.return_target_type = returnTargetType;
+  if (returnTargetId) route.return_target_id = returnTargetId;
+  if (reexecuteTargetType) route.reexecute_target_type = reexecuteTargetType;
+  if (reexecuteTargetId) route.reexecute_target_id = reexecuteTargetId;
+  if (contextRestoreType) route.context_restore_type = contextRestoreType;
+  if (contextRestoreId) route.context_restore_id = contextRestoreId;
+
+  return route;
+}
+
+function aiwB6R44fMergeSourceRouteIntoAppReadPayload(appReadPayload, input) {
+  const base = aiwB6R44fPlainObject(appReadPayload);
+  const route = aiwB6R44fExtractSourceRouteMetadata(input);
+  if (!route.source_route_code) return base;
+  return Object.assign({}, base, {
+    source: Object.assign({}, aiwB6R44fPlainObject(base.source), route)
+  });
+}
+
+function aiwB6R44fExposeSourceRouteOnRow(row) {
+  const out = Object.assign({}, aiwB6R44fPlainObject(row));
+  const appRead = aiwB6R44fPlainObject(out.app_read_payload_jsonb);
+  const source = aiwB6R44fPlainObject(appRead.source);
+  const route = aiwB6R44fExtractSourceRouteMetadata(Object.assign({}, out, {
+    metadata_jsonb: out.metadata_jsonb,
+    app_read_payload_jsonb: aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, body || payload || requestBody || input || {}),
+    source_app_ref: out.source_app_ref || source.source_app_ref,
+    source_route_code: out.source_route_code || source.source_route_code,
+    source_screen_code: out.source_screen_code || source.source_screen_code,
+    source_entity_type: out.source_entity_type || source.source_entity_type,
+    source_entity_id: out.source_entity_id || source.source_entity_id
+  }));
+
+  if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+  if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+  if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+  if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+  if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+
+  if (route.source_route_code) {
+    out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+  }
+  return out;
+}
+
+function aiwB6R44fExposeSourceRouteOnRows(value) {
+  if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+  return value;
+}
+// AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_END
+
+// AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_START
+/*
+  B6R44G-R4:
+  SendJson boundary wrapper.
+  Exposes source route metadata only for runtime-shaped rows.
+*/
+function aiwB6R44gR4PlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function aiwB6R44gR4LooksRuntimeRow(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+  if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+  if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+  if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+  return false;
+}
+
+function aiwB6R44gR4ExposeSourceRouteRow(row) {
+  if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+
+  const out = aiwB6R44fExposeSourceRouteOnRow(row);
+  const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+  const source = aiwB6R44gR4PlainObject(appRead.source);
+
+  if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+  if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+  if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+  if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+  if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+
+  return out;
+}
+
+function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+  if (!Array.isArray(rows)) return rows;
+  return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+}
+
+function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+  if (!payload || typeof payload !== "object") return payload;
+  if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+
+  const out = Object.assign({}, payload);
+
+  if (Array.isArray(out.data)) {
+    out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+  }
+  if (Array.isArray(out.rows)) {
+    out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+  }
+  if (Array.isArray(out.items)) {
+    out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+  }
+  if (out.payload && typeof out.payload === "object") {
+    out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+  }
+
+  return out;
+}
+// AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+
+
 const http = require("http");
 const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
 const { URL } = require("url");
@@ -35,6 +223,14 @@ if (!databaseUrl) {
 }
 
 function sendJson(res, status, payload) {
+  // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_START
+  try {
+    payload = aiwB6R44gR4ExposeSourceRoutePayload(payload);
+  } catch (_b6r44gR4Error) {
+    // Keep sendJson stable for non-runtime payloads.
+  }
+  // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_END
+
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store"
