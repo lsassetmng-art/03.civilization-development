@@ -16634,7 +16634,6 @@ if (typeof window !== "undefined") {
     html.push('<section class="aicm-core-card aicm-review-list-stable-b6r12" data-aicm-b6r12-review-list="1">');
     html.push('  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>');
     html.push('  <h2>レビュー・承認待ち: ' + esc(String(list.length)) + '件</h2>');
-    html.push('  <p class="aicm-selected-note">status=pending / selectedCompanyId=' + esc(selectedCompanyId() || "(未選択)") + ' / source=' + esc(meta && meta.source || "api-fallback") + '</p>');
 
     if (!list.length) {
       html.push('  <div class="aicm-core-empty">');
