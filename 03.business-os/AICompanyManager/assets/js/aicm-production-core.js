@@ -15655,24 +15655,6 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
       return null;
     }
 
-    function visibleDebug(message) {
-      try {
-        var root = document.querySelector(".aicm-core-card");
-        var node = document.getElementById("aicm-v10f-visible-debug");
-
-        if (!node) {
-          node = document.createElement("div");
-          node.id = "aicm-v10f-visible-debug";
-          node.className = "aicm-core-card";
-          node.style.border = "2px solid #a855f7";
-          node.style.background = "#faf5ff";
-          node.innerHTML = '<p class="aicm-eyebrow">V10F confirm debug</p><p class="aicm-selected-note">' + esc(message) + '</p>';
-          if (root && root.parentNode) root.parentNode.insertBefore(node, root.nextSibling);
-        } else {
-          node.innerHTML = '<p class="aicm-eyebrow">V10F confirm debug</p><p class="aicm-selected-note">' + esc(message) + '</p>';
-        }
-      } catch (_) {}
-    }
 
     function showConfirm(actionEl, mode, id, eventSource) {
       id = text(id);
@@ -15681,13 +15663,11 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
       removeExistingConfirm();
 
       if (!row) {
-        visibleDebug("confirm row not found / mode=" + mode + " / id=" + id + " / rows=" + String(rowsFromState().length) + " / source=" + eventSource);
         return true;
       }
 
       var host = findInsertHost(actionEl);
       if (!host || !host.parentNode) {
-        visibleDebug("confirm host not found / mode=" + mode + " / id=" + id + " / source=" + eventSource);
         return true;
       }
 
@@ -15697,7 +15677,6 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
 
       host.parentNode.insertBefore(wrap, host.nextSibling);
 
-      visibleDebug("confirm shown / mode=" + mode + " / id=" + id + " / source=" + eventSource);
 
       setTimeout(function() {
         try {
@@ -15746,7 +15725,6 @@ window.aicmR8zV7RenderReviewList = function aicmR8zV7RenderReviewList(appState) 
           s.screen = "review-list";
           if (typeof render === "function") render();
         } catch (_) {}
-        visibleDebug("back to review-list / id=" + id);
         return true;
       }
 
@@ -15758,7 +15736,6 @@ if (action === "review-v10f-cancel-confirm") {
         }
 
         removeExistingConfirm();
-        visibleDebug("confirm closed / id=" + id);
         return true;
       }
 
@@ -16090,7 +16067,6 @@ if (action === "review-v10f-cancel-confirm") {
       if (mode === "return") previewMode = "return";
 
       var inserted = insertDetailAfterButton(actionEl, row, id, previewMode);
-      setVisibleDebug("clicked / source=" + (source || "") + " / action=" + action + " / id=" + id + " / inserted=" + String(inserted));
 
       return true;
     }
@@ -16831,6 +16807,203 @@ if (typeof window !== "undefined") {
   } catch (_) {}
 
   console.info(MARK + "_READY");
+
+  // AICM_V10L_C2G_B6R18_REVIEW_DECISION_REFRESH_START
+  function aicmB6R18Text(value) {
+    if (value === null || typeof value === "undefined") return "";
+    return String(value).trim();
+  }
+
+  function aicmB6R18ReviewId(row) {
+    if (!row || typeof row !== "object") return "";
+    return aicmB6R18Text(
+      row.aicm_human_review_item_id ||
+      row.human_review_item_id ||
+      row.review_id ||
+      row.reviewId ||
+      row.id
+    );
+  }
+
+  function aicmB6R18ReviewStatus(row) {
+    if (!row || typeof row !== "object") return "";
+    return aicmB6R18Text(
+      row.human_review_status_code ||
+      row.review_status_code ||
+      row.review_status ||
+      row.status
+    ).toLowerCase();
+  }
+
+  function aicmB6R18FilterPendingRows(rows, decidedReviewId) {
+    if (!Array.isArray(rows)) return rows;
+
+    return rows.filter(function (row) {
+      var id = aicmB6R18ReviewId(row);
+      var status = aicmB6R18ReviewStatus(row);
+
+      if (decidedReviewId && id && id === decidedReviewId) return false;
+      if (!status) return true;
+
+      return status === "pending" || status === "承認待ち";
+    });
+  }
+
+  function aicmB6R18ApplyReviewDecisionToState(reviewId, decision) {
+    var decidedReviewId = aicmB6R18Text(reviewId);
+    var roots = [];
+
+    if (typeof state !== "undefined" && state && typeof state === "object") {
+      roots.push(state);
+      if (state.context && typeof state.context === "object") roots.push(state.context);
+      if (state.contextData && typeof state.contextData === "object") roots.push(state.contextData);
+      if (state.data && typeof state.data === "object") roots.push(state.data);
+    }
+
+    roots.forEach(function (root) {
+      [
+        "review_wait_items",
+        "human_review_wait_items",
+        "human_review_items"
+      ].forEach(function (key) {
+        if (Array.isArray(root[key])) {
+          root[key] = aicmB6R18FilterPendingRows(root[key], decidedReviewId);
+        }
+      });
+    });
+
+    if (typeof state !== "undefined" && state && typeof state === "object") {
+      [
+        "selectedReviewItemId",
+        "selectedHumanReviewItemId",
+        "activeReviewItemId",
+        "activeHumanReviewItemId",
+        "reviewDetailId",
+        "reviewDecisionId",
+        "reviewDecisionMode",
+        "pendingReviewDecision",
+        "pendingHumanReviewDecision",
+        "reviewDecisionPayload",
+        "reviewConfirm",
+        "humanReviewConfirm",
+        "reviewDetailRow",
+        "selectedReviewRow",
+        "currentReviewRow"
+      ].forEach(function (key) {
+        if (Object.prototype.hasOwnProperty.call(state, key)) {
+          state[key] = null;
+        }
+      });
+
+      state.screen = "review-list";
+    }
+
+    return {
+      review_id: decidedReviewId,
+      decision: aicmB6R18Text(decision),
+      applied: true
+    };
+  }
+
+  function aicmB6R18RenderReviewListAfterDecision(reviewId, decision) {
+    aicmB6R18ApplyReviewDecisionToState(reviewId, decision);
+
+    if (typeof setMessage === "function") {
+      setMessage("ok", decision === "returned" ? "差し戻しました。" : "承認しました。");
+    }
+
+    if (typeof render === "function") {
+      render();
+    }
+  }
+
+  function aicmB6R18RefreshReviewListAfterDecision(reviewId, decision) {
+    aicmB6R18RenderReviewListAfterDecision(reviewId, decision);
+
+    if (typeof loadContext === "function") {
+      Promise.resolve()
+        .then(function () {
+          return loadContext();
+        })
+        .then(function () {
+          aicmB6R18RenderReviewListAfterDecision(reviewId, decision);
+        })
+        .catch(function () {
+          aicmB6R18RenderReviewListAfterDecision(reviewId, decision);
+        });
+    }
+
+    setTimeout(function () {
+      aicmB6R18RenderReviewListAfterDecision(reviewId, decision);
+    }, 120);
+  }
+
+  function aicmB6R18ParseJsonBody(body) {
+    if (!body) return {};
+    if (typeof body === "string") {
+      try { return JSON.parse(body); } catch (_) { return {}; }
+    }
+    return {};
+  }
+
+  function aicmB6R18InstallHumanReviewDecisionFinalizer() {
+    if (typeof window === "undefined") return;
+    if (window.__AICM_B6R18_REVIEW_DECISION_REFRESH_INSTALLED__) return;
+    if (typeof window.fetch !== "function") return;
+
+    var originalFetch = window.fetch;
+
+    window.fetch = function aicmB6R18Fetch(input, init) {
+      var url = "";
+      var method = "GET";
+      var body = {};
+
+      try {
+        url = typeof input === "string" ? input : (input && input.url ? String(input.url) : "");
+        method = init && init.method ? String(init.method).toUpperCase() : "GET";
+        body = aicmB6R18ParseJsonBody(init && init.body);
+      } catch (_) {
+        url = "";
+        method = "GET";
+        body = {};
+      }
+
+      var isReviewDecisionPost =
+        method === "POST" &&
+        (
+          url.indexOf("/api/aicm/v2/human-review/approve") >= 0 ||
+          url.indexOf("/api/aicm/v2/human-review/return") >= 0
+        );
+
+      var decision = url.indexOf("/api/aicm/v2/human-review/return") >= 0 ? "returned" : "approved";
+      var reviewId = aicmB6R18Text(
+        body.aicm_human_review_item_id ||
+        body.human_review_item_id ||
+        body.review_id ||
+        body.reviewId
+      );
+
+      return originalFetch.apply(this, arguments).then(function (response) {
+        if (isReviewDecisionPost && response && response.ok) {
+          try {
+            response.clone().json().then(function (json) {
+              if (json && json.result === "ok") {
+                aicmB6R18RefreshReviewListAfterDecision(reviewId, decision);
+              }
+            }).catch(function () {});
+          } catch (_) {}
+        }
+
+        return response;
+      });
+    };
+
+    window.__AICM_B6R18_REVIEW_DECISION_REFRESH_INSTALLED__ = true;
+  }
+
+  aicmB6R18InstallHumanReviewDecisionFinalizer();
+  // AICM_V10L_C2G_B6R18_REVIEW_DECISION_REFRESH_END
+
 }());
 // AICM_V10L_C2G_B6R12_REVIEW_LIST_FINAL_API_FALLBACK_END
 
