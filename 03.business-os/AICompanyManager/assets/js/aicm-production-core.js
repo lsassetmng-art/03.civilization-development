@@ -16467,3 +16467,367 @@ if (typeof window !== "undefined") {
 // pending=0 review empty-state card should not look like an error.
 // Red border cleanup is limited to the empty review-state window.
 // AICM_R8Z_V10GC4E_REVIEW_EMPTY_RED_BORDER_CLEANUP_END
+
+
+
+// AICM_V10L_C2G_B6R12_REVIEW_LIST_FINAL_API_FALLBACK_START
+(function () {
+  "use strict";
+
+  var MARK = "AICM_V10L_C2G_B6R12_REVIEW_LIST_FINAL_API_FALLBACK";
+
+  function text(value) {
+    if (value === null || typeof value === "undefined") return "";
+    return String(value).trim();
+  }
+
+  function esc(value) {
+    return text(value).replace(/[&<>"']/g, function (ch) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[ch];
+    });
+  }
+
+  function arr(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function statusOf(row) {
+    return text(
+      row &&
+      (
+        row.human_review_status_code ||
+        row.review_status_code ||
+        row.review_status ||
+        row.status
+      )
+    );
+  }
+
+  function companyIdOf(row) {
+    return text(
+      row &&
+      (
+        row.aicm_user_company_id ||
+        row.company_id ||
+        row.user_company_id
+      )
+    );
+  }
+
+  function reviewIdOf(row) {
+    return text(
+      row &&
+      (
+        row.aicm_human_review_item_id ||
+        row.human_review_item_id ||
+        row.review_item_id ||
+        row.id
+      )
+    );
+  }
+
+  function selectedCompanyId() {
+    var candidates = [];
+
+    try {
+      if (typeof state !== "undefined" && state && state.selectedCompanyId) candidates.push(state.selectedCompanyId);
+    } catch (_) {}
+
+    try {
+      if (typeof appState !== "undefined" && appState && appState.selectedCompanyId) candidates.push(appState.selectedCompanyId);
+    } catch (_) {}
+
+    try {
+      if (typeof localStorage !== "undefined") {
+        candidates.push(localStorage.getItem("AICM_V2_SELECTED_COMPANY_ID") || "");
+      }
+    } catch (_) {}
+
+    for (var i = 0; i < candidates.length; i += 1) {
+      var id = text(candidates[i]);
+      if (id) return id;
+    }
+
+    return "";
+  }
+
+  function ownerId() {
+    try {
+      if (typeof state !== "undefined" && state && state.ownerCivilizationId) return text(state.ownerCivilizationId);
+    } catch (_) {}
+
+    try {
+      if (typeof appState !== "undefined" && appState && appState.ownerCivilizationId) return text(appState.ownerCivilizationId);
+    } catch (_) {}
+
+    try {
+      if (typeof localStorage !== "undefined") {
+        var stored = text(localStorage.getItem("AICM_OWNER_CIVILIZATION_ID") || "");
+        if (stored) return stored;
+      }
+    } catch (_) {}
+
+    return "00000000-0000-4000-8000-000000000001";
+  }
+
+  function collectRows(payload) {
+    var rows = []
+      .concat(arr(payload && payload.review_wait_items))
+      .concat(arr(payload && payload.human_review_wait_items))
+      .concat(arr(payload && payload.context && payload.context.review_wait_items))
+      .concat(arr(payload && payload.context && payload.context.human_review_wait_items))
+      .concat(arr(payload && payload.data && payload.data.review_wait_items))
+      .concat(arr(payload && payload.data && payload.data.human_review_wait_items));
+
+    var seen = {};
+    var unique = [];
+
+    rows.forEach(function (row) {
+      if (!row || typeof row !== "object") return;
+
+      var key = reviewIdOf(row) || JSON.stringify(row).slice(0, 180);
+      if (seen[key]) return;
+
+      seen[key] = true;
+      unique.push(row);
+    });
+
+    return unique;
+  }
+
+  function pendingRowsForSelectedCompany(rows) {
+    var companyId = selectedCompanyId();
+
+    return arr(rows).filter(function (row) {
+      if (statusOf(row) !== "pending") return false;
+      if (!companyId) return true;
+
+      var rowCompanyId = companyIdOf(row);
+      return !rowCompanyId || rowCompanyId === companyId;
+    });
+  }
+
+  function renderTextBlock(title, value) {
+    var v = text(value);
+    if (!v) return "";
+
+    return [
+      '<div class="aicm-core-card" style="margin-top:10px;">',
+      '  <p class="aicm-eyebrow">' + esc(title) + '</p>',
+      '  <p class="aicm-selected-note">' + esc(v) + '</p>',
+      '</div>'
+    ].join("");
+  }
+
+  function renderRows(rows, meta) {
+    var list = arr(rows);
+
+    var html = [];
+    html.push('<section class="aicm-core-card aicm-review-list-stable-b6r12" data-aicm-b6r12-review-list="1">');
+    html.push('  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>');
+    html.push('  <h2>レビュー・承認待ち: ' + esc(String(list.length)) + '件</h2>');
+    html.push('  <p class="aicm-selected-note">status=pending / selectedCompanyId=' + esc(selectedCompanyId() || "(未選択)") + ' / source=' + esc(meta && meta.source || "api-fallback") + '</p>');
+
+    if (!list.length) {
+      html.push('  <div class="aicm-core-empty">');
+      html.push('    <strong>レビュー・承認待ちはありません</strong>');
+      html.push('    <p>APIからpending reviewを取得しましたが、選択中の会社に一致する承認待ちは0件でした。</p>');
+      html.push('  </div>');
+      html.push('</section>');
+      return html.join("");
+    }
+
+    list.forEach(function (row, index) {
+      var id = reviewIdOf(row);
+      var title = text(row.review_title || row.title || "納品サマリー確認");
+      var summary = text(row.delivery_summary_text || row.summary || row.result_summary_text || "");
+      var kind = text(row.review_kind_label || row.review_kind_code || "納品サマリー");
+      var artifact = text(row.artifact_kind_label || row.artifact_kind_code || "納品");
+      var priority = text(row.priority_code || "normal");
+      var requested = text(row.requested_at || row.created_at || "");
+      var aiLabel = text(row.responsible_ai_label || row.requested_by_ai_label || "AICompanyManager");
+      var companyName = text(row.company_name || "");
+      var majorId = text(row.related_manager_major_work_item_id || "");
+      var workerId = text(row.related_worker_work_unit_id || "");
+
+      html.push('<article class="aicm-core-card aicm-review-list-item" data-aicm-human-review-id="' + esc(id) + '">');
+      html.push('  <p class="aicm-eyebrow">レビュー待ち #' + esc(String(index + 1)) + '</p>');
+      html.push('  <h3>' + esc(title) + '</h3>');
+      if (summary) html.push('  <p class="aicm-selected-note">' + esc(summary) + '</p>');
+      html.push('  <dl class="aicm-core-detail-list">');
+      html.push('    <dt>会社</dt><dd>' + esc(companyName || companyIdOf(row) || "-") + '</dd>');
+      html.push('    <dt>状態</dt><dd>承認待ち</dd>');
+      html.push('    <dt>種別</dt><dd>' + esc(kind) + '</dd>');
+      html.push('    <dt>成果物</dt><dd>' + esc(artifact) + '</dd>');
+      html.push('    <dt>優先度</dt><dd>' + esc(priority) + '</dd>');
+      html.push('    <dt>依頼日時</dt><dd>' + esc(requested || "-") + '</dd>');
+      html.push('    <dt>担当AI</dt><dd>' + esc(aiLabel) + '</dd>');
+      html.push('    <dt>review_id</dt><dd>' + esc(id || "-") + '</dd>');
+      if (workerId) html.push('    <dt>worker_unit_id</dt><dd>' + esc(workerId) + '</dd>');
+      if (majorId) html.push('    <dt>manager_major_id</dt><dd>' + esc(majorId) + '</dd>');
+      html.push('  </dl>');
+      html.push('  <div class="aicm-dashboard-action-row">');
+      html.push('    <button type="button" data-core-action="review-detail-open" data-review-id="' + esc(id) + '" data-human-review-id="' + esc(id) + '">成果物を確認</button>');
+      html.push('    <button type="button" data-core-action="human-review-approve" data-review-id="' + esc(id) + '" data-human-review-id="' + esc(id) + '">承認</button>');
+      html.push('    <button type="button" data-core-action="human-review-return" data-review-id="' + esc(id) + '" data-human-review-id="' + esc(id) + '">差し戻し</button>');
+      html.push('  </div>');
+      html.push(renderTextBlock("納品サマリー", row.delivery_summary_text));
+      html.push(renderTextBlock("主な変更", row.main_changes_text));
+      html.push(renderTextBlock("AIレビュー", row.ai_review_result_text));
+      html.push(renderTextBlock("未解決事項", row.unresolved_issues_text));
+      html.push('</article>');
+    });
+
+    html.push('</section>');
+    return html.join("");
+  }
+
+  function mountHtml(html) {
+    var candidates = [
+      document.getElementById("aicm-app"),
+      document.getElementById("app"),
+      document.querySelector("[data-aicm-app-root]"),
+      document.querySelector("main"),
+      document.body
+    ].filter(Boolean);
+
+    var root = candidates[0];
+
+    if (!root) return false;
+
+    root.innerHTML = html;
+    return true;
+  }
+
+  async function fetchReviewRows() {
+    var url = "/api/aicm/v2/context?owner_civilization_id=" + encodeURIComponent(ownerId());
+
+    var companyId = selectedCompanyId();
+    if (companyId) {
+      url += "&aicm_user_company_id=" + encodeURIComponent(companyId);
+    }
+
+    var response = await fetch(url, { cache: "no-store" });
+    var textBody = await response.text();
+    var payload = {};
+
+    try {
+      payload = textBody ? JSON.parse(textBody) : {};
+    } catch (error) {
+      throw new Error("context JSON parse failed: " + (error && error.message ? error.message : String(error)));
+    }
+
+    if (!response.ok || (payload && payload.result && payload.result !== "ok")) {
+      throw new Error(
+        payload && (payload.error_message || payload.message || payload.error)
+          ? String(payload.error_message || payload.message || payload.error)
+          : "context API failed: " + String(response.status)
+      );
+    }
+
+    var rows = pendingRowsForSelectedCompany(collectRows(payload));
+
+    try {
+      if (typeof state !== "undefined" && state) {
+        state.review_wait_items = rows;
+        state.human_review_wait_items = rows;
+        if (!state.context || typeof state.context !== "object") state.context = {};
+        state.context.review_wait_items = rows;
+        state.context.human_review_wait_items = rows;
+      }
+    } catch (_) {}
+
+    try {
+      if (typeof appState !== "undefined" && appState) {
+        appState.review_wait_items = rows;
+        appState.human_review_wait_items = rows;
+        if (!appState.context || typeof appState.context !== "object") appState.context = {};
+        appState.context.review_wait_items = rows;
+        appState.context.human_review_wait_items = rows;
+      }
+    } catch (_) {}
+
+    return {
+      rows: rows,
+      payload: payload,
+      source: "context-api-top-level-review_wait_items"
+    };
+  }
+
+  async function showReviewListB6R12() {
+    try {
+      var result = await fetchReviewRows();
+      mountHtml(renderRows(result.rows, { source: result.source }));
+
+      try {
+        if (typeof setMessage === "function") {
+          setMessage("ok", "レビュー・承認待ちを取得しました: " + String(result.rows.length) + "件");
+        }
+      } catch (_) {}
+    } catch (error) {
+      mountHtml([
+        '<section class="aicm-core-card aicm-review-list-stable-b6r12">',
+        '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
+        '  <h2>レビュー・承認待ちを取得できませんでした</h2>',
+        '  <p class="aicm-core-message aicm-core-message-error">' + esc(error && error.message ? error.message : String(error)) + '</p>',
+        '</section>'
+      ].join(""));
+
+      try {
+        if (typeof setMessage === "function") {
+          setMessage("error", error && error.message ? error.message : "レビュー・承認待ちの取得に失敗しました。");
+        }
+      } catch (_) {}
+    }
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event && event.target && event.target.closest
+      ? event.target.closest("[data-core-action]")
+      : null;
+
+    if (!target) return;
+
+    var action = target.getAttribute("data-core-action") || "";
+    var screen = target.getAttribute("data-screen") || "";
+
+    if (action === "go" && screen === "review-list") {
+      try {
+        if (typeof state !== "undefined" && state) state.screen = "review-list";
+      } catch (_) {}
+
+      try {
+        if (typeof appState !== "undefined" && appState) appState.screen = "review-list";
+      } catch (_) {}
+
+      setTimeout(showReviewListB6R12, 0);
+      return;
+    }
+  }, true);
+
+  window.aicmB6R12ShowReviewList = showReviewListB6R12;
+  window.aicmB6R12RenderReviewRows = renderRows;
+  window.aicmB6R12CollectReviewRows = collectRows;
+
+  try {
+    if (typeof state !== "undefined" && state && state.screen === "review-list") {
+      setTimeout(showReviewListB6R12, 0);
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof appState !== "undefined" && appState && appState.screen === "review-list") {
+      setTimeout(showReviewListB6R12, 0);
+    }
+  } catch (_) {}
+
+  console.info(MARK + "_READY");
+}());
+// AICM_V10L_C2G_B6R12_REVIEW_LIST_FINAL_API_FALLBACK_END
+
