@@ -2073,6 +2073,57 @@ function markWorkerUnitAiworkerWaitingMetadataB6R8R1(unitId, detail) {
 }
 // AICM_V10L_C2G_B6R8R1_AIWORKEROS_WAITING_METADATA_HELPER_END
 
+// AICM_V10L_C2G_B6R9R2_CLEAR_WAITING_ON_SUCCESS_HELPER_START
+function markWorkerUnitAiworkerAcceptedMetadataB6R9R2(unitId, detail) {
+  const unit = requiredUuid(unitId, "aicm_worker_work_unit_id");
+  const runtimeRequest = detail && detail.runtime_request && typeof detail.runtime_request === "object"
+    ? detail.runtime_request
+    : {};
+  const aiworkerResponse = detail && detail.aiworker_response && typeof detail.aiworker_response === "object"
+    ? detail.aiworker_response
+    : {};
+
+  const requestId = aicmR8ZIText(runtimeRequest.request_id || aiworkerResponse.request_id || "");
+  const requestCode = aicmR8ZIText(runtimeRequest.request_code || aiworkerResponse.request_code || "");
+  const statusCode = aicmR8ZIText(runtimeRequest.request_status_code || aiworkerResponse.status || "REQUESTED_INTERNAL_ONLY");
+  const acceptedText = "AIWorkerOS再実行受付済み" + (requestId ? ": " + requestId : "");
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_worker_work_unit",
+    "  SET metadata_jsonb = (COALESCE(metadata_jsonb, '{}'::jsonb) - 'aiworkeros_last_error' - 'aiworkeros_last_error_at') || jsonb_build_object(",
+    "        " + sqlLiteral("aiworkeros_execution_state") + ", " + sqlLiteral("accepted") + ",",
+    "        " + sqlLiteral("aiworkeros_retryable") + ", false,",
+    "        " + sqlLiteral("aiworkeros_waiting_resolved_at") + ", now()::text,",
+    "        " + sqlLiteral("aiworkeros_accepted_at") + ", now()::text,",
+    "        " + sqlLiteral("aiworkeros_request_id") + ", " + sqlLiteral(requestId) + ",",
+    "        " + sqlLiteral("aiworkeros_request_code") + ", " + sqlLiteral(requestCode) + ",",
+    "        " + sqlLiteral("aiworkeros_status_code") + ", " + sqlLiteral(statusCode) + "",
+    "      ),",
+    "      note = CASE",
+    "        WHEN NULLIF(note, '') IS NULL THEN " + sqlLiteral(acceptedText),
+    "        WHEN note ILIKE " + sqlLiteral("%AIWorkerOS再実行受付済み%") + " THEN note",
+    "        ELSE note || E'\\n' || " + sqlLiteral(acceptedText),
+    "      END,",
+    "      updated_at = now()",
+    "  WHERE aicm_worker_work_unit_id = " + sqlLiteral(unit) + "::uuid",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_updated' END,",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'aiworkeros_execution_state', " + sqlLiteral("accepted") + ",",
+    "  'retryable', false,",
+    "  'worker_work_unit', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+    ")::text",
+    "FROM (SELECT 1) s;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+// AICM_V10L_C2G_B6R9R2_CLEAR_WAITING_ON_SUCCESS_HELPER_END
+
+
 
 /* AICM_V10L_C2G_B6R7_WORKER_REVIEW_CREATE_HELPER_START */
 function aicmB6r7Text(value) {
@@ -2255,21 +2306,16 @@ async function runWorkerAutoExecutionR8ZI(body) {
     try {
       const requestBody = buildWorkerRuntimeRequestBodyR8ZI(pair);
 
-      if (dryRun) {
-        // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_MARK_RESULT_START
-      aicmB6r7Log("after_mark_worker_unit", {
-        aicm_worker_work_unit_id: unitId,
-        mark_result: markResult && markResult.result || "",
-        mark_keys: markResult && typeof markResult === "object" ? Object.keys(markResult).sort() : []
-      });
-      // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_MARK_RESULT_END
-
-      executed.push({
+            if (dryRun) {
+        // AICM_V10L_C2G_B6R9R5_DRYRUN_MARKRESULT_TDZ_FIX_START
+        // dry_run must stop before runtime POST / markResult / human review creation.
+        executed.push({
           aicm_worker_work_unit_id: unitId,
           dry_run: true,
           request_body: requestBody
         });
         continue;
+        // AICM_V10L_C2G_B6R9R5_DRYRUN_MARKRESULT_TDZ_FIX_END
       }
 
       // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_RUNTIME_START
@@ -2304,6 +2350,23 @@ async function runWorkerAutoExecutionR8ZI(body) {
         runtime_request: runtimeResult.runtime_request || {},
         aiworker_response: runtimeResult.aiworker_response || {}
       });
+
+      // AICM_V10L_C2G_B6R9R2_CLEAR_WAITING_ON_SUCCESS_START
+      let aicmB6r9r2AcceptedMarkResult = null;
+      try {
+        aicmB6r9r2AcceptedMarkResult = markWorkerUnitAiworkerAcceptedMetadataB6R9R2(unitId, {
+          runtime_request: runtimeResult.runtime_request || {},
+          aiworker_response: runtimeResult.aiworker_response || {}
+        });
+      } catch (aicmB6r9r2AcceptedError) {
+        aicmB6r9r2AcceptedMarkResult = {
+          result: "error",
+          error_message: aicmB6r9r2AcceptedError && aicmB6r9r2AcceptedError.message
+            ? String(aicmB6r9r2AcceptedError.message)
+            : String(aicmB6r9r2AcceptedError)
+        };
+      }
+      // AICM_V10L_C2G_B6R9R2_CLEAR_WAITING_ON_SUCCESS_END
 
       const reviewResult = completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, {
         result: runtimeResult.result,
