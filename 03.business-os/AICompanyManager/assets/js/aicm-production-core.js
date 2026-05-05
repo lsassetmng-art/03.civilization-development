@@ -16626,30 +16626,11 @@ if (typeof window !== "undefined") {
   }
 
 
-  // AICM_V10L_C2G_B6R13_REVIEW_LIST_TOP_NAV_RESTORE_HELPER_START
-  function renderTopNavB6R13() {
-    return [
-      '<section class="aicm-core-card aicm-review-list-top-nav-b6r13" data-aicm-b6r13-top-nav="1">',
-      '  <p class="aicm-eyebrow">AICompanyManager</p>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="company-settings">AI企業設定</button>',
-      '    <button type="button" data-core-action="go" data-screen="dashboard">会社ダッシュボード</button>',
-      '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳</button>',
-      '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
-      '    <button type="button" data-core-action="go" data-screen="home">ホーム</button>',
-      '    <button type="button" onclick="window.location.reload()">再読み込み</button>',
-      '  </div>',
-      '</section>'
-    ].join("");
-  }
-  // AICM_V10L_C2G_B6R13_REVIEW_LIST_TOP_NAV_RESTORE_HELPER_END
 
   function renderRows(rows, meta) {
     var list = arr(rows);
 
     var html = [];
-    html.push(renderTopNavB6R13());
-    // AICM_V10L_C2G_B6R13_REVIEW_LIST_TOP_NAV_RESTORE_INSERT
     html.push('<section class="aicm-core-card aicm-review-list-stable-b6r12" data-aicm-b6r12-review-list="1">');
     html.push('  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>');
     html.push('  <h2>レビュー・承認待ち: ' + esc(String(list.length)) + '件</h2>');
