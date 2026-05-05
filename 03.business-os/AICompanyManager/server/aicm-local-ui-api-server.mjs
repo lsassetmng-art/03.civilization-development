@@ -2449,6 +2449,265 @@ async function runWorkerAutoExecutionR8ZI(body) {
     failed
   };
 }
+
+// AICM_V10L_C2G_B6R31R1_AIWORKEROS_WAITING_AUTO_RETRY_HELPER_START
+var aicmB6R31R1AiworkerosWaitingAutoRetryState = {
+  started: false,
+  running: false,
+  timer: null,
+  lastRunAt: "",
+  lastResult: null
+};
+
+function aicmB6R31R1EnvText(name, fallback) {
+  if (typeof process === "undefined" || !process || !process.env) return fallback;
+  var value = process.env[name];
+  if (value === null || typeof value === "undefined" || String(value).trim() === "") return fallback;
+  return String(value).trim();
+}
+
+function aicmB6R31R1EnvBool(primaryName, fallback) {
+  var raw = aicmB6R31R1EnvText(primaryName, "");
+  if (!raw && primaryName !== "AICM_AIWORKEROS_AUTO_RETRY_ENABLED") {
+    raw = aicmB6R31R1EnvText("AICM_AIWORKEROS_AUTO_RETRY_ENABLED", "");
+  }
+
+  if (!raw) return !!fallback;
+
+  var text = String(raw).toLowerCase();
+  if (text === "0" || text === "false" || text === "no" || text === "off" || text === "disabled") return false;
+  if (text === "1" || text === "true" || text === "yes" || text === "on" || text === "enabled") return true;
+  return !!fallback;
+}
+
+function aicmB6R31R1EnvInt(name, fallback, min, max) {
+  var raw = aicmB6R31R1EnvText(name, "");
+  var value = Number(raw || fallback);
+  if (!Number.isFinite(value)) value = fallback;
+  value = Math.floor(value);
+  if (Number.isFinite(min) && value < min) value = min;
+  if (Number.isFinite(max) && value > max) value = max;
+  return value;
+}
+
+function aicmB6R31R1ServerMark() {
+  return typeof SERVER_MARK !== "undefined" ? SERVER_MARK : "AICM_SERVER";
+}
+
+function aicmB6R31R1Log(phase, data) {
+  try {
+    console.info("AICM_B6R31R1_AIWORKEROS_WAITING_AUTO_RETRY " + JSON.stringify({
+      phase: phase,
+      at: new Date().toISOString(),
+      data: data || {}
+    }));
+  } catch (_error) {}
+}
+
+async function aicmB6R31R1AiworkerosHealthOk() {
+  var base = aicmB6R31R1EnvText("PERSONA_AIWORKEROS_BASE_URL", "http://127.0.0.1:8787").replace(/\/+$/, "");
+  var timeoutMs = aicmB6R31R1EnvInt("AICM_AIWORKEROS_AUTO_RETRY_HEALTH_TIMEOUT_MS", 2500, 500, 15000);
+  var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  var timeout = null;
+
+  try {
+    if (controller) {
+      timeout = setTimeout(function () { controller.abort(); }, timeoutMs);
+    }
+
+    var response = await fetch(base + "/health", controller ? { signal: controller.signal } : undefined);
+    return !!(response && response.ok);
+  } catch (error) {
+    aicmB6R31R1Log("health_unavailable", {
+      error_message: error && error.message ? String(error.message) : String(error)
+    });
+    return false;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function aicmB6R31R1WaitingTargets(limit) {
+  var safeLimit = Math.max(1, Math.min(Number(limit) || 5, 50));
+
+  var sql = [
+    "WITH worker AS (",
+    "  SELECT",
+    "    u.owner_civilization_id::text AS owner_civilization_id,",
+    "    u.aicm_user_company_id::text AS aicm_user_company_id,",
+    "    COALESCE(",
+    "      NULLIF(to_jsonb(u)->>'aicm_manager_major_work_item_id', ''),",
+    "      NULLIF(u.metadata_jsonb->>'source_manager_major_work_item_id', ''),",
+    "      NULLIF(u.metadata_jsonb->>'related_manager_major_work_item_id', '')",
+    "    ) AS manager_id_text,",
+    "    max(u.updated_at) AS latest_updated_at,",
+    "    count(*) AS worker_count",
+    "  FROM business.aicm_worker_work_unit u",
+    "  LEFT JOIN business.aicm_human_review_item h",
+    "    ON h.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+    "   AND COALESCE(h.human_review_status_code, '') <> 'archived'",
+    "  WHERE h.aicm_human_review_item_id IS NULL",
+    "    AND COALESCE(u.work_status_code, '') IN ('todo', 'in_progress')",
+    "    AND COALESCE(u.review_status_code, '') IN ('required', 'waiting')",
+    "    AND COALESCE(u.metadata_jsonb->>'aiworkeros_execution_state', '') = 'waiting'",
+    "    AND lower(COALESCE(u.metadata_jsonb->>'aiworkeros_retryable', 'false')) IN ('true', 't', '1', 'yes')",
+    "  GROUP BY",
+    "    u.owner_civilization_id::text,",
+    "    u.aicm_user_company_id::text,",
+    "    COALESCE(",
+    "      NULLIF(to_jsonb(u)->>'aicm_manager_major_work_item_id', ''),",
+    "      NULLIF(u.metadata_jsonb->>'source_manager_major_work_item_id', ''),",
+    "      NULLIF(u.metadata_jsonb->>'related_manager_major_work_item_id', '')",
+    "    )",
+    "),",
+    "target AS (",
+    "  SELECT *",
+    "  FROM worker",
+    "  WHERE manager_id_text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'",
+    "  ORDER BY latest_updated_at ASC NULLS LAST",
+    "  LIMIT " + String(safeLimit),
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', 'ok',",
+    "  'api_identifier', " + sqlLiteral(aicmB6R31R1ServerMark()) + ",",
+    "  'target_count', count(*),",
+    "  'targets', COALESCE(jsonb_agg(jsonb_build_object(",
+    "    'owner_civilization_id', owner_civilization_id,",
+    "    'aicm_user_company_id', aicm_user_company_id,",
+    "    'aicm_manager_major_work_item_id', manager_id_text,",
+    "    'worker_count', worker_count,",
+    "    'latest_updated_at', latest_updated_at",
+    "  ) ORDER BY latest_updated_at ASC NULLS LAST), '[]'::jsonb)",
+    ")::text",
+    "FROM target;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+async function aicmB6R31R1AutoRetryWaitingOnce(reason) {
+  var state = aicmB6R31R1AiworkerosWaitingAutoRetryState;
+
+  if (!aicmB6R31R1EnvBool("AICM_AIWORKEROS_WAITING_AUTO_RETRY_ENABLED", true)) {
+    aicmB6R31R1Log("disabled", { reason: reason || "manual" });
+    return { result: "disabled", api_identifier: aicmB6R31R1ServerMark() };
+  }
+
+  if (state.running) {
+    aicmB6R31R1Log("skip_running", { reason: reason || "manual" });
+    return { result: "skipped", reason: "already_running", api_identifier: aicmB6R31R1ServerMark() };
+  }
+
+  state.running = true;
+  state.lastRunAt = new Date().toISOString();
+
+  try {
+    var healthOk = await aicmB6R31R1AiworkerosHealthOk();
+    if (!healthOk) {
+      state.lastResult = { result: "waiting", reason: "aiworkeros_unavailable" };
+      aicmB6R31R1Log("aiworkeros_unavailable", { reason: reason || "manual" });
+      return state.lastResult;
+    }
+
+    var targetLimit = aicmB6R31R1EnvInt("AICM_AIWORKEROS_AUTO_RETRY_TARGET_LIMIT", 5, 1, 50);
+    var unitLimit = aicmB6R31R1EnvInt("AICM_AIWORKEROS_AUTO_RETRY_UNIT_LIMIT", 10, 1, 50);
+    var targetsResult = aicmB6R31R1WaitingTargets(targetLimit);
+    var targets = targetsResult && Array.isArray(targetsResult.targets) ? targetsResult.targets : [];
+    var executed = [];
+    var failed = [];
+
+    aicmB6R31R1Log("targets", {
+      reason: reason || "manual",
+      target_count: targets.length
+    });
+
+    for (var i = 0; i < targets.length; i += 1) {
+      var target = targets[i] || {};
+      var managerId = String(target.aicm_manager_major_work_item_id || "");
+      var companyId = String(target.aicm_user_company_id || "");
+      var ownerId = String(target.owner_civilization_id || "");
+
+      try {
+        var result = await runWorkerAutoExecutionR8ZI({
+          owner_civilization_id: ownerId,
+          aicm_user_company_id: companyId,
+          aicm_manager_major_work_item_id: managerId,
+          limit: unitLimit
+        });
+
+        executed.push({
+          owner_civilization_id: ownerId,
+          aicm_user_company_id: companyId,
+          aicm_manager_major_work_item_id: managerId,
+          result: result && result.result ? result.result : "unknown",
+          executed_count: result && typeof result.executed_count !== "undefined" ? result.executed_count : null,
+          waiting_count: result && typeof result.waiting_count !== "undefined" ? result.waiting_count : null,
+          failed_count: result && typeof result.failed_count !== "undefined" ? result.failed_count : null
+        });
+      } catch (error) {
+        failed.push({
+          owner_civilization_id: ownerId,
+          aicm_user_company_id: companyId,
+          aicm_manager_major_work_item_id: managerId,
+          error_message: error && error.message ? String(error.message) : String(error)
+        });
+      }
+    }
+
+    state.lastResult = {
+      result: failed.length ? "partial_error" : "ok",
+      api_identifier: aicmB6R31R1ServerMark(),
+      reason: reason || "manual",
+      target_count: targets.length,
+      executed_count: executed.length,
+      failed_count: failed.length,
+      executed: executed,
+      failed: failed
+    };
+
+    aicmB6R31R1Log("done", state.lastResult);
+    return state.lastResult;
+  } finally {
+    state.running = false;
+  }
+}
+
+function aicmB6R31R1StartAiworkerosWaitingAutoRetry() {
+  var state = aicmB6R31R1AiworkerosWaitingAutoRetryState;
+  if (state.started) return;
+  state.started = true;
+
+  if (!aicmB6R31R1EnvBool("AICM_AIWORKEROS_WAITING_AUTO_RETRY_ENABLED", true)) {
+    aicmB6R31R1Log("boot_disabled", {});
+    return;
+  }
+
+  var startDelayMs = aicmB6R31R1EnvInt("AICM_AIWORKEROS_AUTO_RETRY_START_DELAY_MS", 15000, 1000, 300000);
+  var intervalMs = aicmB6R31R1EnvInt("AICM_AIWORKEROS_AUTO_RETRY_INTERVAL_MS", 60000, 10000, 3600000);
+
+  aicmB6R31R1Log("boot", {
+    start_delay_ms: startDelayMs,
+    interval_ms: intervalMs
+  });
+
+  setTimeout(function () {
+    aicmB6R31R1AutoRetryWaitingOnce("startup").catch(function (error) {
+      aicmB6R31R1Log("startup_error", {
+        error_message: error && error.message ? String(error.message) : String(error)
+      });
+    });
+  }, startDelayMs);
+
+  state.timer = setInterval(function () {
+    aicmB6R31R1AutoRetryWaitingOnce("interval").catch(function (error) {
+      aicmB6R31R1Log("interval_error", {
+        error_message: error && error.message ? String(error.message) : String(error)
+      });
+    });
+  }, intervalMs);
+}
+// AICM_V10L_C2G_B6R31R1_AIWORKEROS_WAITING_AUTO_RETRY_HELPER_END
+
 // AICM_R8Z_I_WORKER_AUTO_EXECUTION_SERVER_END
 
 
@@ -2762,3 +3021,18 @@ function aicmR8zV10gc4bFilterPendingReviewContext(value) {
   return value;
 }
 // AICM_R8Z_V10GC4B_REVIEW_PENDING_ONLY_CONTEXT_FILTER_END
+
+
+// AICM_V10L_C2G_B6R31R1_AIWORKEROS_WAITING_AUTO_RETRY_BOOT_START
+setTimeout(function () {
+  try {
+    if (typeof aicmB6R31R1StartAiworkerosWaitingAutoRetry === "function") {
+      aicmB6R31R1StartAiworkerosWaitingAutoRetry();
+    }
+  } catch (error) {
+    try {
+      console.error("AICM_B6R31R1_AIWORKEROS_WAITING_AUTO_RETRY_BOOT_ERROR", error && error.message ? error.message : error);
+    } catch (_error) {}
+  }
+}, 0);
+// AICM_V10L_C2G_B6R31R1_AIWORKEROS_WAITING_AUTO_RETRY_BOOT_END
