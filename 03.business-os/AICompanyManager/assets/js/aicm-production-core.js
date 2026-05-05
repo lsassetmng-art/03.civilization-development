@@ -16631,6 +16631,11 @@ if (typeof window !== "undefined") {
     var list = arr(rows);
 
     var html = [];
+    // AICM_V10L_C2G_B6R16_REVIEW_LIST_COMMON_NAV_RESTORE_START
+    if (typeof aicmR8zV10f4aCommonNavHtml === "function") {
+      html.push(aicmR8zV10f4aCommonNavHtml());
+    }
+    // AICM_V10L_C2G_B6R16_REVIEW_LIST_COMMON_NAV_RESTORE_END
     html.push('<section class="aicm-core-card aicm-review-list-stable-b6r12" data-aicm-b6r12-review-list="1">');
     html.push('  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>');
     html.push('  <h2>レビュー・承認待ち: ' + esc(String(list.length)) + '件</h2>');
