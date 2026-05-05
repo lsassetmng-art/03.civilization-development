@@ -2003,6 +2003,77 @@ function markWorkerUnitAutoExecutionStartedR8ZI(unitId, runtimePayload) {
 }
 
 
+// AICM_V10L_C2G_B6R8R1_AIWORKEROS_WAITING_METADATA_HELPER_START
+function aicmIsAiworkerRuntimeUnavailableB6R8R1(message) {
+  const text = String(message || "").toLowerCase();
+
+  return (
+    text.includes("fetch failed") ||
+    text.includes("econnrefused") ||
+    text.includes("enotfound") ||
+    text.includes("etimedout") ||
+    text.includes("und_err") ||
+    text.includes("socket") ||
+    text.includes("network") ||
+    text.includes("aiworkeros runtime request failed") ||
+    text.includes("persona_aiworkeros_base_url") ||
+    text.includes("persona_aiworkeros_auth_token")
+  );
+}
+
+function markWorkerUnitAiworkerWaitingMetadataB6R8R1(unitId, detail) {
+  const unit = requiredUuid(unitId, "aicm_worker_work_unit_id");
+  const rawMessage = detail && detail.error_message ? String(detail.error_message) : "AIWorkerOS is not reachable.";
+  const message = rawMessage.length > 500 ? rawMessage.slice(0, 500) : rawMessage;
+  const waitText = "AIWorkerOS実行待ち: " + message;
+
+  const sql = [
+    "WITH updated AS (",
+    "  UPDATE business.aicm_worker_work_unit",
+    "  SET work_status_code = COALESCE(NULLIF(work_status_code, ''), " + sqlLiteral("todo") + "),",
+    "      review_status_code = COALESCE(NULLIF(review_status_code, ''), " + sqlLiteral("required") + "),",
+    "      result_summary_text = CASE",
+    "        WHEN NULLIF(result_summary_text, '') IS NULL THEN " + sqlLiteral(waitText),
+    "        WHEN result_summary_text ILIKE " + sqlLiteral("%AIWorkerOS実行待ち%") + " THEN result_summary_text",
+    "        ELSE result_summary_text || E'\\n' || " + sqlLiteral(waitText),
+    "      END,",
+    "      note = CASE",
+    "        WHEN NULLIF(note, '') IS NULL THEN " + sqlLiteral(waitText),
+    "        WHEN note ILIKE " + sqlLiteral("%AIWorkerOS実行待ち%") + " THEN note",
+    "        ELSE note || E'\\n' || " + sqlLiteral(waitText),
+    "      END,",
+    "      metadata_jsonb = COALESCE(metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+    "        " + sqlLiteral("aiworkeros_execution_state") + ", " + sqlLiteral("waiting") + ",",
+    "        " + sqlLiteral("aiworkeros_retryable") + ", true,",
+    "        " + sqlLiteral("aiworkeros_last_error") + ", " + sqlLiteral(message) + ",",
+    "        " + sqlLiteral("aiworkeros_last_error_at") + ", now()::text,",
+    "        " + sqlLiteral("aiworkeros_waiting_source") + ", " + sqlLiteral("worker-auto-execution/run") + "",
+    "      ),",
+    "      updated_at = now()",
+    "  WHERE aicm_worker_work_unit_id = " + sqlLiteral(unit) + "::uuid",
+    "    AND COALESCE(work_status_code, '') IN ('todo', 'in_progress')",
+    "    AND NOT EXISTS (",
+    "      SELECT 1",
+    "      FROM business.aicm_human_review_item h",
+    "      WHERE h.related_worker_work_unit_id = business.aicm_worker_work_unit.aicm_worker_work_unit_id",
+    "    )",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', CASE WHEN EXISTS (SELECT 1 FROM updated) THEN 'ok' ELSE 'not_updated' END,",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'aiworkeros_execution_state', " + sqlLiteral("waiting") + ",",
+    "  'retryable', true,",
+    "  'worker_work_unit', COALESCE((SELECT to_jsonb(updated) FROM updated), '{}'::jsonb)",
+    ")::text",
+    "FROM (SELECT 1) s;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+// AICM_V10L_C2G_B6R8R1_AIWORKEROS_WAITING_METADATA_HELPER_END
+
+
 /* AICM_V10L_C2G_B6R7_WORKER_REVIEW_CREATE_HELPER_START */
 function aicmB6r7Text(value) {
   if (value === null || typeof value === "undefined") return "";
@@ -2256,10 +2327,34 @@ async function runWorkerAutoExecutionR8ZI(body) {
         error_message: error && error.message ? error.message : String(error)
       });
       // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_ERROR_END
+      const aicmB6r8r1ErrorMessage = error && error.message ? String(error.message) : String(error);
+      let aicmB6r8r1WaitingMarked = false;
+      let aicmB6r8r1WaitingMarkResult = null;
+
+      // AICM_V10L_C2G_B6R8R1_AIWORKEROS_WAITING_METADATA_CATCH_START
+      if (!dryRun && aicmIsAiworkerRuntimeUnavailableB6R8R1(aicmB6r8r1ErrorMessage)) {
+        try {
+          aicmB6r8r1WaitingMarkResult = markWorkerUnitAiworkerWaitingMetadataB6R8R1(unitId, {
+            error_message: aicmB6r8r1ErrorMessage
+          });
+
+          if (aicmB6r8r1WaitingMarkResult && aicmB6r8r1WaitingMarkResult.result === "ok") {
+            aicmB6r8r1WaitingMarked = true;
+          }
+        } catch (aicmB6r8r1WaitError) {
+          aicmB6r8r1WaitingMarkResult = {
+            result: "error",
+            error_message: aicmB6r8r1WaitError && aicmB6r8r1WaitError.message ? String(aicmB6r8r1WaitError.message) : String(aicmB6r8r1WaitError)
+          };
+        }
+      }
+      // AICM_V10L_C2G_B6R8R1_AIWORKEROS_WAITING_METADATA_CATCH_END
       failed.push({
         aicm_worker_work_unit_id: unitId,
-        result: "error",
-        error_message: error && error.message ? error.message : String(error)
+        result: aicmB6r8r1WaitingMarked ? "waiting" : "error",
+        error_code: aicmB6r8r1WaitingMarked ? "AIWORKEROS_EXECUTION_WAITING" : "WORKER_AUTO_EXECUTION_ERROR",
+        error_message: aicmB6r8r1ErrorMessage,
+        waiting_mark_result: aicmB6r8r1WaitingMarkResult
       });
     }
   }
@@ -2272,14 +2367,22 @@ async function runWorkerAutoExecutionR8ZI(body) {
     failed_messages: failed.map((row) => row && row.error_message || "")
   });
   // AICM_V10L_C2G_B6R7_WORKER_AUTO_LOG_RETURN_END
+  // AICM_V10L_C2G_B6R8R1_AIWORKEROS_WAITING_METADATA_RETURN_START
+  const aicmB6r8r1Waiting = failed.filter(item => item && item.result === "waiting");
+  const aicmB6r8r1NonWaitingFailed = failed.filter(item => !item || item.result !== "waiting");
+  // AICM_V10L_C2G_B6R8R1_AIWORKEROS_WAITING_METADATA_RETURN_END
+
   return {
-    result: failed.length ? "partial_error" : "ok",
+    result: aicmB6r8r1NonWaitingFailed.length ? "partial_error" : "ok",
     api_identifier: SERVER_MARK,
     dry_run: dryRun,
     candidate_count: pairs.length,
     executed_count: executed.length,
-    failed_count: failed.length,
+    failed_count: aicmB6r8r1NonWaitingFailed.length,
+    waiting_count: aicmB6r8r1Waiting.length,
+    raw_failed_count: failed.length,
     executed,
+    waiting: aicmB6r8r1Waiting,
     failed
   };
 }
