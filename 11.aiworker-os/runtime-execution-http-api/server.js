@@ -214,7 +214,11 @@ function loadDotEnv(filePath) {
 loadDotEnv(envFile);
 
 const port = Number(process.env.PERSONA_AIWORKEROS_PORT || "8787");
-const authToken = process.env.PERSONA_AIWORKEROS_AUTH_TOKEN || "local-aiworkeros-smoke-token";
+const authToken = process.env.PERSONA_AIWORKEROS_AUTH_TOKEN;
+if (!authToken) {
+  console.error("ERROR: PERSONA_AIWORKEROS_AUTH_TOKEN is required");
+  process.exit(1);
+}
 const databaseUrl = process.env.PERSONA_DATABASE_URL;
 
 if (!databaseUrl) {
@@ -345,12 +349,14 @@ function pipelineBoard(query) {
   return psqlJson(`
     select coalesce(jsonb_agg(to_jsonb(t) order by request_created_at desc), '[]'::jsonb)::text
     from (
-      select *
-      from aiworker.vw_app_aiworker_runtime_full_pipeline_board_v1
-      where (nullif(:'request_id','') is null or request_id::text = :'request_id')
-        and (nullif(:'request_code','') is null or request_code = :'request_code')
-        and (nullif(:'app_surface_code','') is null or app_surface_code = :'app_surface_code')
-      order by request_created_at desc
+      select p.*, rr.source_route_code
+      from aiworker.vw_app_aiworker_runtime_full_pipeline_board_v1 p
+      left join aiworker.runtime_execution_request rr
+        on rr.request_id = p.request_id
+      where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+        and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+        and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+      order by p.request_created_at desc
       limit :'limit'
     ) t;
   `, {
@@ -365,12 +371,14 @@ function appReadPayload(query) {
   return psqlJson(`
     select coalesce(jsonb_agg(to_jsonb(t) order by request_created_at desc), '[]'::jsonb)::text
     from (
-      select *
-      from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1
-      where (nullif(:'request_id','') is null or request_id::text = :'request_id')
-        and (nullif(:'request_code','') is null or request_code = :'request_code')
-        and (nullif(:'app_surface_code','') is null or app_surface_code = :'app_surface_code')
-      order by request_created_at desc
+      select p.*, rr.source_route_code
+      from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+      left join aiworker.runtime_execution_request rr
+        on rr.request_id = p.request_id
+      where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+        and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+        and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+      order by p.request_created_at desc
       limit :'limit'
     ) t;
   `, {
@@ -401,6 +409,12 @@ function deliveryBoard(query) {
 
 function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+  const sourceRouteCode = String(
+    payload.source_route_code ||
+    payload.sourceRouteCode ||
+    payload.source_route ||
+    ""
+  ).trim();
   if (!idempotencyKey) {
     const e = new Error("Idempotency-Key is required");
     e.httpStatus = 400;
@@ -418,7 +432,7 @@ function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
 
   return psqlJson(`
     with created as (
-      select aiworker.fn_runtime_execution_create_request(
+      select aiworker.fn_runtime_execution_create_request_with_route_v1(
         :'app_surface_code',
         :'model_code',
         :'task_domain_code',
@@ -427,7 +441,8 @@ function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
         :'source_app_ref',
         :'source_request_ref',
         :'requested_by_ref',
-        :'idempotency_key'
+        :'idempotency_key',
+        :'source_route_code'
       ) as request_id
     ),
     board as (
@@ -456,6 +471,7 @@ function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
     task_instruction_ja: payload.task_instruction_ja,
     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
     source_request_ref: payload.source_request_ref || "",
+    source_route_code: sourceRouteCode,
     requested_by_ref: payload.requested_by_ref || "human",
     idempotency_key: idempotencyKey
   });

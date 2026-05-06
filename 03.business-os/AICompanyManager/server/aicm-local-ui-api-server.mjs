@@ -1435,6 +1435,136 @@ function aicmWorkerRuntimeBuildIdempotencyKey(body, placement) {
   return "aicm:" + sourceRequestRef + ":" + placementId;
 }
 
+function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayload) {
+  requestBody = requestBody && typeof requestBody === "object" ? requestBody : {};
+  runtimePayload = runtimePayload && typeof runtimePayload === "object" ? runtimePayload : {};
+
+  const runtimeRequest = runtimePayload.runtime_request && typeof runtimePayload.runtime_request === "object"
+    ? runtimePayload.runtime_request
+    : {};
+
+  const requestId = String(
+    runtimeRequest.request_id ||
+    runtimePayload.request_id ||
+    ""
+  ).trim();
+
+  const sourceRouteCode = String(
+    requestBody.source_route_code ||
+    requestBody.sourceRouteCode ||
+    runtimeRequest.source_route_code ||
+    runtimePayload.source_route_code ||
+    ""
+  ).trim();
+
+  if (sourceRouteCode !== "individual_instruction") {
+    return {
+      result: "skipped",
+      reason: "NOT_INDIVIDUAL_INSTRUCTION_ROUTE"
+    };
+  }
+
+  if (!requestId) {
+    return {
+      result: "skipped",
+      reason: "REQUEST_ID_NOT_FOUND"
+    };
+  }
+
+  const owner = requiredUuid(requestBody.owner_civilization_id, "owner_civilization_id");
+  const companyId = requiredUuid(requestBody.aicm_user_company_id, "aicm_user_company_id");
+
+  const workerLabel = String(
+    (runtimePayload.worker_placement && runtimePayload.worker_placement.display_label) ||
+    requestBody.worker_label ||
+    requestBody.responsible_ai_label ||
+    "AIWorker"
+  ).trim() || "AIWorker";
+
+  const title = String(
+    requestBody.task_title ||
+    runtimeRequest.task_title ||
+    "個別依頼 実行結果レビュー"
+  ).trim() || "個別依頼 実行結果レビュー";
+
+  const summary = String(
+    "個別依頼のAIWorkerOS実行受付が完了しました。Workbenchで実行状態を確認し、必要に応じてレビュー・差し戻しを行ってください。 runtime_request_id=" + requestId
+  );
+
+  const metadataJson = JSON.stringify({
+    source: "worker-runtime/request",
+    source_app_ref: "AICompanyManager",
+    source_route_code: "individual_instruction",
+    source_screen_code: "ai_execution_workbench",
+    source_entity_type: "runtime_request",
+    source_entity_id: requestId,
+    runtime_request_id: requestId,
+    source_request_ref: runtimeRequest.source_request_ref || requestBody.source_request_ref || "",
+    return_target_type: "workbench_runtime_request",
+    return_target_id: requestId,
+    reexecute_target_type: "runtime_request",
+    reexecute_target_id: requestId,
+    context_restore_type: "workbench",
+    context_restore_id: requestId
+  });
+
+  const sql = [
+    "WITH existing AS (",
+    "  SELECT *",
+    "  FROM business.aicm_human_review_item h",
+    "  WHERE h.metadata_jsonb->>'runtime_request_id' = " + sqlLiteral(requestId),
+    "    AND COALESCE(h.human_review_status_code, '') <> " + sqlLiteral("archived"),
+    "  LIMIT 1",
+    "), inserted AS (",
+    "  INSERT INTO business.aicm_human_review_item (",
+    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+    "    related_president_policy_id, related_manager_major_work_item_id, related_leader_middle_work_item_id,",
+    "    related_deliverable_requirement_id, related_worker_work_unit_id,",
+    "    review_kind_code, artifact_kind_code, review_title,",
+    "    delivery_summary_text, main_changes_text, ai_review_result_text, unresolved_issues_text, artifact_link,",
+    "    responsible_ai_label, requested_by_ai_label, human_review_status_code, priority_code, due_date,",
+    "    display_order, metadata_jsonb",
+    "  )",
+    "  SELECT",
+    "    " + sqlLiteral(owner) + "::uuid,",
+    "    " + sqlLiteral(companyId) + "::uuid,",
+    "    " + aicmHumanReviewOptionalUuidSql(requestBody.aicm_user_company_department_id) + ",",
+    "    " + aicmHumanReviewOptionalUuidSql(requestBody.aicm_user_company_section_id) + ",",
+    "    NULL::uuid,",
+    "    NULL::uuid,",
+    "    NULL::uuid,",
+    "    NULL::uuid,",
+    "    NULL::uuid,",
+    "    " + sqlLiteral("delivery_summary") + ",",
+    "    " + sqlLiteral("delivery_package") + ",",
+    "    " + sqlLiteral("個別依頼レビュー: ") + " || " + sqlLiteral(title) + ",",
+    "    " + sqlLiteral(summary) + ",",
+    "    " + sqlLiteral("AIWorkerOS runtime request accepted.") + ",",
+    "    " + sqlLiteral("自動レビュー待ち登録: human_go済みの個別依頼として受付。") + ",",
+    "    " + sqlLiteral("") + ",",
+    "    " + sqlLiteral("") + ",",
+    "    " + sqlLiteral(workerLabel) + ",",
+    "    " + sqlLiteral("AICompanyManager") + ",",
+    "    " + sqlLiteral("pending") + ",",
+    "    " + sqlLiteral(aicmHumanReviewPriority(requestBody.priority_code)) + ",",
+    "    " + aicmHumanReviewOptionalDateSql(requestBody.due_date) + ",",
+    "    COALESCE(NULLIF(" + sqlLiteral(String(requestBody.display_order || "")) + ", '')::integer, 100),",
+    "    " + sqlLiteral(metadataJson) + "::jsonb",
+    "  WHERE NOT EXISTS (SELECT 1 FROM existing)",
+    "  RETURNING *",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', 'ok',",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'created_human_review_count', (SELECT count(*) FROM inserted),",
+    "  'existing_human_review_count', (SELECT count(*) FROM existing),",
+    "  'human_review_item', COALESCE((SELECT to_jsonb(inserted) FROM inserted LIMIT 1), (SELECT to_jsonb(existing) FROM existing LIMIT 1), '{}'::jsonb)",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
 async function createWorkerRuntimeRequest(body) {
   // AICM_WORKBENCH_RUNTIME_CODE_NORMALIZE_AXT_R7_V1
   body = aicmNormalizeWorkbenchRuntimeRequestBody(body);
@@ -1477,6 +1607,11 @@ async function createWorkerRuntimeRequest(body) {
   const requestedByRef = aicmWorkerRuntimeDefault(body.requested_by_ref, "human");
   const idempotencyKey = aicmWorkerRuntimeBuildIdempotencyKey(body, placement);
 
+  const sourceRouteCode = aicmWorkerRuntimeDefault(
+    body.source_route_code || body.sourceRouteCode || body.source_route,
+    ""
+  );
+
   const outboundBody = {
     app_surface_code: appSurfaceCode,
     model_code: modelCode,
@@ -1488,6 +1623,10 @@ async function createWorkerRuntimeRequest(body) {
     requested_by_ref: requestedByRef,
     idempotency_key: idempotencyKey
   };
+
+  if (sourceRouteCode) {
+    outboundBody.source_route_code = sourceRouteCode;
+  }
 
   const url = baseUrl + "/aiworker/v1/runtime-execution/request";
 
@@ -1552,6 +1691,7 @@ async function createWorkerRuntimeRequest(body) {
       task_title: taskTitle,
       source_app_ref: sourceAppRef,
       source_request_ref: sourceRequestRef,
+      source_route_code: sourceRouteCode,
       idempotency_key: idempotencyKey
     },
     aiworker_response: responseJson
@@ -2964,7 +3104,20 @@ if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
       return true;
     }
     if (route === "/api/aicm/v2/worker-runtime/request" && req.method === "POST") {
-      const payload = await createWorkerRuntimeRequest(await readBody(req));
+      const requestBody = await readBody(req);
+      requestBody.source_app_ref = requestBody.source_app_ref || "AICompanyManager";
+      requestBody.source_route_code = requestBody.source_route_code || "individual_instruction";
+      requestBody.source_screen_code = requestBody.source_screen_code || "ai_execution_workbench";
+      requestBody.source_entity_type = requestBody.source_entity_type || "runtime_request";
+      requestBody.return_target_type = requestBody.return_target_type || "workbench_runtime_request";
+      requestBody.reexecute_target_type = requestBody.reexecute_target_type || "runtime_request";
+      requestBody.context_restore_type = requestBody.context_restore_type || "workbench";
+
+      const payload = await createWorkerRuntimeRequest(requestBody);
+
+      if (payload && payload.result === "ok" && requestBody.source_route_code === "individual_instruction") {
+        payload.human_review_auto_registration = createIndividualRuntimeHumanReviewItemB6R44S(requestBody, payload);
+      }
 
       // AICM_V10L_C2G_B6R44C_WORKBENCH_SOURCE_ROUTE_METADATA_START
       const aicmB6R44cRuntimeRequestSourceRouteMetadata = {

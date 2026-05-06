@@ -11003,15 +11003,7 @@ function aicmB6R44cLooksLikeTaskLedgerWorker(row) {
 
 function aicmB6R44cIsWorkbenchIndividualRuntimeRow(row) {
   var route = aicmB6R44cRuntimeRouteCode(row);
-  if (route) {
-    return route === "individual_instruction";
-  }
-
-  /*
-    source_route_code導入前の既存データ用fallback。
-    台帳WorkerっぽいものはWorkbenchから外す。
-  */
-  return !aicmB6R44cLooksLikeTaskLedgerWorker(row);
+  return route === "individual_instruction";
 }
 
 function aicmB6R44cFilterWorkbenchRuntimeRows(rows) {
