@@ -326,6 +326,157 @@ function createManagerMajorItem(body) {
   return runPsqlJson(sql);
 }
 
+
+// AICM_B6R74_PRESIDENT_ROUTE_DOWNSTREAM_HELPER_START
+function createManagerMajorFromPresidentPolicyB6R74(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+  const policyId = requiredUuid(body.aicm_president_policy_id || body.policy_id, "aicm_president_policy_id");
+
+  const sql = [
+    "WITH input_request AS (",
+    "  SELECT",
+    "    " + sqlLiteral(owner) + "::uuid AS owner_civilization_id,",
+    "    " + sqlLiteral(companyId) + "::uuid AS aicm_user_company_id,",
+    "    " + sqlLiteral(policyId) + "::uuid AS aicm_president_policy_id",
+    "), policy AS (",
+    "  SELECT p.*",
+    "  FROM business.aicm_president_policy p",
+    "  JOIN input_request r",
+    "    ON r.owner_civilization_id = p.owner_civilization_id",
+    "   AND r.aicm_user_company_id = p.aicm_user_company_id",
+    "   AND r.aicm_president_policy_id = p.aicm_president_policy_id",
+    "), existing AS (",
+    "  SELECT m.*, false AS created_flag",
+    "  FROM business.aicm_manager_major_work_item m",
+    "  JOIN policy p",
+    "    ON p.aicm_president_policy_id = m.aicm_president_policy_id",
+    "   AND p.owner_civilization_id = m.owner_civilization_id",
+    "   AND p.aicm_user_company_id = m.aicm_user_company_id",
+    "  WHERE m.source_route_code = " + sqlLiteral("president_route"),
+    "    AND m.decomposition_status_code <> " + sqlLiteral("archived"),
+    "  ORDER BY m.created_at",
+    "  LIMIT 1",
+    "), inserted AS (",
+    "  INSERT INTO business.aicm_manager_major_work_item (",
+    "    owner_civilization_id, aicm_user_company_id, aicm_president_policy_id,",
+    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+    "    major_item_name, major_item_description, source_route_code,",
+    "    manager_robot_label, assigned_leader_label,",
+    "    decomposition_status_code, handoff_status_code, priority_code, due_date,",
+    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link",
+    "  )",
+    "  SELECT",
+    "    p.owner_civilization_id, p.aicm_user_company_id, p.aicm_president_policy_id,",
+    "    NULL::uuid, NULL::uuid,",
+    "    COALESCE(NULLIF(p.policy_title, ''), " + sqlLiteral("President方針") + ") || " + sqlLiteral(" Manager大項目") + ",",
+    "    p.policy_text,",
+    "    " + sqlLiteral("president_route") + ",",
+    "    COALESCE(NULLIF(p.president_robot_label, ''), " + sqlLiteral("President") + "),",
+    "    " + sqlLiteral("自動割当") + ",",
+    "    " + sqlLiteral("assigned_to_leader") + ",",
+    "    " + sqlLiteral("handed_off") + ",",
+    "    COALESCE(NULLIF(p.priority_code, ''), " + sqlLiteral("normal") + "),",
+    "    p.due_date,",
+    "    p.reference_files_text,",
+    "    p.supplemental_materials_text,",
+    "    p.applicable_rules_text,",
+    "    " + sqlLiteral("B6R74 auto-created from President policy") + ",",
+    "    p.handoff_link",
+    "  FROM policy p",
+    "  WHERE NOT EXISTS (SELECT 1 FROM existing)",
+    "  RETURNING *, true AS created_flag",
+    "), selected AS (",
+    "  SELECT * FROM existing",
+    "  UNION ALL",
+    "  SELECT * FROM inserted",
+    "  LIMIT 1",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  " + sqlLiteral("result") + ", CASE WHEN EXISTS (SELECT 1 FROM selected) THEN " + sqlLiteral("ok") + " ELSE " + sqlLiteral("not_found") + " END,",
+    "  " + sqlLiteral("api_identifier") + ", " + sqlLiteral(SERVER_MARK) + ",",
+    "  " + sqlLiteral("manager_major_item") + ", COALESCE((SELECT to_jsonb(selected) FROM selected), '{}'::jsonb),",
+    "  " + sqlLiteral("created_manager_major") + ", COALESCE((SELECT created_flag FROM selected), false)",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+}
+
+async function runPresidentRouteFromPolicyB6R74(body) {
+  const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
+  const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
+  const policyId = requiredUuid(body.aicm_president_policy_id || body.policy_id, "aicm_president_policy_id");
+
+  const managerResult = createManagerMajorFromPresidentPolicyB6R74({
+    owner_civilization_id: owner,
+    aicm_user_company_id: companyId,
+    aicm_president_policy_id: policyId
+  });
+
+  if (!managerResult || managerResult.result !== "ok") {
+    return {
+      result: "ok",
+      api_identifier: SERVER_MARK,
+      downstream_status: "policy_only",
+      reason: "manager_major_not_created",
+      manager_result: managerResult || {}
+    };
+  }
+
+  const major = managerResult.manager_major_item || {};
+  const majorId = String(major.aicm_manager_major_work_item_id || "");
+
+  if (!majorId) {
+    return {
+      result: "ok",
+      api_identifier: SERVER_MARK,
+      downstream_status: "policy_only",
+      reason: "manager_major_id_missing",
+      manager_result: managerResult
+    };
+  }
+
+  const leaderResult = runLeaderAutoDecomposition({
+    owner_civilization_id: owner,
+    aicm_user_company_id: companyId,
+    mode: "single",
+    aicm_manager_major_work_item_id: majorId,
+    limit: 1,
+    auto_decomposition_version: "b6r74_president_route_v1",
+    source_app_ref: "AICompanyManager/president-route"
+  });
+
+  let workerResult = {};
+  try {
+    workerResult = await runWorkerAutoExecutionR8ZI({
+      owner_civilization_id: owner,
+      aicm_user_company_id: companyId,
+      aicm_manager_major_work_item_id: majorId,
+      limit: 1,
+      source_app_ref: "AICompanyManager/president-route"
+    });
+  } catch (error) {
+    workerResult = {
+      result: "worker_auto_execution_error",
+      error_message: error && error.message ? String(error.message) : String(error)
+    };
+  }
+
+  return {
+    result: "ok",
+    api_identifier: SERVER_MARK,
+    downstream_status: "started",
+    aicm_president_policy_id: policyId,
+    aicm_manager_major_work_item_id: majorId,
+    manager_result: managerResult,
+    leader_auto_decomposition: leaderResult,
+    worker_auto_execution: workerResult
+  };
+}
+// AICM_B6R74_PRESIDENT_ROUTE_DOWNSTREAM_HELPER_END
+
+
 function updateManagerMajorItem(body) {
   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
   const majorId = requiredUuid(body.aicm_manager_major_work_item_id, "aicm_manager_major_work_item_id");
@@ -646,6 +797,18 @@ function updateCompany(body) {
   const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
   const name = requiredText(body.company_name || body.companyName, "company_name");
 
+  // AICM_B6R62_COMPANY_RULE_SETTINGS_METADATA_START
+  const incomingMetadata = body.metadata_jsonb && typeof body.metadata_jsonb === "object" && !Array.isArray(body.metadata_jsonb)
+    ? body.metadata_jsonb
+    : {};
+  const ruleSettings = incomingMetadata.aicm_company_rule_settings && typeof incomingMetadata.aicm_company_rule_settings === "object"
+    ? incomingMetadata.aicm_company_rule_settings
+    : {};
+  const metadataPatchJson = JSON.stringify({
+    aicm_company_rule_settings: ruleSettings
+  });
+  // AICM_B6R62_COMPANY_RULE_SETTINGS_METADATA_END
+
   const sql = [
     "WITH updated AS (",
     "  UPDATE business.aicm_user_company",
@@ -653,6 +816,7 @@ function updateCompany(body) {
     "      business_domain = " + aicmOrgUpdateTextSql(body.business_domain || body.businessDomain) + ",",
     "      company_common_rules_text = " + aicmOrgUpdateTextSql(body.company_common_rules_text || body.companyCommonRulesText) + ",",
     "      president_policy_instruction_text = " + aicmOrgUpdateTextSql(body.president_policy_instruction_text || body.presidentPolicyInstructionText) + ",",
+    "      metadata_jsonb = COALESCE(metadata_jsonb, '{}'::jsonb) || " + sqlLiteral(metadataPatchJson) + "::jsonb,",
     "      updated_at = now()",
     "  WHERE aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
     "    AND owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
@@ -3028,6 +3192,12 @@ async function handleApi(req, res, url) {
     if (route === "/api/aicm/v2/president-policy/create" && req.method === "POST") {
       const body = await readBody(req);
       sendJson(res, 200, createPresidentPolicy(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/president-route/run-from-policy" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, await runPresidentRouteFromPolicyB6R74(body));
       return true;
     }
 

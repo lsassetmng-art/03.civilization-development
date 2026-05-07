@@ -755,11 +755,36 @@ function aicmOrgCtx() {
   }
 
   async function aicmOrgPostJson(path, body) {
-    var response = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {})
-    });
+    var effectiveUrl = path;
+
+    try {
+      if (typeof window !== "undefined" && window.location) {
+        effectiveUrl = new URL(path, window.location.href).toString();
+      }
+    } catch (_) {
+      effectiveUrl = path;
+    }
+
+    var response;
+
+    try {
+      response = await fetch(effectiveUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {})
+      });
+    } catch (error) {
+      var currentUrl = "";
+      try {
+        currentUrl = typeof window !== "undefined" && window.location ? window.location.href : "";
+      } catch (_) {}
+
+      throw new Error(
+        "通信失敗: " + path +
+        (currentUrl ? " / current=" + currentUrl : "") +
+        " / " + (error && error.message ? error.message : String(error))
+      );
+    }
 
     var text = await response.text();
     var json = {};
@@ -1035,7 +1060,71 @@ function renderAicmOrgUpdateConfirmation(payload) {
     root.innerHTML = renderAicmOrgUpdateConfirmation(payload || {});
   }
 
-  async function executeAicmOrgUpdateConfirm() {
+  // AICM_B6R68_COMPANY_UPDATE_LOCAL_CONTEXT_HELPER_START
+function aicmB6R68MergeObject(base, patch) {
+  var out = {};
+  var k;
+  base = base && typeof base === "object" ? base : {};
+  patch = patch && typeof patch === "object" ? patch : {};
+
+  for (k in base) {
+    if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = base[k];
+  }
+
+  for (k in patch) {
+    if (!Object.prototype.hasOwnProperty.call(patch, k)) continue;
+
+    if (
+      patch[k] &&
+      typeof patch[k] === "object" &&
+      !Array.isArray(patch[k]) &&
+      out[k] &&
+      typeof out[k] === "object" &&
+      !Array.isArray(out[k])
+    ) {
+      out[k] = aicmB6R68MergeObject(out[k], patch[k]);
+    } else {
+      out[k] = patch[k];
+    }
+  }
+
+  return out;
+}
+
+function aicmB6R68ApplyCompanyUpdateBodyToLocalContext(body, result) {
+  if (!body || !body.aicm_user_company_id || !state || !state.context) return;
+
+  var companies = Array.isArray(state.context.companies) ? state.context.companies : [];
+  var company = null;
+
+  for (var i = 0; i < companies.length; i += 1) {
+    if (companies[i] && companies[i].aicm_user_company_id === body.aicm_user_company_id) {
+      company = companies[i];
+      break;
+    }
+  }
+
+  if (!company) return;
+
+  if (body.company_name !== undefined) company.company_name = body.company_name;
+  if (body.business_domain !== undefined) company.business_domain = body.business_domain;
+  if (body.company_status !== undefined) {
+    company.company_status = body.company_status;
+    company.status_code = body.company_status;
+  }
+  if (body.company_common_rules_text !== undefined) company.company_common_rules_text = body.company_common_rules_text;
+  if (body.president_policy_instruction_text !== undefined) company.president_policy_instruction_text = body.president_policy_instruction_text;
+
+  company.metadata_jsonb = aicmB6R68MergeObject(company.metadata_jsonb || {}, body.metadata_jsonb || {});
+
+  if (result && result.company && typeof result.company === "object") {
+    company.metadata_jsonb = aicmB6R68MergeObject(company.metadata_jsonb || {}, result.company.metadata_jsonb || {});
+  }
+}
+// AICM_B6R68_COMPANY_UPDATE_LOCAL_CONTEXT_HELPER_END
+
+
+async function executeAicmOrgUpdateConfirm() {
     var payload = state.pendingOrgUpdate || null;
 
     if (!payload || !payload.endpoint || !payload.body) {
@@ -1044,21 +1133,45 @@ function renderAicmOrgUpdateConfirmation(payload) {
     }
 
     try {
-      await aicmOrgPostJson(payload.endpoint, payload.body);
-            // AICM_AXC_EXECUTE_ROLE_PLACEMENT_SYNC_AFTER_MAIN_UPDATE
-      await aicmAxcSyncRolePlacementsForPayload(payload);
-state.pendingOrgUpdate = null;
-      // AICM_PRESERVE_UNSAVED_WORKER_ADD_AXO_V1
+      var result = await aicmOrgPostJson(payload.endpoint, payload.body);
+
+      try {
+        await aicmAxcSyncRolePlacementsForPayload(payload);
+      } catch (roleSyncError) {
+        if (typeof console !== "undefined" && console && console.warn) {
+          console.warn("B6R68: role placement sync failed after main update", roleSyncError);
+        }
+      }
+
+      if (payload.kind === "company-update") {
+        aicmB6R68ApplyCompanyUpdateBodyToLocalContext(payload.body, result);
+      }
+
+      state.pendingOrgUpdate = null;
+
       if (typeof aicmAxoClearDraftAfterSuccessfulSave === "function") aicmAxoClearDraftAfterSuccessfulSave();
 
       if (payload.kind === "department") state.editingDepartmentId = "";
       if (payload.kind === "section") state.editingSectionId = "";
 
       setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。");
-      await aicmOrgReloadContext();
+
+      try {
+        await aicmOrgReloadContext();
+      } catch (reloadError) {
+        if (typeof console !== "undefined" && console && console.warn) {
+          console.warn("B6R68: context reload failed after save but main save succeeded", reloadError);
+        }
+        setMessage("ok", aicmOrgUpdateLabel(payload.kind) + "を保存しました。（一覧更新は再読み込みで反映してください）");
+      }
+
+      if (payload.kind === "company-update") {
+        state.screen = "company-edit";
+      }
+
+      if (typeof render === "function") render();
     } catch (error) {
       setMessage("error", error && error.message ? error.message : "保存に失敗しました。");
-      // AICM_CONFIRM_SAVE_ERROR_RENDER_AXM_V1
       if (typeof render === "function") render();
     }
   }
@@ -1287,19 +1400,28 @@ function saveCompanyUpdateFromForm() {
       return;
     }
 
-    var body = {
+    var body = aicmB6R62BuildCompanyRuleSettingsBody({
+      // AICM_B6R62_COMPANY_RULE_SETTINGS_BODY
       owner_civilization_id: aicmAvdOwnerId(),
       aicm_user_company_id: companyId,
       company_name: aicmAvdTextById("aicm-company-edit-name"),
       business_domain: aicmAvdTextById("aicm-company-edit-domain"),
       company_status: aicmAvdTextById("aicm-company-edit-status") || "active"
-    };
+    });
 
     var rows = [
       ["操作", "企業変更"],
       ["企業名", body.company_name],
       ["事業領域", body.business_domain || "未設定"],
-      ["状態", body.company_status]
+      ["状態", body.company_status],
+      ["会社共通ルール", body.company_common_rules_text || "未設定"],
+      ["President方針", body.president_policy_instruction_text || "未設定"],
+      ["規約・禁止事項", body.metadata_jsonb.aicm_company_rule_settings.company_terms_text || "未設定"],
+      ["制約条件", body.metadata_jsonb.aicm_company_rule_settings.company_constraints_text || "未設定"],
+      ["品質基準", body.metadata_jsonb.aicm_company_rule_settings.company_quality_standard_text || "未設定"],
+      ["納品基準", body.metadata_jsonb.aicm_company_rule_settings.company_delivery_standard_text || "未設定"],
+      ["表現/安全ルール", body.metadata_jsonb.aicm_company_rule_settings.company_safety_expression_rules_text || "未設定"],
+      ["関連ファイル", (body.metadata_jsonb.aicm_company_rule_settings.rule_file && body.metadata_jsonb.aicm_company_rule_settings.rule_file.file_name) || "未登録"]
     ].concat(aicmAvdRoleSummaryRows("company"));
 
     aicmAvdShowDbConfirm({
@@ -2690,6 +2812,579 @@ function aicmAvdSummaryHtml(payload) {
 
 
   
+
+// AICM_B6R62_COMPANY_RULES_BUSINESS_START_UI_START
+function aicmB6R62Text(value) {
+  return String(value === undefined || value === null ? "" : value).trim();
+}
+
+function aicmB6R62Html(value) {
+  return typeof escapeHtml === "function" ? escapeHtml(aicmB6R62Text(value)) : aicmB6R62Text(value);
+}
+
+function aicmB6R62CompanyMeta(company) {
+  var meta = company && company.metadata_jsonb && typeof company.metadata_jsonb === "object" ? company.metadata_jsonb : {};
+  return meta.aicm_company_rule_settings && typeof meta.aicm_company_rule_settings === "object" ? meta.aicm_company_rule_settings : {};
+}
+
+function aicmB6R62Default(key) {
+  var defaults = {
+    company_common_rules_text: "会社全体で守る共通ルール、設計開発ルール、品質・安全基準をここに記載する。全作業で参照する。",
+    company_terms_text: "既存IPの無断模倣、差別的表現、危険行為の助長、個人情報の不適切利用、契約外作業を禁止する。",
+    company_constraints_text: "子供からお年寄りまで楽しめる表現を優先する。低予算・短期間で実現可能な案を優先する。",
+    company_quality_standard_text: "成果物は目的、対象ユーザー、確認ポイント、未解決事項、次工程が分かる形に整理する。",
+    company_delivery_standard_text: "納品時は成果物本体とは別に、人間レビュー用の納品サマリーを作成し、レビュー待ちに登録する。",
+    company_safety_expression_rules_text: "暴力・性的・差別的・過度に不安を煽る表現を避け、年齢配慮と安全表現を優先する。"
+  };
+  return defaults[key] || "";
+}
+
+function aicmB6R62RuleValue(company, key) {
+  var meta = aicmB6R62CompanyMeta(company);
+  if (key === "company_common_rules_text") {
+    return aicmB6R62Text(company && company.company_common_rules_text) || aicmB6R62Default(key);
+  }
+  return aicmB6R62Text(meta[key]) || aicmB6R62Default(key);
+}
+
+function aicmB6R62RuleFile(company) {
+  var meta = aicmB6R62CompanyMeta(company);
+  return meta.rule_file && typeof meta.rule_file === "object" ? meta.rule_file : {};
+}
+
+function aicmB6R62Textarea(id, label, value, rows) {
+  return '<label>' + aicmB6R62Html(label) + '<textarea id="' + aicmB6R62Html(id) + '" rows="' + String(rows || 4) + '">' + aicmB6R62Html(value) + '</textarea></label>';
+}
+
+function aicmB6R62ReadOnlyBlock(label, value) {
+  return [
+    '<div class="aicm-confirm-row">',
+    '  <strong>' + aicmB6R62Html(label) + '</strong>',
+    '  <p style="white-space:pre-wrap;overflow-wrap:anywhere;">' + aicmB6R62Html(value || "-") + '</p>',
+    '</div>'
+  ].join("");
+}
+
+function aicmB6R62Select(id, label, options, selected) {
+  return [
+    '<label>' + aicmB6R62Html(label),
+    '<select id="' + aicmB6R62Html(id) + '">',
+    options.map(function (row) {
+      var value = row[0];
+      var text = row[1];
+      return '<option value="' + aicmB6R62Html(value) + '"' + (String(value) === String(selected || "") ? ' selected' : '') + '>' + aicmB6R62Html(text) + '</option>';
+    }).join(""),
+    '</select></label>'
+  ].join("");
+}
+
+function aicmB6R62Checked(id, label, checked) {
+  return '<label class="aicm-inline-check"><input id="' + aicmB6R62Html(id) + '" type="checkbox"' + (checked ? ' checked' : '') + '> ' + aicmB6R62Html(label) + '</label>';
+}
+
+function aicmB6R62Value(id) {
+  var el = typeof document !== "undefined" ? document.getElementById(id) : null;
+  return el ? aicmB6R62Text(el.value) : "";
+}
+
+function aicmB6R62CheckedValue(id) {
+  var el = typeof document !== "undefined" ? document.getElementById(id) : null;
+  return !!(el && el.checked);
+}
+
+function aicmB6R62RuleFileFromInput() {
+  var el = typeof document !== "undefined" ? document.getElementById("aicm-company-rule-file") : null;
+  var file = el && el.files && el.files.length ? el.files[0] : null;
+  if (!file) return null;
+  return {
+    file_name: file.name || "",
+    file_size_bytes: Number(file.size || 0),
+    mime_type: file.type || "",
+    captured_at: new Date().toISOString()
+  };
+}
+
+function aicmB6R62BuildCompanyRuleSettingsBody(baseBody) {
+  var fileMeta = aicmB6R62RuleFileFromInput();
+  var existingCompany = typeof aicmAvdCurrentCompany === "function" ? aicmAvdCurrentCompany() : (typeof selectedCompany === "function" ? selectedCompany() : null);
+  var existingFile = aicmB6R62RuleFile(existingCompany);
+  var clearEl = typeof document !== "undefined" ? document.getElementById("aicm-company-rule-file-clear") : null;
+  var shouldClearRuleFile = !!(clearEl && clearEl.checked);
+
+  return Object.assign({}, baseBody, {
+    company_common_rules_text: aicmB6R62Value("aicm-company-edit-rules"),
+    president_policy_instruction_text: aicmB6R62Value("aicm-company-edit-policy"),
+    metadata_jsonb: {
+      aicm_company_rule_settings: {
+        company_terms_text: aicmB6R62Value("aicm-company-edit-terms"),
+        company_constraints_text: aicmB6R62Value("aicm-company-edit-constraints"),
+        company_quality_standard_text: aicmB6R62Value("aicm-company-edit-quality"),
+        company_delivery_standard_text: aicmB6R62Value("aicm-company-edit-delivery"),
+        company_safety_expression_rules_text: aicmB6R62Value("aicm-company-edit-safety-expression"),
+        rule_file: shouldClearRuleFile ? {} : (fileMeta || existingFile || {}),
+        updated_from: "AICompanyManager/company-edit",
+        updated_at: new Date().toISOString()
+      }
+    }
+  });
+}
+
+function aicmB6R62BusinessStartSettings() {
+  var constraints = [];
+  [
+    ["b6r62-constraint-safe-expression", "安全表現"],
+    ["b6r62-constraint-age-care", "年齢配慮"],
+    ["b6r62-constraint-no-violent-sexual", "暴力/性的表現なし"],
+    ["b6r62-constraint-mobile-first", "スマホ優先"],
+    ["b6r62-constraint-low-budget", "低予算"],
+    ["b6r62-constraint-multilingual", "多言語想定"]
+  ].forEach(function (row) {
+    if (aicmB6R62CheckedValue(row[0])) constraints.push(row[1]);
+  });
+
+  return {
+    run_name: aicmB6R62Value("b6r62-run-name-select") || "初回企画作成",
+    deliverable_type: aicmB6R62Value("b6r62-deliverable-type") || "president_suggest",
+    execution_scope: aicmB6R62Value("b6r62-execution-scope") || "planning_doc",
+    target_user: aicmB6R62Value("b6r62-target-user") || "all_generations",
+    delivery_format: aicmB6R62Value("b6r62-delivery-format") || "delivery_summary",
+    additional_constraints: constraints,
+    supplemental_note: aicmB6R62Value("b6r62-supplemental-note")
+  };
+}
+
+function aicmB6R62BusinessStartLabel(value, list) {
+  for (var i = 0; i < list.length; i += 1) {
+    if (list[i][0] === value) return list[i][1];
+  }
+  return value;
+}
+
+function aicmB6R62CurrentCompany() {
+  if (typeof selectedCompany === "function") {
+    var selected = selectedCompany();
+    if (selected) return selected;
+  }
+  if (typeof aicmOrgSelectedCompany === "function") {
+    var orgSelected = aicmOrgSelectedCompany();
+    if (orgSelected) return orgSelected;
+  }
+  return null;
+}
+
+var AICM_B6R62_DELIVERABLE_TYPES = [
+  ["president_suggest", "Presidentに提案させる"],
+  ["app_plan", "アプリ企画"],
+  ["video_plan", "動画企画"],
+  ["game_plan", "ゲーム企画"],
+  ["character_ip_design", "キャラクター/IP設計"],
+  ["worldbuilding", "世界観設計"],
+  ["business_plan", "事業構想"],
+  ["mixed_entertainment_package", "複合パッケージ"]
+];
+
+var AICM_B6R62_EXECUTION_SCOPES = [
+  ["planning_doc", "まずは企画書まで"],
+  ["character_ideas", "キャラクター案まで"],
+  ["app_screen_ideas", "アプリ画面案まで"],
+  ["video_script", "動画台本まで"],
+  ["mvp_design", "MVP設計まで"],
+  ["implementation_tasks", "実装タスク作成まで"]
+];
+
+var AICM_B6R62_TARGET_USERS = [
+  ["all_generations", "全世代"],
+  ["children", "子供向け"],
+  ["parent_child", "親子向け"],
+  ["elderly", "高齢者向け"],
+  ["family", "家族向け"],
+  ["unspecified", "未指定"]
+];
+
+var AICM_B6R62_DELIVERY_FORMATS = [
+  ["delivery_summary", "要約成果物"],
+  ["detailed_plan", "詳細企画書"],
+  ["screen_idea", "画面案"],
+  ["script", "台本"],
+  ["design_doc", "設計書"],
+  ["implementation_tasks", "実装タスク"],
+  ["multi_deliverables", "複数成果物"]
+];
+
+function aicmB6R62BuildPresidentPolicyPayload() {
+  var company = aicmB6R62CurrentCompany();
+  if (!company || !company.aicm_user_company_id) throw new Error("AI企業が選択されていません。");
+
+  var settings = aicmB6R62BusinessStartSettings();
+  var policyText = aicmB6R62Text(company.president_policy_instruction_text) || "President方針が未設定です。AI企業設定で方針を保存してください。";
+
+  var rulesSnapshot = [
+    "【会社共通ルール】",
+    aicmB6R62RuleValue(company, "company_common_rules_text"),
+    "",
+    "【規約・禁止事項】",
+    aicmB6R62RuleValue(company, "company_terms_text"),
+    "",
+    "【制約条件】",
+    aicmB6R62RuleValue(company, "company_constraints_text"),
+    "",
+    "【品質基準】",
+    aicmB6R62RuleValue(company, "company_quality_standard_text"),
+    "",
+    "【納品基準】",
+    aicmB6R62RuleValue(company, "company_delivery_standard_text"),
+    "",
+    "【表現/安全ルール】",
+    aicmB6R62RuleValue(company, "company_safety_expression_rules_text")
+  ].join("\n");
+
+  var settingsText = [
+    "今回の実行名: " + settings.run_name,
+    "成果物タイプ: " + aicmB6R62BusinessStartLabel(settings.deliverable_type, AICM_B6R62_DELIVERABLE_TYPES),
+    "実行範囲: " + aicmB6R62BusinessStartLabel(settings.execution_scope, AICM_B6R62_EXECUTION_SCOPES),
+    "対象ユーザー: " + aicmB6R62BusinessStartLabel(settings.target_user, AICM_B6R62_TARGET_USERS),
+    "納品形式: " + aicmB6R62BusinessStartLabel(settings.delivery_format, AICM_B6R62_DELIVERY_FORMATS),
+    "今回だけの追加制約: " + (settings.additional_constraints.length ? settings.additional_constraints.join(" / ") : "なし"),
+    "補足メモ: " + (settings.supplemental_note || "なし")
+  ].join("\n");
+
+  return {
+    owner_civilization_id: typeof aicmAvdOwnerId === "function" ? aicmAvdOwnerId() : "00000000-0000-4000-8000-000000000001",
+    aicm_user_company_id: company.aicm_user_company_id,
+    company_id: company.aicm_user_company_id,
+    source_route_code: "president_route",
+    policy_title: settings.run_name + " / " + (company.company_name || "AI企業"),
+    title: settings.run_name + " / " + (company.company_name || "AI企業"),
+    policy_text: policyText + "\n\n【今回の業務設定】\n" + settingsText,
+    president_policy_instruction_text: policyText,
+    president_robot_label: "",
+    requested_by_text: "user",
+    company_common_rules_snapshot: rulesSnapshot,
+    reference_files_text: JSON.stringify(aicmB6R62RuleFile(company) || {}),
+    supplemental_materials_text: settingsText,
+    applicable_rules_text: rulesSnapshot,
+    priority_code: "normal",
+    note: "AI企業業務開始画面からPresidentルート開始",
+    handoff_link: "aicm://president_route/" + company.aicm_user_company_id + "/" + Date.now()
+  };
+}
+
+function renderB6R62BusinessStartConfirm() {
+  var payload = state.pendingB6R62BusinessStartPayload || null;
+
+  if (!payload) {
+    return renderShell([
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">業務開始確認</p>',
+      '  <h2>確認対象がありません</h2>',
+      '  <div class="aicm-dashboard-action-row">',
+      '    <button type="button" data-core-action="go" data-screen="ai-business-start">AI企業業務開始へ戻る</button>',
+      '  </div>',
+      '</section>'
+    ].join(""));
+  }
+
+  return renderShell([
+    '<section class="aicm-core-card">',
+    '  <p class="aicm-eyebrow">業務開始確認</p>',
+    '  <h2>この内容でPresidentルートを開始しますか？</h2>',
+    '  <p class="aicm-selected-note">この操作でPresident方針を作成します。source_route_code=president_route。</p>',
+    '</section>',
+    '<section class="aicm-core-card">',
+    aicmB6R62ReadOnlyBlock("実行名", payload.policy_title),
+    aicmB6R62ReadOnlyBlock("President方針", payload.president_policy_instruction_text),
+    aicmB6R62ReadOnlyBlock("今回の業務設定", payload.supplemental_materials_text),
+    '</section>',
+    '<section class="aicm-core-card aicm-operation-card">',
+    '  <p class="aicm-eyebrow">操作</p>',
+    '  <div class="aicm-dashboard-action-row">',
+    // AICM_B6R65_EXECUTE_INLINE_FALLBACK_BUTTON
+    '    <button id="aicm-b6r62-business-start-execute-btn" type="button" data-core-action="b6r62-business-start-execute" onclick="return window.aicmB6R62ExecuteBusinessStartFromButton ? window.aicmB6R62ExecuteBusinessStartFromButton(event) : false;">開始する</button>',
+    '    <button type="button" data-core-action="b6r62-business-start-cancel">戻る</button>',
+    '  </div>',
+    '</section>'
+  ].join(""));
+}
+
+function aicmB6R62OpenBusinessStartConfirm() {
+  try {
+    state.pendingB6R62BusinessStartPayload = aicmB6R62BuildPresidentPolicyPayload();
+    state.screen = "b6r62-business-start-confirm";
+    if (typeof render === "function") render();
+  } catch (error) {
+    setMessage("error", error && error.message ? error.message : String(error));
+    if (typeof render === "function") render();
+  }
+}
+
+async function aicmB6R62ExecuteBusinessStart() {
+  if (state.b6r62BusinessStartRunning) {
+    setMessage("ok", "Presidentルート開始中...");
+    if (typeof render === "function") render();
+    return;
+  }
+
+  var payload = state.pendingB6R62BusinessStartPayload || null;
+  if (!payload) {
+    setMessage("error", "確認対象がありません。");
+    state.screen = "ai-business-start";
+    if (typeof render === "function") render();
+    return;
+  }
+
+  state.b6r62BusinessStartRunning = true;
+
+  try {
+    state.noticeMessage = "Presidentルート開始中...";
+    state.errorMessage = "";
+    if (typeof render === "function") render();
+
+    var json = await aicmOrgPostJson("/api/aicm/v2/president-policy/create", payload);
+
+    if (!json || json.result !== "ok") {
+      throw new Error((json && (json.message || json.reason)) || "Presidentルート開始に失敗しました。");
+    }
+
+    var policy = json.president_policy || {};
+    var policyId = String(policy.aicm_president_policy_id || "");
+    if (!policyId) throw new Error("President方針IDが取得できません。");
+
+    state.noticeMessage = "President方針を作成しました。Manager大項目を作成中...";
+    if (typeof render === "function") render();
+
+    var managerResult = await aicmOrgPostJson("/api/aicm/v2/manager-major/create", {
+      owner_civilization_id: payload.owner_civilization_id,
+      aicm_user_company_id: payload.aicm_user_company_id,
+      aicm_president_policy_id: policyId,
+      major_item_name: (policy.policy_title || payload.policy_title || "President方針") + " Manager大項目",
+      major_item_description: policy.policy_text || payload.policy_text || "",
+      source_route_code: "president_route",
+      manager_robot_label: policy.president_robot_label || "President",
+      assigned_leader_label: "自動割当",
+      decomposition_status_code: "assigned_to_leader",
+      handoff_status_code: "handed_off",
+      priority_code: policy.priority_code || payload.priority_code || "normal",
+      due_date: policy.due_date || payload.due_date || "",
+      reference_files_text: policy.reference_files_text || payload.reference_files_text || "",
+      supplemental_materials_text: policy.supplemental_materials_text || payload.supplemental_materials_text || "",
+      applicable_rules_text: policy.applicable_rules_text || payload.applicable_rules_text || "",
+      note: "B6R74 auto-created from President route business start",
+      handoff_link: policy.handoff_link || payload.handoff_link || ""
+    });
+
+    var major = managerResult.manager_major_item || {};
+    var majorId = String(major.aicm_manager_major_work_item_id || "");
+    if (!majorId) throw new Error("Manager大項目IDが取得できません。");
+
+    state.noticeMessage = "Manager大項目を作成しました。Leaderへ分解中...";
+    if (typeof render === "function") render();
+
+    var leaderResult = await aicmOrgPostJson("/api/aicm/v2/leader-auto-decomposition/run", {
+      owner_civilization_id: payload.owner_civilization_id,
+      aicm_user_company_id: payload.aicm_user_company_id,
+      mode: "single",
+      aicm_manager_major_work_item_id: majorId,
+      limit: 1,
+      auto_decomposition_version: "b6r74_president_route_ui_v1",
+      source_app_ref: "AICompanyManager/president-route"
+    });
+
+    state.noticeMessage = "Leader分解を実行しました。Worker自動実行中...";
+    if (typeof render === "function") render();
+
+    var workerResult = {};
+    try {
+      workerResult = await aicmOrgPostJson("/api/aicm/v2/worker-auto-execution/run", {
+        owner_civilization_id: payload.owner_civilization_id,
+        aicm_user_company_id: payload.aicm_user_company_id,
+        aicm_manager_major_work_item_id: majorId,
+        limit: 1,
+        source_app_ref: "AICompanyManager/president-route"
+      });
+    } catch (workerError) {
+      workerResult = {
+        result: "worker_auto_execution_error",
+        message: workerError && workerError.message ? workerError.message : String(workerError)
+      };
+    }
+
+    var workerStatus = workerResult && workerResult.result ? String(workerResult.result) : "not_run";
+    var reviewCount = workerResult && workerResult.created_human_review_count !== undefined
+      ? String(workerResult.created_human_review_count)
+      : "";
+
+    state.pendingB6R62BusinessStartPayload = null;
+    state.noticeMessage = "Presidentルートを開始しました。" +
+      " policy_id=" + policyId +
+      " / manager_major_id=" + majorId +
+      " / leader=" + ((leaderResult && leaderResult.result) || "ok") +
+      " / worker=" + workerStatus +
+      (reviewCount ? " / review_count=" + reviewCount : "");
+    state.errorMessage = "";
+
+    try {
+      if (typeof loadContext === "function") await loadContext();
+    } catch (refreshError) {
+      if (typeof console !== "undefined" && console && console.warn) {
+        console.warn("B6R74: context refresh after downstream start failed", refreshError);
+      }
+      state.noticeMessage = (state.noticeMessage || "Presidentルートを開始しました。") + "（一覧更新は再読み込みで反映してください）";
+    }
+
+    state.screen = "dashboard";
+    if (typeof render === "function") render();
+  } catch (error) {
+    setMessage("error", error && error.message ? error.message : "Presidentルート開始に失敗しました。");
+    if (typeof render === "function") render();
+  } finally {
+    state.b6r62BusinessStartRunning = false;
+  }
+}
+
+function aicmB6R62CancelBusinessStart() {
+  state.pendingB6R62BusinessStartPayload = null;
+  state.screen = "ai-business-start";
+  if (typeof render === "function") render();
+}
+
+(function aicmB6R62InstallBusinessStartActions() {
+  if (typeof document === "undefined") return;
+  if (document.__aicmB6R62BusinessStartActionsInstalled) return;
+  document.__aicmB6R62BusinessStartActionsInstalled = true;
+
+  document.addEventListener("click", function (event) {
+    var target = event.target && event.target.closest ? event.target.closest("[data-core-action]") : null;
+    if (!target) return;
+
+    var action = target.getAttribute("data-core-action") || "";
+    if (
+      action !== "b6r62-business-start-confirm-open" &&
+      action !== "b6r62-business-start-execute" &&
+      action !== "b6r62-business-start-cancel"
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (action === "b6r62-business-start-confirm-open") {
+      aicmB6R62OpenBusinessStartConfirm();
+      return;
+    }
+
+    if (action === "b6r62-business-start-execute") {
+      aicmB6R62ExecuteBusinessStart();
+      return;
+    }
+
+    if (action === "b6r62-business-start-cancel") {
+      aicmB6R62CancelBusinessStart();
+    }
+  }, true);
+})();
+
+// AICM_B6R65_WINDOW_EXECUTE_FALLBACK_START
+(function aicmB6R65ExposeBusinessStartExecuteFallback() {
+  if (typeof window === "undefined") return;
+
+  window.aicmB6R62ExecuteBusinessStartFromButton = function (event) {
+    if (event) {
+      if (typeof event.preventDefault === "function") event.preventDefault();
+      if (typeof event.stopPropagation === "function") event.stopPropagation();
+    }
+
+    if (typeof aicmB6R62ExecuteBusinessStart === "function") {
+      void aicmB6R62ExecuteBusinessStart();
+      return false;
+    }
+
+    try {
+      if (typeof setMessage === "function") {
+        setMessage("error", "業務開始処理が読み込まれていません。画面を再読み込みしてください。");
+      }
+      if (typeof render === "function") render();
+    } catch (_) {}
+
+    return false;
+  };
+})();
+// AICM_B6R65_WINDOW_EXECUTE_FALLBACK_END
+
+// AICM_B6R71_RULE_FILE_DELETE_BUTTON_HELPER_START
+function aicmB6R71OpenRuleFileDeleteConfirm() {
+  try {
+    var company = typeof aicmB6R62CurrentCompany === "function"
+      ? aicmB6R62CurrentCompany()
+      : (typeof selectedCompany === "function" ? selectedCompany() : null);
+
+    if (!company || !company.aicm_user_company_id) {
+      setMessage("error", "削除対象のAI企業が選択されていません。");
+      if (typeof render === "function") render();
+      return;
+    }
+
+    var body = aicmB6R62BuildCompanyRuleSettingsBody({
+      owner_civilization_id: typeof aicmAvdOwnerId === "function" ? aicmAvdOwnerId() : "00000000-0000-4000-8000-000000000001",
+      aicm_user_company_id: company.aicm_user_company_id,
+      company_name: aicmB6R62Value("aicm-company-edit-name") || company.company_name || "",
+      business_domain: aicmB6R62Value("aicm-company-edit-domain") || company.business_domain || "",
+      company_status: aicmB6R62Value("aicm-company-edit-status") || company.company_status || company.status_code || "active"
+    });
+
+    if (!body.metadata_jsonb) body.metadata_jsonb = {};
+    if (!body.metadata_jsonb.aicm_company_rule_settings) body.metadata_jsonb.aicm_company_rule_settings = {};
+    body.metadata_jsonb.aicm_company_rule_settings.rule_file = {};
+    body.metadata_jsonb.aicm_company_rule_settings.rule_file_deleted_at = new Date().toISOString();
+
+    var rows = [
+      ["操作", "登録済みファイル削除"],
+      ["企業名", body.company_name],
+      ["削除対象", "登録済み関連ファイル"],
+      ["保存先", "metadata_jsonb.aicm_company_rule_settings.rule_file = {}"]
+    ];
+
+    if (typeof aicmAvdRoleSummaryRows === "function") {
+      rows = rows.concat(aicmAvdRoleSummaryRows("company"));
+    }
+
+    aicmAvdShowDbConfirm({
+      kind: "company-update",
+      title: "登録済みファイル削除",
+      endpoint: "/api/aicm/v2/company/update",
+      body: body,
+      rolePlacements: typeof aicmAxcCompanyRolePlacements === "function"
+        ? aicmAxcCompanyRolePlacements({ aicm_user_company_id: body.aicm_user_company_id })
+        : [],
+      summary_rows: rows
+    });
+  } catch (error) {
+    setMessage("error", error && error.message ? error.message : String(error));
+    if (typeof render === "function") render();
+  }
+}
+
+(function aicmB6R71InstallRuleFileDeleteButton() {
+  if (typeof document === "undefined") return;
+  if (document.__aicmB6R71RuleFileDeleteButtonInstalled) return;
+  document.__aicmB6R71RuleFileDeleteButtonInstalled = true;
+
+  document.addEventListener("click", function (event) {
+    var target = event.target && event.target.closest ? event.target.closest("[data-core-action]") : null;
+    if (!target) return;
+
+    var action = target.getAttribute("data-core-action") || "";
+    if (action !== "b6r71-rule-file-delete-confirm") return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    aicmB6R71OpenRuleFileDeleteConfirm();
+  }, true);
+})();
+// AICM_B6R71_RULE_FILE_DELETE_BUTTON_HELPER_END
+
+// AICM_B6R62_COMPANY_RULES_BUSINESS_START_UI_END
+
 function renderCompanyEditPlaceholder() {
     var company = aicmAvdCurrentCompany();
 
@@ -2706,9 +3401,11 @@ function renderCompanyEditPlaceholder() {
       ].join(""));
     }
 
+    var ruleFile = aicmB6R62RuleFile(company);
+
     return renderShell([
       '<section class="aicm-core-card">',
-      '  <p class="aicm-eyebrow">企業変更</p>',
+      '  <p class="aicm-eyebrow">AI企業設定</p>',
       '  <h2>企業情報を変更</h2>',
       '  <input id="aicm-company-edit-id" type="hidden" value="' + escapeHtml(company.aicm_user_company_id || "") + '">',
       '  <label>企業名<input id="aicm-company-edit-name" type="text" value="' + escapeHtml(company.company_name || "") + '" placeholder="例: ウルフ"></label>',
@@ -2717,6 +3414,23 @@ function renderCompanyEditPlaceholder() {
       '    <option value="active"' + ((company.company_status || "active") === "active" ? " selected" : "") + '>有効</option>',
       '    <option value="inactive"' + ((company.company_status || "active") === "inactive" ? " selected" : "") + '>無効</option>',
       '  </select></label>',
+      '</section>',
+      '<section class="aicm-core-card">',
+      '  <p class="aicm-eyebrow">会社正本設定</p>',
+      '  <h2>方針・規約・制約</h2>',
+      aicmB6R62Textarea("aicm-company-edit-policy", "President方針", aicmB6R62Text(company.president_policy_instruction_text) || "子供からお年寄りまで世代を超えて楽しめるエンタテインメント作品を創造する。", 4),
+      aicmB6R62Textarea("aicm-company-edit-rules", "5. 会社共通ルール", aicmB6R62RuleValue(company, "company_common_rules_text"), 4),
+      aicmB6R62Textarea("aicm-company-edit-terms", "6. 規約・禁止事項", aicmB6R62RuleValue(company, "company_terms_text"), 4),
+      aicmB6R62Textarea("aicm-company-edit-constraints", "7. 制約条件", aicmB6R62RuleValue(company, "company_constraints_text"), 4),
+      aicmB6R62Textarea("aicm-company-edit-quality", "8. 品質基準", aicmB6R62RuleValue(company, "company_quality_standard_text"), 4),
+      aicmB6R62Textarea("aicm-company-edit-delivery", "9. 納品基準", aicmB6R62RuleValue(company, "company_delivery_standard_text"), 4),
+      aicmB6R62Textarea("aicm-company-edit-safety-expression", "10. 表現/安全ルール", aicmB6R62RuleValue(company, "company_safety_expression_rules_text"), 4),
+      '  <label>関連ファイル 1つ<input id="aicm-company-rule-file" type="file"></label>',
+      ruleFile && ruleFile.file_name ? [
+        '  <p class="aicm-selected-note">登録済みファイル: ' + escapeHtml(ruleFile.file_name || "") + '</p>',
+        // AICM_B6R71_RULE_FILE_DELETE_BUTTON
+        '  <button type="button" data-core-action="b6r71-rule-file-delete-confirm">登録済みファイルを削除</button>'
+      ].join("") : '  <p class="aicm-selected-note">ファイルは1つまで。現段階ではファイル名/サイズ/typeを保存します。</p>',
       '</section>',
       '<section class="aicm-core-card">',
       '  <p class="aicm-eyebrow">社長設定</p>',
@@ -11318,30 +12032,59 @@ function renderAicmBusinessStartScreen() {
     if (typeof selectedCompany === "function") company = selectedCompany();
     if (!company && typeof aicmOrgSelectedCompany === "function") company = aicmOrgSelectedCompany();
 
+    if (!company) {
+      return renderShell([
+        '<section class="aicm-core-card">',
+        '  <p class="aicm-eyebrow">AI企業業務開始</p>',
+        '  <h2>AI企業を選択してください</h2>',
+        '  <p class="aicm-core-empty">先にAI企業ダッシュボードで企業を選択してください。</p>',
+        '  <div class="aicm-dashboard-action-row">',
+        '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
+        '  </div>',
+        '</section>'
+      ].join(""));
+    }
+
     return renderShell([
       '<section class="aicm-core-card">',
-      '  <p class="aicm-eyebrow">AI企業業務開始</p>',
-      '  <h2>President起点で業務を開始</h2>',
-      company ? '  <p class="aicm-selected-note">対象会社: <strong>' + escapeHtml(company.company_name || "") + '</strong></p>' : '  <p class="aicm-core-empty">AI企業を選択してください。</p>',
-      '  <p class="aicm-selected-note">Presidentが会社方針・事業方針から業務を送り、Manager/部長が大項目へ分解し、課長へ引き継ぎます。</p>',
+      '  <p class="aicm-eyebrow">President方針</p>',
+      '  <h2>変更不可</h2>',
+      aicmB6R62ReadOnlyBlock("対象会社", company.company_name || "AI企業"),
+      aicmB6R62ReadOnlyBlock("President方針", aicmB6R62Text(company.president_policy_instruction_text) || "President方針が未設定です。AI企業設定で保存してください。"),
       '</section>',
       '<section class="aicm-core-card">',
-      '  <p class="aicm-eyebrow">正本ルート</p>',
-      '  <h2>業務開始ルート</h2>',
-      '  <div class="aicm-confirm-row"><strong>1. President</strong><p>会社方針・事業方針から業務を送ります。</p></div>',
-      '  <div class="aicm-confirm-row"><strong>2. Manager/部長</strong><p>受け取った業務を大項目レベルへ分解します。</p></div>',
-      '  <div class="aicm-confirm-row"><strong>3. 課長</strong><p>大項目を受け取り、中項目・作業単位へ分解します。</p></div>',
-      '  <div class="aicm-confirm-row"><strong>4. Worker</strong><p>作業単位を実行し、成果物を作成します。</p></div>',
+      '  <p class="aicm-eyebrow">会社ルール・規約・制約</p>',
+      '  <h2>今回の業務に適用される前提</h2>',
+      aicmB6R62ReadOnlyBlock("会社共通ルール", aicmB6R62RuleValue(company, "company_common_rules_text")),
+      aicmB6R62ReadOnlyBlock("規約・禁止事項", aicmB6R62RuleValue(company, "company_terms_text")),
+      aicmB6R62ReadOnlyBlock("制約条件", aicmB6R62RuleValue(company, "company_constraints_text")),
+      aicmB6R62ReadOnlyBlock("品質基準", aicmB6R62RuleValue(company, "company_quality_standard_text")),
+      aicmB6R62ReadOnlyBlock("納品基準", aicmB6R62RuleValue(company, "company_delivery_standard_text")),
+      aicmB6R62ReadOnlyBlock("表現/安全ルール", aicmB6R62RuleValue(company, "company_safety_expression_rules_text")),
       '</section>',
       '<section class="aicm-core-card">',
-      '  <p class="aicm-eyebrow">CSV代替ルート</p>',
-      '  <h2>部長分解済み大項目の取り込み</h2>',
-      '  <p class="aicm-selected-note">CSVは、Manager/部長による大項目分解結果を代替入力するルートです。CSV取り込み後、登録済み大項目から課長へ引き継ぎます。</p>',
+      '  <p class="aicm-eyebrow">業務設定</p>',
+      '  <h2>今回の実行条件</h2>',
+      aicmB6R62Select("b6r62-run-name-select", "今回の実行名", [["初回企画作成","初回企画作成"],["MVP設計","MVP設計"],["キャラクター/IP設計","キャラクター/IP設計"],["動画企画作成","動画企画作成"],["アプリ企画作成","アプリ企画作成"]], "初回企画作成"),
+      aicmB6R62Select("b6r62-deliverable-type", "成果物タイプ", AICM_B6R62_DELIVERABLE_TYPES, "president_suggest"),
+      aicmB6R62Select("b6r62-execution-scope", "実行範囲", AICM_B6R62_EXECUTION_SCOPES, "planning_doc"),
+      aicmB6R62Select("b6r62-target-user", "対象ユーザー", AICM_B6R62_TARGET_USERS, "all_generations"),
+      aicmB6R62Select("b6r62-delivery-format", "納品形式", AICM_B6R62_DELIVERY_FORMATS, "delivery_summary"),
+      '<div class="aicm-core-card" style="margin-top:12px;">',
+      '  <p class="aicm-eyebrow">今回だけの追加制約</p>',
+      aicmB6R62Checked("b6r62-constraint-safe-expression", "安全表現", true),
+      aicmB6R62Checked("b6r62-constraint-age-care", "年齢配慮", true),
+      aicmB6R62Checked("b6r62-constraint-no-violent-sexual", "暴力/性的表現なし", true),
+      aicmB6R62Checked("b6r62-constraint-mobile-first", "スマホ優先", false),
+      aicmB6R62Checked("b6r62-constraint-low-budget", "低予算", false),
+      aicmB6R62Checked("b6r62-constraint-multilingual", "多言語想定", false),
+      '</div>',
+      '<label>補足メモ<textarea id="b6r62-supplemental-note" rows="3" placeholder="今回だけの補足があれば短く入力"></textarea></label>',
       '</section>',
       '<section class="aicm-core-card aicm-operation-card">',
       '  <p class="aicm-eyebrow">操作</p>',
       '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="task-ledger-open">部門別タスク台帳へ</button>',
+      '    <button type="button" data-core-action="b6r62-business-start-confirm-open">業務開始</button>',
       '    <button type="button" data-core-action="go" data-screen="dashboard">戻る</button>',
       '  </div>',
       '</section>'
@@ -11503,6 +12246,8 @@ html = renderSectionNew();
       html = renderDepartmentEditPlaceholder();
     } else if (state.screen === "section-edit") {
       html = renderSectionEditPlaceholder();
+    } else if (state.screen === "b6r62-business-start-confirm") {
+      html = renderB6R62BusinessStartConfirm();
     } else if (state.screen === "ai-business-start") {
       html = renderAicmBusinessStartScreen();
     } else if (state.screen === "task-ledger") {
