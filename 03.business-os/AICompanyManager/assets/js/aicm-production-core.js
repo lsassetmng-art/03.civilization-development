@@ -17284,11 +17284,26 @@ async function aicmR8zV10gc3iExecuteReviewDecision(button) {
     button.disabled = true;
     aicmR8zV10gc3iSetMessage("info", decision === "approved" ? "承認を実行しています。" : "差し戻しを実行しています。");
 
+    // AICM_B6R94R3N1_SAFE_RELOAD_AFTER_REVIEW_DECISION_START
+    // Partial updates were unstable for this review screen.
+    // After DB update succeeds, use the browser reload path to rebuild context/UI from canonical sources.
     await aicmR8zV10gc3iPostDecision(decision, payload);
 
-    aicmR8zV10gc3iSetMessage("ok", decision === "approved" ? "承認しました。" : "差し戻しました。");
+    aicmR8zV10gc3iSetMessage("ok", decision === "approved" ? "承認しました。画面を再読込します。" : "差し戻しました。画面を再読込します。");
+
+    try {
+      if (typeof window !== "undefined" && window.location && typeof window.location.reload === "function") {
+        window.__aicmB6R94R3n1LastDecisionReviewId = aicmR8zV10gc3iText(payload.aicm_human_review_item_id);
+        window.__aicmB6R94R3n1ReloadAt = new Date().toISOString();
+        setTimeout(function() {
+          window.location.reload();
+        }, 350);
+        return;
+      }
+    } catch (_) {}
 
     await aicmR8zV10gc3iRefreshReviewList(payload.aicm_human_review_item_id);
+    // AICM_B6R94R3N1_SAFE_RELOAD_AFTER_REVIEW_DECISION_END
   } catch (error) {
     button.disabled = false;
     aicmR8zV10gc3iSetMessage("error", error && error.message ? error.message : "レビュー更新に失敗しました。");

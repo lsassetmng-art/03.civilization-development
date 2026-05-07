@@ -1600,6 +1600,7 @@ function aicmWorkerRuntimeBuildIdempotencyKey(body, placement) {
 }
 
 function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayload) {
+  // AICM_B6R94R3A_INDIVIDUAL_REVIEW_SUMMARY_LINK_START
   requestBody = requestBody && typeof requestBody === "object" ? requestBody : {};
   runtimePayload = runtimePayload && typeof runtimePayload === "object" ? runtimePayload : {};
 
@@ -1651,9 +1652,34 @@ function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayloa
     "個別依頼 実行結果レビュー"
   ).trim() || "個別依頼 実行結果レビュー";
 
-  const summary = String(
-    "個別依頼のAIWorkerOS実行受付が完了しました。Workbenchで実行状態を確認し、必要に応じてレビュー・差し戻しを行ってください。 runtime_request_id=" + requestId
-  );
+  const sourceInstructionText = String(
+    requestBody.instruction_text ||
+    requestBody.task_description ||
+    runtimeRequest.instruction_text ||
+    runtimeRequest.task_description ||
+    runtimeRequest.prompt ||
+    ""
+  ).trim();
+
+  const resultSummaryText = String(
+    runtimePayload.result_summary_text ||
+    runtimePayload.delivery_summary_text ||
+    runtimePayload.summary ||
+    runtimePayload.message ||
+    runtimeRequest.result_summary_text ||
+    runtimeRequest.summary ||
+    ""
+  ).trim();
+
+  const summary = [
+    "成果物概要: " + (resultSummaryText || (title + " の実行結果を人間レビューへ回付するための納品サマリーです。")),
+    "主な内容: 個別AI実行Workbenchから送信された依頼内容、実行結果、確認対象をレビュー用に整理しています。",
+    "確認ポイント: 依頼内容との整合性、成果物としての不足、表現・形式、次工程へ進める品質を確認してください。",
+    "未解決事項: レビュー時点で不足や差し戻し理由があれば、差し戻し指示へ記録してください。",
+    "次工程: 承認する場合は納品扱いへ進み、差し戻す場合は修正指示を返してください。"
+  ].join("\n");
+
+  const summaryFileLink = "/api/aicm/v2/delivery-summary/markdown?runtime_request_id=" + encodeURIComponent(requestId);
 
   const metadataJson = JSON.stringify({
     source: "worker-runtime/request",
@@ -1664,12 +1690,18 @@ function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayloa
     source_entity_id: requestId,
     runtime_request_id: requestId,
     source_request_ref: runtimeRequest.source_request_ref || requestBody.source_request_ref || "",
+    source_instruction_text: sourceInstructionText,
+    runtime_result_summary_text: resultSummaryText,
     return_target_type: "workbench_runtime_request",
     return_target_id: requestId,
     reexecute_target_type: "runtime_request",
     reexecute_target_id: requestId,
     context_restore_type: "workbench",
-    context_restore_id: requestId
+    context_restore_id: requestId,
+    delivery_summary_file_link: summaryFileLink,
+    delivery_summary_file_kind: "markdown",
+    delivery_summary_file_source: "human_review_delivery_summary",
+    review_target_is_summary_file: true
   });
 
   const sql = [
@@ -1703,10 +1735,10 @@ function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayloa
     "    " + sqlLiteral("delivery_package") + ",",
     "    " + sqlLiteral("個別依頼レビュー: ") + " || " + sqlLiteral(title) + ",",
     "    " + sqlLiteral(summary) + ",",
-    "    " + sqlLiteral("AIWorkerOS runtime request accepted.") + ",",
-    "    " + sqlLiteral("自動レビュー待ち登録: human_go済みの個別依頼として受付。") + ",",
-    "    " + sqlLiteral("") + ",",
-    "    " + sqlLiteral("") + ",",
+    "    " + sqlLiteral("個別AI実行Workbenchの実行結果を納品レビュー用に整理。") + ",",
+    "    " + sqlLiteral("AIレビュー: human_go済みの個別依頼として、納品サマリーファイルを人間レビューへ回付。") + ",",
+    "    " + sqlLiteral("レビューで不足があれば差し戻し指示へ記録してください。") + ",",
+    "    " + sqlLiteral(summaryFileLink) + ",",
     "    " + sqlLiteral(workerLabel) + ",",
     "    " + sqlLiteral("AICompanyManager") + ",",
     "    " + sqlLiteral("pending") + ",",
@@ -1727,7 +1759,9 @@ function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayloa
   ].join("\n");
 
   return runPsqlJson(sql);
+  // AICM_B6R94R3A_INDIVIDUAL_REVIEW_SUMMARY_LINK_END
 }
+
 
 async function createWorkerRuntimeRequest(body) {
   // AICM_WORKBENCH_RUNTIME_CODE_NORMALIZE_AXT_R7_V1
@@ -2307,6 +2341,135 @@ function markWorkerUnitAutoExecutionStartedR8ZI(unitId, runtimePayload) {
 }
 
 
+// AICM_B6R85_DELIVERY_SUMMARY_FILE_LINK_START
+function aicmB6R85UuidOrEmpty(value) {
+  const text = String(value || "").trim();
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(text) ? text : "";
+}
+
+function aicmB6R85SafeSummaryFileName(value) {
+  const base = String(value || "delivery-summary")
+    .replace(/[^A-Za-z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 90);
+  return (base || "delivery-summary") + ".md";
+}
+
+function aicmB6R85DeliverySummaryMarkdown(searchParams) {
+  // AICM_B6R94R3A_DELIVERY_SUMMARY_MARKDOWN_ENDPOINT_START
+  const reviewId = aicmB6R85UuidOrEmpty(searchParams.get("review_id") || searchParams.get("reviewId"));
+  const workerId = aicmB6R85UuidOrEmpty(searchParams.get("worker_id") || searchParams.get("workerId"));
+  const runtimeRequestId = String(searchParams.get("runtime_request_id") || searchParams.get("runtimeRequestId") || "").trim();
+
+  if (!reviewId && !workerId && !runtimeRequestId) {
+    return {
+      result: "error",
+      error_code: "MISSING_TARGET",
+      message: "review_id, worker_id, or runtime_request_id is required."
+    };
+  }
+
+  const where = reviewId
+    ? "r.aicm_human_review_item_id = " + sqlLiteral(reviewId) + "::uuid"
+    : workerId
+      ? "r.related_worker_work_unit_id = " + sqlLiteral(workerId) + "::uuid"
+      : "r.metadata_jsonb->>'runtime_request_id' = " + sqlLiteral(runtimeRequestId);
+
+  const sql = [
+    "WITH target AS (",
+    "  SELECT",
+    "    to_jsonb(r) AS rj,",
+    "    COALESCE(to_jsonb(w), '{}'::jsonb) AS wj",
+    "  FROM business.aicm_human_review_item r",
+    "  LEFT JOIN business.aicm_worker_work_unit w",
+    "    ON w.aicm_worker_work_unit_id = r.related_worker_work_unit_id",
+    "  WHERE " + where,
+    "  ORDER BY r.created_at DESC",
+    "  LIMIT 1",
+    "), rendered AS (",
+    "  SELECT",
+    "    COALESCE(rj->>'aicm_human_review_item_id', '') AS review_id,",
+    "    COALESCE(rj->>'related_worker_work_unit_id', wj->>'aicm_worker_work_unit_id', '') AS worker_id,",
+    "    COALESCE(rj->'metadata_jsonb'->>'runtime_request_id', '') AS runtime_request_id,",
+    "    COALESCE(NULLIF(rj->>'review_title', ''), NULLIF(wj->>'work_unit_name', ''), '納品サマリー') AS title,",
+    "    COALESCE(NULLIF(rj->>'artifact_kind_label', ''), NULLIF(rj->>'artifact_kind_code', ''), 'delivery_summary') AS artifact_kind,",
+    "    COALESCE(NULLIF(rj->>'priority_code', ''), NULLIF(wj->>'priority_code', ''), 'normal') AS priority_code,",
+    "    COALESCE(NULLIF(rj->>'created_at', ''), NULLIF(wj->>'updated_at', ''), NULLIF(wj->>'created_at', ''), '') AS created_at,",
+    "    COALESCE(",
+    "      NULLIF(rj->>'delivery_summary_text', ''),",
+    "      NULLIF(wj->>'result_summary_text', ''),",
+    "      NULLIF(rj->'metadata_jsonb'->'worker_auto_execution_result'->>'delivery_summary_text', ''),",
+    "      NULLIF(rj->'metadata_jsonb'->'worker_auto_execution_result'->>'result_summary_text', ''),",
+    "      NULLIF(rj->'metadata_jsonb'->'worker_auto_execution_result'->>'summary', ''),",
+    "      NULLIF(rj->'metadata_jsonb'->'worker_auto_execution_result'->>'message', ''),",
+    "      NULLIF(rj->'metadata_jsonb'->>'runtime_result_summary_text', ''),",
+    "      NULLIF(rj->'metadata_jsonb'->>'runtime_summary', ''),",
+    "      '対象成果物の概要を、人間レビュー用に整理しました。'",
+    "    ) AS summary_text,",
+    "    COALESCE(",
+    "      NULLIF(rj->>'main_changes_text', ''),",
+    "      NULLIF(rj->'metadata_jsonb'->'worker_auto_execution_result'->>'main_changes_text', ''),",
+    "      NULLIF(rj->'metadata_jsonb'->'worker_auto_execution_result'->>'main_contents_text', ''),",
+    "      NULLIF(wj->>'expected_output_text', ''),",
+    "      '成果物の本文・出力形式・対象範囲・依頼内容との整合性を確認してください。'",
+    "    ) AS main_contents_text,",
+    "    COALESCE(",
+    "      NULLIF(rj->>'unresolved_issues_text', ''),",
+    "      NULLIF(rj->'metadata_jsonb'->'worker_auto_execution_result'->>'unresolved_issues_text', ''),",
+    "      'レビュー時点で未解決事項があれば、差し戻し理由として記録してください。'",
+    "    ) AS unresolved_issues_text,",
+    "    COALESCE(NULLIF(rj->>'ai_review_result_text', ''), NULLIF(rj->'metadata_jsonb'->'worker_auto_execution_result'->>'ai_review_result_text', ''), 'AIレビュー結果: 登録済みの納品サマリーを人間レビューへ回付します。') AS ai_review_text,",
+    "    concat_ws(chr(10),",
+    "      NULLIF('作業名: ' || COALESCE(NULLIF(wj->>'work_unit_name', ''), NULLIF(rj->>'review_title', '')), '作業名: '),",
+    "      NULLIF('作業説明: ' || COALESCE(NULLIF(wj->>'work_unit_description', ''), NULLIF(rj->'metadata_jsonb'->>'source_instruction_text', '')), '作業説明: '),",
+    "      NULLIF('期待成果物: ' || COALESCE(NULLIF(wj->>'expected_output_text', ''), NULLIF(rj->'metadata_jsonb'->>'expected_output_text', '')), '期待成果物: '),",
+    "      NULLIF('元依頼ID: ' || COALESCE(NULLIF(rj->'metadata_jsonb'->>'source_request_ref', ''), NULLIF(rj->'metadata_jsonb'->>'source_entity_id', '')), '元依頼ID: ')",
+    "    ) AS source_instruction_text",
+    "  FROM target",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', CASE WHEN EXISTS (SELECT 1 FROM rendered) THEN 'ok' ELSE 'not_found' END,",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'file_name', COALESCE((SELECT 'delivery-summary-' || COALESCE(NULLIF(worker_id, ''), NULLIF(runtime_request_id, ''), NULLIF(review_id, '')) || '.md' FROM rendered), 'delivery-summary.md'),",
+    "  'content', COALESCE((",
+    "    SELECT concat(",
+    "      '# ', title, chr(10), chr(10),",
+    "      '## このファイルについて', chr(10),",
+    "      'このファイルは、成果物本体ではなく、人間レビュー用にAICompanyManagerが生成した納品サマリーファイルです。', chr(10), chr(10),",
+    "      '## レビューID', chr(10), review_id, chr(10), chr(10),",
+    "      '## Worker作業単位ID または Runtime request ID', chr(10),",
+    "      'Worker作業単位ID: ', COALESCE(NULLIF(worker_id, ''), '-'), chr(10),",
+    "      'Runtime request ID: ', COALESCE(NULLIF(runtime_request_id, ''), '-'), chr(10), chr(10),",
+    "      '## 種別', chr(10), artifact_kind, chr(10), chr(10),",
+    "      '## 優先度', chr(10), priority_code, chr(10), chr(10),",
+    "      '## 作成日時', chr(10), created_at, chr(10), chr(10),",
+    "      '## 納品サマリー', chr(10),",
+    "      '### 成果物概要', chr(10), summary_text, chr(10), chr(10),",
+    "      '### 主な内容', chr(10), main_contents_text, chr(10), chr(10),",
+    "      '### 確認ポイント', chr(10),",
+    "      '- 依頼内容・作成条件と成果物の整合性', chr(10),",
+    "      '- 成果物として必要な項目の不足有無', chr(10),",
+    "      '- 表現、形式、次工程へ進める品質かどうか', chr(10), chr(10),",
+    "      '### 未解決事項', chr(10), unresolved_issues_text, chr(10), chr(10),",
+    "      '### 次工程', chr(10),",
+    "      '- 承認する場合は納品扱いへ進む', chr(10),",
+    "      '- 差し戻す場合は修正指示を返す', chr(10), chr(10),",
+    "      '## 作成条件 / 元指示', chr(10), COALESCE(NULLIF(source_instruction_text, ''), '元指示はreview metadataまたはWorker作業単位を参照してください。'), chr(10), chr(10),",
+    "      '## AIレビュー結果', chr(10), ai_review_text, chr(10)",
+    "    )",
+    "    FROM rendered",
+    "  ), '')",
+    ")::text;"
+  ].join("\n");
+
+  return runPsqlJson(sql);
+  // AICM_B6R94R3A_DELIVERY_SUMMARY_MARKDOWN_ENDPOINT_END
+}
+
+// AICM_B6R85_DELIVERY_SUMMARY_FILE_LINK_END
+
+
+
 // AICM_V10L_C2G_B6R8R1_AIWORKEROS_WAITING_METADATA_HELPER_START
 function aicmIsAiworkerRuntimeUnavailableB6R8R1(message) {
   const text = String(message || "").toLowerCase();
@@ -2691,7 +2854,7 @@ function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
     "    '',",
     "    " + sqlLiteral(aiReviewText) + ",",
     "    '',",
-    "    COALESCE(NULLIF(t.handoff_link, ''), ''),",
+    "    COALESCE(NULLIF(t.handoff_link, ''), " + sqlLiteral("/api/aicm/v2/delivery-summary/markdown?worker_id=") + " || t.aicm_worker_work_unit_id::text),",
     "    COALESCE(NULLIF(t.assigned_worker_label, ''), " + sqlLiteral("AIWorker") + "),",
     "    " + sqlLiteral("AICompanyManager") + ",",
     "    " + sqlLiteral("pending") + ",",
@@ -2714,7 +2877,11 @@ function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
     "      " + sqlLiteral("reexecute_target_id") + ", " + b6r46ReexecuteTargetIdTargetExpr + ",",
     "      " + sqlLiteral("context_restore_type") + ", " + b6r46ContextRestoreTypeTargetExpr + ",",
     "      " + sqlLiteral("context_restore_id") + ", " + b6r46ContextRestoreIdTargetExpr + ",",
-    "      " + sqlLiteral("worker_auto_execution_source") + ", " + sqlLiteral("worker-auto-execution/run") + "",
+    "      " + sqlLiteral("worker_auto_execution_source") + ", " + sqlLiteral("worker-auto-execution/run") + ",",
+    "      " + sqlLiteral("delivery_summary_file_link") + ", " + sqlLiteral("/api/aicm/v2/delivery-summary/markdown?worker_id=") + " || t.aicm_worker_work_unit_id::text,",
+    "      " + sqlLiteral("delivery_summary_file_kind") + ", " + sqlLiteral("markdown") + ",",
+    "      " + sqlLiteral("delivery_summary_file_source") + ", " + sqlLiteral("human_review_delivery_summary") + ",",
+    "      " + sqlLiteral("review_target_is_summary_file") + ", true",
     "    )",
     "  FROM target t",
     "  WHERE COALESCE(t.review_required_flag, true) = true",
@@ -3351,6 +3518,26 @@ if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
     if (route === "/api/aicm/v2/worker-auto-execution/run" && req.method === "POST") {
       const body = await readBody(req);
       sendJson(res, 200, await runWorkerAutoExecutionR8ZI(body));
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/delivery-summary/markdown" && req.method === "GET") {
+      const payload = aicmB6R85DeliverySummaryMarkdown(url.searchParams);
+      if (!payload || payload.result !== "ok") {
+        sendJson(res, payload && payload.result === "not_found" ? 404 : 400, payload || {
+          result: "error",
+          error_code: "DELIVERY_SUMMARY_NOT_FOUND"
+        });
+        return true;
+      }
+
+      const fileName = aicmB6R85SafeSummaryFileName(payload.file_name || "delivery-summary.md");
+      res.writeHead(200, {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": "inline; filename=\"" + fileName + "\"",
+        "Cache-Control": "no-store"
+      });
+      res.end(String(payload.content || ""));
       return true;
     }
     if (route === "/api/aicm/v2/worker-runtime/request" && req.method === "POST") {
