@@ -13206,8 +13206,87 @@ root.addEventListener("click", handleRootClick);
     return status;
   }
 
+  // AICM_B6R47_REVIEW_LIST_SYNC_CONTEXT_FALLBACK_START
+  function r8zB47ReviewRowsSyncFallback() {
+    try {
+      if (typeof XMLHttpRequest === "undefined") return [];
+
+      var state = r8zV5dState();
+      var ctx = state && state.context && typeof state.context === "object" ? state.context : {};
+      var owner = r8zV5dText(
+        state.owner_civilization_id ||
+        state.ownerCivilizationId ||
+        ctx.owner_civilization_id ||
+        ctx.ownerCivilizationId ||
+        "00000000-0000-4000-8000-000000000001"
+      );
+
+      if (!owner) return [];
+
+      var xhr = new XMLHttpRequest();
+      var url = "/api/aicm/v2/context?owner_civilization_id=" + encodeURIComponent(owner) + "&v=b6r47_r3_" + String(Date.now());
+      xhr.open("GET", url, false);
+      try { xhr.setRequestHeader("cache-control", "no-store"); } catch (_) {}
+      xhr.send(null);
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        state.aicmB6R47ReviewSyncFallbackError = "status=" + String(xhr.status);
+        return [];
+      }
+
+      var payload = {};
+      try { payload = xhr.responseText ? JSON.parse(xhr.responseText) : {}; } catch (parseError) {
+        state.aicmB6R47ReviewSyncFallbackError = "parse=" + String(parseError && parseError.message ? parseError.message : parseError);
+        return [];
+      }
+
+      var rows = [];
+      if (Array.isArray(payload.review_wait_items)) rows = payload.review_wait_items;
+      else if (payload.context && Array.isArray(payload.context.review_wait_items)) rows = payload.context.review_wait_items;
+      else if (payload.data && Array.isArray(payload.data.review_wait_items)) rows = payload.data.review_wait_items;
+      else if (Array.isArray(payload.human_review_wait_items)) rows = payload.human_review_wait_items;
+      else if (Array.isArray(payload.reviewWaitItems)) rows = payload.reviewWaitItems;
+      else if (Array.isArray(payload.humanReviewWaitItems)) rows = payload.humanReviewWaitItems;
+
+      rows = Array.isArray(rows) ? rows.filter(function(row) {
+        return row && typeof row === "object";
+      }) : [];
+
+      rows.forEach(function(row) {
+        var meta = row && row.metadata_jsonb && typeof row.metadata_jsonb === "object" ? row.metadata_jsonb : null;
+        if (meta && !r8zV5dText(row.source_route_code) && r8zV5dText(meta.source_route_code)) row.source_route_code = r8zV5dText(meta.source_route_code);
+        if (meta && !r8zV5dText(row.source_president_policy_id) && r8zV5dText(meta.source_president_policy_id)) row.source_president_policy_id = r8zV5dText(meta.source_president_policy_id);
+      });
+
+      if (!state.context || typeof state.context !== "object") state.context = {};
+      if (payload && payload.result === "ok") {
+        Object.keys(payload).forEach(function(key) {
+          state.context[key] = payload[key];
+        });
+      }
+
+      state.context.review_wait_items = rows;
+      state.review_wait_items = rows;
+      state.aicmB6R47ReviewSyncFallbackRows = rows.length;
+      state.aicmB6R47ReviewSyncFallbackAt = new Date().toISOString();
+      state.aicmB6R47ReviewSyncFallbackError = "";
+      return rows;
+    } catch (error) {
+      try {
+        var state = r8zV5dState();
+        state.aicmB6R47ReviewSyncFallbackError = String(error && error.message ? error.message : error);
+      } catch (_) {}
+      return [];
+    }
+  }
+  // AICM_B6R47_REVIEW_LIST_SYNC_CONTEXT_FALLBACK_END
+
   window.renderReviewListPlaceholder = function renderReviewListPlaceholderR8zV5d() {
     var rows = r8zV5dReviewRows();
+
+    if (!rows.length) {
+      rows = r8zB47ReviewRowsSyncFallback();
+    }
 
     if (!rows.length) {
       r8zV5dHydrateIfNeeded();
@@ -16194,6 +16273,55 @@ if (action === "review-v10f-cancel-confirm") {
       }
 
       var row = findRowById(id);
+
+      // AICM_B6R50_REVIEW_DETAIL_ROW_FALLBACK_START
+      if (!row) {
+        try {
+          var fallbackRows = fetchRowsByContextV10D5();
+          for (var fallbackIndex = 0; fallbackIndex < fallbackRows.length; fallbackIndex += 1) {
+            var fallbackRow = fallbackRows[fallbackIndex] || {};
+            var fallbackId = text(
+              fallbackRow.aicm_human_review_item_id ||
+              fallbackRow.human_review_item_id ||
+              fallbackRow.review_id ||
+              fallbackRow.id ||
+              ""
+            );
+
+            if (fallbackId && fallbackId === id) {
+              row = fallbackRow;
+              break;
+            }
+          }
+
+          if (row) {
+            var stateForFallback = app();
+            if (!Array.isArray(stateForFallback.review_wait_items)) stateForFallback.review_wait_items = [];
+            var existsInState = false;
+
+            for (var stateRowIndex = 0; stateRowIndex < stateForFallback.review_wait_items.length; stateRowIndex += 1) {
+              var stateRow = stateForFallback.review_wait_items[stateRowIndex] || {};
+              var stateRowId = text(
+                stateRow.aicm_human_review_item_id ||
+                stateRow.human_review_item_id ||
+                stateRow.review_id ||
+                stateRow.id ||
+                ""
+              );
+              if (stateRowId === id) {
+                existsInState = true;
+                break;
+              }
+            }
+
+            if (!existsInState) stateForFallback.review_wait_items.push(row);
+            if (!stateForFallback.context || typeof stateForFallback.context !== "object") stateForFallback.context = {};
+            if (!Array.isArray(stateForFallback.context.review_wait_items)) stateForFallback.context.review_wait_items = stateForFallback.review_wait_items;
+          }
+        } catch (_) {}
+      }
+      // AICM_B6R50_REVIEW_DETAIL_ROW_FALLBACK_END
+
       if (!row) {
         setVisibleDebug("clicked but row not found / action=" + action + " / id=" + id + " / rows=" + String(rowsFromState().length));
         return true;
@@ -16796,7 +16924,7 @@ if (typeof window !== "undefined") {
       if (majorId) html.push('    <dt>manager_major_id</dt><dd>' + esc(majorId) + '</dd>');
       html.push('  </dl>');
       html.push('  <div class="aicm-dashboard-action-row">');
-      html.push('    <button type="button" data-core-action="review-detail-open" data-review-id="' + esc(id) + '" data-human-review-id="' + esc(id) + '">成果物を確認</button>');
+      html.push('    <button type="button" data-core-action="review-v10d4-open-detail" data-review-id="' + esc(id) + '" data-human-review-id="' + esc(id) + '">成果物を確認</button>');
       html.push('    <button type="button" data-core-action="human-review-approve" data-review-id="' + esc(id) + '" data-human-review-id="' + esc(id) + '">承認</button>');
       html.push('    <button type="button" data-core-action="human-review-return" data-review-id="' + esc(id) + '" data-human-review-id="' + esc(id) + '">差し戻し</button>');
       html.push('  </div>');

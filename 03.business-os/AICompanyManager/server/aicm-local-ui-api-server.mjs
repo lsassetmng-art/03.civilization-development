@@ -2360,6 +2360,73 @@ function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
     " THEN NULLIF(" + b6r43r4RuntimeRequestIdSql + ", '')",
     " ELSE w.aicm_worker_work_unit_id::text END)",
   ].join("");
+  // AICM_B6R46_INSERTED_REVIEW_TARGET_ALIAS_METADATA_SQL_VARS_START
+  const b6r46TargetMetaExpr = "COALESCE(t.metadata_jsonb, '{}'::jsonb)";
+  const b6r46MetaTextTargetExpr = function b6r46MetaTextTargetExpr(key) {
+    return b6r46TargetMetaExpr + "->>" + sqlLiteral(key);
+  };
+  const b6r46MetaNullIfTargetExpr = function b6r46MetaNullIfTargetExpr(key) {
+    return "NULLIF(" + b6r46MetaTextTargetExpr(key) + ", '')";
+  };
+  const b6r46ReviewRouteTargetExpr = [
+    "COALESCE(",
+    b6r46MetaNullIfTargetExpr("source_route_code"),
+    ", CASE ",
+    "WHEN " + b6r46MetaNullIfTargetExpr("source_president_policy_id") + " IS NOT NULL THEN " + b6r43r4RoutePresidentSql + " ",
+    "WHEN t.aicm_president_policy_id IS NOT NULL THEN " + b6r43r4RoutePresidentSql + " ",
+    "WHEN " + b6r46MetaNullIfTargetExpr("source_manager_major_work_item_id") + " IS NOT NULL THEN " + sqlLiteral("task_ledger_worker") + " ",
+    "WHEN NULLIF(" + b6r43r4RuntimeRequestIdSql + ", '') IS NOT NULL THEN " + b6r43r4RouteIndividualSql + " ",
+    "ELSE " + sqlLiteral("worker_auto_execution") + " END)",
+  ].join("");
+  const b6r46ReturnTargetTypeTargetExpr = [
+    "COALESCE(",
+    b6r46MetaNullIfTargetExpr("return_target_type"),
+    ", CASE WHEN " + b6r46ReviewRouteTargetExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN " + sqlLiteral("workbench_runtime_request"),
+    " ELSE " + sqlLiteral("worker_work_unit") + " END)",
+  ].join("");
+  const b6r46ReturnTargetIdTargetExpr = [
+    "COALESCE(",
+    b6r46MetaNullIfTargetExpr("return_target_id"),
+    ", CASE WHEN " + b6r46ReviewRouteTargetExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN NULLIF(" + b6r43r4RuntimeRequestIdSql + ", '')",
+    " ELSE t.aicm_worker_work_unit_id::text END)",
+  ].join("");
+  const b6r46ReexecuteTargetTypeTargetExpr = [
+    "COALESCE(",
+    b6r46MetaNullIfTargetExpr("reexecute_target_type"),
+    ", CASE WHEN " + b6r46ReviewRouteTargetExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN " + sqlLiteral("runtime_request"),
+    " ELSE " + sqlLiteral("worker_work_unit") + " END)",
+  ].join("");
+  const b6r46ReexecuteTargetIdTargetExpr = [
+    "COALESCE(",
+    b6r46MetaNullIfTargetExpr("reexecute_target_id"),
+    ", CASE WHEN " + b6r46ReviewRouteTargetExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN NULLIF(" + b6r43r4RuntimeRequestIdSql + ", '')",
+    " ELSE t.aicm_worker_work_unit_id::text END)",
+  ].join("");
+  const b6r46ContextRestoreTypeTargetExpr = [
+    "COALESCE(",
+    b6r46MetaNullIfTargetExpr("context_restore_type"),
+    ", CASE WHEN " + b6r46ReviewRouteTargetExpr + " = " + b6r43r4RoutePresidentSql,
+    " THEN " + sqlLiteral("president_route"),
+    " WHEN " + b6r46ReviewRouteTargetExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN " + sqlLiteral("workbench"),
+    " ELSE " + sqlLiteral("task_ledger") + " END)",
+  ].join("");
+  const b6r46ContextRestoreIdTargetExpr = [
+    "COALESCE(",
+    b6r46MetaNullIfTargetExpr("context_restore_id"),
+    ", " + b6r46MetaNullIfTargetExpr("source_manager_major_work_item_id"),
+    ", " + b6r46MetaNullIfTargetExpr("source_president_policy_id"),
+    ", t.aicm_president_policy_id::text",
+    ", CASE WHEN " + b6r46ReviewRouteTargetExpr + " = " + b6r43r4RouteIndividualSql,
+    " THEN NULLIF(" + b6r43r4RuntimeRequestIdSql + ", '')",
+    " ELSE t.aicm_worker_work_unit_id::text END)",
+  ].join("");
+  // AICM_B6R46_INSERTED_REVIEW_TARGET_ALIAS_METADATA_SQL_VARS_END
+
   // AICM_V10L_C2G_B6R43R4_ROUTE_METADATA_SQL_VARS_END
 
   const responseSummary = aicmB6r7Text(
@@ -2469,8 +2536,21 @@ function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
     "    COALESCE(t.display_order, 100),",
     "    jsonb_build_object(",
     "      " + sqlLiteral("source") + ", " + sqlLiteral("worker-auto-execution/run") + ",",
+    "      " + sqlLiteral("source_app_ref") + ", " + sqlLiteral("AICompanyManager") + ",",
+    "      " + sqlLiteral("source_route_code") + ", " + b6r46ReviewRouteTargetExpr + ",",
+    "      " + sqlLiteral("source_screen_code") + ", COALESCE(" + b6r46MetaNullIfTargetExpr("source_screen_code") + ", CASE WHEN " + b6r46ReviewRouteTargetExpr + " = " + b6r43r4RoutePresidentSql + " THEN " + sqlLiteral("president_route") + " WHEN " + b6r46ReviewRouteTargetExpr + " = " + b6r43r4RouteIndividualSql + " THEN " + sqlLiteral("ai_execution_workbench") + " ELSE " + sqlLiteral("task_ledger") + " END),",
+    "      " + sqlLiteral("source_entity_type") + ", " + sqlLiteral("worker_work_unit") + ",",
+    "      " + sqlLiteral("source_entity_id") + ", t.aicm_worker_work_unit_id::text,",
     "      " + sqlLiteral("source_worker_work_unit_id") + ", t.aicm_worker_work_unit_id::text,",
-    "      " + sqlLiteral("source_manager_major_work_item_id") + ", t.aicm_manager_major_work_item_id::text",
+    "      " + sqlLiteral("source_president_policy_id") + ", t.aicm_president_policy_id::text,",
+    "      " + sqlLiteral("source_manager_major_work_item_id") + ", t.aicm_manager_major_work_item_id::text,",
+    "      " + sqlLiteral("return_target_type") + ", " + b6r46ReturnTargetTypeTargetExpr + ",",
+    "      " + sqlLiteral("return_target_id") + ", " + b6r46ReturnTargetIdTargetExpr + ",",
+    "      " + sqlLiteral("reexecute_target_type") + ", " + b6r46ReexecuteTargetTypeTargetExpr + ",",
+    "      " + sqlLiteral("reexecute_target_id") + ", " + b6r46ReexecuteTargetIdTargetExpr + ",",
+    "      " + sqlLiteral("context_restore_type") + ", " + b6r46ContextRestoreTypeTargetExpr + ",",
+    "      " + sqlLiteral("context_restore_id") + ", " + b6r46ContextRestoreIdTargetExpr + ",",
+    "      " + sqlLiteral("worker_auto_execution_source") + ", " + sqlLiteral("worker-auto-execution/run") + "",
     "    )",
     "  FROM target t",
     "  WHERE COALESCE(t.review_required_flag, true) = true",
