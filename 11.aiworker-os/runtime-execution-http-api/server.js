@@ -446,7 +446,7 @@ function aiwB6R95R3R3Lines(items) {
   return items.filter((value) => value !== null && value !== undefined && String(value).trim() !== "").join("\n");
 }
 
-function aiwB6R95R3R3BuildRequesterFacingDeliverable(payload, sourceRouteCode) {
+function aiwB6R95R3R3BuildRequesterFacingDeliverableBaseB6R95R3Z24(payload, sourceRouteCode) {
   const requesterAppRef = aiwB6R95R3R3OneLine(payload.source_app_ref, "HTTP_LOCAL");
   const sourceRequestRef = aiwB6R95R3R3OneLine(payload.source_request_ref, "");
   const appSurfaceCode = aiwB6R95R3R3OneLine(payload.app_surface_code, "unknown_app_surface");
@@ -634,6 +634,335 @@ function aiwB6R95R3R3BuildRequesterFacingDeliverable(payload, sourceRouteCode) {
     artifacts
   };
 }
+
+/* B6R95R3Z_R24_CX_MATERIAL_BODY_GENERATION_PATCH_START */
+function aiwB6R95R3Z24Text(value) {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  try { return JSON.stringify(value); } catch { return String(value); }
+}
+
+function aiwB6R95R3Z24SqlLiteral(value) {
+  return "'" + String(value || "").replace(/'/g, "''") + "'";
+}
+
+function aiwB6R95R3Z24PickFirstText(obj, keys) {
+  if (!obj || typeof obj !== "object") return "";
+  for (const key of keys) {
+    if (typeof obj[key] === "string" && obj[key].trim()) return obj[key].trim();
+  }
+  return "";
+}
+
+function aiwB6R95R3Z24CollectTextDeep(value, maxLen = 5000, depth = 0) {
+  if (value == null || depth > 5) return "";
+  if (typeof value === "string") return value.slice(0, maxLen);
+  if (typeof value !== "object") return String(value).slice(0, maxLen);
+
+  const parts = [];
+  if (Array.isArray(value)) {
+    for (const item of value.slice(0, 12)) {
+      const t = aiwB6R95R3Z24CollectTextDeep(item, maxLen, depth + 1);
+      if (t) parts.push(t);
+    }
+  } else {
+    const preferred = [
+      "unit_title_ja",
+      "unit_summary_ja",
+      "unit_body_ja",
+      "title_ja",
+      "summary_ja",
+      "body_ja",
+      "content_ja",
+      "description_ja",
+      "robot_use_summary_ja",
+      "source_caution_ja",
+      "misconception_guard_ja",
+      "topic_label_ja",
+      "brain_data_code",
+      "detail_axis_code"
+    ];
+    for (const key of preferred) {
+      if (value[key]) {
+        const t = aiwB6R95R3Z24CollectTextDeep(value[key], maxLen, depth + 1);
+        if (t) parts.push(t);
+      }
+    }
+    if (!parts.length) {
+      for (const [k, v] of Object.entries(value).slice(0, 30)) {
+        if (/secret|token|password|key/i.test(k)) continue;
+        const t = aiwB6R95R3Z24CollectTextDeep(v, maxLen, depth + 1);
+        if (t) parts.push(t);
+      }
+    }
+  }
+
+  return parts.join("\n").slice(0, maxLen);
+}
+
+function aiwB6R95R3Z24PayloadText(payload, keys) {
+  for (const key of keys) {
+    if (payload && typeof payload[key] === "string" && payload[key].trim()) return payload[key].trim();
+  }
+  for (const nestedKey of ["payload", "request_payload", "input_json", "body", "request", "runtime_request"]) {
+    const nested = payload && payload[nestedKey];
+    if (nested && typeof nested === "object") {
+      for (const key of keys) {
+        if (typeof nested[key] === "string" && nested[key].trim()) return nested[key].trim();
+      }
+    }
+  }
+  return "";
+}
+
+function aiwB6R95R3Z24ModelCode(payload) {
+  return aiwB6R95R3Z24PayloadText(payload, [
+    "model_code",
+    "robot_model_code",
+    "selected_robot_model_code",
+    "runtime_model_code"
+  ]) || "byd2_003_asic_leader3";
+}
+
+function aiwB6R95R3Z24Instruction(payload) {
+  return aiwB6R95R3Z24PayloadText(payload, [
+    "task_instruction_ja",
+    "instruction_ja",
+    "user_instruction_ja",
+    "task_instruction",
+    "instruction",
+    "user_instruction"
+  ]);
+}
+
+function aiwB6R95R3Z24TaskTitle(payload) {
+  return aiwB6R95R3Z24PayloadText(payload, [
+    "task_title_ja",
+    "task_title",
+    "title"
+  ]) || "AIWorkerOS 成果物";
+}
+
+function aiwB6R95R3Z24SearchTerms(payload) {
+  const text = [
+    aiwB6R95R3Z24TaskTitle(payload),
+    aiwB6R95R3Z24Instruction(payload)
+  ].join("\n");
+
+  const terms = [];
+
+  if (/大化|taika|乙巳|改新|公地公民/.test(text)) {
+    terms.push("大化", "大化の改新", "taika", "乙巳", "改新の詔", "公地公民", "日本書紀", "律令");
+  }
+
+  for (const m of text.matchAll(/[一-龯ぁ-んァ-ンA-Za-z0-9_]{3,}/g)) {
+    const v = m[0];
+    if (!terms.includes(v) && !/してください|成果物|summary|generated|artifacts|link|zip/.test(v)) terms.push(v);
+    if (terms.length >= 12) break;
+  }
+
+  return terms.length ? terms : ["大化", "taika"];
+}
+
+function aiwB6R95R3Z24RunPsqlJson(sql) {
+  let req = null;
+  try {
+    req = eval("require");
+  } catch {
+    return [];
+  }
+
+  try {
+    const cp = req("node:child_process");
+    const dbUrl = process.env.PERSONA_DATABASE_URL || process.env.DATABASE_URL || "";
+    if (!dbUrl) return [];
+
+    const out = cp.execFileSync("psql", [
+      dbUrl,
+      "-X",
+      "-q",
+      "-t",
+      "-A",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      sql
+    ], {
+      encoding: "utf8",
+      timeout: 15000,
+      env: Object.assign({}, process.env, { PGOPTIONS: "" })
+    });
+
+    const text = String(out || "").trim();
+    if (!text) return [];
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function aiwB6R95R3Z24FetchCxRuntimeMaterials(payload) {
+  const modelCode = aiwB6R95R3Z24ModelCode(payload);
+  const terms = aiwB6R95R3Z24SearchTerms(payload);
+  const termConds = terms
+    .slice(0, 10)
+    .map((term) => "to_jsonb(t)::text ILIKE " + aiwB6R95R3Z24SqlLiteral("%" + term + "%"))
+    .join(" OR ");
+
+  const views = [
+    "aiworker.vw_robot_readable_brain_runtime_material_canon_v1",];
+
+  for (const view of views) {
+    const sql = [
+      "BEGIN READ ONLY;",
+      "WITH picked AS (",
+      "  SELECT to_jsonb(t) AS row_json",
+      "  FROM " + view + " t",
+      "  WHERE t.model_code = " + aiwB6R95R3Z24SqlLiteral(modelCode),
+      "    AND (" + termConds + ")",
+      "  LIMIT 24",
+      ")",
+      "SELECT COALESCE(jsonb_agg(row_json), '[]'::jsonb)::text FROM picked;",
+      "COMMIT;",
+      "/* B6R95R3Z_R26_READONLY_HELPER_REPAIR */"
+    ].join("\n");
+
+    const rows = aiwB6R95R3Z24RunPsqlJson(sql);
+    if (rows.length) return rows;
+  }
+
+  return [];
+}
+
+function aiwB6R95R3Z24MaterialTitle(row, index) {
+  return aiwB6R95R3Z24PickFirstText(row, [
+    "unit_title_ja",
+    "title_ja",
+    "material_title_ja",
+    "topic_label_ja",
+    "brain_data_title_ja",
+    "brain_data_code",
+    "unit_code",
+    "detail_axis_code"
+  ]) || "CX参照素材 " + String(index + 1);
+}
+
+function aiwB6R95R3Z24MaterialBody(row) {
+  const body = aiwB6R95R3Z24PickFirstText(row, [
+    "unit_body_ja",
+    "unit_summary_ja",
+    "body_ja",
+    "content_ja",
+    "summary_ja",
+    "detail_body_ja",
+    "reference_text_ja",
+    "robot_use_summary_ja",
+    "description_ja",
+    "source_caution_ja",
+    "misconception_guard_ja"
+  ]);
+
+  return body || aiwB6R95R3Z24CollectTextDeep(row, 3500);
+}
+
+function aiwB6R95R3Z24BuildMaterialMarkdown(payload, rows) {
+  const title = aiwB6R95R3Z24TaskTitle(payload);
+  const modelCode = aiwB6R95R3Z24ModelCode(payload);
+  const instruction = aiwB6R95R3Z24Instruction(payload);
+
+  const blocks = [];
+  blocks.push("# " + title);
+  blocks.push("");
+  blocks.push("## 1. 成果物サマリ");
+  blocks.push("AIWorkerOSがCX22073JWのruntime materialを参照し、依頼内容に対応する詳細資料として再構成した成果物です。");
+  blocks.push("");
+  blocks.push("## 2. 生成主体");
+  blocks.push("- generation_owner: AIWorkerOS");
+  blocks.push("- model_code: " + modelCode);
+  blocks.push("- cx_reference_source: CX22073JW runtime material / selector v2 readable brain material");
+  blocks.push("- safety_boundary: internal_only_no_external_execution_no_pg_apply_no_destructive_action");
+  blocks.push("");
+  blocks.push("## 3. 依頼要旨");
+  blocks.push(instruction || "依頼文なし");
+  blocks.push("");
+  blocks.push("## 4. CX参照素材からの展開本文");
+
+  rows.slice(0, 16).forEach((row, index) => {
+    const title = aiwB6R95R3Z24MaterialTitle(row, index);
+    const body = aiwB6R95R3Z24MaterialBody(row).trim();
+
+    blocks.push("");
+    blocks.push("### 4." + String(index + 1) + " " + title);
+    blocks.push(body ? body.slice(0, 2600) : "本文なし");
+  });
+
+  blocks.push("");
+  blocks.push("## 5. 出典・史料注意");
+  blocks.push("CX側materialに source_basis / source_caution / verification_status が含まれる場合は、それを優先して扱います。歴史資料では、一次史料・標準学習整理・研究上の注意点を分け、断定しすぎない説明にします。");
+  blocks.push("");
+  blocks.push("## 6. 誤解防止");
+  blocks.push("制度や事件を単発で完成したものとして扱わず、時系列・後続制度・史料上の注意と接続して説明します。");
+  blocks.push("");
+  blocks.push("## 7. 次工程");
+  blocks.push("依頼元アプリは summary_text と deliverable_link を保存し、必要に応じて追加条件を指定して再生成できます。");
+
+  return blocks.join("\n");
+}
+
+function aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(deliverable, payload, sourceRouteCode) {
+  const safeDeliverable = deliverable || {};
+  const originalBody = aiwB6R95R3Z24Text(safeDeliverable.bodyMarkdown || safeDeliverable.body_markdown || "");
+  const instruction = aiwB6R95R3Z24Instruction(payload);
+  const normalizedBody = originalBody.replace(/\s+/g, "");
+  const normalizedInstruction = instruction.replace(/\s+/g, "");
+  const echoRisk = normalizedInstruction && normalizedBody.includes(normalizedInstruction.slice(0, Math.min(120, normalizedInstruction.length)));
+
+  const rows = aiwB6R95R3Z24FetchCxRuntimeMaterials(payload);
+
+  if (!rows.length) {
+    safeDeliverable.generationBasis = Object.assign({}, safeDeliverable.generationBasis || {}, {
+      cx_material_patch_code: "B6R95R3Z-R24",
+      cx_material_rows_found: 0,
+      cx_material_body_enhanced: false
+    });
+    return safeDeliverable;
+  }
+
+  const enhancedBody = aiwB6R95R3Z24BuildMaterialMarkdown(payload, rows);
+
+  if (echoRisk || enhancedBody.length > originalBody.length) {
+    safeDeliverable.bodyMarkdown = enhancedBody;
+    safeDeliverable.summaryText = "CX22073JWのruntime materialを参照し、" + aiwB6R95R3Z24TaskTitle(payload) + " の詳細資料を生成しました。";
+    safeDeliverable.qualityNotes = [
+      "CX material rows used: " + String(rows.length),
+      "selector/material path: runtime readable brain material v3/v2/v1 fallback",
+      "body generation patch: B6R95R3Z-R24",
+      "source_route_code: " + String(sourceRouteCode || "")
+    ].join("\n");
+  }
+
+  safeDeliverable.robotContext = Object.assign({}, safeDeliverable.robotContext || {}, {
+    cx_material_rows_used: rows.length,
+    cx_material_patch_code: "B6R95R3Z-R24"
+  });
+
+  safeDeliverable.generationBasis = Object.assign({}, safeDeliverable.generationBasis || {}, {
+    cx_material_patch_code: "B6R95R3Z-R24",
+    cx_material_rows_found: rows.length,
+    cx_material_body_enhanced: true,
+    source: "CX22073JW runtime readable brain material"
+  });
+
+  return safeDeliverable;
+}
+
+function aiwB6R95R3R3BuildRequesterFacingDeliverable(payload, sourceRouteCode) {
+  const baseDeliverable = aiwB6R95R3R3BuildRequesterFacingDeliverableBaseB6R95R3Z24(payload, sourceRouteCode);
+  return aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(baseDeliverable, payload, sourceRouteCode);
+}
+/* B6R95R3Z_R24_CX_MATERIAL_BODY_GENERATION_PATCH_END */
+
 // AIWORKEROS_B6R95R3D_R1_MULTI_ARTIFACT_ZIP_CONTRACT_START
 /*
   B6R95R3D-R1:

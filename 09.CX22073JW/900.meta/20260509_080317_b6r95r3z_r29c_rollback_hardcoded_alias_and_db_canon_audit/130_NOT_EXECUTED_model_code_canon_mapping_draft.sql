@@ -1,0 +1,65 @@
+-- ============================================================
+-- NOT EXECUTED
+-- Draft only: model code alias resolver
+-- Requires Sato(DB担当) review before apply.
+-- ============================================================
+
+-- 方針:
+-- - 既存正本テーブルで対応できない場合のみ新規追加
+-- - server.jsの決め打ちaliasを廃止し、DB-driven resolverへ移行する
+-- - これはドラフト。まだ実行しない。
+
+-- CREATE TABLE aiworker.model_code_alias_resolver (
+--   alias_code text PRIMARY KEY,
+--   canonical_public_model_code text NOT NULL,
+--   canonical_runtime_model_code text,
+--   alias_kind_code text NOT NULL DEFAULT 'alias',
+--   series_code text,
+--   model_family_code text,
+--   active_flag boolean NOT NULL DEFAULT true,
+--   note_ja text NOT NULL DEFAULT '',
+--   created_at timestamptz NOT NULL DEFAULT now(),
+--   updated_at timestamptz NOT NULL DEFAULT now()
+-- );
+
+-- INSERT INTO aiworker.model_code_alias_resolver (
+--   alias_code,
+--   canonical_public_model_code,
+--   canonical_runtime_model_code,
+--   alias_kind_code,
+--   series_code,
+--   model_family_code,
+--   note_ja
+-- ) VALUES
+-- (
+--   'byd2_003_asic_leader3',
+--   'BYD2-003',
+--   'byd2_003_asic_leader3',
+--   'runtime_model_code',
+--   'Beyond',
+--   'BYD2',
+--   'Runtime normalized code maps to public model code used by CX runtime material views.'
+-- )
+-- ON CONFLICT (alias_code) DO UPDATE
+-- SET
+--   canonical_public_model_code = EXCLUDED.canonical_public_model_code,
+--   canonical_runtime_model_code = EXCLUDED.canonical_runtime_model_code,
+--   alias_kind_code = EXCLUDED.alias_kind_code,
+--   series_code = EXCLUDED.series_code,
+--   model_family_code = EXCLUDED.model_family_code,
+--   note_ja = EXCLUDED.note_ja,
+--   active_flag = true,
+--   updated_at = now();
+
+-- CREATE OR REPLACE VIEW aiworker.vw_model_code_alias_resolver_v1 AS
+-- SELECT
+--   alias_code,
+--   canonical_public_model_code,
+--   canonical_runtime_model_code,
+--   alias_kind_code,
+--   series_code,
+--   model_family_code,
+--   active_flag,
+--   note_ja
+-- FROM aiworker.model_code_alias_resolver
+-- WHERE active_flag = true;

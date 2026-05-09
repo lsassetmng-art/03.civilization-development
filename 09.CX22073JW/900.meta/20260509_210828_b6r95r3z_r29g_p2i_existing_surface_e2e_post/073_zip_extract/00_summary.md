@@ -1,0 +1,1 @@
+CX22073JWのruntime materialを参照し、R29G 大化の改新 CX material quality gate の詳細資料を生成しました。

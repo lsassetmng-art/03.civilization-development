@@ -1,0 +1,101 @@
+-- ============================================================
+-- NOT EXECUTED
+-- R29F draft: FK-backed robot model identifier canon
+-- Requires Sato(DB担当) review.
+-- ============================================================
+
+-- IMPORTANT:
+-- This is a template draft.
+-- Replace __ROBOT_MASTER_TABLE__ and __ROBOT_MASTER_PUBLIC_CODE_COLUMN__
+-- after R29E-R1 audit confirms the correct robot master real table and unique column.
+
+-- Example target:
+--   __ROBOT_MASTER_TABLE__ = aiworker.worker_model_catalog
+--   __ROBOT_MASTER_PUBLIC_CODE_COLUMN__ = model_code
+--
+-- Do not execute until target is confirmed.
+
+-- BEGIN;
+
+-- CREATE TABLE IF NOT EXISTS aiworker.robot_model_identifier_canon (
+--   identifier_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+--   identifier_code text NOT NULL,
+--   identifier_kind_code text NOT NULL,
+--   canonical_public_model_code text NOT NULL,
+--   canonical_runtime_model_code text,
+--   series_code text,
+--   model_family_code text,
+--   active_flag boolean NOT NULL DEFAULT true,
+--   source_basis_ja text NOT NULL DEFAULT '',
+--   note_ja text NOT NULL DEFAULT '',
+--   created_at timestamptz NOT NULL DEFAULT now(),
+--   updated_at timestamptz NOT NULL DEFAULT now(),
+--   CONSTRAINT robot_model_identifier_canon_identifier_not_blank CHECK (btrim(identifier_code) <> ''),
+--   CONSTRAINT robot_model_identifier_canon_kind_not_blank CHECK (btrim(identifier_kind_code) <> ''),
+--   CONSTRAINT robot_model_identifier_canon_public_not_blank CHECK (btrim(canonical_public_model_code) <> ''),
+--
+--   -- FK target must be a real table with unique/primary key on the target column.
+--   CONSTRAINT fk_robot_model_identifier_public_model
+--     FOREIGN KEY (canonical_public_model_code)
+--     REFERENCES __ROBOT_MASTER_TABLE__ (__ROBOT_MASTER_PUBLIC_CODE_COLUMN__)
+-- );
+
+-- CREATE UNIQUE INDEX IF NOT EXISTS ux_robot_model_identifier_canon_identifier_active
+-- ON aiworker.robot_model_identifier_canon (identifier_code)
+-- WHERE active_flag = true;
+
+-- CREATE INDEX IF NOT EXISTS ix_robot_model_identifier_canon_public
+-- ON aiworker.robot_model_identifier_canon (canonical_public_model_code);
+
+-- CREATE INDEX IF NOT EXISTS ix_robot_model_identifier_canon_runtime
+-- ON aiworker.robot_model_identifier_canon (canonical_runtime_model_code);
+
+-- CREATE OR REPLACE VIEW aiworker.vw_robot_model_identifier_canon_v1 AS
+-- SELECT
+--   identifier_code,
+--   identifier_kind_code,
+--   canonical_public_model_code,
+--   canonical_runtime_model_code,
+--   series_code,
+--   model_family_code,
+--   active_flag,
+--   source_basis_ja,
+--   note_ja,
+--   created_at,
+--   updated_at
+-- FROM aiworker.robot_model_identifier_canon
+-- WHERE active_flag = true;
+
+-- INSERT INTO aiworker.robot_model_identifier_canon (
+--   identifier_code,
+--   identifier_kind_code,
+--   canonical_public_model_code,
+--   canonical_runtime_model_code,
+--   series_code,
+--   model_family_code,
+--   source_basis_ja,
+--   note_ja
+-- ) VALUES
+-- (
+--   'BYD2-003',
+--   'public_model_code',
+--   'BYD2-003',
+--   'byd2_003_asic_leader3',
+--   'Beyond',
+--   'BYD2',
+--   'CX runtime material view uses BYD2-003 as readable material model_code.',
+--   'Public model code self identifier.'
+-- ),
+-- (
+--   'byd2_003_asic_leader3',
+--   'runtime_model_code',
+--   'BYD2-003',
+--   'byd2_003_asic_leader3',
+--   'Beyond',
+--   'BYD2',
+--   'Runtime request/control code maps to public model code used by CX runtime material.',
+--   'Runtime/internal model identifier.'
+-- )
+-- ON CONFLICT DO NOTHING;
+
+-- COMMIT;
