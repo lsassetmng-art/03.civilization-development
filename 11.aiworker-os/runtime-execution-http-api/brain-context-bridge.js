@@ -1,7 +1,7 @@
 const { execFileSync } = require("node:child_process");
 
-const PROVIDER_VERSION = "lane07-selector-v1";
-const SELECTOR_FUNCTION = "aiworker.fn_robot_brain_runtime_material_select_v1";
+const PROVIDER_VERSION = "lane10-selector-v2";
+const SELECTOR_FUNCTION = "aiworker.fn_robot_brain_runtime_material_select_v2";
 
 function valueOf(input, keys, fallback = undefined) {
   if (!input) return fallback;

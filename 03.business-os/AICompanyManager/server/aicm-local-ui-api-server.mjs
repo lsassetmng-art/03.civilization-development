@@ -1681,6 +1681,72 @@ function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayloa
 
   const summaryFileLink = "/api/aicm/v2/delivery-summary/markdown?runtime_request_id=" + encodeURIComponent(requestId);
 
+  // B6R96R1M4B START: AIWorkerOS zip/download link reference for AICM artifact_link
+  const aiworkerRuntimeResponseB6R96R1M4B = (
+    typeof runtimePayload !== "undefined" ? runtimePayload :
+    typeof runtimeResult !== "undefined" ? runtimeResult :
+    typeof payload !== "undefined" ? payload :
+    typeof response !== "undefined" ? response :
+    typeof result !== "undefined" ? result :
+    {}
+  );
+
+  function aicmB6R96R1M4BText(value) {
+    return String(value === null || value === undefined ? "" : value).trim();
+  }
+
+  function aicmB6R96R1M4BDeepPick(value, keys, depth) {
+    if (!value || typeof value !== "object" || depth > 8) return "";
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        const found = aicmB6R96R1M4BText(value[key]);
+        if (found) return found;
+      }
+    }
+    for (const nested of Object.values(value)) {
+      const found = aicmB6R96R1M4BDeepPick(nested, keys, depth + 1);
+      if (found) return found;
+    }
+    return "";
+  }
+
+  function aicmB6R96R1M4BDefaultDeliveryUrl(runtimeRequestId) {
+    const base = aicmB6R96R1M4BText(
+      process.env.AIWORKEROS_BASE_URL ||
+      process.env.AIWORKEROS_URL ||
+      "http://127.0.0.1:8787"
+    ).replace(/\/+$/, "");
+    const id = aicmB6R96R1M4BText(runtimeRequestId);
+    return id ? base + "/aiworker/v1/runtime-execution/delivery?runtime_request_id=" + encodeURIComponent(id) : "";
+  }
+
+  const aiworkerZipLinkB6R96R1M4B = aicmB6R96R1M4BDeepPick(aiworkerRuntimeResponseB6R96R1M4B, [
+    "deliverable_zip_link",
+    "zip_link",
+    "download_link",
+    "deliverable_link",
+    "artifact_link"
+  ], 0);
+
+  const aiworkerArtifactIdB6R96R1M4B = aicmB6R96R1M4BDeepPick(aiworkerRuntimeResponseB6R96R1M4B, [
+    "artifact_id",
+    "aiworker_artifact_id",
+    "zip_id",
+    "deliverable_id"
+  ], 0);
+
+  const aiworkerRuntimeRequestIdB6R96R1M4B = aicmB6R96R1M4BDeepPick(aiworkerRuntimeResponseB6R96R1M4B, [
+    "runtime_request_id",
+    "request_id"
+  ], 0) || requestId;
+
+  const aiworkerZipOrDeliveryLinkB6R96R1M4B =
+    aiworkerZipLinkB6R96R1M4B ||
+    aicmB6R96R1M4BDefaultDeliveryUrl(aiworkerRuntimeRequestIdB6R96R1M4B);
+
+  const artifactLinkB6R96R1M4B = aiworkerZipOrDeliveryLinkB6R96R1M4B || summaryFileLink;
+  // B6R96R1M4B END
+
   const metadataJson = JSON.stringify({
     source: "worker-runtime/request",
     source_app_ref: "AICompanyManager",
@@ -1699,6 +1765,12 @@ function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayloa
     context_restore_type: "workbench",
     context_restore_id: requestId,
     delivery_summary_file_link: summaryFileLink,
+    aiworker_runtime_request_id: aiworkerRuntimeRequestIdB6R96R1M4B,
+    aiworker_artifact_id: aiworkerArtifactIdB6R96R1M4B,
+    aiworker_zip_link: aiworkerZipOrDeliveryLinkB6R96R1M4B,
+    aiworker_download_link: aiworkerZipOrDeliveryLinkB6R96R1M4B,
+    artifact_link_kind: aiworkerZipOrDeliveryLinkB6R96R1M4B ? "aiworkeros_zip" : "summary_fallback",
+    artifact_storage_owner: "aiworkeros",
     delivery_summary_file_kind: "markdown",
     delivery_summary_file_source: "human_review_delivery_summary",
     review_target_is_summary_file: true
@@ -1738,7 +1810,7 @@ function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayloa
     "    " + sqlLiteral("個別AI実行Workbenchの実行結果を納品レビュー用に整理。") + ",",
     "    " + sqlLiteral("AIレビュー: human_go済みの個別依頼として、納品サマリーファイルを人間レビューへ回付。") + ",",
     "    " + sqlLiteral("レビューで不足があれば差し戻し指示へ記録してください。") + ",",
-    "    " + sqlLiteral(summaryFileLink) + ",",
+    "    " + sqlLiteral(artifactLinkB6R96R1M4B) + ",",
     "    " + sqlLiteral(workerLabel) + ",",
     "    " + sqlLiteral("AICompanyManager") + ",",
     "    " + sqlLiteral("pending") + ",",
@@ -2391,6 +2463,11 @@ function aicmB6R85DeliverySummaryMarkdown(searchParams) {
     "    COALESCE(rj->>'aicm_human_review_item_id', '') AS review_id,",
     "    COALESCE(rj->>'related_worker_work_unit_id', wj->>'aicm_worker_work_unit_id', '') AS worker_id,",
     "    COALESCE(rj->'metadata_jsonb'->>'runtime_request_id', '') AS runtime_request_id,",
+
+    // B6R96R1M4D-B START: delivery-summary link display aliases
+    "    COALESCE(NULLIF(rj->'metadata_jsonb'->>'aiworker_zip_link', ''), NULLIF(rj->'metadata_jsonb'->>'aiworker_download_link', ''), NULLIF(rj->>'artifact_link', '')) AS aiworker_zip_link,",
+    "    COALESCE(NULLIF(rj->'metadata_jsonb'->>'delivery_summary_file_link', ''), '') AS delivery_summary_file_link,",
+    // B6R96R1M4D-B END
     "    COALESCE(NULLIF(rj->>'review_title', ''), NULLIF(wj->>'work_unit_name', ''), '納品サマリー') AS title,",
     "    COALESCE(NULLIF(rj->>'artifact_kind_label', ''), NULLIF(rj->>'artifact_kind_code', ''), 'delivery_summary') AS artifact_kind,",
     "    COALESCE(NULLIF(rj->>'priority_code', ''), NULLIF(wj->>'priority_code', ''), 'normal') AS priority_code,",
@@ -2440,6 +2517,11 @@ function aicmB6R85DeliverySummaryMarkdown(searchParams) {
     "      '## Worker作業単位ID または Runtime request ID', chr(10),",
     "      'Worker作業単位ID: ', COALESCE(NULLIF(worker_id, ''), '-'), chr(10),",
     "      'Runtime request ID: ', COALESCE(NULLIF(runtime_request_id, ''), '-'), chr(10), chr(10),",
+
+    // B6R96R1M4D-B START: display AIWorkerOS zip and AICM summary links
+    "      '## 成果物zipダウンロード', chr(10), COALESCE(NULLIF(aiworker_zip_link, ''), 'AIWorkerOS成果物zipリンク未取得'), chr(10), chr(10),",
+    "      '## サマリ確認', chr(10), COALESCE(NULLIF(delivery_summary_file_link, ''), '-'), chr(10), chr(10),",
+    // B6R96R1M4D-B END
     "      '## 種別', chr(10), artifact_kind, chr(10), chr(10),",
     "      '## 優先度', chr(10), priority_code, chr(10), chr(10),",
     "      '## 作成日時', chr(10), created_at, chr(10), chr(10),",
