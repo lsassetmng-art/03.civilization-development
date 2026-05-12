@@ -491,8 +491,12 @@ function setMessage(kind, message) {
     state.errorMessage = String(message || "");
     state.noticeMessage = "";
   }
-
   function go(screen) {
+    if (screen === "artifact-list") {
+      window.location.href = "/api/aicm/v2/artifact-list-page?v=" + encodeURIComponent(String(Date.now()));
+      return;
+    }
+
     // AICM_TASK_LEDGER_FRESH_CONTEXT_NAV_CANONICAL_V1
     var nextScreen = String(screen || "dashboard");
 
@@ -537,23 +541,99 @@ function setMessage(kind, message) {
     if (state.screen === "section-new") return "課新規追加";
     if (state.screen === "placement-new") return "Worker配置";
     if (state.screen === "settings") return "AI企業設定";
+    if (state.screen === "artifact-list") return "成果物一覧";
     return "AI企業ダッシュボード";
   }
 
   
+
 // AICM_WORKER_RUNTIME_UI_NAV_AXT_R1_V1
+
+
+
+
+
+// AICM_Q5JR5P_VISUAL_STYLE_START
+function aicmQ5JR5PVisualStyleHtml() {
+  var css = [
+    'html,body{max-width:100%;overflow-x:hidden;}',
+    'body{background:#f4f7fb;}',
+    '.aicm-core,.wrap{max-width:760px;margin:0 auto;padding-left:18px;padding-right:18px;box-sizing:border-box;}',
+    '.aicm-core{padding-bottom:112px;}',
+    '.wrap{padding-top:24px;padding-bottom:112px;}',
+    '.app-title{display:none!important;}',
+    '.app-title:empty,.page-title:empty,h1:empty{display:none!important;}',
+    '.page-title{font-size:32px;font-weight:1000;letter-spacing:-.04em;margin:18px 0 18px;line-height:1.12;color:#111827;}',
+    '.lead{font-size:16px;line-height:1.7;color:#64748b;margin:0 0 22px;}',
+    '.artifact-card,.card,.aicm-core-card{max-width:100%;box-sizing:border-box;overflow:hidden;border:1px solid #dfe6f2;border-radius:22px;background:#fff;box-shadow:0 16px 38px rgba(15,23,42,.08);}',
+    '.artifact-card *,.card *,.aicm-core-card *{box-sizing:border-box;min-width:0;overflow-wrap:anywhere;word-break:break-word;}',
+    '.artifact-card{margin:0 0 16px;}',
+    '.artifact-title,.line1{font-size:18px;font-weight:1000;line-height:1.35;color:#111827;}',
+    '.artifact-row,.line2{display:flex;gap:12px;align-items:center;flex-wrap:wrap;white-space:normal;overflow:hidden;}',
+    '.meta{color:#64748b;line-height:1.55;}',
+    '@media (max-width:720px){.aicm-core,.wrap{max-width:100%;padding-left:18px;padding-right:18px}.page-title{font-size:30px}.artifact-title,.line1{font-size:17px}.artifact-row,.line2{font-size:15px}.artifact-card,.card,.aicm-core-card{border-radius:22px}.artifact-card [style*="overflow"],.card [style*="overflow"]{max-width:100%;overflow-x:auto}}'
+  ].join('');
+  return '<style id="aicm-q5jr5p-visual-unify">' + css + '</style>';
+}
+// AICM_Q5JR5P_VISUAL_STYLE_END
+
+
+// AICM_Q5JR5Q_TITLE_BAR_START
+function aicmQ5JR5QTitleBarHtml() {
+  var version = "v-git-7f0eb72";
+  return [
+    '<header class="aicm-title-bar" data-aicm-q5jr5q-title-bar="1" style="position:sticky;top:0;z-index:9998;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 16px;padding:10px 14px;border:1px solid #dbe3f0;border-radius:18px;background:rgba(255,255,255,.96);box-shadow:0 8px 22px rgba(15,23,42,.08);backdrop-filter:blur(10px);box-sizing:border-box;max-width:100%;overflow:hidden;">',
+    '<span style="font-size:14px;font-weight:1000;color:#111827;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">AI Company Manager</span>',
+    '<span style="font-size:11px;font-weight:900;color:#64748b;white-space:nowrap;">' + version + '</span>',
+    '</header>'
+  ].join("");
+}
+// AICM_Q5JR5Q_TITLE_BAR_END
+
 function renderShell(content) {
     return [
       '<div class="aicm-core" data-core-mark="' + CORE_MARK + '">',
+    aicmQ5JR5PVisualStyleHtml(),
+    aicmQ5JR5QTitleBarHtml(),
       '  <header class="aicm-core-header">',
-      '    <h1>AI企業運営アプリ</h1>',
+      '    <h1></h1>',
       '  </header>',
-      '  <nav class="aicm-core-tabs" aria-label="AICompanyManager navigation">',
+      '  <!-- AICM_Q5JR3_MOBILE_BOTTOM_NAV_START -->',
+      '  <style id="aicm-q5jr3-mobile-bottom-nav-style">',
+      '    .aicm-mobile-bottom-nav{display:none;}',
+      '    .aicm-mobile-bottom-nav button{font:inherit;}',
+      '    @media (max-width:720px){',
+      '      .aicm-core{padding-bottom:104px;}',
+'      html,body{max-width:100%;overflow-x:hidden;}',
+'      .aicm-core,.aicm-core-main,.aicm-core-card,.aicm-review-list-stable-b6r12,.aicm-review-card{max-width:100%;box-sizing:border-box;overflow-x:hidden;}',
+'      .aicm-core *,.aicm-review-list-stable-b6r12 *,.aicm-review-card *{box-sizing:border-box;min-width:0;overflow-wrap:anywhere;word-break:break-word;}',
+'      pre,code,.aicm-core .mono,.aicm-core [class*=\"mono\"]{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%;}',
+'      .aicm-mobile-bottom-nav{width:100%;max-width:100vw;box-sizing:border-box;}',
+'      /* AICM_Q5JR5F_MOBILE_OVERFLOW_FIX */',
+      '      .aicm-core-tabs{display:none;}',
+      '      .aicm-mobile-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);border-top:1px solid #dbe3f0;box-shadow:0 -12px 28px rgba(15,23,42,.12);backdrop-filter:blur(10px);}',
+      '      .aicm-mobile-bottom-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;min-height:48px;border:1px solid #d9e2f2;border-radius:16px;background:#eef3ff;color:#111827;font-size:12px;font-weight:900;line-height:1.12;padding:6px 3px;white-space:normal;}',
+      '      .aicm-mobile-bottom-nav .aicm-bottom-nav-line{display:block;line-height:1.12;}',
+      '      .aicm-mobile-bottom-nav button:has(.aicm-bottom-nav-line + .aicm-bottom-nav-line){font-size:11px;}',
+      '      /* AICM_Q5JR5J_BOTTOM_NAV_TWO_LINE_LABEL */',
+      '    }',
+      '    @media (min-width:721px){.aicm-production-main-nav{display:grid;}.aicm-mobile-bottom-nav{display:none;}}',
+      '  </style>',
+      '  <nav class="aicm-core-tabs aicm-production-main-nav" aria-label="AICompanyManager navigation">',
       '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
+      '    <button type="button" data-core-action="go" data-screen="artifact-list">成果物一覧</button>',
       '    <button type="button" data-core-action="task-ledger-open">部門別タスク台帳</button>',
       '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
-      '  <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
+      '    <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
       '  </nav>',
+      '  <nav class="aicm-mobile-bottom-nav" aria-label="AICompanyManager mobile navigation">',
+      '    <button type="button" data-core-action="go" data-screen="dashboard" aria-label="AI企業ダッシュボード"><span class="aicm-bottom-nav-line">ホーム</span></button>',
+      '    <button type="button" data-core-action="task-ledger-open" aria-label="部門別タスク台帳 まとめ依頼"><span class="aicm-bottom-nav-line">まとめ</span><span class="aicm-bottom-nav-line">依頼</span></button>',
+      '    <button type="button" data-core-action="go" data-screen="worker-runtime-request" aria-label="AI実行Workbench 個別依頼"><span class="aicm-bottom-nav-line">個別</span><span class="aicm-bottom-nav-line">依頼</span></button>',
+      '    <button type="button" data-core-action="go" data-screen="review-list" aria-label="レビュー・承認待ち一覧 納品レビュー"><span class="aicm-bottom-nav-line">納品</span><span class="aicm-bottom-nav-line">レビュー</span></button>',
+      '    <button type="button" data-core-action="go" data-screen="artifact-list" aria-label="成果物一覧"><span class="aicm-bottom-nav-line">成果物</span></button>',
+      '  </nav>',
+      '  <!-- AICM_Q5JR3_MOBILE_BOTTOM_NAV_END -->',
       renderMessages(),
       '  <main class="aicm-core-main">',
       content,
@@ -12158,69 +12238,8 @@ function renderAicmBusinessStartDashboardCard() {
   // AICM_R8Z_V10F2G_SECTION_NEW_ENTRY_STATE_HYGIENE_HELPER_END
 
 
-  // AICM_R8Z_V10F4A_REVIEW_LIST_COMMON_NAV_AND_SECTION_WORKER_SOURCE_GUARD_COMMON_NAV_START
-  function aicmR8zV10f4aText(value) {
-    return String(value === undefined || value === null ? "" : value).trim();
-  }
+  
 
-  function aicmR8zV10f4aIsSectionCreateScreen() {
-    try {
-      if (typeof state !== "undefined" && state && state.screen === "section-new") return true;
-      if (typeof window !== "undefined" && window.state && window.state.screen === "section-new") return true;
-    } catch (_) {}
-    return false;
-  }
-
-  function aicmR8zV10f4aCommonNavHtml() {
-    return [
-      '<section id="aicm-v10f4a-common-screen-nav" class="aicm-core-card" style="border:2px solid #cbd5e1;background:#f8fafc;">',
-      '  <p class="aicm-eyebrow">AI企業運営アプリ</p>',
-      '  <h1>AI企業運営アプリ</h1>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
-      '    <button type="button" data-core-action="go" data-screen="task-ledger">部門別タスク台帳</button>',
-      '  </div>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
-      '  </div>',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
-      '  </div>',
-      '</section>'
-    ].join("");
-  }
-
-  function aicmR8zV10f4aInstallReviewListCommonNav() {
-    try {
-      if (typeof window === "undefined") return false;
-      if (typeof window.aicmR8zV7RenderReviewList !== "function") return false;
-      if (window.aicmR8zV7RenderReviewList.__aicmR8zV10f4aWrapped) return true;
-
-      var original = window.aicmR8zV7RenderReviewList;
-      var wrapped = function() {
-        var html = String(original.apply(this, arguments) || "");
-        html = html.replace(/<section id="aicm-v10f3b-review-list-back"[\s\S]*?<\/section>/g, "");
-        html = html.replace(/<section id="aicm-v10f3c-review-list-back-simple"[\s\S]*?<\/section>/g, "");
-        html = html.replace(/<section id="aicm-v10f3d-review-list-back-single"[\s\S]*?<\/section>/g, "");
-        html = html.replace(/<section id="aicm-v10f4a-common-screen-nav"[\s\S]*?<\/section>/g, "");
-        return aicmR8zV10f4aCommonNavHtml() + html;
-      };
-
-      wrapped.__aicmR8zV10f4aWrapped = true;
-      wrapped.__aicmR8zV10f4aOriginal = original;
-      window.aicmR8zV7RenderReviewList = wrapped;
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  (function aicmR8zV10f4aInstallCommonNavBootstrap() {
-    aicmR8zV10f4aInstallReviewListCommonNav();
-    setTimeout(aicmR8zV10f4aInstallReviewListCommonNav, 0);
-    setTimeout(aicmR8zV10f4aInstallReviewListCommonNav, 250);
-  })();
-  // AICM_R8Z_V10F4A_REVIEW_LIST_COMMON_NAV_AND_SECTION_WORKER_SOURCE_GUARD_COMMON_NAV_END
 function render() {
     if (!root) return;
 
@@ -12254,6 +12273,7 @@ html = renderSectionNew();
       html = renderTaskLedgerPlaceholder();
     } else if (state.screen === "review-list") {
       html = (typeof window !== "undefined" && typeof window.aicmR8zV7RenderReviewList === "function" ? window.aicmR8zV7RenderReviewList(state) : renderReviewListPlaceholder()); // AICM_R8Z_V7_ROUTE_BRIDGE_CALL
+            html = (typeof renderShell === "function" ? renderShell(html) : html); // AICM_Q5JR5C_REVIEW_ROUTE_SHELL_WRAP
     } else {
       html = renderDashboard();
     }
@@ -14713,7 +14733,8 @@ root.addEventListener("click", handleRootClick);
       appState.screen = "review-list";
       appState.aicmR8zV8kDebug = "v9-local-render-start";
 
-      root.innerHTML = window.aicmR8zV7RenderReviewList(appState);
+      var aicmQ5JR5CReviewHtml = window.aicmR8zV7RenderReviewList(appState);
+            root.innerHTML = (typeof renderShell === "function" ? renderShell(aicmQ5JR5CReviewHtml) : aicmQ5JR5CReviewHtml);
 
       appState.aicmR8zV8kDebug = "v9-local-render-done";
       appState.aicmR8zV8kError = "";
@@ -17632,15 +17653,21 @@ if (typeof window !== "undefined") {
 
 
 
+
+  function shellHtml(body) {
+    var html = body === null || typeof body === "undefined" ? "" : String(body);
+
+    if (typeof renderShell === "function") {
+      return renderShell(html);
+    }
+
+    return html;
+  }
+
   function renderRows(rows, meta) {
     var list = arr(rows);
 
     var html = [];
-    // AICM_V10L_C2G_B6R16_REVIEW_LIST_COMMON_NAV_RESTORE_START
-    if (typeof aicmR8zV10f4aCommonNavHtml === "function") {
-      html.push(aicmR8zV10f4aCommonNavHtml());
-    }
-    // AICM_V10L_C2G_B6R16_REVIEW_LIST_COMMON_NAV_RESTORE_END
     html.push('<section class="aicm-core-card aicm-review-list-stable-b6r12" data-aicm-b6r12-review-list="1">');
     html.push('  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>');
     html.push('  <h2>レビュー・承認待ち: ' + esc(String(list.length)) + '件</h2>');
@@ -17651,7 +17678,7 @@ if (typeof window !== "undefined") {
       html.push('    <p>APIからpending reviewを取得しましたが、選択中の会社に一致する承認待ちは0件でした。</p>');
       html.push('  </div>');
       html.push('</section>');
-      return html.join("");
+      return shellHtml(html.join(""));
     }
 
     list.forEach(function (row, index) {
@@ -17696,7 +17723,7 @@ if (typeof window !== "undefined") {
     });
 
     html.push('</section>');
-    return html.join("");
+    return shellHtml(html.join(""));
   }
 
   function mountHtml(html) {
@@ -17782,13 +17809,13 @@ if (typeof window !== "undefined") {
         }
       } catch (_) {}
     } catch (error) {
-      mountHtml([
+      mountHtml(shellHtml([
         '<section class="aicm-core-card aicm-review-list-stable-b6r12">',
         '  <p class="aicm-eyebrow">レビュー・承認待ち一覧</p>',
         '  <h2>レビュー・承認待ちを取得できませんでした</h2>',
         '  <p class="aicm-core-message aicm-core-message-error">' + esc(error && error.message ? error.message : String(error)) + '</p>',
         '</section>'
-      ].join(""));
+      ].join("")));
 
       try {
         if (typeof setMessage === "function") {
@@ -17842,4 +17869,3 @@ if (typeof window !== "undefined") {
 
 }());
 // AICM_V10L_C2G_B6R12_REVIEW_LIST_FINAL_API_FALLBACK_END
-

@@ -3838,12 +3838,16 @@ function aicmQ5JArtifactPageShell(innerHtml) {
     '.empty,.error{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:18px;line-height:1.7;}',
     '.error{color:#991b1b;border-color:#fecaca;background:#fff1f2;}',
     'button{border:1px solid #d9e2f2;border-radius:16px;background:#eef3ff;padding:10px 12px;font-weight:800;color:#6b7280;}',
-    '@media (max-width:520px){.app-title{font-size:30px}.page-title{font-size:28px}.nav{grid-template-columns:1fr}.wrap{padding:24px 14px 72px}}',
+      'button.delete,.delete{border:1px solid #fecaca;border-radius:16px;background:#fff1f2;padding:10px 12px;font-weight:900;color:#991b1b;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-width:max-content;}',
+      '.delete-form{display:inline-flex;margin:0;min-width:max-content;}',
+      '/* AICM_Q5JR5J_ARTIFACT_HIDE_BUTTON_STYLE */',
+    '.mobile-bottom-nav{display:none;}',
+    '@media (max-width:720px){.app-title{font-size:30px}.page-title{font-size:28px}.nav{display:none}.wrap{padding:24px 14px 104px}.mobile-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);border-top:1px solid #dbe3f0;box-shadow:0 -12px 28px rgba(15,23,42,.12);backdrop-filter:blur(10px)}.mobile-bottom-nav a{display:flex;align-items:center;justify-content:center;min-width:0;min-height:48px;border:1px solid #d9e2f2;border-radius:16px;background:#eef3ff;color:#111827;text-decoration:none;font-size:12px;font-weight:900;line-height:1.2;padding:7px 3px;white-space:normal}}',
     '</style>',
     '</head>',
     '<body>',
     '<main class="wrap">',
-    '<h1 class="app-title">AI企業運営アプリ</h1>',
+    '<h1 class="app-title"></h1>',
     '<nav class="nav">',
     '<a href="/">AI企業ダッシュボード</a>',
     '<a href="/api/aicm/v2/artifact-list-page">成果物一覧</a>',
@@ -3906,7 +3910,10 @@ async function aicmQ5JServeArtifactListPage(req, res) {
         save,
         '<span class="meta">有効期限: ' + expires + '</span>',
         '<span class="meta">' + status + '</span>',
-        '<button type="button" disabled>一覧から削除</button>',
+        '<form class="delete-form" method="GET" action="/api/aicm/v2/artifact-list-hide-confirm" style="display:inline-flex;margin:0;">',
+          '<input type="hidden" name="artifact_id" value="' + encodeURIComponent(id) + '">',
+          '<button type="submit" class="delete">一覧から削除</button>',
+          '</form>',
         '</div>',
         '</article>'
       ].join("");
@@ -3971,6 +3978,144 @@ async function aicmQ5JR1PsqlJson(sql) {
   return JSON.parse(raw);
 }
 
+
+
+
+// AICM_Q5JR5P_VISUAL_STYLE_START
+function aicmQ5JR5PVisualStyleHtml() {
+  const css = [
+    'html,body{max-width:100%;overflow-x:hidden;}',
+    'body{background:#f4f7fb;}',
+    '.aicm-core,.wrap{max-width:760px;margin:0 auto;padding-left:18px;padding-right:18px;box-sizing:border-box;}',
+    '.aicm-core{padding-bottom:112px;}',
+    '.wrap{padding-top:24px;padding-bottom:112px;}',
+    '.app-title{display:none!important;}',
+    '.app-title:empty,.page-title:empty,h1:empty{display:none!important;}',
+    '.page-title{font-size:32px;font-weight:1000;letter-spacing:-.04em;margin:18px 0 18px;line-height:1.12;color:#111827;}',
+    '.lead{font-size:16px;line-height:1.7;color:#64748b;margin:0 0 22px;}',
+    '.artifact-card,.card,.aicm-core-card{max-width:100%;box-sizing:border-box;overflow:hidden;border:1px solid #dfe6f2;border-radius:22px;background:#fff;box-shadow:0 16px 38px rgba(15,23,42,.08);}',
+    '.artifact-card *,.card *,.aicm-core-card *{box-sizing:border-box;min-width:0;overflow-wrap:anywhere;word-break:break-word;}',
+    '.artifact-card{margin:0 0 16px;}',
+    '.artifact-title,.line1{font-size:18px;font-weight:1000;line-height:1.35;color:#111827;}',
+    '.artifact-row,.line2{display:flex;gap:12px;align-items:center;flex-wrap:wrap;white-space:normal;overflow:hidden;}',
+    '.meta{color:#64748b;line-height:1.55;}',
+    '@media (max-width:720px){.aicm-core,.wrap{max-width:100%;padding-left:18px;padding-right:18px}.page-title{font-size:30px}.artifact-title,.line1{font-size:17px}.artifact-row,.line2{font-size:15px}.artifact-card,.card,.aicm-core-card{border-radius:22px}.artifact-card [style*="overflow"],.card [style*="overflow"]{max-width:100%;overflow-x:auto}}'
+  ].join('');
+  return '<style id="aicm-q5jr5p-visual-unify">' + css + '</style>';
+}
+// AICM_Q5JR5P_VISUAL_STYLE_END
+
+
+// AICM_Q5JR5Q_TITLE_BAR_START
+function aicmQ5JR5QTitleBarHtml() {
+  const version = "v-git-7f0eb72";
+  return [
+    '<header class="aicm-title-bar" data-aicm-q5jr5q-title-bar="1" style="position:sticky;top:0;z-index:9998;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 16px;padding:10px 14px;border:1px solid #dbe3f0;border-radius:18px;background:rgba(255,255,255,.96);box-shadow:0 8px 22px rgba(15,23,42,.08);backdrop-filter:blur(10px);box-sizing:border-box;max-width:100%;overflow:hidden;">',
+    '<span style="font-size:14px;font-weight:1000;color:#111827;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">AI Company Manager</span>',
+    '<span style="font-size:11px;font-weight:900;color:#64748b;white-space:nowrap;">' + version + '</span>',
+    '</header>'
+  ].join("");
+}
+// AICM_Q5JR5Q_TITLE_BAR_END
+
+
+
+// AICM_Q5JR5R_ARTIFACT_GRID_TABLE_START
+function aicmQ5JR5RArtifactGridTableHtml() {
+  return [
+    '<style id="aicm-q5jr5r-artifact-grid-style">',
+    '.aicm-artifact-grid-panel{margin:0 0 18px;border:1px solid #dfe6f2;border-radius:22px;background:#fff;box-shadow:0 16px 38px rgba(15,23,42,.08);overflow:hidden;}',
+    '.aicm-artifact-grid-scroll{max-height:62vh;overflow:auto;-webkit-overflow-scrolling:touch;}',
+    '.aicm-artifact-grid-table{min-width:980px;width:100%;border-collapse:separate;border-spacing:0;font-size:14px;}',
+    '.aicm-artifact-grid-table th{position:sticky;top:0;z-index:2;background:#f8fafc;color:#475569;font-size:12px;font-weight:1000;text-align:left;border-bottom:1px solid #dfe6f2;padding:12px 14px;white-space:nowrap;}',
+    '.aicm-artifact-grid-table td{border-bottom:1px solid #eef2f7;padding:12px 14px;vertical-align:middle;background:#fff;}',
+    '.aicm-artifact-grid-title{font-weight:1000;color:#111827;line-height:1.35;width:16em;min-width:16em;max-width:16em;white-space:nowrap;overflow-x:auto;overflow-y:hidden;word-break:normal;overflow-wrap:normal;}/* AICM_Q5JR5U_NOWRAP_WIDTH_ONLY */',
+    '.aicm-artifact-grid-expire{color:#64748b;width:10em;min-width:10em;max-width:10em;white-space:nowrap;overflow-x:auto;overflow-y:hidden;word-break:normal;overflow-wrap:normal;}/* AICM_Q5JR5U_NOWRAP_WIDTH_ONLY */',
+    '.aicm-artifact-grid-status{color:#64748b;white-space:nowrap;font-weight:800;}',
+    '.aicm-artifact-grid-action{white-space:nowrap;}',
+    '.aicm-artifact-grid-action a,.aicm-artifact-grid-action button{font-weight:1000;}',
+    '.aicm-artifact-grid-empty{padding:18px;color:#64748b;font-weight:800;}',
+    '.aicm-grid-source-hidden{display:none!important;}',
+    '@media (max-width:720px){.aicm-artifact-grid-scroll{max-height:58vh}.aicm-artifact-grid-table{min-width:920px}}',
+    '</style>',
+    '<script>',
+    '(function(){',
+    'function textOf(el){return (el&&el.textContent?el.textContent:"").replace(/\\s+/g," ").trim();}',
+    'function isArtifactCard(el){',
+    '  if(!el||el.closest(".aicm-artifact-grid-panel"))return false;',
+    '  var html=el.innerHTML||"";',
+    '  var text=textOf(el);',
+    '  return html.indexOf("artifact-save")>=0||html.indexOf("artifact-list-hide-confirm")>=0||(/有効期限/.test(text)&&/保存/.test(text));',
+    '}',
+    'function getCards(){',
+    '  var nodes=Array.prototype.slice.call(document.querySelectorAll(".artifact-card,.card,section,article,div"));',
+    '  var seen=[];',
+    '  return nodes.filter(function(el){',
+    '    if(!isArtifactCard(el))return false;',
+    '    for(var i=0;i<seen.length;i++){',
+    '      if(seen[i].contains(el))return false;',
+    '      if(el.contains(seen[i])){seen.splice(i,1);i--;}',
+    '    }',
+    '    seen.push(el);',
+    '    return true;',
+    '  });',
+    '}',
+    'function pickTitle(card){',
+    '  var n=card.querySelector(".artifact-title,.line1,h2,h3,strong");',
+    '  var t=textOf(n);',
+    '  if(t)return t;',
+    '  var clone=card.cloneNode(true);',
+    '  Array.prototype.forEach.call(clone.querySelectorAll("a,button,form,input"),function(x){x.remove();});',
+    '  return textOf(clone).replace(/有効期限[:：]?.*/,"").slice(0,160)||"無題";',
+    '}',
+    'function pickExpire(card){',
+    '  var t=textOf(card);',
+    '  var m=t.match(/有効期限[:：]?\\s*([0-9]{4}-[0-9]{2}-[0-9]{2}[^一覧保存有効]*)/);',
+    '  return m?m[1].trim():"";',
+    '}',
+    'function pickStatus(card){',
+    '  var t=textOf(card);',
+    '  if(/期限切れ/.test(t))return "期限切れ";',
+    '  if(/有効/.test(t))return "有効";',
+    '  return "";',
+    '}',
+    'function cloneAction(node){',
+    '  if(!node)return document.createTextNode("—");',
+    '  var c=node.cloneNode(true);',
+    '  if(c.removeAttribute)c.removeAttribute("disabled");',
+    '  return c;',
+    '}',
+    'function build(){',
+    '  if(document.querySelector(".aicm-artifact-grid-panel"))return;',
+    '  var cards=getCards();',
+    '  if(!cards.length)return;',
+    '  var panel=document.createElement("section");panel.className="aicm-artifact-grid-panel";panel.setAttribute("data-aicm-grid-built","1");',
+    '  var scroll=document.createElement("div");scroll.className="aicm-artifact-grid-scroll";',
+    '  var table=document.createElement("table");table.className="aicm-artifact-grid-table";',
+    '  table.innerHTML="<thead><tr><th>成果物タイトル</th><th>保存</th><th>有効期限</th><th>状態</th><th>一覧から削除</th></tr></thead><tbody></tbody>";',
+    '  var tbody=table.querySelector("tbody");',
+    '  cards.forEach(function(card){',
+    '    var tr=document.createElement("tr");',
+    '    var tdTitle=document.createElement("td");tdTitle.className="aicm-artifact-grid-title";tdTitle.textContent=pickTitle(card);',
+    '    var tdSave=document.createElement("td");tdSave.className="aicm-artifact-grid-action";tdSave.appendChild(cloneAction(card.querySelector("a[href*=artifact-save],a.save")));',
+    '    var tdExpire=document.createElement("td");tdExpire.className="aicm-artifact-grid-expire";tdExpire.textContent=pickExpire(card)||"—";',
+    '    var tdStatus=document.createElement("td");tdStatus.className="aicm-artifact-grid-status";tdStatus.textContent=pickStatus(card)||"—";',
+    '    var tdDelete=document.createElement("td");tdDelete.className="aicm-artifact-grid-action";tdDelete.appendChild(cloneAction(card.querySelector("form[action*=artifact-list-hide-confirm],button.delete")));',
+    '    tr.appendChild(tdTitle);tr.appendChild(tdSave);tr.appendChild(tdExpire);tr.appendChild(tdStatus);tr.appendChild(tdDelete);tbody.appendChild(tr);',
+    '    card.classList.add("aicm-grid-source-hidden");',
+    '  });',
+    '  scroll.appendChild(table);panel.appendChild(scroll);',
+    '  cards[0].parentNode.insertBefore(panel,cards[0]);',
+    '}',
+    'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",build);}else{build();}',
+    'setTimeout(build,100);',
+    'setTimeout(build,500);',
+    '})();',
+    '</script>'
+  ].join("");
+}
+// AICM_Q5JR5R_ARTIFACT_GRID_TABLE_END
+
 function aicmQ5JR1PageShell(innerHtml) {
   return [
     '<!doctype html>',
@@ -3995,12 +4140,19 @@ function aicmQ5JR1PageShell(innerHtml) {
     '.empty,.error{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:18px;line-height:1.7;}',
     '.error{color:#991b1b;border-color:#fecaca;background:#fff1f2;}',
     'button{border:1px solid #d9e2f2;border-radius:16px;background:#eef3ff;padding:10px 12px;font-weight:800;color:#6b7280;}',
-    '@media (max-width:520px){.app-title{font-size:30px}.page-title{font-size:28px}.nav{grid-template-columns:1fr}.wrap{padding:24px 14px 72px}}',
+      'button.delete,.delete{border:1px solid #fecaca;border-radius:16px;background:#fff1f2;padding:10px 12px;font-weight:900;color:#991b1b;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-width:max-content;}',
+      '.delete-form{display:inline-flex;margin:0;min-width:max-content;}',
+      '/* AICM_Q5JR5J_ARTIFACT_HIDE_BUTTON_STYLE */',
+    '.mobile-bottom-nav{display:none;}',
+    '@media (max-width:720px){.app-title{font-size:30px}.page-title{font-size:28px}.nav{display:none}.wrap{padding:24px 14px 104px}.mobile-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);border-top:1px solid #dbe3f0;box-shadow:0 -12px 28px rgba(15,23,42,.12);backdrop-filter:blur(10px)}.mobile-bottom-nav a{display:flex;align-items:center;justify-content:center;min-width:0;min-height:48px;border:1px solid #d9e2f2;border-radius:16px;background:#eef3ff;color:#111827;text-decoration:none;font-size:12px;font-weight:900;line-height:1.2;padding:7px 3px;white-space:normal}}',
     '</style>',
     '</head>',
     '<body>',
+      aicmQ5JR5RArtifactGridTableHtml(),
+      aicmQ5JR5PVisualStyleHtml(),
+      aicmQ5JR5QTitleBarHtml(),
     '<main class="wrap">',
-    '<h1 class="app-title">AI企業運営アプリ</h1>',
+    '<h1 class="app-title"></h1>',
     '<nav class="nav">',
     '<a href="/">AI企業ダッシュボード</a>',
     '<a href="/api/aicm/v2/artifact-list-page">成果物一覧</a>',
@@ -4010,6 +4162,15 @@ function aicmQ5JR1PageShell(innerHtml) {
     '<h2 class="page-title">成果物一覧</h2>',
     '<p class="lead">納品レビュー承認済みの成果物を表示します。成果物本体はAICMでは保持せず、「保存」から取得します。</p>',
     innerHtml,
+      '<!-- AICM_Q5JR3_SERVER_BOTTOM_NAV_START -->',
+      '<nav class="mobile-bottom-nav" aria-label="AICompanyManager mobile navigation" data-aicm-q5jr5j-bottom-nav="1">',
+      '<a href="/" aria-label="AI企業ダッシュボード" data-aicm-bottom-nav-item="home"><span style="display:block;line-height:1.12;">ホーム</span></a>',
+      '<a href="/" aria-label="部門別タスク台帳 まとめ依頼" data-aicm-bottom-nav-item="ledger" style="display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.12;"><span style="display:block;line-height:1.12;">まとめ</span><span style="display:block;line-height:1.12;">依頼</span></a>',
+      '<a href="/" aria-label="AI実行Workbench 個別依頼" data-aicm-bottom-nav-item="execution" style="display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.12;"><span style="display:block;line-height:1.12;">個別</span><span style="display:block;line-height:1.12;">依頼</span></a>',
+      '<a href="/" aria-label="レビュー・承認待ち一覧 納品レビュー" data-aicm-bottom-nav-item="review" style="display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.12;"><span style="display:block;line-height:1.12;">納品</span><span style="display:block;line-height:1.12;">レビュー</span></a>',
+      '<a href="/api/aicm/v2/artifact-list-page" aria-current="page" aria-label="成果物一覧" data-aicm-bottom-nav-item="artifact"><span style="display:block;line-height:1.12;">成果物</span></a>',
+      '</nav>',
+      '<!-- AICM_Q5JR3_SERVER_BOTTOM_NAV_END -->',
     // AICM_B6R96R1Q5X_ARTIFACT_LIST_SAVE_NO_CURRENT_TAB_NAVIGATION: keep artifact downloads out of the current browsing tab.
     '<iframe title="成果物保存" name="aicmArtifactDownloadFrame" style="display:none;width:0;height:0;border:0" aria-hidden="true"></iframe>',
     '</main>',
@@ -4017,6 +4178,162 @@ function aicmQ5JR1PageShell(innerHtml) {
     '</html>'
   ].join('');
 }
+
+
+// AICM_Q5JR5J_ARTIFACT_HIDE_CONFIRM_START
+function aicmQ5JR1IsArtifactHideConfirm(req) {
+  try {
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    return req.method === "GET" && url.pathname === "/api/aicm/v2/artifact-list-hide-confirm";
+  } catch (_) {
+    return false;
+  }
+}
+
+function aicmQ5JR1IsArtifactHideApply(req) {
+  try {
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    return req.method === "POST" && url.pathname === "/api/aicm/v2/artifact-list-hide-apply";
+  } catch (_) {
+    return false;
+  }
+}
+
+function aicmQ5JR1IsUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
+function aicmQ5JR1Redirect(res, location) {
+  if (res.writableEnded) return;
+  if (!res.headersSent) {
+    res.writeHead(303, {
+      "location": location,
+      "cache-control": "no-store"
+    });
+  }
+  res.end();
+}
+
+function aicmQ5JR1ReadBody(req, limitBytes) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (Buffer.byteLength(body, "utf8") > limitBytes) {
+        reject(new Error("REQUEST_BODY_TOO_LARGE"));
+        req.destroy();
+      }
+    });
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
+async function aicmQ5JR1FindArtifactForHide(artifactId) {
+  if (!aicmQ5JR1IsUuid(artifactId)) return [];
+
+  const sql = [
+    "WITH target AS (",
+    "  SELECT",
+    "    aicm_human_review_item_id::text AS artifact_id,",
+    "    COALESCE(NULLIF(review_title::text,''), '無題の成果物') AS title,",
+    "    COALESCE(NULLIF(metadata_jsonb->>'expires_at',''), (created_at + interval '6 months')::text) AS expires_at,",
+    "    COALESCE(metadata_jsonb->>'artifact_list_hidden','false') AS artifact_list_hidden",
+    "  FROM business.aicm_human_review_item",
+    "  WHERE aicm_human_review_item_id = '" + artifactId + "'::uuid",
+    "    AND review_kind_code = 'delivery_summary'",
+    "    AND human_review_status_code = 'approved'",
+    ")",
+    "SELECT COALESCE(json_agg(row_to_json(target)), '[]'::json)::text FROM target;"
+  ].join("\n");
+
+  return aicmQ5JR1PsqlJson(sql);
+}
+
+async function aicmQ5JR1ServeArtifactHideConfirm(req, res) {
+  try {
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    const artifactId = String(url.searchParams.get("artifact_id") || "");
+
+    if (!aicmQ5JR1IsUuid(artifactId)) {
+      aicmQ5JR1SendHtml(res, 400, aicmQ5JR1PageShell('<section class="error">成果物IDが不正です。</section>'));
+      return;
+    }
+
+    const rows = await aicmQ5JR1FindArtifactForHide(artifactId);
+    const row = Array.isArray(rows) && rows.length ? rows[0] : null;
+
+    if (!row) {
+      aicmQ5JR1SendHtml(res, 404, aicmQ5JR1PageShell('<section class="error">対象の成果物が見つかりません。</section>'));
+      return;
+    }
+
+    const title = aicmQ5JR1HtmlEscape(row.title || "無題の成果物");
+    const id = aicmQ5JR1HtmlEscape(artifactId);
+    const expires = aicmQ5JR1HtmlEscape(row.expires_at || "");
+
+    const html = [
+      '<section class="card">',
+      '<div class="line1">一覧から削除の確認</div>',
+      '<div class="line2" style="white-space:normal;display:block">',
+      '<p>この成果物を一覧から非表示にします。成果物本体やAIWorkerOS側のzipは削除しません。</p>',
+      '<p><strong>' + title + '</strong></p>',
+      '<p class="meta">有効期限: ' + expires + '</p>',
+      '<form method="POST" action="/api/aicm/v2/artifact-list-hide-apply" class="delete-form">',
+      '<input type="hidden" name="artifact_id" value="' + id + '">',
+      '<button type="submit" class="delete">一覧から削除する</button>',
+      '<a class="save" href="/api/aicm/v2/artifact-list-page">戻る</a>',
+      '</form>',
+      '</div>',
+      '</section>'
+    ].join("");
+
+    aicmQ5JR1SendHtml(res, 200, aicmQ5JR1PageShell(html));
+  } catch (error) {
+    const message = aicmQ5JR1HtmlEscape(error && error.message ? error.message : String(error));
+    aicmQ5JR1SendHtml(res, 500, aicmQ5JR1PageShell('<section class="error">一覧から削除確認の表示に失敗しました: ' + message + '</section>'));
+  }
+}
+
+async function aicmQ5JR1ApplyArtifactHide(req, res) {
+  try {
+    const body = await aicmQ5JR1ReadBody(req, 8192);
+    const params = new URLSearchParams(body);
+    const artifactId = String(params.get("artifact_id") || "");
+
+    if (!aicmQ5JR1IsUuid(artifactId)) {
+      aicmQ5JR1SendHtml(res, 400, aicmQ5JR1PageShell('<section class="error">成果物IDが不正です。</section>'));
+      return;
+    }
+
+    const sql = [
+      "WITH updated AS (",
+      "  UPDATE business.aicm_human_review_item",
+      "  SET metadata_jsonb = COALESCE(metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+      "    'artifact_list_hidden', 'true',",
+      "    'artifact_list_hidden_at', now()::text,",
+      "    'artifact_list_hidden_reason', 'user_hidden_from_artifact_list'",
+      "  )",
+      "  WHERE aicm_human_review_item_id = '" + artifactId + "'::uuid",
+      "    AND review_kind_code = 'delivery_summary'",
+      "    AND human_review_status_code = 'approved'",
+      "  RETURNING aicm_human_review_item_id::text AS artifact_id",
+      ")",
+      "SELECT COALESCE(json_agg(row_to_json(updated)), '[]'::json)::text FROM updated;"
+    ].join("\n");
+
+    await aicmQ5JR1PsqlJson(sql);
+    aicmQ5JR1Redirect(res, "/api/aicm/v2/artifact-list-page?hidden=1");
+  } catch (error) {
+    const message = aicmQ5JR1HtmlEscape(error && error.message ? error.message : String(error));
+    aicmQ5JR1SendHtml(res, 500, aicmQ5JR1PageShell('<section class="error">一覧から削除に失敗しました: ' + message + '</section>'));
+  }
+}
+// AICM_Q5JR5J_ARTIFACT_HIDE_CONFIRM_END
+
+
+
 
 async function aicmQ5JR1ServeArtifactListPage(req, res) {
   try {
@@ -4082,7 +4399,10 @@ async function aicmQ5JR1ServeArtifactListPage(req, res) {
         save,
         '<span class="meta">有効期限: ' + expires + '</span>',
         '<span class="meta">' + status + '</span>',
-        '<button type="button" disabled>一覧から削除</button>',
+        '<form class="delete-form" method="GET" action="/api/aicm/v2/artifact-list-hide-confirm" style="display:inline-flex;margin:0;">',
+          '<input type="hidden" name="artifact_id" value="' + encodeURIComponent(id) + '">',
+          '<button type="submit" class="delete">一覧から削除</button>',
+          '</form>',
         '</div>',
         '</article>'
       ].join("");
@@ -4097,6 +4417,18 @@ async function aicmQ5JR1ServeArtifactListPage(req, res) {
 // AICM_B6R96R1Q5J_R1_ARTIFACT_LIST_PAGE_ROUTE_END
 
 async function handleApi(req, res, url) {
+
+  // AICM_Q5JR5J_HIDE_ROUTES_IN_HANDLE_API
+  if (aicmQ5JR1IsArtifactHideConfirm(req)) {
+    await aicmQ5JR1ServeArtifactHideConfirm(req, res);
+    return;
+  }
+
+  if (aicmQ5JR1IsArtifactHideApply(req)) {
+    await aicmQ5JR1ApplyArtifactHide(req, res);
+    return;
+  }
+
   if (aicmQ5JR1IsArtifactListPage(req)) {
     aicmQ5JR1ServeArtifactListPage(req, res);
     return;
