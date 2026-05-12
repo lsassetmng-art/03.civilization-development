@@ -36,6 +36,13 @@ function sendJson(res, statusCode, payload) {
 }
 
 function sendText(res, statusCode, contentType, text) {
+  // AICM_B6R96R1Q4S_SENDTEXT_HEADERS_SENT_GUARD_START
+  if (res && (res.headersSent || res.writableEnded)) {
+    console.warn("AICM_B6R96R1Q4S_SENDTEXT_HEADERS_SENT_GUARD: skip sendText because response is already closed");
+    return;
+  }
+  // AICM_B6R96R1Q4S_SENDTEXT_HEADERS_SENT_GUARD_END
+
   res.writeHead(statusCode, {
     "content-type": contentType,
     "cache-control": "no-store"
@@ -3428,7 +3435,686 @@ function aicmB6R31R1StartAiworkerosWaitingAutoRetry() {
 // AICM_R8Z_I_WORKER_AUTO_EXECUTION_SERVER_END
 
 
+
+// AICM_B6R96R1Q4R_ARTIFACT_LIST_SERVER_START
+function aicmB6R96R1Q4RSendJson(res, statusCode, body) {
+  const payload = JSON.stringify(body);
+  if (!res.headersSent) {
+    res.writeHead(statusCode, {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    });
+  }
+  res.end(payload);
+}
+
+async function aicmB6R96R1Q4RRunPsqlJson(sql) {
+  const { spawnSync } = await import("node:child_process");
+  const databaseUrl = process.env.PERSONA_DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("PERSONA_DATABASE_URL is not set");
+  }
+  const result = spawnSync(
+    "psql",
+    [databaseUrl, "-v", "ON_ERROR_STOP=1", "-X", "-qAt"],
+    {
+      input: sql,
+      encoding: "utf8",
+      timeout: 45000,
+      maxBuffer: 1024 * 1024 * 8
+    }
+  );
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(String(result.stderr || result.stdout || "psql failed"));
+  }
+  const out = String(result.stdout || "").trim();
+  if (!out) return [];
+  return JSON.parse(out);
+}
+
+async function aicmB6R96R1Q4RTryHandleArtifactList(req, res) {
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  if (url.pathname !== "/api/aicm/v2/artifact-list") {
+    return false;
+  }
+
+  if ((req.method || "GET").toUpperCase() !== "GET") {
+    aicmB6R96R1Q4RSendJson(res, 405, { ok: false, reason: "METHOD_NOT_ALLOWED" });
+    return true;
+  }
+
+  try {
+    const sql = [
+      "WITH base AS (",
+      "  SELECT",
+      "    aicm_human_review_item_id::text AS artifact_id,",
+      "    COALESCE(NULLIF(review_title::text,''), '無題の成果物') AS title,",
+      "    COALESCE(",
+      "      NULLIF(metadata_jsonb->>'aiworker_zip_link',''),",
+      "      NULLIF(metadata_jsonb->>'aiworker_download_link',''),",
+      "      NULLIF(artifact_link::text,''),",
+      "      ''",
+      "    ) AS artifact_link,",
+      "    COALESCE(NULLIF(metadata_jsonb->>'delivery_summary_file_link',''), '') AS summary_link,",
+      "    CASE",
+      "      WHEN metadata_jsonb->>'expires_at' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'",
+      "        THEN (metadata_jsonb->>'expires_at')::timestamptz",
+      "      ELSE created_at + interval '6 months'",
+      "    END AS expires_at_ts,",
+      "    COALESCE(NULLIF(metadata_jsonb->>'expires_at',''), (created_at + interval '6 months')::text) AS expires_at,",
+      "    created_at",
+      "  FROM business.aicm_human_review_item",
+      "  WHERE review_kind_code = 'delivery_summary'",
+      "    AND human_review_status_code = 'approved'",
+      "    AND COALESCE(metadata_jsonb->>'artifact_list_hidden','false') <> 'true'",
+      "),",
+      "rows AS (",
+      "  SELECT",
+      "    artifact_id,",
+      "    title,",
+      "    artifact_link,",
+      "    summary_link,",
+      "    expires_at,",
+      "    CASE",
+      "      WHEN COALESCE(artifact_link,'') = '' THEN ''",
+      "      WHEN expires_at_ts < now() THEN '期限切れ'",
+      "      ELSE '有効'",
+      "    END AS status,",
+      "    created_at::text AS created_at",
+      "  FROM base",
+      "  ORDER BY created_at DESC",
+      ")",
+      "SELECT COALESCE(json_agg(row_to_json(rows)), '[]'::json)::text",
+      "FROM rows;"
+    ].join("\n");
+
+    const artifacts = await aicmB6R96R1Q4RRunPsqlJson(sql);
+    aicmB6R96R1Q4RSendJson(res, 200, {
+      ok: true,
+      source: "business.aicm_human_review_item",
+      filter: "delivery_summary approved only; no artifact-link existence filter",
+      artifacts,
+      count: Array.isArray(artifacts) ? artifacts.length : 0
+    });
+  } catch (error) {
+    aicmB6R96R1Q4RSendJson(res, 500, {
+      ok: false,
+      reason: "ARTIFACT_LIST_QUERY_FAILED",
+      message: error && error.message ? error.message : String(error)
+    });
+  }
+  return true;
+}
+// AICM_B6R96R1Q4R_ARTIFACT_LIST_SERVER_END
+
+
+// AICM_B6R96R1Q4X_ARTIFACT_SAVE_ROUTE_START
+function aicmB6R96R1Q4XSendJson(res, statusCode, body) {
+  const payload = JSON.stringify(body);
+  if (res.writableEnded) return;
+  if (!res.headersSent) {
+    res.writeHead(statusCode, {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    });
+  }
+  res.end(payload);
+}
+
+function aicmB6R96R1Q4XSafeFilename(value) {
+  const base = String(value || "artifact")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/[\r\n\t]+/g, " ")
+    .trim()
+    .slice(0, 80) || "artifact";
+  return base.endsWith(".zip") ? base : base + ".zip";
+}
+
+async function aicmB6R96R1Q4XRunPsqlOneJson(sql) {
+  const { spawnSync } = await import("node:child_process");
+  const databaseUrl = process.env.PERSONA_DATABASE_URL;
+  if (!databaseUrl) throw new Error("PERSONA_DATABASE_URL is not set");
+
+  const result = spawnSync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-X", "-qAt"], {
+    input: sql,
+    encoding: "utf8",
+    timeout: 45000,
+    maxBuffer: 1024 * 1024 * 8
+  });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(String(result.stderr || result.stdout || "psql failed"));
+
+  const out = String(result.stdout || "").trim();
+  if (!out) return null;
+  return JSON.parse(out);
+}
+
+async function aicmB6R96R1Q4XTryArtifactSaveRoute(req, res) {
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  if (url.pathname !== "/api/aicm/v2/artifact-save") return false;
+
+  if ((req.method || "GET").toUpperCase() !== "GET") {
+    aicmB6R96R1Q4XSendJson(res, 405, { ok: false, reason: "METHOD_NOT_ALLOWED" });
+    return true;
+  }
+
+  const artifactId = String(url.searchParams.get("artifact_id") || "").trim();
+  if (!artifactId) {
+    aicmB6R96R1Q4XSendJson(res, 400, { ok: false, reason: "ARTIFACT_ID_REQUIRED" });
+    return true;
+  }
+
+  try {
+    const escapedId = artifactId.replace(/'/g, "''");
+    const sql = [
+      "WITH target AS (",
+      "  SELECT",
+      "    aicm_human_review_item_id::text AS artifact_id,",
+      "    COALESCE(NULLIF(review_title::text,''), 'artifact') AS title,",
+      "    COALESCE(",
+      "      NULLIF(metadata_jsonb->>'aiworker_zip_link',''),",
+      "      NULLIF(metadata_jsonb->>'aiworker_download_link',''),",
+      "      NULLIF(artifact_link::text,''),",
+      "      ''",
+      "    ) AS artifact_link,",
+      "    CASE",
+      "      WHEN metadata_jsonb->>'expires_at' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'",
+      "        THEN (metadata_jsonb->>'expires_at')::timestamptz",
+      "      ELSE created_at + interval '6 months'",
+      "    END AS expires_at_ts",
+      "  FROM business.aicm_human_review_item",
+      "  WHERE aicm_human_review_item_id::text = '" + escapedId + "'",
+      "    AND review_kind_code = 'delivery_summary'",
+      "    AND human_review_status_code = 'approved'",
+      "    AND COALESCE(metadata_jsonb->>'artifact_list_hidden','false') <> 'true'",
+      "  LIMIT 1",
+      ")",
+      "SELECT COALESCE(row_to_json(target), '{}'::json)::text FROM target;"
+    ].join("\n");
+
+    const artifact = await aicmB6R96R1Q4XRunPsqlOneJson(sql);
+
+    if (!artifact || !artifact.artifact_id) {
+      aicmB6R96R1Q4XSendJson(res, 404, { ok: false, reason: "ARTIFACT_NOT_FOUND" });
+      return true;
+    }
+
+    if (!artifact.artifact_link) {
+      aicmB6R96R1Q4XSendJson(res, 404, { ok: false, reason: "ARTIFACT_LINK_EMPTY" });
+      return true;
+    }
+
+    const expiresAt = Date.parse(artifact.expires_at_ts || "");
+    if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
+      if (!res.headersSent) {
+        res.writeHead(410, {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store"
+        });
+      }
+      res.end("<!doctype html><html><head><meta charset=\"utf-8\"><title>期限切れ</title></head><body><p>この成果物のリンク先は有効期限切れです</p><button onclick=\"history.back()\">戻る</button></body></html>");
+      return true;
+    }
+
+    // AICM_B6R96R1Q5W_R4_EXISTING_ARTIFACT_SAVE_AIWORKEROS_ZIP_SUPPORT_START
+    const artifactLinkText = String(artifact.artifact_link || "").trim();
+
+    if (
+      artifactLinkText.startsWith("aiworkeros://runtime-deliverable-zip/") ||
+      artifactLinkText.startsWith("aiworkeros://runtime-deliverable-zips/")
+    ) {
+      let zipName = "";
+
+      try {
+        const aiworkerArtifactUrl = new URL(artifactLinkText);
+        const parts = String(aiworkerArtifactUrl.pathname || "").split("/").filter(Boolean);
+        zipName = decodeURIComponent(parts[parts.length - 1] || "");
+      } catch (_error) {
+        zipName = decodeURIComponent(
+          artifactLinkText
+            .replace(/^aiworkeros:\/\/runtime-deliverable-zips?\//, "")
+            .split(/[?#]/)[0]
+            .split("/")
+            .filter(Boolean)
+            .pop() || ""
+        );
+      }
+
+      zipName = String(zipName || "").trim();
+
+      if (!zipName || !/^[A-Za-z0-9._ -]+\.zip$/i.test(zipName) || zipName.includes("..")) {
+        aicmB6R96R1Q4XSendJson(res, 400, {
+          ok: false,
+          reason: "INVALID_AIWORKEROS_ZIP_NAME"
+        });
+        return true;
+      }
+
+      const aiworkerRoot = String(
+        process.env.AIWORKEROS_ROOT ||
+        "/data/data/com.termux/files/home/03.civilization-development/11.aiworker-os/runtime-execution-http-api"
+      );
+
+      const zipDir = path.resolve(aiworkerRoot, "runtime-deliverable-zips");
+      const zipPath = path.resolve(zipDir, zipName);
+
+      if (!zipPath.startsWith(zipDir + path.sep)) {
+        aicmB6R96R1Q4XSendJson(res, 400, {
+          ok: false,
+          reason: "AIWORKEROS_ZIP_PATH_OUTSIDE_ALLOWED_DIR"
+        });
+        return true;
+      }
+
+      if (!fs.existsSync(zipPath)) {
+        aicmB6R96R1Q4XSendJson(res, 404, {
+          ok: false,
+          reason: "AIWORKEROS_ZIP_FILE_NOT_FOUND",
+          zip_name: zipName
+        });
+        return true;
+      }
+
+      const zipBuffer = await fs.promises.readFile(zipPath);
+      const filename = zipName.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 180) || "artifact.zip";
+
+      if (!res.headersSent) {
+        res.writeHead(200, {
+          "content-type": "application/zip",
+          "content-disposition": "attachment; filename*=UTF-8''" + encodeURIComponent(filename),
+          "cache-control": "no-store",
+          "content-length": String(zipBuffer.length),
+          "x-aicm-artifact-save-mode": "aiworkeros-runtime-deliverable-zip"
+        });
+      }
+
+      res.end(zipBuffer);
+      return true;
+    }
+    // AICM_B6R96R1Q5W_R4_EXISTING_ARTIFACT_SAVE_AIWORKEROS_ZIP_SUPPORT_END
+
+    const artifactUrl = new URL(artifactLinkText);
+    if (!["http:", "https:"].includes(artifactUrl.protocol)) {
+      aicmB6R96R1Q4XSendJson(res, 400, { ok: false, reason: "UNSUPPORTED_ARTIFACT_URL" });
+      return true;
+    }
+
+    const upstream = await fetch(artifactUrl.toString(), { redirect: "follow" });
+
+    if (!upstream.ok) {
+      aicmB6R96R1Q4XSendJson(res, 502, {
+        ok: false,
+        reason: "UPSTREAM_ARTIFACT_FETCH_FAILED",
+        status: upstream.status
+      });
+      return true;
+    }
+
+    const filename = aicmB6R96R1Q4XSafeFilename(artifact.title);
+
+    if (!res.headersSent) {
+      res.writeHead(200, {
+        "content-type": upstream.headers.get("content-type") || "application/octet-stream",
+        "content-disposition": "attachment; filename*=UTF-8''" + encodeURIComponent(filename),
+        "cache-control": "no-store"
+      });
+    }
+
+    if (upstream.body) {
+      const { Readable } = await import("node:stream");
+      Readable.fromWeb(upstream.body).pipe(res);
+    } else {
+      const buf = Buffer.from(await upstream.arrayBuffer());
+      res.end(buf);
+    }
+  } catch (error) {
+    aicmB6R96R1Q4XSendJson(res, 500, {
+      ok: false,
+      reason: "ARTIFACT_SAVE_FAILED",
+      message: error && error.message ? error.message : String(error)
+    });
+  }
+
+  return true;
+}
+// AICM_B6R96R1Q4X_ARTIFACT_SAVE_ROUTE_END
+
+
+// AICM_B6R96R1Q5J_ARTIFACT_LIST_PAGE_START
+function aicmQ5JHtmlEscape(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function aicmQ5JIsArtifactListPage(req) {
+  try {
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    return url.pathname === "/api/aicm/v2/artifact-list-page";
+  } catch (_) {
+    return false;
+  }
+}
+
+function aicmQ5JSendHtml(res, statusCode, html) {
+  if (res.writableEnded) return;
+  if (!res.headersSent) {
+    res.writeHead(statusCode, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store"
+    });
+  }
+  res.end(html);
+}
+
+function aicmQ5JArtifactPageShell(innerHtml) {
+  return [
+    '<!doctype html>',
+    '<html lang="ja">',
+    '<head>',
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<title>成果物一覧</title>',
+    '<style>',
+    'body{margin:0;background:#f5f7fb;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
+    '.wrap{max-width:980px;margin:0 auto;padding:28px 18px 80px;}',
+    '.app-title{font-size:34px;line-height:1.2;margin:0 0 22px;font-weight:900;}',
+    '.nav{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 24px;}',
+    '.nav a{display:block;text-align:center;text-decoration:none;color:#111827;background:#eef3ff;border:1px solid #d9e2f2;border-radius:18px;padding:14px 10px;font-weight:800;}',
+    '.page-title{font-size:32px;margin:8px 0 14px;font-weight:900;}',
+    '.lead{color:#4b5563;line-height:1.7;margin:0 0 18px;}',
+    '.card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.08);margin:0 0 14px;overflow:hidden;}',
+    '.line1{white-space:nowrap;overflow-x:auto;overflow-y:hidden;padding:16px 18px;font-weight:900;border-bottom:1px solid #eef2f7;-webkit-overflow-scrolling:touch;}',
+    '.line2{display:flex;gap:16px;align-items:center;white-space:nowrap;overflow-x:auto;overflow-y:hidden;padding:16px 18px;-webkit-overflow-scrolling:touch;}',
+    '.save{font-weight:900;text-decoration:underline;min-width:max-content;}',
+    '.meta{min-width:max-content;color:#374151;}',
+    '.empty,.error{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:18px;line-height:1.7;}',
+    '.error{color:#991b1b;border-color:#fecaca;background:#fff1f2;}',
+    'button{border:1px solid #d9e2f2;border-radius:16px;background:#eef3ff;padding:10px 12px;font-weight:800;color:#6b7280;}',
+    '@media (max-width:520px){.app-title{font-size:30px}.page-title{font-size:28px}.nav{grid-template-columns:1fr}.wrap{padding:24px 14px 72px}}',
+    '</style>',
+    '</head>',
+    '<body>',
+    '<main class="wrap">',
+    '<h1 class="app-title">AI企業運営アプリ</h1>',
+    '<nav class="nav">',
+    '<a href="/">AI企業ダッシュボード</a>',
+    '<a href="/api/aicm/v2/artifact-list-page">成果物一覧</a>',
+    '<a href="/">部門別タスク台帳へ戻る</a>',
+    '<a href="/">レビュー・承認待ち一覧へ戻る</a>',
+    '</nav>',
+    '<h2 class="page-title">成果物一覧</h2>',
+    '<p class="lead">納品レビュー承認済みの成果物を表示します。成果物本体はAICMでは保持せず、「保存」から取得します。</p>',
+    innerHtml,
+    '</main>',
+    '</body>',
+    '</html>'
+  ].join('');
+}
+
+async function aicmQ5JServeArtifactListPage(req, res) {
+  try {
+    const host = (req.headers && req.headers.host) ? req.headers.host : "127.0.0.1:" + (process.env.PORT || process.env.AICM_LOCAL_UI_PORT || "8794");
+    const apiUrl = "http://" + host + "/api/aicm/v2/artifact-list?server_rendered=1&v=" + encodeURIComponent(String(Date.now()));
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: { "accept": "application/json" },
+      cache: "no-store"
+    });
+
+    const raw = await response.text();
+    let json = {};
+    try {
+      json = JSON.parse(raw || "{}");
+    } catch (error) {
+      throw new Error("artifact-list JSON parse failed: " + error.message + " body=" + raw.slice(0, 120));
+    }
+
+    if (!response.ok || !json.ok) {
+      throw new Error((json && json.message) ? json.message : "artifact-list API failed status=" + response.status);
+    }
+
+    const rows = Array.isArray(json.artifacts) ? json.artifacts : [];
+
+    if (!rows.length) {
+      aicmQ5JSendHtml(res, 200, aicmQ5JArtifactPageShell('<section class="empty">承認済み成果物はありません。</section>'));
+      return;
+    }
+
+    const html = rows.map((row) => {
+      const id = row && row.artifact_id ? String(row.artifact_id) : "";
+      const title = aicmQ5JHtmlEscape(row && row.title ? row.title : "無題の成果物");
+      const expires = aicmQ5JHtmlEscape(row && row.expires_at ? row.expires_at : "");
+      const status = aicmQ5JHtmlEscape(row && row.status ? row.status : "");
+      const hasLink = !!(row && row.artifact_link);
+
+      const save = hasLink
+        ? '<a class="save" href="/api/aicm/v2/artifact-save?artifact_id=' + encodeURIComponent(id) + '">保存</a>'
+        : '<span class="save"></span>';
+
+      return [
+        '<article class="card">',
+        '<div class="line1">' + title + '</div>',
+        '<div class="line2">',
+        save,
+        '<span class="meta">有効期限: ' + expires + '</span>',
+        '<span class="meta">' + status + '</span>',
+        '<button type="button" disabled>一覧から削除</button>',
+        '</div>',
+        '</article>'
+      ].join("");
+    }).join("");
+
+    aicmQ5JSendHtml(res, 200, aicmQ5JArtifactPageShell(html));
+  } catch (error) {
+    const message = aicmQ5JHtmlEscape(error && error.message ? error.message : String(error));
+    aicmQ5JSendHtml(res, 500, aicmQ5JArtifactPageShell('<section class="error">成果物一覧の取得に失敗しました: ' + message + '</section>'));
+  }
+}
+// AICM_B6R96R1Q5J_ARTIFACT_LIST_PAGE_END
+
+
+// AICM_B6R96R1Q5J_R1_ARTIFACT_LIST_PAGE_ROUTE_START
+function aicmQ5JR1HtmlEscape(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function aicmQ5JR1IsArtifactListPage(req) {
+  try {
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    return url.pathname === "/api/aicm/v2/artifact-list-page";
+  } catch (_) {
+    return false;
+  }
+}
+
+function aicmQ5JR1SendHtml(res, statusCode, html) {
+  if (res.writableEnded) return;
+  if (!res.headersSent) {
+    res.writeHead(statusCode, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store"
+    });
+  }
+  res.end(html);
+}
+
+async function aicmQ5JR1PsqlJson(sql) {
+  const { spawnSync } = await import("node:child_process");
+  const databaseUrl = process.env.PERSONA_DATABASE_URL;
+  if (!databaseUrl) throw new Error("PERSONA_DATABASE_URL is not set");
+
+  const result = spawnSync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-X", "-qAt"], {
+    input: sql,
+    encoding: "utf8",
+    timeout: 45000,
+    maxBuffer: 1024 * 1024 * 8
+  });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(String(result.stderr || result.stdout || "psql failed"));
+
+  const raw = String(result.stdout || "").trim();
+  if (!raw) return [];
+  return JSON.parse(raw);
+}
+
+function aicmQ5JR1PageShell(innerHtml) {
+  return [
+    '<!doctype html>',
+    '<html lang="ja">',
+    '<head>',
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<title>成果物一覧</title>',
+    '<style>',
+    'body{margin:0;background:#f5f7fb;color:#111827;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
+    '.wrap{max-width:980px;margin:0 auto;padding:28px 18px 80px;}',
+    '.app-title{font-size:34px;line-height:1.2;margin:0 0 22px;font-weight:900;}',
+    '.nav{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 24px;}',
+    '.nav a{display:block;text-align:center;text-decoration:none;color:#111827;background:#eef3ff;border:1px solid #d9e2f2;border-radius:18px;padding:14px 10px;font-weight:800;}',
+    '.page-title{font-size:32px;margin:8px 0 14px;font-weight:900;}',
+    '.lead{color:#4b5563;line-height:1.7;margin:0 0 18px;}',
+    '.card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.08);margin:0 0 14px;overflow:hidden;}',
+    '.line1{white-space:nowrap;overflow-x:auto;overflow-y:hidden;padding:16px 18px;font-weight:900;border-bottom:1px solid #eef2f7;-webkit-overflow-scrolling:touch;}',
+    '.line2{display:flex;gap:16px;align-items:center;white-space:nowrap;overflow-x:auto;overflow-y:hidden;padding:16px 18px;-webkit-overflow-scrolling:touch;}',
+    '.save{font-weight:900;text-decoration:underline;min-width:max-content;}',
+    '.meta{min-width:max-content;color:#374151;}',
+    '.empty,.error{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:18px;line-height:1.7;}',
+    '.error{color:#991b1b;border-color:#fecaca;background:#fff1f2;}',
+    'button{border:1px solid #d9e2f2;border-radius:16px;background:#eef3ff;padding:10px 12px;font-weight:800;color:#6b7280;}',
+    '@media (max-width:520px){.app-title{font-size:30px}.page-title{font-size:28px}.nav{grid-template-columns:1fr}.wrap{padding:24px 14px 72px}}',
+    '</style>',
+    '</head>',
+    '<body>',
+    '<main class="wrap">',
+    '<h1 class="app-title">AI企業運営アプリ</h1>',
+    '<nav class="nav">',
+    '<a href="/">AI企業ダッシュボード</a>',
+    '<a href="/api/aicm/v2/artifact-list-page">成果物一覧</a>',
+    '<a href="/">部門別タスク台帳へ戻る</a>',
+    '<a href="/">レビュー・承認待ち一覧へ戻る</a>',
+    '</nav>',
+    '<h2 class="page-title">成果物一覧</h2>',
+    '<p class="lead">納品レビュー承認済みの成果物を表示します。成果物本体はAICMでは保持せず、「保存」から取得します。</p>',
+    innerHtml,
+    // AICM_B6R96R1Q5X_ARTIFACT_LIST_SAVE_NO_CURRENT_TAB_NAVIGATION: keep artifact downloads out of the current browsing tab.
+    '<iframe title="成果物保存" name="aicmArtifactDownloadFrame" style="display:none;width:0;height:0;border:0" aria-hidden="true"></iframe>',
+    '</main>',
+    '</body>',
+    '</html>'
+  ].join('');
+}
+
+async function aicmQ5JR1ServeArtifactListPage(req, res) {
+  try {
+    const sql = [
+      "WITH base AS (",
+      "  SELECT",
+      "    aicm_human_review_item_id::text AS artifact_id,",
+      "    COALESCE(NULLIF(review_title::text,''), '無題の成果物') AS title,",
+      "    COALESCE(",
+      "      NULLIF(metadata_jsonb->>'aiworker_zip_link',''),",
+      "      NULLIF(metadata_jsonb->>'aiworker_download_link',''),",
+      "      NULLIF(artifact_link::text,''),",
+      "      ''",
+      "    ) AS artifact_link,",
+      "    COALESCE(NULLIF(metadata_jsonb->>'expires_at',''), (created_at + interval '6 months')::text) AS expires_at,",
+      "    CASE",
+      "      WHEN COALESCE(",
+      "        NULLIF(metadata_jsonb->>'aiworker_zip_link',''),",
+      "        NULLIF(metadata_jsonb->>'aiworker_download_link',''),",
+      "        NULLIF(artifact_link::text,''),",
+      "        ''",
+      "      ) = '' THEN ''",
+      "      WHEN (",
+      "        CASE",
+      "          WHEN metadata_jsonb->>'expires_at' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'",
+      "            THEN (metadata_jsonb->>'expires_at')::timestamptz",
+      "          ELSE created_at + interval '6 months'",
+      "        END",
+      "      ) < now() THEN '期限切れ'",
+      "      ELSE '有効'",
+      "    END AS status,",
+      "    created_at",
+      "  FROM business.aicm_human_review_item",
+      "  WHERE review_kind_code = 'delivery_summary'",
+      "    AND human_review_status_code = 'approved'",
+      "    AND COALESCE(metadata_jsonb->>'artifact_list_hidden','false') <> 'true'",
+      ")",
+      "SELECT COALESCE(json_agg(row_to_json(base) ORDER BY created_at DESC), '[]'::json)::text FROM base;"
+    ].join("\n");
+
+    const rows = await aicmQ5JR1PsqlJson(sql);
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      aicmQ5JR1SendHtml(res, 200, aicmQ5JR1PageShell('<section class="empty">承認済み成果物はありません。</section>'));
+      return;
+    }
+
+    const html = rows.map((row) => {
+      const id = row && row.artifact_id ? String(row.artifact_id) : "";
+      const title = aicmQ5JR1HtmlEscape(row && row.title ? row.title : "無題の成果物");
+      const expires = aicmQ5JR1HtmlEscape(row && row.expires_at ? row.expires_at : "");
+      const status = aicmQ5JR1HtmlEscape(row && row.status ? row.status : "");
+      const hasLink = !!(row && row.artifact_link);
+
+      const save = hasLink
+        ? '<a class="save" target="aicmArtifactDownloadFrame" href="/api/aicm/v2/artifact-save?artifact_id=' + encodeURIComponent(id) + '">保存</a>'
+        : '<span class="save"></span>';
+
+      return [
+        '<article class="card">',
+        '<div class="line1">' + title + '</div>',
+        '<div class="line2">',
+        save,
+        '<span class="meta">有効期限: ' + expires + '</span>',
+        '<span class="meta">' + status + '</span>',
+        '<button type="button" disabled>一覧から削除</button>',
+        '</div>',
+        '</article>'
+      ].join("");
+    }).join("");
+
+    aicmQ5JR1SendHtml(res, 200, aicmQ5JR1PageShell(html));
+  } catch (error) {
+    const message = aicmQ5JR1HtmlEscape(error && error.message ? error.message : String(error));
+    aicmQ5JR1SendHtml(res, 500, aicmQ5JR1PageShell('<section class="error">成果物一覧の取得に失敗しました: ' + message + '</section>'));
+  }
+}
+// AICM_B6R96R1Q5J_R1_ARTIFACT_LIST_PAGE_ROUTE_END
+
 async function handleApi(req, res, url) {
+  if (aicmQ5JR1IsArtifactListPage(req)) {
+    aicmQ5JR1ServeArtifactListPage(req, res);
+    return;
+  }
+
+  if (aicmQ5JIsArtifactListPage(req)) {
+    aicmQ5JServeArtifactListPage(req, res);
+    return;
+  }
+
+  if (await aicmB6R96R1Q4XTryArtifactSaveRoute(req, res)) {
+    return;
+  }
+
+  if (await aicmB6R96R1Q4RTryHandleArtifactList(req, res)) {
+    return;
+  }
+
   const route = url.pathname;
 
   try {
