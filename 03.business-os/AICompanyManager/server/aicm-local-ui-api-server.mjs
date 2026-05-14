@@ -97,6 +97,20 @@ function requiredUuid(value, name) {
   }
   return text;
 }
+// AICM_Q5JR5Z_CONTEXT_DEFAULT_OWNER_START
+const AICM_Q5JR5Z_DEFAULT_OWNER_CIVILIZATION_ID = "00000000-0000-4000-8000-000000000001";
+
+function aicmQ5JR5ZContextOwnerFromUrl(url) {
+  const raw = String(url && url.searchParams ? url.searchParams.get("owner_civilization_id") || "" : "").trim();
+  if (!raw) {
+    return AICM_Q5JR5Z_DEFAULT_OWNER_CIVILIZATION_ID;
+  }
+  return requiredUuid(raw, "owner_civilization_id");
+}
+// AICM_Q5JR5Z_CONTEXT_DEFAULT_OWNER_END
+
+
+
 
 function requiredText(value, name) {
   const text = String(value || "").trim();
@@ -105,6 +119,36 @@ function requiredText(value, name) {
   }
   return text;
 }
+
+// AICM_Q5JR8K_R4A_SERVER_RESERVED_NAME_VALIDATION_START
+function aicmQ5JR8KR4AServerReservedNames(kind) {
+  if (kind === "company") {
+    return ["企業", "AI企業", "会社", "会社名", "未設定", "選択してください"];
+  }
+
+  if (kind === "department") {
+    return ["部門", "部署", "部門名", "部署名", "未設定", "選択してください"];
+  }
+
+  if (kind === "section") {
+    return ["課", "組織", "課名", "組織名", "未設定", "選択してください"];
+  }
+
+  return ["未設定", "選択してください"];
+}
+
+function aicmQ5JR8KR4AServerRequiredEntityName(value, fieldName, kind, label) {
+  const text = requiredText(value, fieldName);
+  const reserved = aicmQ5JR8KR4AServerReservedNames(kind);
+
+  if (reserved.includes(text)) {
+    throw new Error(label + "に「" + text + "」は使えません。正式名称を入力してください。");
+  }
+
+  return text;
+}
+// AICM_Q5JR8K_R4A_SERVER_RESERVED_NAME_VALIDATION_END
+
 
 function runPsqlJson(sql) {
   const connection = process.env[DB_ENV_KEY];
@@ -802,7 +846,7 @@ function aicmOrgUpdateStatus(value, allowed, fallback) {
 function updateCompany(body) {
   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
   const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
-  const name = requiredText(body.company_name || body.companyName, "company_name");
+  const name = aicmQ5JR8KR4AServerRequiredEntityName(body.company_name || body.companyName, "company_name", "company", "AI企業名");
 
   // AICM_B6R62_COMPANY_RULE_SETTINGS_METADATA_START
   const incomingMetadata = body.metadata_jsonb && typeof body.metadata_jsonb === "object" && !Array.isArray(body.metadata_jsonb)
@@ -842,7 +886,7 @@ function updateCompany(body) {
 function updateDepartment(body) {
   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
   const departmentId = requiredUuid(body.aicm_user_company_department_id, "aicm_user_company_department_id");
-  const name = requiredText(body.department_name || body.departmentName, "department_name");
+  const name = aicmQ5JR8KR4AServerRequiredEntityName(body.department_name || body.departmentName, "department_name", "department", "部門名");
   const status = aicmOrgUpdateStatus(body.department_status || body.department_status_code, ["active", "inactive", "archived"], "active");
 
   const sql = [
@@ -869,7 +913,7 @@ function updateDepartment(body) {
 function updateSection(body) {
   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
   const sectionId = requiredUuid(body.aicm_user_company_section_id, "aicm_user_company_section_id");
-  const name = requiredText(body.section_name || body.sectionName, "section_name");
+  const name = aicmQ5JR8KR4AServerRequiredEntityName(body.section_name || body.sectionName, "section_name", "section", "課名");
   const status = aicmOrgUpdateStatus(body.section_status || body.section_status_code, ["active", "inactive", "archived"], "active");
 
   const sql = [
@@ -980,18 +1024,42 @@ function getContext(ownerCivilizationId) {
 }
 
 function createCompany(body) {
+  // AICM_Q5JR7D_SERVER_COMPANY_CREATE_ONLY_START
   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
-  const name = requiredText(body.company_name, "company_name");
-  const domain = String(body.business_domain || "");
+  const name = aicmQ5JR8KR4AServerRequiredEntityName(body.company_name, "company_name", "company", "AI企業名");
+  const domain = requiredText(body.business_domain, "business_domain");
+
+  const incomingMetadata = body.metadata_jsonb && typeof body.metadata_jsonb === "object" && !Array.isArray(body.metadata_jsonb)
+    ? body.metadata_jsonb
+    : {};
+  const rawRuleSettings = incomingMetadata.aicm_company_rule_settings && typeof incomingMetadata.aicm_company_rule_settings === "object"
+    ? incomingMetadata.aicm_company_rule_settings
+    : {};
+
+  const companyCommonRulesText = requiredText(body.company_common_rules_text || body.companyCommonRulesText, "company_common_rules_text");
+  const presidentPolicyInstructionText = requiredText(body.president_policy_instruction_text || body.presidentPolicyInstructionText, "president_policy_instruction_text");
+
+  const metadataJson = JSON.stringify({
+    aicm_company_rule_settings: {
+      company_terms_text: requiredText(rawRuleSettings.company_terms_text || rawRuleSettings.terms_text, "company_terms_text"),
+      company_constraints_text: requiredText(rawRuleSettings.company_constraints_text || rawRuleSettings.constraints_text, "company_constraints_text"),
+      company_quality_standard_text: requiredText(rawRuleSettings.company_quality_standard_text || rawRuleSettings.quality_standard_text, "company_quality_standard_text"),
+      company_delivery_standard_text: requiredText(rawRuleSettings.company_delivery_standard_text || rawRuleSettings.delivery_standard_text, "company_delivery_standard_text"),
+      company_safety_expression_rules_text: requiredText(rawRuleSettings.company_safety_expression_rules_text || rawRuleSettings.safety_expression_rules_text, "company_safety_expression_rules_text")
+    }
+  });
 
   const sql = [
     "WITH inserted AS (",
     "  INSERT INTO business.aicm_user_company (",
-    "    owner_civilization_id, company_name, business_domain, company_status, selected_flag",
+    "    owner_civilization_id, company_name, business_domain, company_common_rules_text, president_policy_instruction_text, metadata_jsonb, company_status, selected_flag",
     "  ) VALUES (",
     "    " + sqlLiteral(owner) + "::uuid,",
     "    " + sqlLiteral(name) + ",",
     "    " + sqlLiteral(domain) + ",",
+    "    " + sqlLiteral(companyCommonRulesText) + ",",
+    "    " + sqlLiteral(presidentPolicyInstructionText) + ",",
+    "    " + sqlLiteral(metadataJson) + "::jsonb,",
     "    'active',",
     "    true",
     "  )",
@@ -1006,12 +1074,13 @@ function createCompany(body) {
   ].join("\n");
 
   return runPsqlJson(sql);
+  // AICM_Q5JR7D_SERVER_COMPANY_CREATE_ONLY_END
 }
 
 function createDepartment(body) {
   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
   const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
-  const name = requiredText(body.department_name, "department_name");
+  const name = aicmQ5JR8KR4AServerRequiredEntityName(body.department_name, "department_name", "department", "部門名");
   const purpose = String(body.purpose || "");
 
   const sql = [
@@ -1058,7 +1127,7 @@ function createSection(body) {
   const owner = requiredUuid(body.owner_civilization_id, "owner_civilization_id");
   const companyId = requiredUuid(body.aicm_user_company_id, "aicm_user_company_id");
   const departmentId = requiredUuid(body.aicm_user_company_department_id, "aicm_user_company_department_id");
-  const name = requiredText(body.section_name, "section_name");
+  const name = aicmQ5JR8KR4AServerRequiredEntityName(body.section_name, "section_name", "section", "課名");
   const purpose = String(body.purpose || "");
 
   const sql = [
@@ -2863,6 +2932,86 @@ function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
 
   const detailJson = aicmB6r7Json(safeDetail);
 
+  // AICM_Q5JR8G_R2C_WORKER_AUTO_ZIP_REQUIRED_GATE_START
+  function aicmQ5JR8GR2CDeepPickText(value, keys, depth) {
+    if (!value || typeof value !== "object" || depth > 8) return "";
+
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        const found = aicmB6r7Text(value[key]);
+        if (found) return found;
+      }
+    }
+
+    for (const nested of Object.values(value)) {
+      const found = aicmQ5JR8GR2CDeepPickText(nested, keys, depth + 1);
+      if (found) return found;
+    }
+
+    return "";
+  }
+
+  const aiworkerZipLinkQ5JR8GR2C = aicmQ5JR8GR2CDeepPickText(safeDetail, [
+    "deliverable_zip_link",
+    "zip_link",
+    "download_link",
+    "aiworker_zip_link",
+    "aiworker_download_link",
+    "artifact_link"
+  ], 0);
+
+  const aiworkerRuntimeRequestIdQ5JR8GR2C = aicmQ5JR8GR2CDeepPickText(safeDetail, [
+    "runtime_request_id",
+    "request_id",
+    "aiworker_request_id"
+  ], 0);
+
+  const aiworkerZipLooksReadyQ5JR8GR2C = (
+    /^aiworkeros:\/\/runtime-deliverable-zips?\//.test(aiworkerZipLinkQ5JR8GR2C) ||
+    /^https?:\/\/.+\.zip($|[?#])/.test(aiworkerZipLinkQ5JR8GR2C)
+  );
+
+  if (!aiworkerZipLinkQ5JR8GR2C || !aiworkerZipLooksReadyQ5JR8GR2C) {
+    const waitingMetadataJson = aicmB6r7Json({
+      aiworkeros_execution_state: "waiting_for_artifact_zip",
+      aiworkeros_retryable: true,
+      artifact_zip_required: true,
+      artifact_zip_required_reason: "AIWorkerOS zip link was not returned; human review is blocked until the real deliverable zip exists.",
+      aiworkeros_runtime_request_id: aiworkerRuntimeRequestIdQ5JR8GR2C,
+      worker_auto_execution_result: safeDetail || {},
+      updated_by: "AICompanyManager.Q5JR8G-R2C"
+    });
+
+    const waitingSql = [
+      "WITH updated AS (",
+      "  UPDATE business.aicm_worker_work_unit",
+      "  SET work_status_code = " + sqlLiteral("in_progress") + ",",
+      "      review_status_code = " + sqlLiteral("required") + ",",
+      "      metadata_jsonb = COALESCE(metadata_jsonb, '{}'::jsonb) || " + sqlLiteral(waitingMetadataJson) + "::jsonb,",
+      "      note = CASE",
+      "        WHEN COALESCE(note, '') ILIKE " + sqlLiteral("%成果物zip待ち%") + " THEN note",
+      "        WHEN NULLIF(note, '') IS NULL THEN " + sqlLiteral("成果物zip待ち: AIWorkerOSから成果物zipリンクが返るまで納品レビューへ進めません。") + "",
+      "        ELSE note || E'\\n' || " + sqlLiteral("成果物zip待ち: AIWorkerOSから成果物zipリンクが返るまで納品レビューへ進めません。") + "",
+      "      END,",
+      "      updated_at = now()",
+      "  WHERE aicm_worker_work_unit_id = " + sqlLiteral(unit) + "::uuid",
+      "  RETURNING *",
+      ")",
+      "SELECT jsonb_build_object(",
+      "  'result', " + sqlLiteral("waiting_for_artifact_zip") + ",",
+      "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+      "  'artifact_zip_required', true,",
+      "  'created_human_review_count', 0,",
+      "  'updated_worker_count', (SELECT count(*) FROM updated),",
+      "  'aiworkeros_runtime_request_id', " + sqlLiteral(aiworkerRuntimeRequestIdQ5JR8GR2C) + ",",
+      "  'worker_work_unit', COALESCE((SELECT to_jsonb(updated) FROM updated LIMIT 1), '{}'::jsonb)",
+      ")::text;"
+    ].join("\n");
+
+    return runPsqlJson(waitingSql);
+  }
+  // AICM_Q5JR8G_R2C_WORKER_AUTO_ZIP_REQUIRED_GATE_END
+
   const sql = [
     "WITH target AS (",
     "  SELECT",
@@ -2943,7 +3092,7 @@ function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
     "    '',",
     "    " + sqlLiteral(aiReviewText) + ",",
     "    '',",
-    "    COALESCE(NULLIF(t.handoff_link, ''), " + sqlLiteral("/api/aicm/v2/delivery-summary/markdown?worker_id=") + " || t.aicm_worker_work_unit_id::text),",
+    "    " + sqlLiteral(aiworkerZipLinkQ5JR8GR2C) + ",",
     "    COALESCE(NULLIF(t.assigned_worker_label, ''), " + sqlLiteral("AIWorker") + "),",
     "    " + sqlLiteral("AICompanyManager") + ",",
     "    " + sqlLiteral("pending") + ",",
@@ -2967,7 +3116,13 @@ function completeWorkerAutoExecutionAndCreateHumanReviewB6R7(unitId, detail) {
     "      " + sqlLiteral("context_restore_type") + ", " + b6r46ContextRestoreTypeTargetExpr + ",",
     "      " + sqlLiteral("context_restore_id") + ", " + b6r46ContextRestoreIdTargetExpr + ",",
     "      " + sqlLiteral("worker_auto_execution_source") + ", " + sqlLiteral("worker-auto-execution/run") + ",",
-    "      " + sqlLiteral("delivery_summary_file_link") + ", " + sqlLiteral("/api/aicm/v2/delivery-summary/markdown?worker_id=") + " || t.aicm_worker_work_unit_id::text,",
+    "      " + sqlLiteral("aiworker_zip_link") + ", " + sqlLiteral(aiworkerZipLinkQ5JR8GR2C) + ",",
+"      " + sqlLiteral("aiworker_download_link") + ", " + sqlLiteral(aiworkerZipLinkQ5JR8GR2C) + ",",
+"      " + sqlLiteral("artifact_link_kind") + ", " + sqlLiteral("aiworkeros_zip") + ",",
+"      " + sqlLiteral("artifact_storage_owner") + ", " + sqlLiteral("aiworkeros") + ",",
+"      " + sqlLiteral("artifact_zip_required") + ", true,",
+"      " + sqlLiteral("zip_metadata_patch") + ", " + sqlLiteral("AICompanyManager.Q5JR8G-R2C_ZIP_METADATA") + ",",
+"      " + sqlLiteral("delivery_summary_file_link") + ", " + sqlLiteral("/api/aicm/v2/delivery-summary/markdown?worker_id=") + " || t.aicm_worker_work_unit_id::text,",
     "      " + sqlLiteral("delivery_summary_file_kind") + ", " + sqlLiteral("markdown") + ",",
     "      " + sqlLiteral("delivery_summary_file_source") + ", " + sqlLiteral("human_review_delivery_summary") + ",",
     "      " + sqlLiteral("review_target_is_summary_file") + ", true",
@@ -3492,10 +3647,17 @@ async function aicmB6R96R1Q4RTryHandleArtifactList(req, res) {
       "  SELECT",
       "    aicm_human_review_item_id::text AS artifact_id,",
       "    COALESCE(NULLIF(review_title::text,''), '無題の成果物') AS title,",
+      // AICM_Q5JR8G_R2C_ARTIFACT_LIST_ZIP_ONLY_SQL
+      // AICM_Q5JR8G_R2D_ARTIFACT_LINK_SQL_COMMA_REPAIRED
       "    COALESCE(",
       "      NULLIF(metadata_jsonb->>'aiworker_zip_link',''),",
       "      NULLIF(metadata_jsonb->>'aiworker_download_link',''),",
-      "      NULLIF(artifact_link::text,''),",
+      "      CASE",
+      "        WHEN artifact_link::text LIKE 'aiworkeros://runtime-deliverable-zip/%' THEN artifact_link::text",
+      "        WHEN artifact_link::text LIKE 'aiworkeros://runtime-deliverable-zips/%' THEN artifact_link::text",
+      "        WHEN artifact_link::text ~ '^https?://.+\\.zip($|[?#])' THEN artifact_link::text",
+      "        ELSE ''",
+      "      END,",
       "      ''",
       "    ) AS artifact_link,",
       "    COALESCE(NULLIF(metadata_jsonb->>'delivery_summary_file_link',''), '') AS summary_link,",
@@ -3550,6 +3712,85 @@ async function aicmB6R96R1Q4RTryHandleArtifactList(req, res) {
 }
 // AICM_B6R96R1Q4R_ARTIFACT_LIST_SERVER_END
 
+
+
+// AICM_Q5JR8F_R5_COMMON_URL_RESOLVER_START
+function aicmServerRequestOrigin(req) {
+  const host = String(
+    (req && req.headers && req.headers.host) ||
+    ("127.0.0.1:" + String(
+      process.env.AICM_LOCAL_UI_API_PORT ||
+      process.env.AICM_LOCAL_UI_PORT ||
+      process.env.PORT ||
+      "8794"
+    ))
+  ).trim();
+
+  return "http://" + host;
+}
+
+function aicmServerResolveHttpUrl(value, req, options = {}) {
+  const raw = String(value == null ? "" : value).trim();
+
+  if (!raw) {
+    return {
+      ok: false,
+      reason: "BLANK_URL",
+      message: "URL is blank",
+      raw
+    };
+  }
+
+  if (raw.startsWith("//")) {
+    return {
+      ok: false,
+      reason: "SCHEME_RELATIVE_URL_NOT_ALLOWED",
+      message: "Scheme-relative URL is not allowed",
+      raw
+    };
+  }
+
+  let resolved;
+
+  try {
+    if (raw.startsWith("/")) {
+      resolved = new URL(raw, aicmServerRequestOrigin(req));
+    } else {
+      resolved = new URL(raw);
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "INVALID_URL",
+      message: error && error.message ? String(error.message) : "Invalid URL",
+      raw
+    };
+  }
+
+  const allowedProtocols = Array.isArray(options.allowedProtocols) && options.allowedProtocols.length
+    ? options.allowedProtocols
+    : ["http:", "https:"];
+
+  if (!allowedProtocols.includes(resolved.protocol)) {
+    return {
+      ok: false,
+      reason: "UNSUPPORTED_URL_PROTOCOL",
+      message: "Unsupported URL protocol: " + resolved.protocol,
+      raw,
+      href: resolved.href,
+      protocol: resolved.protocol
+    };
+  }
+
+  return {
+    ok: true,
+    raw,
+    href: resolved.href,
+    url: resolved,
+    protocol: resolved.protocol
+  };
+}
+// AICM_Q5JR8F_R5_COMMON_URL_RESOLVER_END
 
 // AICM_B6R96R1Q4X_ARTIFACT_SAVE_ROUTE_START
 function aicmB6R96R1Q4XSendJson(res, statusCode, body) {
@@ -3615,10 +3856,17 @@ async function aicmB6R96R1Q4XTryArtifactSaveRoute(req, res) {
       "  SELECT",
       "    aicm_human_review_item_id::text AS artifact_id,",
       "    COALESCE(NULLIF(review_title::text,''), 'artifact') AS title,",
+      // AICM_Q5JR8G_R2C_ARTIFACT_LIST_ZIP_ONLY_SQL
+      // AICM_Q5JR8G_R2D_ARTIFACT_LINK_SQL_COMMA_REPAIRED
       "    COALESCE(",
       "      NULLIF(metadata_jsonb->>'aiworker_zip_link',''),",
       "      NULLIF(metadata_jsonb->>'aiworker_download_link',''),",
-      "      NULLIF(artifact_link::text,''),",
+      "      CASE",
+      "        WHEN artifact_link::text LIKE 'aiworkeros://runtime-deliverable-zip/%' THEN artifact_link::text",
+      "        WHEN artifact_link::text LIKE 'aiworkeros://runtime-deliverable-zips/%' THEN artifact_link::text",
+      "        WHEN artifact_link::text ~ '^https?://.+\\.zip($|[?#])' THEN artifact_link::text",
+      "        ELSE ''",
+      "      END,",
       "      ''",
       "    ) AS artifact_link,",
       "    CASE",
@@ -3644,7 +3892,11 @@ async function aicmB6R96R1Q4XTryArtifactSaveRoute(req, res) {
     }
 
     if (!artifact.artifact_link) {
-      aicmB6R96R1Q4XSendJson(res, 404, { ok: false, reason: "ARTIFACT_LINK_EMPTY" });
+      aicmB6R96R1Q4XSendJson(res, 409, {
+        ok: false,
+        reason: "ARTIFACT_ZIP_NOT_READY",
+        message: "AIWorkerOS成果物zipリンクがまだ取得できていません。サマリMarkdownは成果物本体として保存しません。"
+      });
       return true;
     }
 
@@ -3662,6 +3914,16 @@ async function aicmB6R96R1Q4XTryArtifactSaveRoute(req, res) {
 
     // AICM_B6R96R1Q5W_R4_EXISTING_ARTIFACT_SAVE_AIWORKEROS_ZIP_SUPPORT_START
     const artifactLinkText = String(artifact.artifact_link || "").trim();
+
+    // AICM_Q5JR8G_R2C_ARTIFACT_SAVE_REJECT_SUMMARY_MARKDOWN
+    if (artifactLinkText.indexOf("/api/aicm/v2/delivery-summary/markdown") >= 0) {
+      aicmB6R96R1Q4XSendJson(res, 409, {
+        ok: false,
+        reason: "ARTIFACT_ZIP_NOT_READY",
+        message: "納品サマリーMarkdownは成果物zipではありません。AIWorkerOS成果物zipの作成完了後に保存してください。"
+      });
+      return true;
+    }
 
     if (
       artifactLinkText.startsWith("aiworkeros://runtime-deliverable-zip/") ||
@@ -3737,11 +3999,22 @@ async function aicmB6R96R1Q4XTryArtifactSaveRoute(req, res) {
     }
     // AICM_B6R96R1Q5W_R4_EXISTING_ARTIFACT_SAVE_AIWORKEROS_ZIP_SUPPORT_END
 
-    const artifactUrl = new URL(artifactLinkText);
-    if (!["http:", "https:"].includes(artifactUrl.protocol)) {
-      aicmB6R96R1Q4XSendJson(res, 400, { ok: false, reason: "UNSUPPORTED_ARTIFACT_URL" });
+    // AICM_Q5JR8F_R5_NORMAL_ARTIFACT_URL_RESOLVER_START
+    const artifactUrlResult = aicmServerResolveHttpUrl(artifactLinkText, req, {
+      allowedProtocols: ["http:", "https:"]
+    });
+
+    if (!artifactUrlResult.ok) {
+      aicmB6R96R1Q4XSendJson(res, 400, {
+        ok: false,
+        reason: artifactUrlResult.reason || "UNSUPPORTED_ARTIFACT_URL",
+        message: artifactUrlResult.message || "Unsupported artifact URL"
+      });
       return true;
     }
+
+    const artifactUrl = artifactUrlResult.url;
+    // AICM_Q5JR8F_R5_NORMAL_ARTIFACT_URL_RESOLVER_END
 
     const upstream = await fetch(artifactUrl.toString(), { redirect: "follow" });
 
@@ -3901,7 +4174,7 @@ async function aicmQ5JServeArtifactListPage(req, res) {
 
       const save = hasLink
         ? '<a class="save" href="/api/aicm/v2/artifact-save?artifact_id=' + encodeURIComponent(id) + '">保存</a>'
-        : '<span class="save"></span>';
+        : '<span class="meta">zip未取得</span>';
 
       return [
         '<article class="card">',
@@ -4342,18 +4615,31 @@ async function aicmQ5JR1ServeArtifactListPage(req, res) {
       "  SELECT",
       "    aicm_human_review_item_id::text AS artifact_id,",
       "    COALESCE(NULLIF(review_title::text,''), '無題の成果物') AS title,",
+      // AICM_Q5JR8G_R2C_ARTIFACT_LIST_ZIP_ONLY_SQL
+      // AICM_Q5JR8G_R2D_ARTIFACT_LINK_SQL_COMMA_REPAIRED
       "    COALESCE(",
       "      NULLIF(metadata_jsonb->>'aiworker_zip_link',''),",
       "      NULLIF(metadata_jsonb->>'aiworker_download_link',''),",
-      "      NULLIF(artifact_link::text,''),",
+      "      CASE",
+      "        WHEN artifact_link::text LIKE 'aiworkeros://runtime-deliverable-zip/%' THEN artifact_link::text",
+      "        WHEN artifact_link::text LIKE 'aiworkeros://runtime-deliverable-zips/%' THEN artifact_link::text",
+      "        WHEN artifact_link::text ~ '^https?://.+\\.zip($|[?#])' THEN artifact_link::text",
+      "        ELSE ''",
+      "      END,",
       "      ''",
       "    ) AS artifact_link,",
       "    COALESCE(NULLIF(metadata_jsonb->>'expires_at',''), (created_at + interval '6 months')::text) AS expires_at,",
       "    CASE",
       "      WHEN COALESCE(",
+      // AICM_Q5JR8G_R2C_ARTIFACT_STATUS_ZIP_ONLY_SQL
       "        NULLIF(metadata_jsonb->>'aiworker_zip_link',''),",
       "        NULLIF(metadata_jsonb->>'aiworker_download_link',''),",
-      "        NULLIF(artifact_link::text,''),",
+      "        CASE",
+      "          WHEN artifact_link::text LIKE 'aiworkeros://runtime-deliverable-zip/%' THEN artifact_link::text",
+      "          WHEN artifact_link::text LIKE 'aiworkeros://runtime-deliverable-zips/%' THEN artifact_link::text",
+      "          WHEN artifact_link::text ~ '^https?://.+\\.zip($|[?#])' THEN artifact_link::text",
+      "          ELSE ''",
+      "        END,",
       "        ''",
       "      ) = '' THEN ''",
       "      WHEN (",
@@ -4390,7 +4676,7 @@ async function aicmQ5JR1ServeArtifactListPage(req, res) {
 
       const save = hasLink
         ? '<a class="save" target="aicmArtifactDownloadFrame" href="/api/aicm/v2/artifact-save?artifact_id=' + encodeURIComponent(id) + '">保存</a>'
-        : '<span class="save"></span>';
+        : '<span class="meta">zip未取得</span>';
 
       return [
         '<article class="card">',
@@ -4549,7 +4835,7 @@ if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
 
     // AICM_R8Z_V9_CONTEXT_SCRIPT_ROUTE: review-list script transport for local browser hydration
     if (route === "/api/aicm/v2/context-script" && req.method === "GET") {
-      const owner = url.searchParams.get("owner_civilization_id") || "";
+      const owner = aicmQ5JR5ZContextOwnerFromUrl(url);
       const callbackRaw = url.searchParams.get("callback") || "__aicmR8zV9ReviewContextCallback";
       const callback = /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/.test(callbackRaw)
         ? callbackRaw
@@ -4574,7 +4860,7 @@ if (route === "/api/aicm/v2/manager-major/archive" && req.method === "POST") {
     }
 
 if (route === "/api/aicm/v2/context" && req.method === "GET") {
-      sendJson(res, 200, aicmR8zV10gc4bFilterPendingReviewContext(getContext(url.searchParams.get("owner_civilization_id") || "")));
+      sendJson(res, 200, aicmR8zV10gc4bFilterPendingReviewContext(getContext(aicmQ5JR5ZContextOwnerFromUrl(url))));
       return true;
     }
 

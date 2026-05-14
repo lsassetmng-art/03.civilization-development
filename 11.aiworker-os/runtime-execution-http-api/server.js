@@ -1357,7 +1357,7 @@ function aiwB6R95R3D1BuildZipPackageMeta(requesterAppRef, taskTitle) {
   const zipLink = `aiworkeros://runtime-deliverable-zip/${fileName}`;
 
   return {
-    package_kind: "deliverable_zip",
+    package_kind: "delivery_package",
     package_format: "zip",
     mime_type: "application/zip",
     zip_id: zipId,
@@ -1588,7 +1588,7 @@ function aiwB6R95R3D1CreateZipAndAttach(responsePayload, deliverable) {
   const stat = fs.statSync(zipPath);
 
   const zipPublic = {
-    package_kind: "deliverable_zip",
+    package_kind: "delivery_package",
     package_format: "zip",
     mime_type: "application/zip",
     zip_id: packageMeta.zip_id,
@@ -1698,7 +1698,7 @@ function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
     "  'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),",
     "  'robot_context', :'robot_context_jsonb'::jsonb,",
     "  'generation_basis', :'generation_basis_jsonb'::jsonb,",    "  'deliverable', jsonb_build_object(",
-    "    'package_kind', 'deliverable_zip',",
+    "    'package_kind', 'delivery_package',",
     "    'deliverable_kind', 'document',",
     "    'title', :'output_title_ja',",
     "    'body_format', 'markdown',",
@@ -1721,7 +1721,7 @@ function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
     "  'deliverable_link', :'deliverable_zip_link',",    "  'requester_delivery_payload', jsonb_build_object(",
     "    'summary_text', :'output_summary_ja',",
     "    'deliverable_title', :'output_title_ja',",
-    "    'package_kind', 'deliverable_zip',",
+    "    'package_kind', 'delivery_package',",
     "    'deliverable_kind', 'document',",
     "    'body_format', 'markdown',",
     "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
@@ -1895,3 +1895,541 @@ const server = http.createServer(async (req, res) => {
 server.listen(port, "127.0.0.1", () => {
   console.log(`AIWorkerOS runtime execution HTTP API listening on http://127.0.0.1:${port}`);
 });
+
+
+// AIW_B6R97R14_QUEUE_CONSUMER_START
+// AIWorkerOS-owned queue consumer.
+// AICM does not trigger execution here.
+// This consumer scans waiting/retryable work, claims it, calls existing createRuntimeRequest,
+// records AIWorkerOS request/output metadata, and creates/updates AICM human review rows.
+const childProcessB6R97R14 = require("node:child_process");
+
+function aiwB6R97R14DbUrl() {
+  return process.env.PERSONA_DATABASE_URL || process.env.DATABASE_URL || "";
+}
+
+function aiwB6R97R14SqlLiteral(value) {
+  return "'" + String(value == null ? "" : value).replace(/'/g, "''") + "'";
+}
+
+function aiwB6R97R14IsUuid(value) {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(value || "").trim());
+}
+
+function aiwB6R97R14UuidOrNull(value) {
+  const text = String(value || "").trim();
+  return aiwB6R97R14IsUuid(text) ? aiwB6R97R14SqlLiteral(text) + "::uuid" : "NULL";
+}
+
+function aiwB6R97R14PsqlText(sql) {
+  const dbUrl = aiwB6R97R14DbUrl();
+  if (!dbUrl) {
+    throw new Error("PERSONA_DATABASE_URL is not set for AIWorkerOS consumer");
+  }
+
+  // AIW_B6R97R17_PSQL_STDIN_SAFE_ERROR_PATCH
+  // Pass SQL via stdin instead of psql -c to avoid OS argv length limits.
+  return childProcessB6R97R14.execFileSync("psql", [
+    dbUrl,
+    "-v", "ON_ERROR_STOP=1",
+    "-X",
+    "-q",
+    "-A",
+    "-t",
+    "-P", "pager=off"
+  ], {
+    input: String(sql || "") + "\n",
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 40
+  }).trim();
+}
+
+function aiwB6R97R14PsqlJson(sql, fallback) {
+  const raw = aiwB6R97R14PsqlText(sql);
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error("AIWorkerOS consumer failed to parse psql JSON: " + error.message + " raw=" + raw.slice(0, 400));
+  }
+}
+
+function aiwB6R97R14ClaimWorkUnits(limit) {
+  const sql = [
+    "with picked as (",
+    "  select u.aicm_worker_work_unit_id",
+    "  from business.aicm_worker_work_unit u",
+    "  where (",
+    "    coalesce(u.metadata_jsonb->>'aiworkeros_execution_state','') in ('waiting','waiting_for_artifact_zip')",
+    "    or lower(coalesce(u.metadata_jsonb->>'aiworkeros_retryable','false')) in ('true','t','1','yes')",
+    "  )",
+    "    and coalesce(u.metadata_jsonb->>'aiworkeros_consumer_claim_state','') <> 'processing'",
+    "    and coalesce(u.metadata_jsonb->>'aiworkeros_request_id','') = ''",
+    "  order by u.updated_at asc nulls last, u.created_at asc nulls last",
+    "  limit " + Number(limit || 5),
+    "  for update skip locked",
+    "), claimed as (",
+    "  update business.aicm_worker_work_unit u",
+    "  set metadata_jsonb = coalesce(u.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+    "      'aiworkeros_execution_state', 'processing',",
+    "      'aiworkeros_retryable', 'false',",
+    "      'aiworkeros_consumer_claim_state', 'processing',",
+    "      'aiworkeros_claimed_by', 'AIWorkerOS/B6R97R14',",
+    "      'aiworkeros_claimed_at', now()::text",
+    "    ),",
+    "    updated_at = now()",
+    "  from picked p",
+    "  where u.aicm_worker_work_unit_id = p.aicm_worker_work_unit_id",
+    "  returning to_jsonb(u) as row_json",
+    ")",
+    "select coalesce(jsonb_agg(row_json), '[]'::jsonb)::text from claimed;"
+  ].join("\n");
+
+  return aiwB6R97R14PsqlJson(sql, []);
+}
+
+function aiwB6R97R14BuildPayload(row) {
+  const meta = row && row.metadata_jsonb && typeof row.metadata_jsonb === "object" ? row.metadata_jsonb : {};
+  const workUnitId = String(row.aicm_worker_work_unit_id || row.worker_work_unit_id || row.work_unit_id || "");
+  const sourceRouteCode = String(meta.source_route_code || row.source_route_code || "aicm_worker_work_unit");
+  const title = String(row.work_unit_name || row.task_name || row.title || "AICompanyManager Worker作業");
+  const instruction = [
+    String(row.work_instruction_text || ""),
+    String(row.work_unit_description || ""),
+    String(row.note || ""),
+    "AICM worker_work_unit_id: " + workUnitId,
+    "source_route_code: " + sourceRouteCode
+  ].filter(Boolean).join("\n\n");
+
+  return {
+    app_surface_code: String(meta.app_surface_code || "ai_company_manager"),
+    model_code: String(meta.model_code || "byd2_003_asic_leader3"),
+    task_domain_code: String(meta.task_domain_code || "business_operation"),
+    task_title: title,
+    task_instruction_ja: instruction || title,
+    source_app_ref: String(meta.source_app_ref || "AICompanyManager"),
+    source_request_ref: workUnitId,
+    requested_by_ref: String(meta.requested_by_ref || "AIWorkerOSConsumer"),
+    source_route_code: sourceRouteCode,
+    metadata_jsonb: {
+      aicm_worker_work_unit_id: workUnitId,
+      owner_civilization_id: row.owner_civilization_id || "",
+      aicm_user_company_id: row.aicm_user_company_id || "",
+      source_route_code: sourceRouteCode,
+      consumer_code: "B6R97R14"
+    }
+  };
+}
+
+function aiwB6R97R14RequestId(result) {
+  return String(
+    (result && result.request_id) ||
+    (result && result.runtime_request_id) ||
+    (result && result.data && result.data.request_id) ||
+    ""
+  );
+}
+
+function aiwB6R97R14OutputId(result) {
+  return String(
+    (result && result.output_id) ||
+    (result && result.deliverable_ref && result.deliverable_ref.id) ||
+    (result && result.requester_delivery_payload && result.requester_delivery_payload.deliverable_ref && result.requester_delivery_payload.deliverable_ref.id) ||
+    ""
+  );
+}
+
+function aiwB6R97R14Summary(result) {
+  return String(
+    (result && result.requester_delivery_payload && result.requester_delivery_payload.summary_text) ||
+    (result && result.deliverable && result.deliverable.summary_text) ||
+    (result && result.summary_text) ||
+    ""
+  );
+}
+
+function aiwB6R97R14DeliverableLink(result) {
+  return String(
+    (result && result.deliverable_link) ||
+    (result && result.requester_delivery_payload && result.requester_delivery_payload.deliverable_link) ||
+    (result && result.deliverable && result.deliverable.zip_link) ||
+    ""
+  );
+}
+
+function aiwB6R97R14MarkFailed(row, error) {
+  const id = row && row.aicm_worker_work_unit_id;
+  if (!aiwB6R97R14IsUuid(id)) return;
+
+  // AIW_B6R97R17_PSQL_STDIN_SAFE_ERROR_PATCH: never store DB URL or full SQL command in metadata.
+  const rawMessage = String(error && error.message ? error.message : error);
+  const message = rawMessage
+    .replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[DB_URL_REDACTED]")
+    .replace(/-c\s+update[\s\S]*/i, "-c [SQL_REDACTED]")
+    .split("\n")
+    .slice(0, 8)
+    .join("\n")
+    .slice(0, 600);
+
+  const sql = [
+    "update business.aicm_worker_work_unit",
+    "set metadata_jsonb = coalesce(metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+    "  'aiworkeros_execution_state', 'waiting',",
+    "  'aiworkeros_retryable', 'true',",
+    "  'aiworkeros_consumer_claim_state', 'failed',",
+    "  'aiworkeros_last_error', " + aiwB6R97R14SqlLiteral(message) + ",",
+    "  'aiworkeros_last_failed_at', now()::text",
+    "), updated_at = now()",
+    "where aicm_worker_work_unit_id = " + aiwB6R97R14UuidOrNull(id) + ";"
+  ].join("\n");
+
+  aiwB6R97R14PsqlText(sql);
+}
+
+
+// AIW_B6R97R21_SCHEMA_MISMATCH_REPAIR
+function aiwB6R97R19CAicmArtifactKindCode() {
+  // AIW_B6R97R19C_ARTIFACT_KIND_RESOLVER_FINALIZER_PATCH
+  return "delivery_package";
+}
+
+function aiwB6R97R19CFinalizeGeneratedReviewRows(limit) {
+  const artifactKind = aiwB6R97R19CAicmArtifactKindCode();
+  const safeLimit = Math.max(1, Number(limit || 5) || 5);
+
+  const sql = [
+    "with valid_artifact_kind as (",
+    "  select " + aiwB6R97R14SqlLiteral(artifactKind) + "::text as artifact_kind_code",
+    "  where exists (",
+    "    select 1",
+    "    from pg_constraint c",
+    "    where c.conrelid = 'business.aicm_human_review_item'::regclass",
+    "      and c.conname = 'chk_aicm_human_review_artifact_kind'",
+    "      and pg_get_constraintdef(c.oid) like '%' || " + aiwB6R97R14SqlLiteral(artifactKind) + " || '%'",
+    "  )",
+    "), target as (",
+    "  select u.*",
+    "  from business.aicm_worker_work_unit u",
+    "  where coalesce(u.metadata_jsonb->>'aiworkeros_claimed_by','') = 'AIWorkerOS/B6R97R14'",
+    "    and coalesce(u.metadata_jsonb->>'aiworkeros_request_id','') <> ''",
+    "    and coalesce(u.metadata_jsonb->>'aiworkeros_output_id','') <> ''",
+    "    and coalesce(u.metadata_jsonb->>'aiworkeros_deliverable_link','') <> ''",
+    "    and coalesce(u.metadata_jsonb->>'aiworkeros_consumer_claim_state','') in ('failed','review_registration_failed')",
+    "  order by u.updated_at asc nulls last",
+    "  limit " + safeLimit,
+    "), updated_unit as (",
+    "  update business.aicm_worker_work_unit u",
+    "  set",
+    "    work_status_code = 'review_waiting',",
+    "    review_status_code = 'waiting',",
+    "    metadata_jsonb = (coalesce(u.metadata_jsonb, '{}'::jsonb) - 'aiworkeros_last_error') || jsonb_build_object(",
+    "      'aiworkeros_execution_state', 'completed',",
+    "      'aiworkeros_retryable', 'false',",
+    "      'aiworkeros_consumer_claim_state', 'completed',",
+    "      'aiworkeros_artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+    "      'aiworkeros_review_finalized_by', 'B6R97R19C',",
+    "      'aiworkeros_review_finalized_at', now()::text",
+    "    ),",
+    "    updated_at = now()",
+    "  from target t",
+    "  where u.aicm_worker_work_unit_id = t.aicm_worker_work_unit_id",
+    "    and exists (select 1 from valid_artifact_kind)",
+    "  returning u.*",
+    "), existing_review as (",
+    "  select h.aicm_human_review_item_id, h.related_worker_work_unit_id",
+    "  from business.aicm_human_review_item h",
+    "  join updated_unit u on h.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+    "  where coalesce(h.human_review_status_code,'') = 'pending'",
+    "), updated_review as (",
+    "  update business.aicm_human_review_item h",
+    "  set",
+    "    artifact_kind_code = (select artifact_kind_code from valid_artifact_kind),",
+    "    review_title = coalesce(nullif(h.review_title,''), '納品サマリー確認: ' || coalesce(u.work_unit_name, 'AIWorkerOS成果物')),",
+    "    delivery_summary_text = coalesce(nullif(h.delivery_summary_text,''), 'AIWorkerOS consumer generated deliverable, summary, and delivery package.'),",
+    "    main_changes_text = coalesce(nullif(h.main_changes_text,''), 'AIWorkerOS consumer generated deliverable, summary, and zip link.'),",
+    "    ai_review_result_text = coalesce(nullif(h.ai_review_result_text,''), 'AIWorkerOS consumer completed deliverable generation.'),",
+    "    artifact_link = coalesce(nullif(h.artifact_link,''), u.metadata_jsonb->>'aiworkeros_deliverable_link'),",
+    "    metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+    "      'source_route_code', coalesce(u.metadata_jsonb->>'source_route_code', 'aicm_worker_work_unit'),",
+    "      'aiworkeros_request_id', u.metadata_jsonb->>'aiworkeros_request_id',",
+    "      'aiworkeros_output_id', u.metadata_jsonb->>'aiworkeros_output_id',",
+    "      'artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+    "      'consumer_code', 'B6R97R19C'",
+    "    ),",
+    "    updated_at = now()",
+    "  from updated_unit u",
+    "  where h.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+    "    and h.aicm_human_review_item_id in (select aicm_human_review_item_id from existing_review)",
+    "  returning h.aicm_human_review_item_id",
+    "), inserted_review as (",
+    "  insert into business.aicm_human_review_item (",
+    "    owner_civilization_id,",
+    "    aicm_user_company_id,",
+    "    aicm_user_company_department_id,",
+    "    aicm_user_company_section_id,",
+    "    related_manager_major_work_item_id,",
+    "    related_worker_work_unit_id,",
+    "    review_kind_code,",
+    "    artifact_kind_code,",
+    "    review_title,",
+    "    delivery_summary_text,",
+    "    main_changes_text,",
+    "    ai_review_result_text,",
+    "    unresolved_issues_text,",
+    "    artifact_link,",
+    "    responsible_ai_label,",
+    "    requested_by_ai_label,",
+    "    human_review_status_code,",
+    "    priority_code,",
+    "    metadata_jsonb",
+    "  )",
+    "  select",
+    "    u.owner_civilization_id,",
+    "    u.aicm_user_company_id,",
+    "    NULL::uuid,",
+    "    NULL::uuid,",
+    "    NULL::uuid,",
+    "    u.aicm_worker_work_unit_id,",
+    "    'delivery_summary',",
+    "    (select artifact_kind_code from valid_artifact_kind),",
+    "    '納品サマリー確認: ' || coalesce(u.work_unit_name, 'AIWorkerOS成果物'),",
+    "    'AIWorkerOS consumer generated deliverable, summary, and delivery package.',",
+    "    'AIWorkerOS consumer generated deliverable, summary, and zip link.',",
+    "    'AIWorkerOS consumer completed deliverable generation.',",
+    "    '',",
+    "    u.metadata_jsonb->>'aiworkeros_deliverable_link',",
+    "    'AIWorkerOS',",
+    "    'AICompanyManager',",
+    "    'pending',",
+    "    coalesce(nullif(u.priority_code,''), 'normal'),",
+    "    jsonb_build_object(",
+    "      'source_route_code', coalesce(u.metadata_jsonb->>'source_route_code', 'aicm_worker_work_unit'),",
+    "      'aiworkeros_request_id', u.metadata_jsonb->>'aiworkeros_request_id',",
+    "      'aiworkeros_output_id', u.metadata_jsonb->>'aiworkeros_output_id',",
+    "      'artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+    "      'consumer_code', 'B6R97R19C'",
+    "    )",
+    "  from updated_unit u",
+    "  where not exists (",
+    "    select 1",
+    "    from existing_review er",
+    "    where er.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+    "  )",
+    "  returning aicm_human_review_item_id",
+    ")",
+    "select 1;"
+  ].join("\n");
+
+  aiwB6R97R14PsqlText(sql);
+  return true;
+}
+
+function aiwB6R97R14RecordSuccess(row, result, payload) {
+  const workUnitId = String(row.aicm_worker_work_unit_id || "");
+  if (!aiwB6R97R14IsUuid(workUnitId)) {
+    throw new Error("invalid work unit id for AIWorkerOS consumer success");
+  }
+
+  const meta = row && row.metadata_jsonb && typeof row.metadata_jsonb === "object" ? row.metadata_jsonb : {};
+  const requestId = aiwB6R97R14RequestId(result);
+  const outputId = aiwB6R97R14OutputId(result);
+  const summary = aiwB6R97R14Summary(result);
+  const link = aiwB6R97R14DeliverableLink(result);
+  const sourceRouteCode = String(meta.source_route_code || payload.source_route_code || "aicm_worker_work_unit");
+  const title = String(payload.task_title || "AIWorkerOS成果物レビュー");
+
+  const ownerExpr = aiwB6R97R14UuidOrNull(row.owner_civilization_id || "00000000-0000-4000-8000-000000000001");
+  const companyExpr = aiwB6R97R14UuidOrNull(row.aicm_user_company_id || row.company_id || "");
+  const deptExpr = aiwB6R97R14UuidOrNull(row.aicm_user_company_department_id || "");
+  const sectionExpr = aiwB6R97R14UuidOrNull(row.aicm_user_company_section_id || "");
+  const majorExpr = aiwB6R97R14UuidOrNull(row.related_manager_major_work_item_id || row.aicm_manager_major_work_item_id || "");
+
+  // AIW_B6R97R16_E2BIG_COMPACT_RESULT_PATCH
+  // Do not embed the full AIWorkerOS result JSON into psql -c SQL.
+  // Full result payload can exceed OS argv limits and cause spawnSync psql E2BIG.
+  const compactResultJson = JSON.stringify({
+    result: result && result.result ? result.result : "",
+    request_id: requestId,
+    output_id: outputId,
+    summary_present: Boolean(summary),
+    deliverable_link: link,
+    consumer_code: "B6R97R16"
+  });
+
+  const sql = [
+    "update business.aicm_worker_work_unit",
+    "set work_status_code = 'review_waiting',",
+    "    review_status_code = 'waiting',",
+    "    metadata_jsonb = coalesce(metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+    "      'aiworkeros_execution_state', 'completed',",
+    "      'aiworkeros_retryable', 'false',",
+    "      'aiworkeros_consumer_claim_state', 'completed',",
+    "      'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+    "      'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+    "      'aiworkeros_deliverable_link', " + aiwB6R97R14SqlLiteral(link) + ",",
+    "      'aiworkeros_completed_at', now()::text",
+    "    ),",
+    "    updated_at = now()",
+    "where aicm_worker_work_unit_id = " + aiwB6R97R14UuidOrNull(workUnitId) + ";",
+    "",
+    "with existing as (",
+    "  select aicm_human_review_item_id",
+    "  from business.aicm_human_review_item",
+    "  where related_worker_work_unit_id = " + aiwB6R97R14UuidOrNull(workUnitId),
+    "    and coalesce(human_review_status_code,'') = 'pending'",
+    "  limit 1",
+    "), updated as (",
+    "  update business.aicm_human_review_item h",
+    "  set review_title = " + aiwB6R97R14SqlLiteral(title) + ",",
+    "      delivery_summary_text = " + aiwB6R97R14SqlLiteral(summary) + ",",
+    "      artifact_link = " + aiwB6R97R14SqlLiteral(link) + ",",
+    "      ai_review_result_text = 'AIWorkerOS consumer completed deliverable generation.',",
+    "      metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+    "        'source_route_code', " + aiwB6R97R14SqlLiteral(sourceRouteCode) + ",",
+    "        'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+    "        'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+    "        'aiworkeros_result_compact', " + aiwB6R97R14SqlLiteral(compactResultJson) + "::jsonb",
+    "      ),",
+    "      updated_at = now()",
+    "  where h.aicm_human_review_item_id in (select aicm_human_review_item_id from existing)",
+    "  returning h.aicm_human_review_item_id",
+    "), inserted as (",
+    "  insert into business.aicm_human_review_item (",
+    "    owner_civilization_id,",
+    "    aicm_user_company_id,",
+    "    aicm_user_company_department_id,",
+    "    aicm_user_company_section_id,",
+    "    related_manager_major_work_item_id,",
+    "    related_worker_work_unit_id,",
+    "    review_kind_code,",
+    "    artifact_kind_code,",
+    "    review_title,",
+    "    delivery_summary_text,",
+    "    main_changes_text,",
+    "    ai_review_result_text,",
+    "    unresolved_issues_text,",
+    "    artifact_link,",
+    "    responsible_ai_label,",
+    "    requested_by_ai_label,",
+    "    human_review_status_code,",
+    "    priority_code,",
+    "    metadata_jsonb",
+    "  )",
+    "  select",
+    "    " + ownerExpr + ",",
+    "    " + companyExpr + ",",
+    "    " + deptExpr + ",",
+    "    " + sectionExpr + ",",
+    "    " + majorExpr + ",",
+    "    " + aiwB6R97R14UuidOrNull(workUnitId) + ",",
+    "    'delivery_summary',",
+    "    'delivery_package',",
+    "    " + aiwB6R97R14SqlLiteral(title) + ",",
+    "    " + aiwB6R97R14SqlLiteral(summary) + ",",
+    "    'AIWorkerOS consumer generated deliverable, summary, and zip link.',",
+    "    'AIWorkerOS consumer completed deliverable generation.',",
+    "    '',",
+    "    " + aiwB6R97R14SqlLiteral(link) + ",",
+    "    'AIWorkerOS',",
+    "    'AICompanyManager',",
+    "    'pending',",
+    "    coalesce(" + aiwB6R97R14SqlLiteral(row.priority_code || "") + ", 'normal'),",
+    "    jsonb_build_object(",
+    "      'source_route_code', " + aiwB6R97R14SqlLiteral(sourceRouteCode) + ",",
+    "      'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+    "      'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+    "      'aiworkeros_result_compact', " + aiwB6R97R14SqlLiteral(compactResultJson) + "::jsonb,",
+    "      'consumer_code', 'B6R97R14'",
+    "    )",
+    "  where not exists (select 1 from existing)",
+    "  returning aicm_human_review_item_id",
+    ")",
+    "select coalesce((select aicm_human_review_item_id::text from updated limit 1), (select aicm_human_review_item_id::text from inserted limit 1), '') as review_id;"
+  ].join("\n");
+
+  aiwB6R97R14PsqlText(sql);
+}
+
+async function aiwB6R97R14ConsumerOnce(reason) {
+  const state = globalThis.__AIW_B6R97R14_QUEUE_CONSUMER_STATE__ || {
+    running: false,
+    lastRunAt: "",
+    lastReason: "",
+    processedTotal: 0
+  };
+  globalThis.__AIW_B6R97R14_QUEUE_CONSUMER_STATE__ = state;
+
+  if (state.running) return { skipped: true, reason: "already_running" };
+
+  state.running = true;
+  state.lastRunAt = new Date().toISOString();
+  state.lastReason = reason;
+
+  const limit = Math.max(1, Number(process.env.AIWORKER_QUEUE_CONSUMER_BATCH_LIMIT || "5") || 5);
+
+  try {
+    const finalizedReviewRowsB6R97R19C = aiwB6R97R19CFinalizeGeneratedReviewRows(limit);
+    if (finalizedReviewRowsB6R97R19C) {
+      state.processedTotal += 1;
+    }
+
+    const rows = aiwB6R97R14ClaimWorkUnits(limit);
+    if (!Array.isArray(rows) || !rows.length) {
+      return { processed: 0 };
+    }
+
+    let processed = 0;
+
+    for (const row of rows) {
+      const payload = aiwB6R97R14BuildPayload(row);
+      const idempotencyKey = "aiworker-consumer-b6r97r14:" + String(row.aicm_worker_work_unit_id || "");
+      try {
+        const result = createRuntimeRequest(payload, idempotencyKey);
+        aiwB6R97R14RecordSuccess(row, result, payload);
+        processed += 1;
+      } catch (error) {
+        aiwB6R97R14MarkFailed(row, error);
+      }
+    }
+
+    state.processedTotal += processed;
+    return { processed };
+  } finally {
+    state.running = false;
+  }
+}
+
+function aiwB6R97R14StartConsumer() {
+  if (process.env.AIWORKER_QUEUE_CONSUMER_ENABLED === "0") {
+    console.log("[B6R97R14] AIWorkerOS queue consumer disabled by env");
+    return;
+  }
+
+  const key = "__AIW_B6R97R14_QUEUE_CONSUMER_STARTED__";
+  if (globalThis[key]) return;
+  globalThis[key] = true;
+
+  const intervalMs = Math.max(1000, Number(process.env.AIWORKER_QUEUE_CONSUMER_INTERVAL_MS || "5000") || 5000);
+
+  setTimeout(() => {
+    aiwB6R97R14ConsumerOnce("startup").catch((error) => {
+      console.error("[B6R97R14] startup consumer failed", String(error && error.message ? error.message : error).replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[DB_URL_REDACTED]").split("\n").slice(0, 8).join("\n"));
+    });
+  }, 1000);
+
+  const timer = setInterval(() => {
+    aiwB6R97R14ConsumerOnce("interval").catch((error) => {
+      console.error("[B6R97R14] interval consumer failed", String(error && error.message ? error.message : error).replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[DB_URL_REDACTED]").split("\n").slice(0, 8).join("\n"));
+    });
+  }, intervalMs);
+
+  globalThis.__AIW_B6R97R14_QUEUE_CONSUMER_TIMER__ = timer;
+
+  process.once("SIGTERM", () => clearInterval(timer));
+  process.once("SIGINT", () => clearInterval(timer));
+
+  console.log("[B6R97R14] AIWorkerOS queue consumer started interval_ms=" + intervalMs);
+}
+
+setTimeout(aiwB6R97R14StartConsumer, 1500);
+// AIW_B6R97R14_QUEUE_CONSUMER_END
