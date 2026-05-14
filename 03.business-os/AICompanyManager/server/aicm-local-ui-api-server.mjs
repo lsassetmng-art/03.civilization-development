@@ -1911,11 +1911,241 @@ function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayloa
 }
 
 
+
+// B6R97R32B_START
+// 個別依頼はAIWorkerOSへ即時fetchせず、AICM共通Workerキューへ登録する。
+// AIWorkerOS consumer が aiworkeros_execution_state=waiting / retryable を拾って実行する。
+function aicmB6R97R32BIsIndividualInstruction(body) {
+  const sourceRouteCode = String(
+    (body && (body.source_route_code || body.sourceRouteCode || body.source_route)) || ""
+  ).trim();
+  return sourceRouteCode === "individual_instruction";
+}
+
+function aicmB6R97R32BWorkType(value) {
+  const text = String(value || "").trim();
+  const allowed = {
+    design: true,
+    implementation: true,
+    db: true,
+    api: true,
+    ui: true,
+    test: true,
+    review: true,
+    handoff: true,
+    research: true,
+    operation: true,
+    other: true
+  };
+  return allowed[text] ? text : "operation";
+}
+
+function createIndividualRuntimeQueuedWorkerWorkUnitB6R97R32B(body) {
+  body = aicmNormalizeWorkbenchRuntimeRequestBody(body || {});
+
+  const placementResult = getAicmWorkerRuntimePlacement(body);
+  const placement = placementResult && placementResult.placement && typeof placementResult.placement === "object"
+    ? placementResult.placement
+    : {};
+
+  if (!placement.aicm_user_company_worker_placement_id) {
+    return {
+      result: "error",
+      api_identifier: SERVER_MARK,
+      error_message: "有効なWorker配置が見つかりません。"
+    };
+  }
+
+  const owner = requiredUuid(body.owner_civilization_id || placement.owner_civilization_id, "owner_civilization_id");
+  const companyId = requiredUuid(body.aicm_user_company_id || placement.aicm_user_company_id, "aicm_user_company_id");
+  const departmentIdSql = aicmWorkerRuntimeOptionalUuidSql(body.aicm_user_company_department_id || placement.aicm_user_company_department_id);
+  const sectionIdSql = aicmWorkerRuntimeOptionalUuidSql(body.aicm_user_company_section_id || placement.aicm_user_company_section_id);
+
+  const title = requiredText(body.task_title || body.title, "task_title");
+  const instruction = requiredText(body.task_instruction_ja || body.task_instruction || body.instruction, "task_instruction_ja");
+
+  const taskDomainCode = aicmWorkerRuntimeDefault(body.task_domain_code, "business_operation");
+  const workTypeCode = aicmB6R97R32BWorkType(body.work_type_code || body.task_domain_code);
+  const sourceRequestRef = aicmWorkerRuntimeDefault(body.source_request_ref, "manual:" + Date.now());
+  const sourceBody = Object.assign({}, body, { source_request_ref: sourceRequestRef });
+  const idempotencyKey = aicmWorkerRuntimeBuildIdempotencyKey(sourceBody, placement);
+  const modelCode = aicmNormalizeWorkbenchRuntimeModelCode(body.model_code || placement.aiworker_model_code || "");
+  const assignedWorkerLabel = aicmWorkerRuntimeDefault(
+    placement.display_label || placement.internal_nickname || placement.aiworker_model_code,
+    "個別依頼Worker"
+  );
+  const priorityCode = aicmHumanReviewPriority(body.priority_code || "normal");
+
+  const baseMetadata = {
+    source_app_ref: "AICompanyManager",
+    source_route_code: "individual_instruction",
+    source_screen_code: "ai_execution_workbench",
+    source_entity_type: "worker_work_unit",
+    source_request_ref: sourceRequestRef,
+    idempotency_key: idempotencyKey,
+    app_surface_code: "ai_company_manager",
+    model_code: modelCode,
+    task_domain_code: taskDomainCode,
+    requested_by_ref: body.requested_by_ref || "human",
+    return_target_type: "workbench_runtime_request",
+    reexecute_target_type: "worker_work_unit",
+    context_restore_type: "workbench",
+    aicm_user_company_worker_placement_id: placement.aicm_user_company_worker_placement_id,
+    robot_pool_id: placement.robot_pool_id || body.robot_pool_id || "",
+    aiworkeros_execution_state: "waiting",
+    aiworkeros_retryable: true,
+    aiworkeros_consumer_claim_state: "",
+    aiworkeros_request_id: "",
+    aiworkeros_waiting_source: "worker-runtime/request",
+    queue_registered_by: "AICM/B6R97R32B",
+    queue_registered_at: new Date().toISOString()
+  };
+
+  const metadataSql = sqlLiteral(JSON.stringify(baseMetadata)) + "::jsonb";
+
+  const sql = [
+    "WITH existing_worker AS (",
+    "  SELECT w.*",
+    "  FROM business.aicm_worker_work_unit w",
+    "  WHERE w.owner_civilization_id = " + sqlLiteral(owner) + "::uuid",
+    "    AND w.aicm_user_company_id = " + sqlLiteral(companyId) + "::uuid",
+    "    AND COALESCE(w.metadata_jsonb->>'idempotency_key', '') = " + sqlLiteral(idempotencyKey),
+    "    AND COALESCE(w.work_status_code, '') <> " + sqlLiteral("archived"),
+    "  ORDER BY w.created_at DESC",
+    "  LIMIT 1",
+    "), inserted_major AS (",
+    "  INSERT INTO business.aicm_manager_major_work_item (",
+    "    owner_civilization_id, aicm_user_company_id, aicm_user_company_department_id, aicm_user_company_section_id,",
+    "    major_item_name, major_item_description, source_route_code, manager_robot_label, assigned_leader_label,",
+    "    decomposition_status_code, handoff_status_code, priority_code, reference_files_text, supplemental_materials_text,",
+    "    applicable_rules_text, note, handoff_link, display_order, metadata_jsonb",
+    "  )",
+    "  SELECT",
+    "    " + sqlLiteral(owner) + "::uuid, " + sqlLiteral(companyId) + "::uuid, " + departmentIdSql + ", " + sectionIdSql + ",",
+    "    " + sqlLiteral(title) + ", " + sqlLiteral(instruction) + ", " + sqlLiteral("manual") + ",",
+    "    " + sqlLiteral("AI実行Workbench") + ", " + sqlLiteral("個別依頼") + ",",
+    "    " + sqlLiteral("decomposed") + ", " + sqlLiteral("completed") + ", " + sqlLiteral(priorityCode) + ",",
+    "    " + sqlLiteral("") + ", " + sqlLiteral("") + ", " + sqlLiteral("") + ",",
+    "    " + sqlLiteral("B6R97R32B individual request queue wrapper") + ", " + sqlLiteral("") + ", 100,",
+    "    " + metadataSql + " || jsonb_build_object(" + sqlLiteral("queue_wrapper_level") + ", " + sqlLiteral("manager_major") + ")",
+    "  WHERE NOT EXISTS (SELECT 1 FROM existing_worker)",
+    "  RETURNING *",
+    "), inserted_middle AS (",
+    "  INSERT INTO business.aicm_leader_middle_work_item (",
+    "    owner_civilization_id, aicm_user_company_id, aicm_manager_major_work_item_id,",
+    "    aicm_user_company_department_id, aicm_user_company_section_id,",
+    "    middle_item_name, middle_item_description, leader_robot_label, breakdown_status_code, handoff_status_code,",
+    "    priority_code, reference_files_text, supplemental_materials_text, applicable_rules_text, note, handoff_link, display_order, metadata_jsonb",
+    "  )",
+    "  SELECT",
+    "    im.owner_civilization_id, im.aicm_user_company_id, im.aicm_manager_major_work_item_id,",
+    "    im.aicm_user_company_department_id, im.aicm_user_company_section_id,",
+    "    im.major_item_name, im.major_item_description, " + sqlLiteral("個別依頼") + ",",
+    "    " + sqlLiteral("worker_units_created") + ", " + sqlLiteral("handed_off") + ",",
+    "    im.priority_code, im.reference_files_text, im.supplemental_materials_text, im.applicable_rules_text,",
+    "    " + sqlLiteral("B6R97R32B individual request middle wrapper") + ", " + sqlLiteral("") + ", im.display_order,",
+    "    COALESCE(im.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+    "      " + sqlLiteral("source_manager_major_work_item_id") + ", im.aicm_manager_major_work_item_id::text,",
+    "      " + sqlLiteral("queue_wrapper_level") + ", " + sqlLiteral("leader_middle") + "",
+    "    )",
+    "  FROM inserted_major im",
+    "  RETURNING *",
+    "), inserted_requirement AS (",
+    "  INSERT INTO business.aicm_leader_deliverable_requirement (",
+    "    owner_civilization_id, aicm_user_company_id, aicm_leader_middle_work_item_id,",
+    "    deliverable_name, deliverable_type_code, deliverable_description, required_quality_text, acceptance_criteria_text,",
+    "    review_required_flag, requirement_status_code, priority_code, reference_files_text, supplemental_materials_text,",
+    "    applicable_rules_text, note, handoff_link, display_order, metadata_jsonb",
+    "  )",
+    "  SELECT",
+    "    im.owner_civilization_id, im.aicm_user_company_id, im.aicm_leader_middle_work_item_id,",
+    "    im.middle_item_name || " + sqlLiteral(" 成果物") + ", " + sqlLiteral("operation") + ", im.middle_item_description,",
+    "    " + sqlLiteral("個別依頼の指示に従い、レビュー可能な成果物または作業結果を作成する") + ",",
+    "    " + sqlLiteral("依頼タイトル・指示内容に対して成果物が不足なく作成されていること") + ",",
+    "    true, " + sqlLiteral("ready_for_worker") + ", im.priority_code,",
+    "    im.reference_files_text, im.supplemental_materials_text, im.applicable_rules_text,",
+    "    " + sqlLiteral("B6R97R32B individual request deliverable wrapper") + ", " + sqlLiteral("") + ", im.display_order,",
+    "    COALESCE(im.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+    "      " + sqlLiteral("source_leader_middle_work_item_id") + ", im.aicm_leader_middle_work_item_id::text,",
+    "      " + sqlLiteral("queue_wrapper_level") + ", " + sqlLiteral("deliverable_requirement") + "",
+    "    )",
+    "  FROM inserted_middle im",
+    "  RETURNING *",
+    "), inserted_worker AS (",
+    "  INSERT INTO business.aicm_worker_work_unit (",
+    "    owner_civilization_id, aicm_user_company_id, aicm_leader_middle_work_item_id, aicm_leader_deliverable_requirement_id,",
+    "    work_unit_name, work_unit_description, work_type_code, assigned_worker_label, worker_model_code,",
+    "    work_status_code, review_status_code, priority_code, input_context_text, expected_output_text, result_summary_text, handoff_link,",
+    "    reference_files_text, supplemental_materials_text, applicable_rules_text, note, display_order, metadata_jsonb",
+    "  )",
+    "  SELECT",
+    "    im.owner_civilization_id, im.aicm_user_company_id, im.aicm_leader_middle_work_item_id, ir.aicm_leader_deliverable_requirement_id,",
+    "    " + sqlLiteral(title) + ", " + sqlLiteral(instruction) + ", " + sqlLiteral(workTypeCode) + ",",
+    "    " + sqlLiteral(assignedWorkerLabel) + ", " + sqlLiteral(modelCode) + ",",
+    "    " + sqlLiteral("todo") + ", " + sqlLiteral("required") + ", " + sqlLiteral(priorityCode) + ",",
+    "    " + sqlLiteral("個別依頼: " + title) + ",",
+    "    " + sqlLiteral("AIWorkerOS consumer が実行し、成果物をレビューへ回付する") + ",",
+    "    " + sqlLiteral("受付済み。AIWorkerOS実行待ちです。") + ", " + sqlLiteral("") + ",",
+    "    " + sqlLiteral("") + ", " + sqlLiteral("") + ", " + sqlLiteral("") + ",",
+    "    " + sqlLiteral("B6R97R32B individual request queued for AIWorkerOS consumer") + ", im.display_order,",
+    "    " + metadataSql + " || jsonb_build_object(",
+    "      " + sqlLiteral("source_manager_major_work_item_id") + ", im.aicm_manager_major_work_item_id::text,",
+    "      " + sqlLiteral("source_leader_middle_work_item_id") + ", im.aicm_leader_middle_work_item_id::text,",
+    "      " + sqlLiteral("source_deliverable_requirement_id") + ", ir.aicm_leader_deliverable_requirement_id::text,",
+    "      " + sqlLiteral("queue_wrapper_level") + ", " + sqlLiteral("worker_work_unit") + "",
+    "    )",
+    "  FROM inserted_middle im",
+    "  JOIN inserted_requirement ir ON ir.aicm_leader_middle_work_item_id = im.aicm_leader_middle_work_item_id",
+    "  RETURNING *",
+    "), final_worker AS (",
+    "  SELECT * FROM existing_worker",
+    "  UNION ALL",
+    "  SELECT * FROM inserted_worker",
+    "  LIMIT 1",
+    ")",
+    "SELECT jsonb_build_object(",
+    "  'result', 'ok',",
+    "  'api_identifier', " + sqlLiteral(SERVER_MARK) + ",",
+    "  'queued_for_aiworkeros_consumer', true,",
+    "  'aiworkeros_execution_state', COALESCE((SELECT metadata_jsonb->>'aiworkeros_execution_state' FROM final_worker), " + sqlLiteral("waiting") + "),",
+    "  'aiworkeros_retryable', true,",
+    "  'worker_work_unit', COALESCE((SELECT to_jsonb(final_worker) FROM final_worker), '{}'::jsonb),",
+    "  'worker_placement', " + sqlLiteral(JSON.stringify(placement)) + "::jsonb,",
+    "  'runtime_request', jsonb_build_object(",
+    "    'request_id', '',",
+    "    'request_status_code', 'queued_for_aiworkeros_consumer',",
+    "    'app_surface_code', 'ai_company_manager',",
+    "    'model_code', " + sqlLiteral(modelCode) + ",",
+    "    'task_domain_code', " + sqlLiteral(taskDomainCode) + ",",
+    "    'task_title', " + sqlLiteral(title) + ",",
+    "    'source_app_ref', 'AICompanyManager',",
+    "    'source_route_code', 'individual_instruction',",
+    "    'source_request_ref', " + sqlLiteral(sourceRequestRef) + ",",
+    "    'idempotency_key', " + sqlLiteral(idempotencyKey) + ",",
+    "    'related_worker_work_unit_id', COALESCE((SELECT aicm_worker_work_unit_id::text FROM final_worker), '')",
+    "  ),",
+    "  'message', '個別依頼を共通Workerキューへ登録しました。AIWorkerOS consumer が後続実行します。'",
+    ")::text;"
+  ].join("\n");
+
+  const payload = runPsqlJson(sql);
+  return payload && typeof payload === "object" ? payload : {
+    result: "error",
+    api_identifier: SERVER_MARK,
+    error_message: "Failed to queue individual runtime request."
+  };
+}
+// B6R97R32B_END
+
 async function createWorkerRuntimeRequest(body) {
   // AICM_WORKBENCH_RUNTIME_CODE_NORMALIZE_AXT_R7_V1
   body = aicmNormalizeWorkbenchRuntimeRequestBody(body);
 
   body = body || {};
+
+  if (aicmB6R97R32BIsIndividualInstruction(body)) {
+    return createIndividualRuntimeQueuedWorkerWorkUnitB6R97R32B(body);
+  }
 
   const placementResult = getAicmWorkerRuntimePlacement(body);
   if (!placementResult || placementResult.result !== "ok" || !placementResult.placement) {
@@ -4938,7 +5168,7 @@ if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
 
       const payload = await createWorkerRuntimeRequest(requestBody);
 
-      if (payload && payload.result === "ok" && requestBody.source_route_code === "individual_instruction") {
+      if (payload && payload.result === "ok" && !payload.queued_for_aiworkeros_consumer && requestBody.source_route_code === "individual_instruction") {
         payload.human_review_auto_registration = createIndividualRuntimeHumanReviewItemB6R44S(requestBody, payload);
       }
 

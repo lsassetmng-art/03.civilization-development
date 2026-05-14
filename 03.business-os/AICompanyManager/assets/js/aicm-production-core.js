@@ -12955,7 +12955,7 @@ function aicmRuntimeStatusRowsHtml(rows) {
     rows = Array.isArray(rows) ? rows.slice(0, 5) : [];
 
     if (!rows.length) {
-      return '<p class="aicm-core-empty">AICompanyManager由来の実行状況はまだありません。作成後に「実行状況を更新」を押してください。</p>';
+      return '<p class="aicm-core-empty">個別依頼画面のランタイムカードは廃止済みです。</p>';
     }
 
     return rows.map(function (row) {
@@ -13181,7 +13181,7 @@ function aicmB6R44cFilterWorkbenchRuntimeRows(rows) {
 }
 
 function aicmB6R44cRuntimeSourceNote() {
-  return '<p class="aicm-selected-note">表示対象: 個別ロボット指示のみ。台帳Worker / PresidentルートWorker はレビュー・承認待ち一覧側で扱います。</p>';
+  return "";
 }
 // AICM_V10L_C2G_B6R44C_WORKBENCH_SOURCE_ROUTE_FILTER_END
 function aicmRuntimeStatusFilterRowsForCurrentApp(rows) {
@@ -13213,30 +13213,33 @@ function aicmRuntimeStatusPanelRender() {
     var rows = Array.isArray(state.runtimeStatusRows) ? state.runtimeStatusRows : [];
     var lastUpdated = state.runtimeStatusUpdatedAt || "";
 
-    return [
-      '<section class="aicm-core-card aicm-runtime-status-panel">',
-      '  <p class="aicm-eyebrow">AIWorkerOS 実行状況</p>',
-      '  <h2>Runtime request / pipeline</h2>',
-      '  <p class="aicm-selected-note">AIWorkerOSの app-read-payload / pipeline-board をAICM server経由で読みます。DB書込は行いません。</p>',
-      aicmB6R44cRuntimeSourceNote(),
-      error ? '  <p class="aicm-core-error">' + escapeHtml(error) + '</p>' : '',
-      lastUpdated ? '  <p class="aicm-core-empty">最終更新: ' + escapeHtml(lastUpdated) + '</p>' : '',
-      '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="worker-runtime-status-refresh">' + (loading ? '更新中...' : '実行状況を更新') + '</button>',
-      '  </div>',
-      aicmRuntimeStatusRowsHtml(rows),
-      '</section>'
-    ].join("");
+    void loading;
+    void error;
+    void rows;
+    void lastUpdated;
+    return "";
   }
 
 async function aicmRuntimeStatusRefresh() {
     state.runtimeStatusLoading = true;
     state.runtimeStatusError = "";
 
+    state.runtimeStatusLoading = false;
+    state.runtimeStatusRows = [];
+    state.runtimeStatusRawRows = [];
+    state.runtimeStatusRaw = null;
+    state.runtimeStatusUpdatedAt = "";
+
     if (typeof render === "function") render();
 
+    return {
+      ok: true,
+      skipped: true,
+      reason_code: "RUNTIME_STATUS_CARD_REMOVED"
+    };
+
     try {
-      var response = await fetch("/api/aicm/v2/worker-runtime/pipeline-board?app_surface_code=ai_company_manager&source_app_ref=AICompanyManager", { method: "GET" });
+      var response = await fetch("/api/aicm/v2/worker-runtime/pipeline-board-disabled-b6r97r24b", { method: "GET" });
       var json = await response.json();
 
       if (!response.ok || (json && json.result === "error")) {
@@ -13295,7 +13298,7 @@ function renderWorkerRuntimeRequestBaseAxtR9R1() {
       '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
       '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
       '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
-      '  <label>source_request_ref<input id="aicm-worker-runtime-source-ref" type="text" placeholder="空なら manual:<timestamp>"></label>',
+      '  <input id="aicm-worker-runtime-source-ref" type="hidden" value="">',
       '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
       '</section>',
       '<section class="aicm-core-card aicm-operation-card">',
@@ -13374,6 +13377,9 @@ function renderWorkerRuntimeConfirm() {
     }
 
     var body = payload.body;
+    var aicmB6R97R29WorkerRuntimeBusy = !!(state && state.workerRuntimeSubmitInFlight);
+    var aicmB6R97R29ExecuteButtonAttr = aicmB6R97R29WorkerRuntimeBusy ? ' disabled aria-disabled="true" aria-busy="true"' : '';
+    var aicmB6R97R29ExecuteButtonLabel = aicmB6R97R29WorkerRuntimeBusy ? '実行中...' : '確定して実行';
     var rows = [
       ["実行AI/Worker", payload.worker_label],
       ["model_code", body.model_code],
@@ -13381,7 +13387,6 @@ function renderWorkerRuntimeConfirm() {
       ["task_domain_code", body.task_domain_code],
       ["作業タイトル", body.task_title],
       ["作業指示", body.task_instruction_ja],
-      ["source_request_ref", body.source_request_ref],
       ["idempotency_key", body.idempotency_key]
     ];
 
@@ -13399,7 +13404,7 @@ function renderWorkerRuntimeConfirm() {
       '<section class="aicm-core-card aicm-operation-card">',
       '  <p class="aicm-eyebrow">操作</p>',
       '  <div class="aicm-dashboard-action-row">',
-      '    <button type="button" data-core-action="worker-runtime-execute">確定して実行</button>',
+      '    <button type="button" data-core-action="worker-runtime-execute"' + aicmB6R97R29ExecuteButtonAttr + '>' + aicmB6R97R29ExecuteButtonLabel + '</button>',
       '    <button type="button" data-core-action="worker-runtime-cancel">戻る</button>',
       '  </div>',
       '</section>'
@@ -14434,7 +14439,27 @@ function handleRootClick(event) {
     }
 
     if (action === "worker-runtime-execute") {
-      executeWorkerRuntimeConfirm();
+      // B6R97R29: prevent duplicate individual runtime execution while request creation is running.
+      if (state && state.workerRuntimeSubmitInFlight) {
+        return;
+      }
+      if (state) state.workerRuntimeSubmitInFlight = true;
+      if (typeof render === "function") render();
+
+      Promise.resolve()
+        .then(function () {
+          return executeWorkerRuntimeConfirm();
+        })
+        .catch(function (error) {
+          if (state) {
+            state.errorMessage = error && error.message ? error.message : String(error);
+          }
+        })
+        .finally(function () {
+          if (state) state.workerRuntimeSubmitInFlight = false;
+          if (typeof render === "function") render();
+        });
+
       return;
     }
 
