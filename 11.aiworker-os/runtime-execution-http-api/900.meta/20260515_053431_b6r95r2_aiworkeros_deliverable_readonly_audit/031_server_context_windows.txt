@@ -1,0 +1,2727 @@
+
+============================================================
+CONTEXT PATTERN=artifact
+============================================================
+933-  ];
+934-  const outputPayload = {
+935-    contract_version: "B6R95R3B-R3",
+936-    contract_name: "aiworkeros_common_requester_deliverable_contract",
+937-    deliverable_kind: "document",
+938-    body_format: "markdown",
+939-    deliverable_package: deliverablePackage,
+940-    deliverable_link: deliverablePackage.zip_link,
+941:    generated_artifacts: generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index)),
+942-    requester_app_ref: requesterAppRef,
+943-    source_request_ref: sourceRequestRef,
+944-    source_route_code: routeCode,
+945-    app_surface_code: appSurfaceCode,
+946-    robot_context: robotContext,
+947-    generation_basis: generationBasis,
+948-    quality_notes: qualityNotes,
+949-    unresolved_issues: unresolvedIssues,
+950-    next_steps: nextSteps,
+951-    external_execution_performed_flag: false,
+952-    pg_apply_performed_flag: false,
+953-    destructive_action_performed_flag: false
+954-  };
+955-
+956:  const artifacts = [
+957-    {
+958:      artifact_kind_code: "markdown",
+959:      artifact_title_ja: outputTitle,
+960-      body_format: "markdown",
+961-      deliverable_package: deliverablePackage,
+962-      deliverable_link: deliverablePackage.zip_link,
+963:      generated_artifacts: generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index)),
+964-      body_markdown: bodyMarkdown,
+965-      summary_text: summaryText,
+966-      quality_notes: qualityNotes,
+967-      unresolved_issues: unresolvedIssues,
+968-      next_steps: nextSteps,
+969-      robot_context: robotContext,
+970-      generation_basis: generationBasis,
+971-      contract_version: "B6R95R3B-R3"
+--
+979-    qualityNotes,
+980-    unresolvedIssues,
+981-    nextSteps,
+982-    robotContext,
+983-    generationBasis,
+984-    deliverablePackage,
+985-    generatedArtifacts,
+986-    outputPayload,
+987:    artifacts
+988-  };
+989-}
+990-
+991-/* B6R95R3Z_R24_CX_MATERIAL_BODY_GENERATION_PATCH_START */
+992-function aiwB6R95R3Z24Text(value) {
+993-  if (value == null) return "";
+994-  if (typeof value === "string") return value;
+995-  try { return JSON.stringify(value); } catch { return String(value); }
+--
+1105-  const terms = [];
+1106-
+1107-  if (/大化|taika|乙巳|改新|公地公民/.test(text)) {
+1108-    terms.push("大化", "大化の改新", "taika", "乙巳", "改新の詔", "公地公民", "日本書紀", "律令");
+1109-  }
+1110-
+1111-  for (const m of text.matchAll(/[一-龯ぁ-んァ-ンA-Za-z0-9_]{3,}/g)) {
+1112-    const v = m[0];
+1113:    if (!terms.includes(v) && !/してください|成果物|summary|generated|artifacts|link|zip/.test(v)) terms.push(v);
+1114-    if (terms.length >= 12) break;
+1115-  }
+1116-
+1117-  return terms.length ? terms : ["大化", "taika"];
+1118-}
+1119-
+1120-function aiwB6R95R3Z24RunPsqlJson(sql) {
+1121-  let req = null;
+--
+1314-  const baseDeliverable = aiwB6R95R3R3BuildRequesterFacingDeliverableBaseB6R95R3Z24(payload, sourceRouteCode);
+1315-  return aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(baseDeliverable, payload, sourceRouteCode);
+1316-}
+1317-/* B6R95R3Z_R24_CX_MATERIAL_BODY_GENERATION_PATCH_END */
+1318-
+1319-// AIWORKEROS_B6R95R3D_R1_MULTI_ARTIFACT_ZIP_CONTRACT_START
+1320-/*
+1321-  B6R95R3D-R1:
+1322:  Multi-artifact deliverable zip package contract.
+1323-
+1324-  Canon:
+1325:  - AIWorkerOS creates one or more deliverable artifacts from the instruction.
+1326-  - AIWorkerOS creates summary_text.
+1327:  - AIWorkerOS bundles generated artifacts into one deliverable zip.
+1328-  - Requester apps display summary_text and link to the zip.
+1329:  - The zip exists to avoid one-by-one downloads when multiple artifacts are generated.
+1330-
+1331-  Boundary:
+1332-  - No external execution.
+1333-  - No PG apply.
+1334-  - No destructive action.
+1335-  - No requester-app-specific contract.
+1336-*/
+1337-function aiwB6R95R3D1SafeFilePart(value, fallback) {
+--
+1368-      storage_code: "runtime-deliverable-zip",
+1369-      file_name: fileName
+1370-    }
+1371-  };
+1372-}
+1373-
+1374-function aiwB6R95R3D1NormalizeGeneratedArtifact(item, index) {
+1375-  const seq = String(index + 1).padStart(2, "0");
+1376:  const kind = aiwB6R95R3R3OneLine(item?.artifact_kind_code || item?.kind || "document", "document");
+1377:  const title = aiwB6R95R3R3OneLine(item?.title || item?.artifact_title_ja || `成果物${seq}`, `成果物${seq}`);
+1378-  const body = aiwB6R95R3R3Text(item?.body_markdown || item?.body_text || item?.content || "");
+1379:  const suggestedName = item?.file_name || `${seq}_${aiwB6R95R3D1SafeFilePart(title, `artifact_${seq}`)}.md`;
+1380:  const fileName = aiwB6R95R3D1SafeFilePart(suggestedName, `artifact_${seq}.md`).endsWith(".md")
+1381:    ? aiwB6R95R3D1SafeFilePart(suggestedName, `artifact_${seq}.md`)
+1382:    : `${aiwB6R95R3D1SafeFilePart(suggestedName, `artifact_${seq}`)}.md`;
+1383-  return {
+1384:    artifact_no: index + 1,
+1385:    artifact_kind_code: kind,
+1386-    title,
+1387-    file_name: fileName,
+1388-    body_markdown: body,
+1389-    body_format: "markdown"
+1390-  };
+1391-}
+1392-
+1393-function aiwB6R95R3D1BuildGeneratedArtifacts(deliverable) {
+1394-  const provided = Array.isArray(deliverable?.generatedArtifacts) ? deliverable.generatedArtifacts : [];
+1395-  if (provided.length > 0) {
+1396-    return provided.map(aiwB6R95R3D1NormalizeGeneratedArtifact);
+1397-  }
+1398-
+1399:  const artifacts = [
+1400-    {
+1401-      kind: "main_deliverable",
+1402-      title: deliverable?.outputTitle || "主成果物",
+1403-      file_name: "01_main_deliverable.md",
+1404-      body_markdown: deliverable?.bodyMarkdown || ""
+1405-    }
+1406-  ];
+1407-
+1408-  if (aiwB6R95R3R3Text(deliverable?.qualityNotes)) {
+1409:    artifacts.push({
+1410-      kind: "quality_notes",
+1411-      title: "品質メモ",
+1412-      file_name: "90_quality_notes.md",
+1413-      body_markdown: deliverable.qualityNotes
+1414-    });
+1415-  }
+1416-
+1417-  if (aiwB6R95R3R3Text(deliverable?.unresolvedIssues)) {
+1418:    artifacts.push({
+1419-      kind: "unresolved_issues",
+1420-      title: "未解決事項",
+1421-      file_name: "91_unresolved_issues.md",
+1422-      body_markdown: deliverable.unresolvedIssues
+1423-    });
+1424-  }
+1425-
+1426-  if (aiwB6R95R3R3Text(deliverable?.nextSteps)) {
+1427:    artifacts.push({
+1428-      kind: "next_steps",
+1429-      title: "次工程",
+1430-      file_name: "92_next_steps.md",
+1431-      body_markdown: deliverable.nextSteps
+1432-    });
+1433-  }
+1434-
+1435:  return artifacts.map(aiwB6R95R3D1NormalizeGeneratedArtifact);
+1436-}
+1437-
+1438-function aiwB6R95R3D1ZipCrc32(buffer) {
+1439-  let table = aiwB6R95R3D1ZipCrc32._table;
+1440-  if (!table) {
+1441-    table = new Uint32Array(256);
+1442-    for (let i = 0; i < 256; i++) {
+1443-      let c = i;
+--
+1548-    source: "aiworkeros",
+1549-    storage_code: "runtime-deliverable-zip",
+1550-    file_name: fileName
+1551-  });
+1552-
+1553-  const summaryText = response.deliverable?.summary_text || deliverable?.summaryText || "";
+1554-  const manifest = {
+1555-    contract_version: "B6R95R3D-R1",
+1556:    contract_name: "aiworkeros_common_requester_multi_artifact_zip_contract",
+1557:    package_purpose: "bundle_generated_artifacts_for_single_download",
+1558-    request_id: response.request_id || null,
+1559-    output_id: response.output_id || null,
+1560-    deliverable_title: response.deliverable?.title || deliverable?.outputTitle || "成果物",
+1561-    summary_text: summaryText,
+1562:    artifact_count: generatedArtifacts.length,
+1563:    generated_artifacts: generatedArtifacts.map((artifact) => ({
+1564:      artifact_no: artifact.artifact_no,
+1565:      artifact_kind_code: artifact.artifact_kind_code,
+1566:      title: artifact.title,
+1567:      file_name: artifact.file_name,
+1568:      body_format: artifact.body_format
+1569-    })),
+1570-    deliverable_ref: response.deliverable_ref || null,
+1571-    robot_context: response.robot_context || deliverable?.robotContext || null,
+1572-    generation_basis: response.generation_basis || deliverable?.generationBasis || null,
+1573-    safety: response.safety || null,
+1574-    created_at: new Date().toISOString()
+1575-  };
+1576-
+1577-  const entries = [
+1578-    { name: "00_summary.md", content: summaryText },
+1579:    ...generatedArtifacts.map((artifact) => ({
+1580:      name: artifact.file_name,
+1581:      content: artifact.body_markdown
+1582-    })),
+1583-    { name: "manifest.json", content: JSON.stringify(manifest, null, 2) }
+1584-  ];
+1585-
+1586-  const zipBuffer = aiwB6R95R3D1ZipStored(entries);
+1587-  fs.writeFileSync(zipPath, zipBuffer);
+1588-  const stat = fs.statSync(zipPath);
+1589-
+--
+1592-    package_format: "zip",
+1593-    mime_type: "application/zip",
+1594-    zip_id: packageMeta.zip_id,
+1595-    file_name: fileName,
+1596-    zip_link: actualZipLink,
+1597-    zip_ref: actualZipRef,
+1598-    byte_size: stat.size,
+1599-    entry_count: entries.length,
+1600:    artifact_count: generatedArtifacts.length,
+1601-    created_at: manifest.created_at
+1602-  };
+1603-
+1604:  response.generated_artifacts = generatedArtifacts.map((artifact) => ({
+1605:    artifact_no: artifact.artifact_no,
+1606:    artifact_kind_code: artifact.artifact_kind_code,
+1607:    title: artifact.title,
+1608:    file_name: artifact.file_name,
+1609:    body_format: artifact.body_format
+1610-  }));
+1611-  response.deliverable_package = zipPublic;
+1612-  response.deliverable_zip_ref = actualZipRef;
+1613-  response.deliverable_link = actualZipLink;
+1614-
+1615-  response.requester_delivery_payload = Object.assign({}, response.requester_delivery_payload || {}, {
+1616-    summary_text: summaryText,
+1617-    deliverable_link: actualZipLink,
+1618-    deliverable_package: zipPublic,
+1619-    deliverable_zip_ref: actualZipRef,
+1620:    generated_artifacts: response.generated_artifacts
+1621-  });
+1622-
+1623-  response.deliverable = Object.assign({}, response.deliverable || {}, {
+1624-    deliverable_package: zipPublic,
+1625-    zip_link: actualZipLink,
+1626:    generated_artifacts: response.generated_artifacts
+1627-  });
+1628-
+1629-  return response;
+1630-}
+1631-// AIWORKEROS_B6R95R3D_R1_MULTI_ARTIFACT_ZIP_CONTRACT_END
+1632-// AIWORKEROS_B6R95R3B_R3_COMMON_DELIVERABLE_CONTRACT_END
+1633-function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+1634-  const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+--
+1672-    "),",
+1673-    "worker_output as (",
+1674-    "  select aiworker.fn_runtime_execution_submit_worker_output(",
+1675-    "    (select request_id from created),",
+1676-    "    :'output_title_ja',",
+1677-    "    :'output_body_ja',",
+1678-    "    :'output_summary_ja',",
+1679-    "    :'output_payload_jsonb'::jsonb,",
+1680:    "    :'artifacts_jsonb'::jsonb",
+1681-    "  ) as output_id",
+1682-    "),",
+1683-    "board as (",
+1684-    "  select p.*",
+1685-    "  from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p",
+1686-    "  join created c",
+1687-    "    on c.request_id = p.request_id",
+1688-    ")",
+--
+1698-    "  'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),",
+1699-    "  'robot_context', :'robot_context_jsonb'::jsonb,",
+1700-    "  'generation_basis', :'generation_basis_jsonb'::jsonb,",    "  'deliverable', jsonb_build_object(",
+1701-    "    'package_kind', 'delivery_package',",
+1702-    "    'deliverable_kind', 'document',",
+1703-    "    'title', :'output_title_ja',",
+1704-    "    'body_format', 'markdown',",
+1705-    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1706:    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+1707-    "    'body_markdown', :'output_body_ja',",
+1708-    "    'summary_text', :'output_summary_ja',",
+1709-    "    'quality_notes', :'quality_notes',",
+1710-    "    'unresolved_issues', :'unresolved_issues',",
+1711-    "    'next_steps', :'next_steps',",
+1712-    "    'output_id', (select output_id from worker_output),",
+1713-    "    'zip_link', :'deliverable_zip_link'",
+1714-    "  ),",
+--
+1719-    "    'id', (select output_id from worker_output)::text",
+1720-    "  ),",
+1721-    "  'deliverable_link', :'deliverable_zip_link',",    "  'requester_delivery_payload', jsonb_build_object(",
+1722-    "    'summary_text', :'output_summary_ja',",
+1723-    "    'deliverable_title', :'output_title_ja',",
+1724-    "    'package_kind', 'delivery_package',",
+1725-    "    'deliverable_kind', 'document',",
+1726-    "    'body_format', 'markdown',",
+1727:    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+1728-    "    'deliverable_link', :'deliverable_zip_link',",
+1729-    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1730-    "    'deliverable_ref', jsonb_build_object(",
+1731-    "      'source', 'aiworkeros',",
+1732-    "      'schema', 'aiworker',",
+1733-    "      'table', 'runtime_worker_output',",
+1734-    "      'id', (select output_id from worker_output)::text",
+1735-    "    )",
+--
+1756-    output_title_ja: deliverable.outputTitle,
+1757-    output_body_ja: deliverable.bodyMarkdown,
+1758-    output_summary_ja: deliverable.summaryText,
+1759-    quality_notes: deliverable.qualityNotes,
+1760-    unresolved_issues: deliverable.unresolvedIssues,
+1761-    next_steps: deliverable.nextSteps,
+1762-    deliverable_package_jsonb: JSON.stringify(deliverable.deliverablePackage),
+1763-    deliverable_zip_link: deliverable.deliverablePackage.zip_link,
+1764:    generated_artifacts_jsonb: JSON.stringify(deliverable.generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index))),
+1765-    robot_context_jsonb: JSON.stringify(deliverable.robotContext),
+1766-    generation_basis_jsonb: JSON.stringify(deliverable.generationBasis),
+1767-    output_payload_jsonb: JSON.stringify(deliverable.outputPayload),
+1768:    artifacts_jsonb: JSON.stringify(deliverable.artifacts)
+1769-  });
+1770-
+1771-  return aiwB6R95R3D1CreateZipAndAttach(responsePayload, deliverable);
+1772-}
+1773-
+1774-const server = http.createServer(async (req, res) => {
+1775-  const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+1776-
+--
+1955-}
+1956-
+1957-function aiwB6R97R14ClaimWorkUnits(limit) {
+1958-  const sql = [
+1959-    "with picked as (",
+1960-    "  select u.aicm_worker_work_unit_id",
+1961-    "  from business.aicm_worker_work_unit u",
+1962-    "  where (",
+1963:    "    coalesce(u.metadata_jsonb->>'aiworkeros_execution_state','') in ('waiting','waiting_for_artifact_zip')",
+1964-    "    or lower(coalesce(u.metadata_jsonb->>'aiworkeros_retryable','false')) in ('true','t','1','yes')",
+1965-    "  )",
+1966-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_consumer_claim_state','') <> 'processing'",
+1967-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_request_id','') = ''",
+1968-    "  order by u.updated_at asc nulls last, u.created_at asc nulls last",
+1969-    "  limit " + Number(limit || 5),
+1970-    "  for update skip locked",
+1971-    "), claimed as (",
+--
+2089-
+2090-// AIW_B6R97R21_SCHEMA_MISMATCH_REPAIR
+2091-function aiwB6R97R19CAicmArtifactKindCode() {
+2092-  // AIW_B6R97R19C_ARTIFACT_KIND_RESOLVER_FINALIZER_PATCH
+2093-  return "delivery_package";
+2094-}
+2095-
+2096-function aiwB6R97R19CFinalizeGeneratedReviewRows(limit) {
+2097:  const artifactKind = aiwB6R97R19CAicmArtifactKindCode();
+2098-  const safeLimit = Math.max(1, Number(limit || 5) || 5);
+2099-
+2100-  const sql = [
+2101:    "with valid_artifact_kind as (",
+2102:    "  select " + aiwB6R97R14SqlLiteral(artifactKind) + "::text as artifact_kind_code",
+2103-    "  where exists (",
+2104-    "    select 1",
+2105-    "    from pg_constraint c",
+2106-    "    where c.conrelid = 'business.aicm_human_review_item'::regclass",
+2107:    "      and c.conname = 'chk_aicm_human_review_artifact_kind'",
+2108:    "      and pg_get_constraintdef(c.oid) like '%' || " + aiwB6R97R14SqlLiteral(artifactKind) + " || '%'",
+2109-    "  )",
+2110-    "), target as (",
+2111-    "  select u.*",
+2112-    "  from business.aicm_worker_work_unit u",
+2113-    "  where coalesce(u.metadata_jsonb->>'aiworkeros_claimed_by','') = 'AIWorkerOS/B6R97R14'",
+2114-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_request_id','') <> ''",
+2115-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_output_id','') <> ''",
+2116-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_deliverable_link','') <> ''",
+--
+2121-    "  update business.aicm_worker_work_unit u",
+2122-    "  set",
+2123-    "    work_status_code = 'review_waiting',",
+2124-    "    review_status_code = 'waiting',",
+2125-    "    metadata_jsonb = (coalesce(u.metadata_jsonb, '{}'::jsonb) - 'aiworkeros_last_error') || jsonb_build_object(",
+2126-    "      'aiworkeros_execution_state', 'completed',",
+2127-    "      'aiworkeros_retryable', 'false',",
+2128-    "      'aiworkeros_consumer_claim_state', 'completed',",
+2129:    "      'aiworkeros_artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+2130-    "      'aiworkeros_review_finalized_by', 'B6R97R19C',",
+2131-    "      'aiworkeros_review_finalized_at', now()::text",
+2132-    "    ),",
+2133-    "    updated_at = now()",
+2134-    "  from target t",
+2135-    "  where u.aicm_worker_work_unit_id = t.aicm_worker_work_unit_id",
+2136:    "    and exists (select 1 from valid_artifact_kind)",
+2137-    "  returning u.*",
+2138-    "), existing_review as (",
+2139-    "  select h.aicm_human_review_item_id, h.related_worker_work_unit_id",
+2140-    "  from business.aicm_human_review_item h",
+2141-    "  join updated_unit u on h.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+2142-    "  where coalesce(h.human_review_status_code,'') = 'pending'",
+2143-    "), updated_review as (",
+2144-    "  update business.aicm_human_review_item h",
+2145-    "  set",
+2146:    "    artifact_kind_code = (select artifact_kind_code from valid_artifact_kind),",
+2147-    "    review_title = coalesce(nullif(h.review_title,''), '納品サマリー確認: ' || coalesce(u.work_unit_name, 'AIWorkerOS成果物')),",
+2148-    "    delivery_summary_text = coalesce(nullif(h.delivery_summary_text,''), 'AIWorkerOS consumer generated deliverable, summary, and delivery package.'),",
+2149-    "    main_changes_text = coalesce(nullif(h.main_changes_text,''), 'AIWorkerOS consumer generated deliverable, summary, and zip link.'),",
+2150-    "    ai_review_result_text = coalesce(nullif(h.ai_review_result_text,''), 'AIWorkerOS consumer completed deliverable generation.'),",
+2151:    "    artifact_link = coalesce(nullif(h.artifact_link,''), u.metadata_jsonb->>'aiworkeros_deliverable_link'),",
+2152-    "    metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2153-    "      'source_route_code', coalesce(u.metadata_jsonb->>'source_route_code', 'aicm_worker_work_unit'),",
+2154-    "      'aiworkeros_request_id', u.metadata_jsonb->>'aiworkeros_request_id',",
+2155-    "      'aiworkeros_output_id', u.metadata_jsonb->>'aiworkeros_output_id',",
+2156:    "      'artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+2157-    "      'consumer_code', 'B6R97R19C'",
+2158-    "    ),",
+2159-    "    updated_at = now()",
+2160-    "  from updated_unit u",
+2161-    "  where h.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+2162-    "    and h.aicm_human_review_item_id in (select aicm_human_review_item_id from existing_review)",
+2163-    "  returning h.aicm_human_review_item_id",
+2164-    "), inserted_review as (",
+2165-    "  insert into business.aicm_human_review_item (",
+2166-    "    owner_civilization_id,",
+2167-    "    aicm_user_company_id,",
+2168-    "    aicm_user_company_department_id,",
+2169-    "    aicm_user_company_section_id,",
+2170-    "    related_manager_major_work_item_id,",
+2171-    "    related_worker_work_unit_id,",
+2172-    "    review_kind_code,",
+2173:    "    artifact_kind_code,",
+2174-    "    review_title,",
+2175-    "    delivery_summary_text,",
+2176-    "    main_changes_text,",
+2177-    "    ai_review_result_text,",
+2178-    "    unresolved_issues_text,",
+2179:    "    artifact_link,",
+2180-    "    responsible_ai_label,",
+2181-    "    requested_by_ai_label,",
+2182-    "    human_review_status_code,",
+2183-    "    priority_code,",
+2184-    "    metadata_jsonb",
+2185-    "  )",
+2186-    "  select",
+2187-    "    u.owner_civilization_id,",
+2188-    "    u.aicm_user_company_id,",
+2189-    "    NULL::uuid,",
+2190-    "    NULL::uuid,",
+2191-    "    NULL::uuid,",
+2192-    "    u.aicm_worker_work_unit_id,",
+2193-    "    'delivery_summary',",
+2194:    "    (select artifact_kind_code from valid_artifact_kind),",
+2195-    "    '納品サマリー確認: ' || coalesce(u.work_unit_name, 'AIWorkerOS成果物'),",
+2196-    "    'AIWorkerOS consumer generated deliverable, summary, and delivery package.',",
+2197-    "    'AIWorkerOS consumer generated deliverable, summary, and zip link.',",
+2198-    "    'AIWorkerOS consumer completed deliverable generation.',",
+2199-    "    '',",
+2200-    "    u.metadata_jsonb->>'aiworkeros_deliverable_link',",
+2201-    "    'AIWorkerOS',",
+2202-    "    'AICompanyManager',",
+2203-    "    'pending',",
+2204-    "    coalesce(nullif(u.priority_code,''), 'normal'),",
+2205-    "    jsonb_build_object(",
+2206-    "      'source_route_code', coalesce(u.metadata_jsonb->>'source_route_code', 'aicm_worker_work_unit'),",
+2207-    "      'aiworkeros_request_id', u.metadata_jsonb->>'aiworkeros_request_id',",
+2208-    "      'aiworkeros_output_id', u.metadata_jsonb->>'aiworkeros_output_id',",
+2209:    "      'artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+2210-    "      'consumer_code', 'B6R97R19C'",
+2211-    "    )",
+2212-    "  from updated_unit u",
+2213-    "  where not exists (",
+2214-    "    select 1",
+2215-    "    from existing_review er",
+2216-    "    where er.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+2217-    "  )",
+--
+2277-    "  from business.aicm_human_review_item",
+2278-    "  where related_worker_work_unit_id = " + aiwB6R97R14UuidOrNull(workUnitId),
+2279-    "    and coalesce(human_review_status_code,'') = 'pending'",
+2280-    "  limit 1",
+2281-    "), updated as (",
+2282-    "  update business.aicm_human_review_item h",
+2283-    "  set review_title = " + aiwB6R97R14SqlLiteral(title) + ",",
+2284-    "      delivery_summary_text = " + aiwB6R97R14SqlLiteral(summary) + ",",
+2285:    "      artifact_link = " + aiwB6R97R14SqlLiteral(link) + ",",
+2286-    "      ai_review_result_text = 'AIWorkerOS consumer completed deliverable generation.',",
+2287-    "      metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2288-    "        'source_route_code', " + aiwB6R97R14SqlLiteral(sourceRouteCode) + ",",
+2289-    "        'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+2290-    "        'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+2291-    "        'aiworkeros_result_compact', " + aiwB6R97R14SqlLiteral(compactResultJson) + "::jsonb",
+2292-    "      ),",
+2293-    "      updated_at = now()",
+--
+2297-    "  insert into business.aicm_human_review_item (",
+2298-    "    owner_civilization_id,",
+2299-    "    aicm_user_company_id,",
+2300-    "    aicm_user_company_department_id,",
+2301-    "    aicm_user_company_section_id,",
+2302-    "    related_manager_major_work_item_id,",
+2303-    "    related_worker_work_unit_id,",
+2304-    "    review_kind_code,",
+2305:    "    artifact_kind_code,",
+2306-    "    review_title,",
+2307-    "    delivery_summary_text,",
+2308-    "    main_changes_text,",
+2309-    "    ai_review_result_text,",
+2310-    "    unresolved_issues_text,",
+2311:    "    artifact_link,",
+2312-    "    responsible_ai_label,",
+2313-    "    requested_by_ai_label,",
+2314-    "    human_review_status_code,",
+2315-    "    priority_code,",
+2316-    "    metadata_jsonb",
+2317-    "  )",
+2318-    "  select",
+2319-    "    " + ownerExpr + ",",
+
+============================================================
+CONTEXT PATTERN=deliverable
+============================================================
+314-  ]);
+315-
+316-  const role = aiwB6R96R1G2NormalizeRoleCode(payload, appPayload);
+317-  const tier = aiwB6R96R1G2CapabilityTier(payload, appPayload);
+318-  const referenceProfile = aiwB6R96R1G2ReferenceProfile(tier);
+319-  const body = aiwB6R96R1G2BuildBody(role, title, instruction, referenceProfile);
+320-
+321-  return {
+322:    contract_version: "requester_deliverable_v1",
+323:    deliverable_title: title,
+324:    deliverable_kind: role === "president" ? "policy_proposal" : role === "manager" ? "major_breakdown" : role === "leader" ? "task_decomposition" : "document",
+325-    body_format: "markdown",
+326-    body_markdown: body,
+327:    summary_text: role + " role produced a stable minimum deliverable.",
+328-    limitations_text: "Performance differences are controlled by CX reference permission and capability profile. Low performance still returns stable output.",
+329-    unresolved_issues_text: instruction ? "" : "Task instruction is missing or insufficient.",
+330:    next_steps_text: "Review the deliverable and provide additional constraints if deeper specialty or originality is required.",
+331-    minimum_guarantee_status: body ? "satisfied" : "blocking_report",
+332-    performance_profile: {
+333-      capability_tier: tier,
+334-      stability_level: referenceProfile.stability_level,
+335-      originality_level: referenceProfile.originality_level,
+336-      specialty_level: referenceProfile.specialty_level,
+337-      prediction_level: referenceProfile.prediction_level,
+338-      review_depth: referenceProfile.review_depth
+--
+353-  const current = aiwB6R96R1G2Object(payload.requester_delivery_payload);
+354-  if (aiwB6R96R1G2Text(current.body_markdown) || aiwB6R96R1G2Text(current.body_text)) {
+355-    return payload;
+356-  }
+357-
+358-  if (!aiwB6R96R1G2LooksRuntimePayload(payload)) return payload;
+359-
+360-  payload.requester_delivery_payload = aiwB6R96R1G2BuildRequesterDeliveryPayload(payload);
+361:  payload.deliverable = payload.requester_delivery_payload;
+362-  return payload;
+363-}
+364-// AIW_B6R96R1G2_MINIMUM_DELIVERABLE_HELPER_END
+365-
+366-function aiwB6R44fPlainObject(value) {
+367-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+368-}
+369-
+--
+759-    limit: normalizeLimit(query.get("limit"))
+760-  });
+761-}
+762-
+763-
+764-// AIWORKEROS_B6R95R3B_R3_COMMON_DELIVERABLE_CONTRACT_START
+765-/*
+766-  B6R95R3B-R3:
+767:  Common requester-facing deliverable contract for AIWorkerOS runtime execution.
+768-
+769-  Canon:
+770-  - This is not AICM-specific.
+771-  - AICM is one consumer among multiple requester apps / OSs.
+772:  - AIWorkerOS creates the deliverable body and first summary.
+773:  - Requester apps store summary_text plus deliverable_ref / deliverable_link.
+774-  - Robot performance differences are represented through robot_context and generation_basis.
+775-
+776-  Boundary:
+777-  - No external execution.
+778-  - No PG apply.
+779-  - No destructive action.
+780-  - No AICM-side change in this patch.
+781-  - No CX22073JW access-control change in this patch.
+--
+831-    robot_trait_basis: "model_code / role_layer_code / series_code / capability_profile_code are carried as generation basis; deeper trait resolution belongs to AIWorkerOS robot profile logic.",
+832-    cx_depth_basis: cxDepthCode,
+833-    cx_breadth_basis: cxBreadthCode,
+834-    cx_reference_boundary: "CX22073JW is robot brain/reference data. Access-control remains AIWorkerOS-side, not requester-app-side.",
+835-    safety_boundary: "internal_only_no_external_execution_no_pg_apply_no_destructive_action"
+836-  };
+837-
+838-  const outputTitle = `${taskTitle} 成果物`;
+839:  const deliverablePackage = aiwB6R95R3D1BuildZipPackageMeta(requesterAppRef, taskTitle);
+840-  const summaryText = aiwB6R95R3R3Clip(
+841:    `AIWorkerOSが${modelCode}を成果物生成主体として、${taskTitle}の一次成果物と一次サマリを作成しました。依頼元アプリはこのsummary_textとdeliverable_ref/linkを保存してレビューに利用できます。`,
+842-    700
+843-  );
+844-
+845-  const qualityNotes = aiwB6R95R3R3Lines([
+846-    "AIWorkerOS側で生成した一次成果物です。",
+847-    `設定ロボット: ${modelCode}`,
+848-    `役割レイヤー: ${roleLayerCode}`,
+849-    `タスク領域: ${taskDomainCode}`,
+--
+853-  ]);
+854-
+855-  const unresolvedIssues = aiwB6R95R3R3Lines([
+856-    "この段階では外部実行、PG apply、破壊的操作は行っていません。",
+857-    "追加調査・DB変更・実装反映が必要な場合は、依頼元アプリ側の承認/差し戻し工程で判断してください。"
+858-  ]);
+859-
+860-  const nextSteps = aiwB6R95R3R3Lines([
+861:    "依頼元アプリでsummary_textとdeliverable_ref/linkを保存する。",
+862-    "レビュー画面から成果物本文へ辿れるようにする。",
+863-    "差し戻し時は追加条件をAIWorkerOSへ再依頼する。"
+864-  ]);
+865-
+866-  const bodyMarkdown = aiwB6R95R3R3Lines([
+867-    `# ${taskTitle}`,
+868-    "",
+869-    "## 1. 成果物サマリ",
+--
+902-    "- pg_apply_performed_flag=false",
+903-    "- destructive_action_performed_flag=false",
+904-    "- CX22073JW brain access control is AIWorkerOS-side responsibility",
+905-    ""
+906-  ]);
+907-
+908-  const generatedArtifacts = [
+909-    {
+910:      kind: "main_deliverable",
+911-      title: outputTitle,
+912:      file_name: "01_main_deliverable.md",
+913-      body_markdown: bodyMarkdown
+914-    },
+915-    {
+916-      kind: "quality_notes",
+917-      title: "品質メモ",
+918-      file_name: "90_quality_notes.md",
+919-      body_markdown: qualityNotes
+920-    },
+--
+928-      kind: "next_steps",
+929-      title: "次工程",
+930-      file_name: "92_next_steps.md",
+931-      body_markdown: nextSteps
+932-    }
+933-  ];
+934-  const outputPayload = {
+935-    contract_version: "B6R95R3B-R3",
+936:    contract_name: "aiworkeros_common_requester_deliverable_contract",
+937:    deliverable_kind: "document",
+938-    body_format: "markdown",
+939:    deliverable_package: deliverablePackage,
+940:    deliverable_link: deliverablePackage.zip_link,
+941-    generated_artifacts: generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index)),
+942-    requester_app_ref: requesterAppRef,
+943-    source_request_ref: sourceRequestRef,
+944-    source_route_code: routeCode,
+945-    app_surface_code: appSurfaceCode,
+946-    robot_context: robotContext,
+947-    generation_basis: generationBasis,
+948-    quality_notes: qualityNotes,
+--
+953-    destructive_action_performed_flag: false
+954-  };
+955-
+956-  const artifacts = [
+957-    {
+958-      artifact_kind_code: "markdown",
+959-      artifact_title_ja: outputTitle,
+960-      body_format: "markdown",
+961:      deliverable_package: deliverablePackage,
+962:      deliverable_link: deliverablePackage.zip_link,
+963-      generated_artifacts: generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index)),
+964-      body_markdown: bodyMarkdown,
+965-      summary_text: summaryText,
+966-      quality_notes: qualityNotes,
+967-      unresolved_issues: unresolvedIssues,
+968-      next_steps: nextSteps,
+969-      robot_context: robotContext,
+970-      generation_basis: generationBasis,
+--
+976-    outputTitle,
+977-    bodyMarkdown,
+978-    summaryText,
+979-    qualityNotes,
+980-    unresolvedIssues,
+981-    nextSteps,
+982-    robotContext,
+983-    generationBasis,
+984:    deliverablePackage,
+985-    generatedArtifacts,
+986-    outputPayload,
+987-    artifacts
+988-  };
+989-}
+990-
+991-/* B6R95R3Z_R24_CX_MATERIAL_BODY_GENERATION_PATCH_START */
+992-function aiwB6R95R3Z24Text(value) {
+--
+1253-  blocks.push("");
+1254-  blocks.push("## 5. 出典・史料注意");
+1255-  blocks.push("CX側materialに source_basis / source_caution / verification_status が含まれる場合は、それを優先して扱います。歴史資料では、一次史料・標準学習整理・研究上の注意点を分け、断定しすぎない説明にします。");
+1256-  blocks.push("");
+1257-  blocks.push("## 6. 誤解防止");
+1258-  blocks.push("制度や事件を単発で完成したものとして扱わず、時系列・後続制度・史料上の注意と接続して説明します。");
+1259-  blocks.push("");
+1260-  blocks.push("## 7. 次工程");
+1261:  blocks.push("依頼元アプリは summary_text と deliverable_link を保存し、必要に応じて追加条件を指定して再生成できます。");
+1262-
+1263-  return blocks.join("\n");
+1264-}
+1265-
+1266:function aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(deliverable, payload, sourceRouteCode) {
+1267:  const safeDeliverable = deliverable || {};
+1268-  const originalBody = aiwB6R95R3Z24Text(safeDeliverable.bodyMarkdown || safeDeliverable.body_markdown || "");
+1269-  const instruction = aiwB6R95R3Z24Instruction(payload);
+1270-  const normalizedBody = originalBody.replace(/\s+/g, "");
+1271-  const normalizedInstruction = instruction.replace(/\s+/g, "");
+1272-  const echoRisk = normalizedInstruction && normalizedBody.includes(normalizedInstruction.slice(0, Math.min(120, normalizedInstruction.length)));
+1273-
+1274-  const rows = aiwB6R95R3Z24FetchCxRuntimeMaterials(payload);
+1275-
+--
+1314-  const baseDeliverable = aiwB6R95R3R3BuildRequesterFacingDeliverableBaseB6R95R3Z24(payload, sourceRouteCode);
+1315-  return aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(baseDeliverable, payload, sourceRouteCode);
+1316-}
+1317-/* B6R95R3Z_R24_CX_MATERIAL_BODY_GENERATION_PATCH_END */
+1318-
+1319-// AIWORKEROS_B6R95R3D_R1_MULTI_ARTIFACT_ZIP_CONTRACT_START
+1320-/*
+1321-  B6R95R3D-R1:
+1322:  Multi-artifact deliverable zip package contract.
+1323-
+1324-  Canon:
+1325:  - AIWorkerOS creates one or more deliverable artifacts from the instruction.
+1326-  - AIWorkerOS creates summary_text.
+1327:  - AIWorkerOS bundles generated artifacts into one deliverable zip.
+1328-  - Requester apps display summary_text and link to the zip.
+1329-  - The zip exists to avoid one-by-one downloads when multiple artifacts are generated.
+1330-
+1331-  Boundary:
+1332-  - No external execution.
+1333-  - No PG apply.
+1334-  - No destructive action.
+1335-  - No requester-app-specific contract.
+1336-*/
+1337-function aiwB6R95R3D1SafeFilePart(value, fallback) {
+1338:  const raw = String(value || fallback || "deliverable").trim();
+1339-  const safe = raw.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80);
+1340:  return safe || String(fallback || "deliverable");
+1341-}
+1342-
+1343-function aiwB6R95R3D1BuildZipPackageMeta(requesterAppRef, taskTitle) {
+1344-  const crypto = require("crypto");
+1345-  const zipId = `${Date.now()}_${crypto.randomUUID()}`;
+1346-  const requesterPart = aiwB6R95R3D1SafeFilePart(requesterAppRef, "requester");
+1347:  const titlePart = aiwB6R95R3D1SafeFilePart(taskTitle, "deliverables");
+1348-  const rawFileName = `${requesterPart}_${titlePart}_${zipId}.zip`;
+1349-
+1350-  // AIWORKEROS_B6R95R3H_PACKAGE_META_ZIP_LINK_BEFORE_DB_FIX
+1351-  // The package metadata is saved to DB before the zip file is written.
+1352-  // Therefore file_name / zip_link must already use the exact sanitized filename
+1353-  // that will be written to disk by aiwB6R95R3D1CreateZipAndAttach.
+1354:  const fileName = aiwB6R95R3D1SafeFilePart(rawFileName, "deliverables.zip").endsWith(".zip")
+1355:    ? aiwB6R95R3D1SafeFilePart(rawFileName, "deliverables.zip")
+1356:    : `${aiwB6R95R3D1SafeFilePart(rawFileName, "deliverables")}.zip`;
+1357:  const zipLink = `aiworkeros://runtime-deliverable-zip/${fileName}`;
+1358-
+1359-  return {
+1360-    package_kind: "delivery_package",
+1361-    package_format: "zip",
+1362-    mime_type: "application/zip",
+1363-    zip_id: zipId,
+1364-    file_name: fileName,
+1365-    zip_link: zipLink,
+1366-    zip_ref: {
+1367-      source: "aiworkeros",
+1368:      storage_code: "runtime-deliverable-zip",
+1369-      file_name: fileName
+1370-    }
+1371-  };
+1372-}
+1373-
+1374-function aiwB6R95R3D1NormalizeGeneratedArtifact(item, index) {
+1375-  const seq = String(index + 1).padStart(2, "0");
+1376-  const kind = aiwB6R95R3R3OneLine(item?.artifact_kind_code || item?.kind || "document", "document");
+--
+1385-    artifact_kind_code: kind,
+1386-    title,
+1387-    file_name: fileName,
+1388-    body_markdown: body,
+1389-    body_format: "markdown"
+1390-  };
+1391-}
+1392-
+1393:function aiwB6R95R3D1BuildGeneratedArtifacts(deliverable) {
+1394:  const provided = Array.isArray(deliverable?.generatedArtifacts) ? deliverable.generatedArtifacts : [];
+1395-  if (provided.length > 0) {
+1396-    return provided.map(aiwB6R95R3D1NormalizeGeneratedArtifact);
+1397-  }
+1398-
+1399-  const artifacts = [
+1400-    {
+1401:      kind: "main_deliverable",
+1402:      title: deliverable?.outputTitle || "主成果物",
+1403:      file_name: "01_main_deliverable.md",
+1404:      body_markdown: deliverable?.bodyMarkdown || ""
+1405-    }
+1406-  ];
+1407-
+1408:  if (aiwB6R95R3R3Text(deliverable?.qualityNotes)) {
+1409-    artifacts.push({
+1410-      kind: "quality_notes",
+1411-      title: "品質メモ",
+1412-      file_name: "90_quality_notes.md",
+1413:      body_markdown: deliverable.qualityNotes
+1414-    });
+1415-  }
+1416-
+1417:  if (aiwB6R95R3R3Text(deliverable?.unresolvedIssues)) {
+1418-    artifacts.push({
+1419-      kind: "unresolved_issues",
+1420-      title: "未解決事項",
+1421-      file_name: "91_unresolved_issues.md",
+1422:      body_markdown: deliverable.unresolvedIssues
+1423-    });
+1424-  }
+1425-
+1426:  if (aiwB6R95R3R3Text(deliverable?.nextSteps)) {
+1427-    artifacts.push({
+1428-      kind: "next_steps",
+1429-      title: "次工程",
+1430-      file_name: "92_next_steps.md",
+1431:      body_markdown: deliverable.nextSteps
+1432-    });
+1433-  }
+1434-
+1435-  return artifacts.map(aiwB6R95R3D1NormalizeGeneratedArtifact);
+1436-}
+1437-
+1438-function aiwB6R95R3D1ZipCrc32(buffer) {
+1439-  let table = aiwB6R95R3D1ZipCrc32._table;
+--
+1520-  eocd.writeUInt16LE(entries.length, 10);
+1521-  eocd.writeUInt32LE(centralDir.length, 12);
+1522-  eocd.writeUInt32LE(localData.length, 16);
+1523-  eocd.writeUInt16LE(0, 20);
+1524-
+1525-  return Buffer.concat([localData, centralDir, eocd]);
+1526-}
+1527-
+1528:function aiwB6R95R3D1CreateZipAndAttach(responsePayload, deliverable) {
+1529-  const fs = require("fs");
+1530-  const path = require("path");
+1531-
+1532-  const response = responsePayload && typeof responsePayload === "object" ? responsePayload : {};
+1533:  const packageMeta = deliverable?.deliverablePackage || aiwB6R95R3D1BuildZipPackageMeta("requester", "deliverables");
+1534:  const generatedArtifacts = aiwB6R95R3D1BuildGeneratedArtifacts(deliverable);
+1535-
+1536:  const zipDir = process.env.AIWORKEROS_DELIVERABLE_ZIP_DIR || path.join(process.cwd(), "runtime-deliverable-zips");
+1537-  fs.mkdirSync(zipDir, { recursive: true });
+1538-
+1539:  const fileName = aiwB6R95R3D1SafeFilePart(packageMeta.file_name, "deliverables.zip").endsWith(".zip")
+1540:    ? aiwB6R95R3D1SafeFilePart(packageMeta.file_name, "deliverables.zip")
+1541:    : `${aiwB6R95R3D1SafeFilePart(packageMeta.file_name, "deliverables")}.zip`;
+1542-  const zipPath = path.join(zipDir, fileName);
+1543-
+1544-  // AIWORKEROS_B6R95R3F_ZIP_LINK_ACTUAL_FILE_FIX
+1545-  // Keep the returned zip link aligned with the actual sanitized filename written to disk.
+1546:  const actualZipLink = `aiworkeros://runtime-deliverable-zip/${fileName}`;
+1547-  const actualZipRef = Object.assign({}, packageMeta.zip_ref || {}, {
+1548-    source: "aiworkeros",
+1549:    storage_code: "runtime-deliverable-zip",
+1550-    file_name: fileName
+1551-  });
+1552-
+1553:  const summaryText = response.deliverable?.summary_text || deliverable?.summaryText || "";
+1554-  const manifest = {
+1555-    contract_version: "B6R95R3D-R1",
+1556-    contract_name: "aiworkeros_common_requester_multi_artifact_zip_contract",
+1557-    package_purpose: "bundle_generated_artifacts_for_single_download",
+1558-    request_id: response.request_id || null,
+1559-    output_id: response.output_id || null,
+1560:    deliverable_title: response.deliverable?.title || deliverable?.outputTitle || "成果物",
+1561-    summary_text: summaryText,
+1562-    artifact_count: generatedArtifacts.length,
+1563-    generated_artifacts: generatedArtifacts.map((artifact) => ({
+1564-      artifact_no: artifact.artifact_no,
+1565-      artifact_kind_code: artifact.artifact_kind_code,
+1566-      title: artifact.title,
+1567-      file_name: artifact.file_name,
+1568-      body_format: artifact.body_format
+1569-    })),
+1570:    deliverable_ref: response.deliverable_ref || null,
+1571:    robot_context: response.robot_context || deliverable?.robotContext || null,
+1572:    generation_basis: response.generation_basis || deliverable?.generationBasis || null,
+1573-    safety: response.safety || null,
+1574-    created_at: new Date().toISOString()
+1575-  };
+1576-
+1577-  const entries = [
+1578-    { name: "00_summary.md", content: summaryText },
+1579-    ...generatedArtifacts.map((artifact) => ({
+1580-      name: artifact.file_name,
+--
+1603-
+1604-  response.generated_artifacts = generatedArtifacts.map((artifact) => ({
+1605-    artifact_no: artifact.artifact_no,
+1606-    artifact_kind_code: artifact.artifact_kind_code,
+1607-    title: artifact.title,
+1608-    file_name: artifact.file_name,
+1609-    body_format: artifact.body_format
+1610-  }));
+1611:  response.deliverable_package = zipPublic;
+1612:  response.deliverable_zip_ref = actualZipRef;
+1613:  response.deliverable_link = actualZipLink;
+1614-
+1615-  response.requester_delivery_payload = Object.assign({}, response.requester_delivery_payload || {}, {
+1616-    summary_text: summaryText,
+1617:    deliverable_link: actualZipLink,
+1618:    deliverable_package: zipPublic,
+1619:    deliverable_zip_ref: actualZipRef,
+1620-    generated_artifacts: response.generated_artifacts
+1621-  });
+1622-
+1623:  response.deliverable = Object.assign({}, response.deliverable || {}, {
+1624:    deliverable_package: zipPublic,
+1625-    zip_link: actualZipLink,
+1626-    generated_artifacts: response.generated_artifacts
+1627-  });
+1628-
+1629-  return response;
+1630-}
+1631-// AIWORKEROS_B6R95R3D_R1_MULTI_ARTIFACT_ZIP_CONTRACT_END
+1632-// AIWORKEROS_B6R95R3B_R3_COMMON_DELIVERABLE_CONTRACT_END
+--
+1648-  for (const key of required) {
+1649-    if (!payload[key] || String(payload[key]).trim() === "") {
+1650-      const e = new Error(`Missing required field: ${key}`);
+1651-      e.httpStatus = 400;
+1652-      throw e;
+1653-    }
+1654-  }
+1655-
+1656:  const deliverable = aiwB6R95R3R3BuildRequesterFacingDeliverable(payload, sourceRouteCode);
+1657-
+1658-  const sql = [
+1659-    "with created as (",
+1660-    "  select aiworker.fn_runtime_execution_create_request_with_route_v1(",
+1661-    "    :'app_surface_code',",
+1662-    "    :'model_code',",
+1663-    "    :'task_domain_code',",
+1664-    "    :'task_title',",
+--
+1692-    "  'request_id', (select request_id from created),",
+1693-    "  'output_id', (select output_id from worker_output),",
+1694-    "  'idempotency_key', :'idempotency_key',",
+1695-    "  'requester_app_ref', :'source_app_ref',",
+1696-    "  'source_request_ref', :'source_request_ref',",
+1697-    "  'source_route_code', :'source_route_code',",
+1698-    "  'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),",
+1699-    "  'robot_context', :'robot_context_jsonb'::jsonb,",
+1700:    "  'generation_basis', :'generation_basis_jsonb'::jsonb,",    "  'deliverable', jsonb_build_object(",
+1701-    "    'package_kind', 'delivery_package',",
+1702:    "    'deliverable_kind', 'document',",
+1703-    "    'title', :'output_title_ja',",
+1704-    "    'body_format', 'markdown',",
+1705:    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1706-    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+1707-    "    'body_markdown', :'output_body_ja',",
+1708-    "    'summary_text', :'output_summary_ja',",
+1709-    "    'quality_notes', :'quality_notes',",
+1710-    "    'unresolved_issues', :'unresolved_issues',",
+1711-    "    'next_steps', :'next_steps',",
+1712-    "    'output_id', (select output_id from worker_output),",
+1713:    "    'zip_link', :'deliverable_zip_link'",
+1714-    "  ),",
+1715:    "  'deliverable_ref', jsonb_build_object(",
+1716-    "    'source', 'aiworkeros',",
+1717-    "    'schema', 'aiworker',",
+1718-    "    'table', 'runtime_worker_output',",
+1719-    "    'id', (select output_id from worker_output)::text",
+1720-    "  ),",
+1721:    "  'deliverable_link', :'deliverable_zip_link',",    "  'requester_delivery_payload', jsonb_build_object(",
+1722-    "    'summary_text', :'output_summary_ja',",
+1723:    "    'deliverable_title', :'output_title_ja',",
+1724-    "    'package_kind', 'delivery_package',",
+1725:    "    'deliverable_kind', 'document',",
+1726-    "    'body_format', 'markdown',",
+1727-    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+1728:    "    'deliverable_link', :'deliverable_zip_link',",
+1729:    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1730:    "    'deliverable_ref', jsonb_build_object(",
+1731-    "      'source', 'aiworkeros',",
+1732-    "      'schema', 'aiworker',",
+1733-    "      'table', 'runtime_worker_output',",
+1734-    "      'id', (select output_id from worker_output)::text",
+1735-    "    )",
+1736-    "  ),",
+1737-    "  'safety', jsonb_build_object(",
+1738-    "    'external_execution_performed_flag', false,",
+--
+1748-    task_domain_code: payload.task_domain_code,
+1749-    task_title: payload.task_title,
+1750-    task_instruction_ja: payload.task_instruction_ja,
+1751-    source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+1752-    source_request_ref: payload.source_request_ref || "",
+1753-    source_route_code: sourceRouteCode,
+1754-    requested_by_ref: payload.requested_by_ref || "human",
+1755-    idempotency_key: idempotencyKey,
+1756:    output_title_ja: deliverable.outputTitle,
+1757:    output_body_ja: deliverable.bodyMarkdown,
+1758:    output_summary_ja: deliverable.summaryText,
+1759:    quality_notes: deliverable.qualityNotes,
+1760:    unresolved_issues: deliverable.unresolvedIssues,
+1761:    next_steps: deliverable.nextSteps,
+1762:    deliverable_package_jsonb: JSON.stringify(deliverable.deliverablePackage),
+1763:    deliverable_zip_link: deliverable.deliverablePackage.zip_link,
+1764:    generated_artifacts_jsonb: JSON.stringify(deliverable.generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index))),
+1765:    robot_context_jsonb: JSON.stringify(deliverable.robotContext),
+1766:    generation_basis_jsonb: JSON.stringify(deliverable.generationBasis),
+1767:    output_payload_jsonb: JSON.stringify(deliverable.outputPayload),
+1768:    artifacts_jsonb: JSON.stringify(deliverable.artifacts)
+1769-  });
+1770-
+1771:  return aiwB6R95R3D1CreateZipAndAttach(responsePayload, deliverable);
+1772-}
+1773-
+1774-const server = http.createServer(async (req, res) => {
+1775-  const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+1776-
+1777-  try {
+1778-    if (req.method === "GET" && url.pathname === "/health") {
+1779-      return sendJson(res, 200, {
+--
+2028-    (result && result.data && result.data.request_id) ||
+2029-    ""
+2030-  );
+2031-}
+2032-
+2033-function aiwB6R97R14OutputId(result) {
+2034-  return String(
+2035-    (result && result.output_id) ||
+2036:    (result && result.deliverable_ref && result.deliverable_ref.id) ||
+2037:    (result && result.requester_delivery_payload && result.requester_delivery_payload.deliverable_ref && result.requester_delivery_payload.deliverable_ref.id) ||
+2038-    ""
+2039-  );
+2040-}
+2041-
+2042-function aiwB6R97R14Summary(result) {
+2043-  return String(
+2044-    (result && result.requester_delivery_payload && result.requester_delivery_payload.summary_text) ||
+2045:    (result && result.deliverable && result.deliverable.summary_text) ||
+2046-    (result && result.summary_text) ||
+2047-    ""
+2048-  );
+2049-}
+2050-
+2051-function aiwB6R97R14DeliverableLink(result) {
+2052-  return String(
+2053:    (result && result.deliverable_link) ||
+2054:    (result && result.requester_delivery_payload && result.requester_delivery_payload.deliverable_link) ||
+2055:    (result && result.deliverable && result.deliverable.zip_link) ||
+2056-    ""
+2057-  );
+2058-}
+2059-
+2060-function aiwB6R97R14MarkFailed(row, error) {
+2061-  const id = row && row.aicm_worker_work_unit_id;
+2062-  if (!aiwB6R97R14IsUuid(id)) return;
+2063-
+--
+2108-    "      and pg_get_constraintdef(c.oid) like '%' || " + aiwB6R97R14SqlLiteral(artifactKind) + " || '%'",
+2109-    "  )",
+2110-    "), target as (",
+2111-    "  select u.*",
+2112-    "  from business.aicm_worker_work_unit u",
+2113-    "  where coalesce(u.metadata_jsonb->>'aiworkeros_claimed_by','') = 'AIWorkerOS/B6R97R14'",
+2114-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_request_id','') <> ''",
+2115-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_output_id','') <> ''",
+2116:    "    and coalesce(u.metadata_jsonb->>'aiworkeros_deliverable_link','') <> ''",
+2117-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_consumer_claim_state','') in ('failed','review_registration_failed')",
+2118-    "  order by u.updated_at asc nulls last",
+2119-    "  limit " + safeLimit,
+2120-    "), updated_unit as (",
+2121-    "  update business.aicm_worker_work_unit u",
+2122-    "  set",
+2123-    "    work_status_code = 'review_waiting',",
+2124-    "    review_status_code = 'waiting',",
+--
+2140-    "  from business.aicm_human_review_item h",
+2141-    "  join updated_unit u on h.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+2142-    "  where coalesce(h.human_review_status_code,'') = 'pending'",
+2143-    "), updated_review as (",
+2144-    "  update business.aicm_human_review_item h",
+2145-    "  set",
+2146-    "    artifact_kind_code = (select artifact_kind_code from valid_artifact_kind),",
+2147-    "    review_title = coalesce(nullif(h.review_title,''), '納品サマリー確認: ' || coalesce(u.work_unit_name, 'AIWorkerOS成果物')),",
+2148:    "    delivery_summary_text = coalesce(nullif(h.delivery_summary_text,''), 'AIWorkerOS consumer generated deliverable, summary, and delivery package.'),",
+2149:    "    main_changes_text = coalesce(nullif(h.main_changes_text,''), 'AIWorkerOS consumer generated deliverable, summary, and zip link.'),",
+2150:    "    ai_review_result_text = coalesce(nullif(h.ai_review_result_text,''), 'AIWorkerOS consumer completed deliverable generation.'),",
+2151:    "    artifact_link = coalesce(nullif(h.artifact_link,''), u.metadata_jsonb->>'aiworkeros_deliverable_link'),",
+2152-    "    metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2153-    "      'source_route_code', coalesce(u.metadata_jsonb->>'source_route_code', 'aicm_worker_work_unit'),",
+2154-    "      'aiworkeros_request_id', u.metadata_jsonb->>'aiworkeros_request_id',",
+2155-    "      'aiworkeros_output_id', u.metadata_jsonb->>'aiworkeros_output_id',",
+2156-    "      'artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+2157-    "      'consumer_code', 'B6R97R19C'",
+2158-    "    ),",
+2159-    "    updated_at = now()",
+--
+2188-    "    u.aicm_user_company_id,",
+2189-    "    NULL::uuid,",
+2190-    "    NULL::uuid,",
+2191-    "    NULL::uuid,",
+2192-    "    u.aicm_worker_work_unit_id,",
+2193-    "    'delivery_summary',",
+2194-    "    (select artifact_kind_code from valid_artifact_kind),",
+2195-    "    '納品サマリー確認: ' || coalesce(u.work_unit_name, 'AIWorkerOS成果物'),",
+2196:    "    'AIWorkerOS consumer generated deliverable, summary, and delivery package.',",
+2197:    "    'AIWorkerOS consumer generated deliverable, summary, and zip link.',",
+2198:    "    'AIWorkerOS consumer completed deliverable generation.',",
+2199-    "    '',",
+2200:    "    u.metadata_jsonb->>'aiworkeros_deliverable_link',",
+2201-    "    'AIWorkerOS',",
+2202-    "    'AICompanyManager',",
+2203-    "    'pending',",
+2204-    "    coalesce(nullif(u.priority_code,''), 'normal'),",
+2205-    "    jsonb_build_object(",
+2206-    "      'source_route_code', coalesce(u.metadata_jsonb->>'source_route_code', 'aicm_worker_work_unit'),",
+2207-    "      'aiworkeros_request_id', u.metadata_jsonb->>'aiworkeros_request_id',",
+2208-    "      'aiworkeros_output_id', u.metadata_jsonb->>'aiworkeros_output_id',",
+--
+2247-  // AIW_B6R97R16_E2BIG_COMPACT_RESULT_PATCH
+2248-  // Do not embed the full AIWorkerOS result JSON into psql -c SQL.
+2249-  // Full result payload can exceed OS argv limits and cause spawnSync psql E2BIG.
+2250-  const compactResultJson = JSON.stringify({
+2251-    result: result && result.result ? result.result : "",
+2252-    request_id: requestId,
+2253-    output_id: outputId,
+2254-    summary_present: Boolean(summary),
+2255:    deliverable_link: link,
+2256-    consumer_code: "B6R97R16"
+2257-  });
+2258-
+2259-  const sql = [
+2260-    "update business.aicm_worker_work_unit",
+2261-    "set work_status_code = 'review_waiting',",
+2262-    "    review_status_code = 'waiting',",
+2263-    "    metadata_jsonb = coalesce(metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2264-    "      'aiworkeros_execution_state', 'completed',",
+2265-    "      'aiworkeros_retryable', 'false',",
+2266-    "      'aiworkeros_consumer_claim_state', 'completed',",
+2267-    "      'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+2268-    "      'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+2269:    "      'aiworkeros_deliverable_link', " + aiwB6R97R14SqlLiteral(link) + ",",
+2270-    "      'aiworkeros_completed_at', now()::text",
+2271-    "    ),",
+2272-    "    updated_at = now()",
+2273-    "where aicm_worker_work_unit_id = " + aiwB6R97R14UuidOrNull(workUnitId) + ";",
+2274-    "",
+2275-    "with existing as (",
+2276-    "  select aicm_human_review_item_id",
+2277-    "  from business.aicm_human_review_item",
+2278-    "  where related_worker_work_unit_id = " + aiwB6R97R14UuidOrNull(workUnitId),
+2279-    "    and coalesce(human_review_status_code,'') = 'pending'",
+2280-    "  limit 1",
+2281-    "), updated as (",
+2282-    "  update business.aicm_human_review_item h",
+2283-    "  set review_title = " + aiwB6R97R14SqlLiteral(title) + ",",
+2284-    "      delivery_summary_text = " + aiwB6R97R14SqlLiteral(summary) + ",",
+2285-    "      artifact_link = " + aiwB6R97R14SqlLiteral(link) + ",",
+2286:    "      ai_review_result_text = 'AIWorkerOS consumer completed deliverable generation.',",
+2287-    "      metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2288-    "        'source_route_code', " + aiwB6R97R14SqlLiteral(sourceRouteCode) + ",",
+2289-    "        'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+2290-    "        'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+2291-    "        'aiworkeros_result_compact', " + aiwB6R97R14SqlLiteral(compactResultJson) + "::jsonb",
+2292-    "      ),",
+2293-    "      updated_at = now()",
+2294-    "  where h.aicm_human_review_item_id in (select aicm_human_review_item_id from existing)",
+--
+2321-    "    " + deptExpr + ",",
+2322-    "    " + sectionExpr + ",",
+2323-    "    " + majorExpr + ",",
+2324-    "    " + aiwB6R97R14UuidOrNull(workUnitId) + ",",
+2325-    "    'delivery_summary',",
+2326-    "    'delivery_package',",
+2327-    "    " + aiwB6R97R14SqlLiteral(title) + ",",
+2328-    "    " + aiwB6R97R14SqlLiteral(summary) + ",",
+2329:    "    'AIWorkerOS consumer generated deliverable, summary, and zip link.',",
+2330:    "    'AIWorkerOS consumer completed deliverable generation.',",
+2331-    "    '',",
+2332-    "    " + aiwB6R97R14SqlLiteral(link) + ",",
+2333-    "    'AIWorkerOS',",
+2334-    "    'AICompanyManager',",
+2335-    "    'pending',",
+2336-    "    coalesce(" + aiwB6R97R14SqlLiteral(row.priority_code || "") + ", 'normal'),",
+2337-    "    jsonb_build_object(",
+2338-    "      'source_route_code', " + aiwB6R97R14SqlLiteral(sourceRouteCode) + ",",
+
+============================================================
+CONTEXT PATTERN=output
+============================================================
+320-
+321-  return {
+322-    contract_version: "requester_deliverable_v1",
+323-    deliverable_title: title,
+324-    deliverable_kind: role === "president" ? "policy_proposal" : role === "manager" ? "major_breakdown" : role === "leader" ? "task_decomposition" : "document",
+325-    body_format: "markdown",
+326-    body_markdown: body,
+327-    summary_text: role + " role produced a stable minimum deliverable.",
+328:    limitations_text: "Performance differences are controlled by CX reference permission and capability profile. Low performance still returns stable output.",
+329-    unresolved_issues_text: instruction ? "" : "Task instruction is missing or insufficient.",
+330-    next_steps_text: "Review the deliverable and provide additional constraints if deeper specialty or originality is required.",
+331-    minimum_guarantee_status: body ? "satisfied" : "blocking_report",
+332-    performance_profile: {
+333-      capability_tier: tier,
+334-      stability_level: referenceProfile.stability_level,
+335-      originality_level: referenceProfile.originality_level,
+336-      specialty_level: referenceProfile.specialty_level,
+--
+484-*/
+485-function aiwB6R44gR4PlainObject(value) {
+486-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+487-}
+488-
+489-function aiwB6R44gR4LooksRuntimeRow(row) {
+490-  if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+491-  if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+492:  if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+493-  if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+494-  return false;
+495-}
+496-
+497-function aiwB6R44gR4ExposeSourceRouteRow(row) {
+498-  if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+499-
+500-  const out = aiwB6R44fExposeSourceRouteOnRow(row);
+--
+830-    source_route_code: routeCode,
+831-    robot_trait_basis: "model_code / role_layer_code / series_code / capability_profile_code are carried as generation basis; deeper trait resolution belongs to AIWorkerOS robot profile logic.",
+832-    cx_depth_basis: cxDepthCode,
+833-    cx_breadth_basis: cxBreadthCode,
+834-    cx_reference_boundary: "CX22073JW is robot brain/reference data. Access-control remains AIWorkerOS-side, not requester-app-side.",
+835-    safety_boundary: "internal_only_no_external_execution_no_pg_apply_no_destructive_action"
+836-  };
+837-
+838:  const outputTitle = `${taskTitle} 成果物`;
+839-  const deliverablePackage = aiwB6R95R3D1BuildZipPackageMeta(requesterAppRef, taskTitle);
+840-  const summaryText = aiwB6R95R3R3Clip(
+841-    `AIWorkerOSが${modelCode}を成果物生成主体として、${taskTitle}の一次成果物と一次サマリを作成しました。依頼元アプリはこのsummary_textとdeliverable_ref/linkを保存してレビューに利用できます。`,
+842-    700
+843-  );
+844-
+845-  const qualityNotes = aiwB6R95R3R3Lines([
+846-    "AIWorkerOS側で生成した一次成果物です。",
+--
+903-    "- destructive_action_performed_flag=false",
+904-    "- CX22073JW brain access control is AIWorkerOS-side responsibility",
+905-    ""
+906-  ]);
+907-
+908-  const generatedArtifacts = [
+909-    {
+910-      kind: "main_deliverable",
+911:      title: outputTitle,
+912-      file_name: "01_main_deliverable.md",
+913-      body_markdown: bodyMarkdown
+914-    },
+915-    {
+916-      kind: "quality_notes",
+917-      title: "品質メモ",
+918-      file_name: "90_quality_notes.md",
+919-      body_markdown: qualityNotes
+--
+926-    },
+927-    {
+928-      kind: "next_steps",
+929-      title: "次工程",
+930-      file_name: "92_next_steps.md",
+931-      body_markdown: nextSteps
+932-    }
+933-  ];
+934:  const outputPayload = {
+935-    contract_version: "B6R95R3B-R3",
+936-    contract_name: "aiworkeros_common_requester_deliverable_contract",
+937-    deliverable_kind: "document",
+938-    body_format: "markdown",
+939-    deliverable_package: deliverablePackage,
+940-    deliverable_link: deliverablePackage.zip_link,
+941-    generated_artifacts: generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index)),
+942-    requester_app_ref: requesterAppRef,
+--
+951-    external_execution_performed_flag: false,
+952-    pg_apply_performed_flag: false,
+953-    destructive_action_performed_flag: false
+954-  };
+955-
+956-  const artifacts = [
+957-    {
+958-      artifact_kind_code: "markdown",
+959:      artifact_title_ja: outputTitle,
+960-      body_format: "markdown",
+961-      deliverable_package: deliverablePackage,
+962-      deliverable_link: deliverablePackage.zip_link,
+963-      generated_artifacts: generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index)),
+964-      body_markdown: bodyMarkdown,
+965-      summary_text: summaryText,
+966-      quality_notes: qualityNotes,
+967-      unresolved_issues: unresolvedIssues,
+968-      next_steps: nextSteps,
+969-      robot_context: robotContext,
+970-      generation_basis: generationBasis,
+971-      contract_version: "B6R95R3B-R3"
+972-    }
+973-  ];
+974-
+975-  return {
+976:    outputTitle,
+977-    bodyMarkdown,
+978-    summaryText,
+979-    qualityNotes,
+980-    unresolvedIssues,
+981-    nextSteps,
+982-    robotContext,
+983-    generationBasis,
+984-    deliverablePackage,
+985-    generatedArtifacts,
+986:    outputPayload,
+987-    artifacts
+988-  };
+989-}
+990-
+991-/* B6R95R3Z_R24_CX_MATERIAL_BODY_GENERATION_PATCH_START */
+992-function aiwB6R95R3Z24Text(value) {
+993-  if (value == null) return "";
+994-  if (typeof value === "string") return value;
+--
+1394-  const provided = Array.isArray(deliverable?.generatedArtifacts) ? deliverable.generatedArtifacts : [];
+1395-  if (provided.length > 0) {
+1396-    return provided.map(aiwB6R95R3D1NormalizeGeneratedArtifact);
+1397-  }
+1398-
+1399-  const artifacts = [
+1400-    {
+1401-      kind: "main_deliverable",
+1402:      title: deliverable?.outputTitle || "主成果物",
+1403-      file_name: "01_main_deliverable.md",
+1404-      body_markdown: deliverable?.bodyMarkdown || ""
+1405-    }
+1406-  ];
+1407-
+1408-  if (aiwB6R95R3R3Text(deliverable?.qualityNotes)) {
+1409-    artifacts.push({
+1410-      kind: "quality_notes",
+--
+1551-  });
+1552-
+1553-  const summaryText = response.deliverable?.summary_text || deliverable?.summaryText || "";
+1554-  const manifest = {
+1555-    contract_version: "B6R95R3D-R1",
+1556-    contract_name: "aiworkeros_common_requester_multi_artifact_zip_contract",
+1557-    package_purpose: "bundle_generated_artifacts_for_single_download",
+1558-    request_id: response.request_id || null,
+1559:    output_id: response.output_id || null,
+1560:    deliverable_title: response.deliverable?.title || deliverable?.outputTitle || "成果物",
+1561-    summary_text: summaryText,
+1562-    artifact_count: generatedArtifacts.length,
+1563-    generated_artifacts: generatedArtifacts.map((artifact) => ({
+1564-      artifact_no: artifact.artifact_no,
+1565-      artifact_kind_code: artifact.artifact_kind_code,
+1566-      title: artifact.title,
+1567-      file_name: artifact.file_name,
+1568-      body_format: artifact.body_format
+--
+1665-    "    :'task_instruction_ja',",
+1666-    "    :'source_app_ref',",
+1667-    "    :'source_request_ref',",
+1668-    "    :'requested_by_ref',",
+1669-    "    :'idempotency_key',",
+1670-    "    :'source_route_code'",
+1671-    "  ) as request_id",
+1672-    "),",
+1673:    "worker_output as (",
+1674:    "  select aiworker.fn_runtime_execution_submit_worker_output(",
+1675-    "    (select request_id from created),",
+1676:    "    :'output_title_ja',",
+1677:    "    :'output_body_ja',",
+1678:    "    :'output_summary_ja',",
+1679:    "    :'output_payload_jsonb'::jsonb,",
+1680-    "    :'artifacts_jsonb'::jsonb",
+1681:    "  ) as output_id",
+1682-    "),",
+1683-    "board as (",
+1684-    "  select p.*",
+1685-    "  from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p",
+1686-    "  join created c",
+1687-    "    on c.request_id = p.request_id",
+1688-    ")",
+1689-    "select jsonb_build_object(",
+1690-    "  'result', 'completed_internal_draft',",
+1691-    "  'status', 'WORKER_OUTPUT_DONE',",
+1692-    "  'request_id', (select request_id from created),",
+1693:    "  'output_id', (select output_id from worker_output),",
+1694-    "  'idempotency_key', :'idempotency_key',",
+1695-    "  'requester_app_ref', :'source_app_ref',",
+1696-    "  'source_request_ref', :'source_request_ref',",
+1697-    "  'source_route_code', :'source_route_code',",
+1698-    "  'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),",
+1699-    "  'robot_context', :'robot_context_jsonb'::jsonb,",
+1700-    "  'generation_basis', :'generation_basis_jsonb'::jsonb,",    "  'deliverable', jsonb_build_object(",
+1701-    "    'package_kind', 'delivery_package',",
+1702-    "    'deliverable_kind', 'document',",
+1703:    "    'title', :'output_title_ja',",
+1704-    "    'body_format', 'markdown',",
+1705-    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1706-    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+1707:    "    'body_markdown', :'output_body_ja',",
+1708:    "    'summary_text', :'output_summary_ja',",
+1709-    "    'quality_notes', :'quality_notes',",
+1710-    "    'unresolved_issues', :'unresolved_issues',",
+1711-    "    'next_steps', :'next_steps',",
+1712:    "    'output_id', (select output_id from worker_output),",
+1713-    "    'zip_link', :'deliverable_zip_link'",
+1714-    "  ),",
+1715-    "  'deliverable_ref', jsonb_build_object(",
+1716-    "    'source', 'aiworkeros',",
+1717-    "    'schema', 'aiworker',",
+1718:    "    'table', 'runtime_worker_output',",
+1719:    "    'id', (select output_id from worker_output)::text",
+1720-    "  ),",
+1721-    "  'deliverable_link', :'deliverable_zip_link',",    "  'requester_delivery_payload', jsonb_build_object(",
+1722:    "    'summary_text', :'output_summary_ja',",
+1723:    "    'deliverable_title', :'output_title_ja',",
+1724-    "    'package_kind', 'delivery_package',",
+1725-    "    'deliverable_kind', 'document',",
+1726-    "    'body_format', 'markdown',",
+1727-    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+1728-    "    'deliverable_link', :'deliverable_zip_link',",
+1729-    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1730-    "    'deliverable_ref', jsonb_build_object(",
+1731-    "      'source', 'aiworkeros',",
+1732-    "      'schema', 'aiworker',",
+1733:    "      'table', 'runtime_worker_output',",
+1734:    "      'id', (select output_id from worker_output)::text",
+1735-    "    )",
+1736-    "  ),",
+1737-    "  'safety', jsonb_build_object(",
+1738-    "    'external_execution_performed_flag', false,",
+1739-    "    'pg_apply_performed_flag', false,",
+1740-    "    'destructive_action_performed_flag', false",
+1741-    "  )",
+1742-    ")::text;",
+--
+1748-    task_domain_code: payload.task_domain_code,
+1749-    task_title: payload.task_title,
+1750-    task_instruction_ja: payload.task_instruction_ja,
+1751-    source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+1752-    source_request_ref: payload.source_request_ref || "",
+1753-    source_route_code: sourceRouteCode,
+1754-    requested_by_ref: payload.requested_by_ref || "human",
+1755-    idempotency_key: idempotencyKey,
+1756:    output_title_ja: deliverable.outputTitle,
+1757:    output_body_ja: deliverable.bodyMarkdown,
+1758:    output_summary_ja: deliverable.summaryText,
+1759-    quality_notes: deliverable.qualityNotes,
+1760-    unresolved_issues: deliverable.unresolvedIssues,
+1761-    next_steps: deliverable.nextSteps,
+1762-    deliverable_package_jsonb: JSON.stringify(deliverable.deliverablePackage),
+1763-    deliverable_zip_link: deliverable.deliverablePackage.zip_link,
+1764-    generated_artifacts_jsonb: JSON.stringify(deliverable.generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index))),
+1765-    robot_context_jsonb: JSON.stringify(deliverable.robotContext),
+1766-    generation_basis_jsonb: JSON.stringify(deliverable.generationBasis),
+1767:    output_payload_jsonb: JSON.stringify(deliverable.outputPayload),
+1768-    artifacts_jsonb: JSON.stringify(deliverable.artifacts)
+1769-  });
+1770-
+1771-  return aiwB6R95R3D1CreateZipAndAttach(responsePayload, deliverable);
+1772-}
+1773-
+1774-const server = http.createServer(async (req, res) => {
+1775-  const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+--
+1896-  console.log(`AIWorkerOS runtime execution HTTP API listening on http://127.0.0.1:${port}`);
+1897-});
+1898-
+1899-
+1900-// AIW_B6R97R14_QUEUE_CONSUMER_START
+1901-// AIWorkerOS-owned queue consumer.
+1902-// AICM does not trigger execution here.
+1903-// This consumer scans waiting/retryable work, claims it, calls existing createRuntimeRequest,
+1904:// records AIWorkerOS request/output metadata, and creates/updates AICM human review rows.
+1905-const childProcessB6R97R14 = require("node:child_process");
+1906-
+1907-function aiwB6R97R14DbUrl() {
+1908-  return process.env.PERSONA_DATABASE_URL || process.env.DATABASE_URL || "";
+1909-}
+1910-
+1911-function aiwB6R97R14SqlLiteral(value) {
+1912-  return "'" + String(value == null ? "" : value).replace(/'/g, "''") + "'";
+--
+2027-    (result && result.runtime_request_id) ||
+2028-    (result && result.data && result.data.request_id) ||
+2029-    ""
+2030-  );
+2031-}
+2032-
+2033-function aiwB6R97R14OutputId(result) {
+2034-  return String(
+2035:    (result && result.output_id) ||
+2036-    (result && result.deliverable_ref && result.deliverable_ref.id) ||
+2037-    (result && result.requester_delivery_payload && result.requester_delivery_payload.deliverable_ref && result.requester_delivery_payload.deliverable_ref.id) ||
+2038-    ""
+2039-  );
+2040-}
+2041-
+2042-function aiwB6R97R14Summary(result) {
+2043-  return String(
+--
+2107-    "      and c.conname = 'chk_aicm_human_review_artifact_kind'",
+2108-    "      and pg_get_constraintdef(c.oid) like '%' || " + aiwB6R97R14SqlLiteral(artifactKind) + " || '%'",
+2109-    "  )",
+2110-    "), target as (",
+2111-    "  select u.*",
+2112-    "  from business.aicm_worker_work_unit u",
+2113-    "  where coalesce(u.metadata_jsonb->>'aiworkeros_claimed_by','') = 'AIWorkerOS/B6R97R14'",
+2114-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_request_id','') <> ''",
+2115:    "    and coalesce(u.metadata_jsonb->>'aiworkeros_output_id','') <> ''",
+2116-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_deliverable_link','') <> ''",
+2117-    "    and coalesce(u.metadata_jsonb->>'aiworkeros_consumer_claim_state','') in ('failed','review_registration_failed')",
+2118-    "  order by u.updated_at asc nulls last",
+2119-    "  limit " + safeLimit,
+2120-    "), updated_unit as (",
+2121-    "  update business.aicm_worker_work_unit u",
+2122-    "  set",
+2123-    "    work_status_code = 'review_waiting',",
+--
+2147-    "    review_title = coalesce(nullif(h.review_title,''), '納品サマリー確認: ' || coalesce(u.work_unit_name, 'AIWorkerOS成果物')),",
+2148-    "    delivery_summary_text = coalesce(nullif(h.delivery_summary_text,''), 'AIWorkerOS consumer generated deliverable, summary, and delivery package.'),",
+2149-    "    main_changes_text = coalesce(nullif(h.main_changes_text,''), 'AIWorkerOS consumer generated deliverable, summary, and zip link.'),",
+2150-    "    ai_review_result_text = coalesce(nullif(h.ai_review_result_text,''), 'AIWorkerOS consumer completed deliverable generation.'),",
+2151-    "    artifact_link = coalesce(nullif(h.artifact_link,''), u.metadata_jsonb->>'aiworkeros_deliverable_link'),",
+2152-    "    metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2153-    "      'source_route_code', coalesce(u.metadata_jsonb->>'source_route_code', 'aicm_worker_work_unit'),",
+2154-    "      'aiworkeros_request_id', u.metadata_jsonb->>'aiworkeros_request_id',",
+2155:    "      'aiworkeros_output_id', u.metadata_jsonb->>'aiworkeros_output_id',",
+2156-    "      'artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+2157-    "      'consumer_code', 'B6R97R19C'",
+2158-    "    ),",
+2159-    "    updated_at = now()",
+2160-    "  from updated_unit u",
+2161-    "  where h.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+2162-    "    and h.aicm_human_review_item_id in (select aicm_human_review_item_id from existing_review)",
+2163-    "  returning h.aicm_human_review_item_id",
+--
+2200-    "    u.metadata_jsonb->>'aiworkeros_deliverable_link',",
+2201-    "    'AIWorkerOS',",
+2202-    "    'AICompanyManager',",
+2203-    "    'pending',",
+2204-    "    coalesce(nullif(u.priority_code,''), 'normal'),",
+2205-    "    jsonb_build_object(",
+2206-    "      'source_route_code', coalesce(u.metadata_jsonb->>'source_route_code', 'aicm_worker_work_unit'),",
+2207-    "      'aiworkeros_request_id', u.metadata_jsonb->>'aiworkeros_request_id',",
+2208:    "      'aiworkeros_output_id', u.metadata_jsonb->>'aiworkeros_output_id',",
+2209-    "      'artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+2210-    "      'consumer_code', 'B6R97R19C'",
+2211-    "    )",
+2212-    "  from updated_unit u",
+2213-    "  where not exists (",
+2214-    "    select 1",
+2215-    "    from existing_review er",
+2216-    "    where er.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+--
+2227-function aiwB6R97R14RecordSuccess(row, result, payload) {
+2228-  const workUnitId = String(row.aicm_worker_work_unit_id || "");
+2229-  if (!aiwB6R97R14IsUuid(workUnitId)) {
+2230-    throw new Error("invalid work unit id for AIWorkerOS consumer success");
+2231-  }
+2232-
+2233-  const meta = row && row.metadata_jsonb && typeof row.metadata_jsonb === "object" ? row.metadata_jsonb : {};
+2234-  const requestId = aiwB6R97R14RequestId(result);
+2235:  const outputId = aiwB6R97R14OutputId(result);
+2236-  const summary = aiwB6R97R14Summary(result);
+2237-  const link = aiwB6R97R14DeliverableLink(result);
+2238-  const sourceRouteCode = String(meta.source_route_code || payload.source_route_code || "aicm_worker_work_unit");
+2239-  const title = String(payload.task_title || "AIWorkerOS成果物レビュー");
+2240-
+2241-  const ownerExpr = aiwB6R97R14UuidOrNull(row.owner_civilization_id || "00000000-0000-4000-8000-000000000001");
+2242-  const companyExpr = aiwB6R97R14UuidOrNull(row.aicm_user_company_id || row.company_id || "");
+2243-  const deptExpr = aiwB6R97R14UuidOrNull(row.aicm_user_company_department_id || "");
+--
+2245-  const majorExpr = aiwB6R97R14UuidOrNull(row.related_manager_major_work_item_id || row.aicm_manager_major_work_item_id || "");
+2246-
+2247-  // AIW_B6R97R16_E2BIG_COMPACT_RESULT_PATCH
+2248-  // Do not embed the full AIWorkerOS result JSON into psql -c SQL.
+2249-  // Full result payload can exceed OS argv limits and cause spawnSync psql E2BIG.
+2250-  const compactResultJson = JSON.stringify({
+2251-    result: result && result.result ? result.result : "",
+2252-    request_id: requestId,
+2253:    output_id: outputId,
+2254-    summary_present: Boolean(summary),
+2255-    deliverable_link: link,
+2256-    consumer_code: "B6R97R16"
+2257-  });
+2258-
+2259-  const sql = [
+2260-    "update business.aicm_worker_work_unit",
+2261-    "set work_status_code = 'review_waiting',",
+2262-    "    review_status_code = 'waiting',",
+2263-    "    metadata_jsonb = coalesce(metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2264-    "      'aiworkeros_execution_state', 'completed',",
+2265-    "      'aiworkeros_retryable', 'false',",
+2266-    "      'aiworkeros_consumer_claim_state', 'completed',",
+2267-    "      'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+2268:    "      'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+2269-    "      'aiworkeros_deliverable_link', " + aiwB6R97R14SqlLiteral(link) + ",",
+2270-    "      'aiworkeros_completed_at', now()::text",
+2271-    "    ),",
+2272-    "    updated_at = now()",
+2273-    "where aicm_worker_work_unit_id = " + aiwB6R97R14UuidOrNull(workUnitId) + ";",
+2274-    "",
+2275-    "with existing as (",
+2276-    "  select aicm_human_review_item_id",
+--
+2282-    "  update business.aicm_human_review_item h",
+2283-    "  set review_title = " + aiwB6R97R14SqlLiteral(title) + ",",
+2284-    "      delivery_summary_text = " + aiwB6R97R14SqlLiteral(summary) + ",",
+2285-    "      artifact_link = " + aiwB6R97R14SqlLiteral(link) + ",",
+2286-    "      ai_review_result_text = 'AIWorkerOS consumer completed deliverable generation.',",
+2287-    "      metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2288-    "        'source_route_code', " + aiwB6R97R14SqlLiteral(sourceRouteCode) + ",",
+2289-    "        'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+2290:    "        'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+2291-    "        'aiworkeros_result_compact', " + aiwB6R97R14SqlLiteral(compactResultJson) + "::jsonb",
+2292-    "      ),",
+2293-    "      updated_at = now()",
+2294-    "  where h.aicm_human_review_item_id in (select aicm_human_review_item_id from existing)",
+2295-    "  returning h.aicm_human_review_item_id",
+2296-    "), inserted as (",
+2297-    "  insert into business.aicm_human_review_item (",
+2298-    "    owner_civilization_id,",
+--
+2332-    "    " + aiwB6R97R14SqlLiteral(link) + ",",
+2333-    "    'AIWorkerOS',",
+2334-    "    'AICompanyManager',",
+2335-    "    'pending',",
+2336-    "    coalesce(" + aiwB6R97R14SqlLiteral(row.priority_code || "") + ", 'normal'),",
+2337-    "    jsonb_build_object(",
+2338-    "      'source_route_code', " + aiwB6R97R14SqlLiteral(sourceRouteCode) + ",",
+2339-    "      'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+2340:    "      'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+2341-    "      'aiworkeros_result_compact', " + aiwB6R97R14SqlLiteral(compactResultJson) + "::jsonb,",
+2342-    "      'consumer_code', 'B6R97R14'",
+2343-    "    )",
+2344-    "  where not exists (select 1 from existing)",
+2345-    "  returning aicm_human_review_item_id",
+2346-    ")",
+2347-    "select coalesce((select aicm_human_review_item_id::text from updated limit 1), (select aicm_human_review_item_id::text from inserted limit 1), '') as review_id;"
+2348-  ].join("\n");
+
+============================================================
+CONTEXT PATTERN=output_markdown
+============================================================
+
+============================================================
+CONTEXT PATTERN=body_markdown
+============================================================
+318-  const referenceProfile = aiwB6R96R1G2ReferenceProfile(tier);
+319-  const body = aiwB6R96R1G2BuildBody(role, title, instruction, referenceProfile);
+320-
+321-  return {
+322-    contract_version: "requester_deliverable_v1",
+323-    deliverable_title: title,
+324-    deliverable_kind: role === "president" ? "policy_proposal" : role === "manager" ? "major_breakdown" : role === "leader" ? "task_decomposition" : "document",
+325-    body_format: "markdown",
+326:    body_markdown: body,
+327-    summary_text: role + " role produced a stable minimum deliverable.",
+328-    limitations_text: "Performance differences are controlled by CX reference permission and capability profile. Low performance still returns stable output.",
+329-    unresolved_issues_text: instruction ? "" : "Task instruction is missing or insufficient.",
+330-    next_steps_text: "Review the deliverable and provide additional constraints if deeper specialty or originality is required.",
+331-    minimum_guarantee_status: body ? "satisfied" : "blocking_report",
+332-    performance_profile: {
+333-      capability_tier: tier,
+334-      stability_level: referenceProfile.stability_level,
+--
+346-    }
+347-  };
+348-}
+349-
+350-function aiwB6R96R1G2EnsureRequesterDeliveryPayload(payload) {
+351-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+352-
+353-  const current = aiwB6R96R1G2Object(payload.requester_delivery_payload);
+354:  if (aiwB6R96R1G2Text(current.body_markdown) || aiwB6R96R1G2Text(current.body_text)) {
+355-    return payload;
+356-  }
+357-
+358-  if (!aiwB6R96R1G2LooksRuntimePayload(payload)) return payload;
+359-
+360-  payload.requester_delivery_payload = aiwB6R96R1G2BuildRequesterDeliveryPayload(payload);
+361-  payload.deliverable = payload.requester_delivery_payload;
+362-  return payload;
+--
+905-    ""
+906-  ]);
+907-
+908-  const generatedArtifacts = [
+909-    {
+910-      kind: "main_deliverable",
+911-      title: outputTitle,
+912-      file_name: "01_main_deliverable.md",
+913:      body_markdown: bodyMarkdown
+914-    },
+915-    {
+916-      kind: "quality_notes",
+917-      title: "品質メモ",
+918-      file_name: "90_quality_notes.md",
+919:      body_markdown: qualityNotes
+920-    },
+921-    {
+922-      kind: "unresolved_issues",
+923-      title: "未解決事項",
+924-      file_name: "91_unresolved_issues.md",
+925:      body_markdown: unresolvedIssues
+926-    },
+927-    {
+928-      kind: "next_steps",
+929-      title: "次工程",
+930-      file_name: "92_next_steps.md",
+931:      body_markdown: nextSteps
+932-    }
+933-  ];
+934-  const outputPayload = {
+935-    contract_version: "B6R95R3B-R3",
+936-    contract_name: "aiworkeros_common_requester_deliverable_contract",
+937-    deliverable_kind: "document",
+938-    body_format: "markdown",
+939-    deliverable_package: deliverablePackage,
+--
+956-  const artifacts = [
+957-    {
+958-      artifact_kind_code: "markdown",
+959-      artifact_title_ja: outputTitle,
+960-      body_format: "markdown",
+961-      deliverable_package: deliverablePackage,
+962-      deliverable_link: deliverablePackage.zip_link,
+963-      generated_artifacts: generatedArtifacts.map((artifact, index) => aiwB6R95R3D1NormalizeGeneratedArtifact(artifact, index)),
+964:      body_markdown: bodyMarkdown,
+965-      summary_text: summaryText,
+966-      quality_notes: qualityNotes,
+967-      unresolved_issues: unresolvedIssues,
+968-      next_steps: nextSteps,
+969-      robot_context: robotContext,
+970-      generation_basis: generationBasis,
+971-      contract_version: "B6R95R3B-R3"
+972-    }
+--
+1260-  blocks.push("## 7. 次工程");
+1261-  blocks.push("依頼元アプリは summary_text と deliverable_link を保存し、必要に応じて追加条件を指定して再生成できます。");
+1262-
+1263-  return blocks.join("\n");
+1264-}
+1265-
+1266-function aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(deliverable, payload, sourceRouteCode) {
+1267-  const safeDeliverable = deliverable || {};
+1268:  const originalBody = aiwB6R95R3Z24Text(safeDeliverable.bodyMarkdown || safeDeliverable.body_markdown || "");
+1269-  const instruction = aiwB6R95R3Z24Instruction(payload);
+1270-  const normalizedBody = originalBody.replace(/\s+/g, "");
+1271-  const normalizedInstruction = instruction.replace(/\s+/g, "");
+1272-  const echoRisk = normalizedInstruction && normalizedBody.includes(normalizedInstruction.slice(0, Math.min(120, normalizedInstruction.length)));
+1273-
+1274-  const rows = aiwB6R95R3Z24FetchCxRuntimeMaterials(payload);
+1275-
+1276-  if (!rows.length) {
+--
+1370-    }
+1371-  };
+1372-}
+1373-
+1374-function aiwB6R95R3D1NormalizeGeneratedArtifact(item, index) {
+1375-  const seq = String(index + 1).padStart(2, "0");
+1376-  const kind = aiwB6R95R3R3OneLine(item?.artifact_kind_code || item?.kind || "document", "document");
+1377-  const title = aiwB6R95R3R3OneLine(item?.title || item?.artifact_title_ja || `成果物${seq}`, `成果物${seq}`);
+1378:  const body = aiwB6R95R3R3Text(item?.body_markdown || item?.body_text || item?.content || "");
+1379-  const suggestedName = item?.file_name || `${seq}_${aiwB6R95R3D1SafeFilePart(title, `artifact_${seq}`)}.md`;
+1380-  const fileName = aiwB6R95R3D1SafeFilePart(suggestedName, `artifact_${seq}.md`).endsWith(".md")
+1381-    ? aiwB6R95R3D1SafeFilePart(suggestedName, `artifact_${seq}.md`)
+1382-    : `${aiwB6R95R3D1SafeFilePart(suggestedName, `artifact_${seq}`)}.md`;
+1383-  return {
+1384-    artifact_no: index + 1,
+1385-    artifact_kind_code: kind,
+1386-    title,
+1387-    file_name: fileName,
+1388:    body_markdown: body,
+1389-    body_format: "markdown"
+1390-  };
+1391-}
+1392-
+1393-function aiwB6R95R3D1BuildGeneratedArtifacts(deliverable) {
+1394-  const provided = Array.isArray(deliverable?.generatedArtifacts) ? deliverable.generatedArtifacts : [];
+1395-  if (provided.length > 0) {
+1396-    return provided.map(aiwB6R95R3D1NormalizeGeneratedArtifact);
+1397-  }
+1398-
+1399-  const artifacts = [
+1400-    {
+1401-      kind: "main_deliverable",
+1402-      title: deliverable?.outputTitle || "主成果物",
+1403-      file_name: "01_main_deliverable.md",
+1404:      body_markdown: deliverable?.bodyMarkdown || ""
+1405-    }
+1406-  ];
+1407-
+1408-  if (aiwB6R95R3R3Text(deliverable?.qualityNotes)) {
+1409-    artifacts.push({
+1410-      kind: "quality_notes",
+1411-      title: "品質メモ",
+1412-      file_name: "90_quality_notes.md",
+1413:      body_markdown: deliverable.qualityNotes
+1414-    });
+1415-  }
+1416-
+1417-  if (aiwB6R95R3R3Text(deliverable?.unresolvedIssues)) {
+1418-    artifacts.push({
+1419-      kind: "unresolved_issues",
+1420-      title: "未解決事項",
+1421-      file_name: "91_unresolved_issues.md",
+1422:      body_markdown: deliverable.unresolvedIssues
+1423-    });
+1424-  }
+1425-
+1426-  if (aiwB6R95R3R3Text(deliverable?.nextSteps)) {
+1427-    artifacts.push({
+1428-      kind: "next_steps",
+1429-      title: "次工程",
+1430-      file_name: "92_next_steps.md",
+1431:      body_markdown: deliverable.nextSteps
+1432-    });
+1433-  }
+1434-
+1435-  return artifacts.map(aiwB6R95R3D1NormalizeGeneratedArtifact);
+1436-}
+1437-
+1438-function aiwB6R95R3D1ZipCrc32(buffer) {
+1439-  let table = aiwB6R95R3D1ZipCrc32._table;
+--
+1573-    safety: response.safety || null,
+1574-    created_at: new Date().toISOString()
+1575-  };
+1576-
+1577-  const entries = [
+1578-    { name: "00_summary.md", content: summaryText },
+1579-    ...generatedArtifacts.map((artifact) => ({
+1580-      name: artifact.file_name,
+1581:      content: artifact.body_markdown
+1582-    })),
+1583-    { name: "manifest.json", content: JSON.stringify(manifest, null, 2) }
+1584-  ];
+1585-
+1586-  const zipBuffer = aiwB6R95R3D1ZipStored(entries);
+1587-  fs.writeFileSync(zipPath, zipBuffer);
+1588-  const stat = fs.statSync(zipPath);
+1589-
+--
+1699-    "  'robot_context', :'robot_context_jsonb'::jsonb,",
+1700-    "  'generation_basis', :'generation_basis_jsonb'::jsonb,",    "  'deliverable', jsonb_build_object(",
+1701-    "    'package_kind', 'delivery_package',",
+1702-    "    'deliverable_kind', 'document',",
+1703-    "    'title', :'output_title_ja',",
+1704-    "    'body_format', 'markdown',",
+1705-    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1706-    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+1707:    "    'body_markdown', :'output_body_ja',",
+1708-    "    'summary_text', :'output_summary_ja',",
+1709-    "    'quality_notes', :'quality_notes',",
+1710-    "    'unresolved_issues', :'unresolved_issues',",
+1711-    "    'next_steps', :'next_steps',",
+1712-    "    'output_id', (select output_id from worker_output),",
+1713-    "    'zip_link', :'deliverable_zip_link'",
+1714-    "  ),",
+1715-    "  'deliverable_ref', jsonb_build_object(",
+
+============================================================
+CONTEXT PATTERN=body_text
+============================================================
+346-    }
+347-  };
+348-}
+349-
+350-function aiwB6R96R1G2EnsureRequesterDeliveryPayload(payload) {
+351-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+352-
+353-  const current = aiwB6R96R1G2Object(payload.requester_delivery_payload);
+354:  if (aiwB6R96R1G2Text(current.body_markdown) || aiwB6R96R1G2Text(current.body_text)) {
+355-    return payload;
+356-  }
+357-
+358-  if (!aiwB6R96R1G2LooksRuntimePayload(payload)) return payload;
+359-
+360-  payload.requester_delivery_payload = aiwB6R96R1G2BuildRequesterDeliveryPayload(payload);
+361-  payload.deliverable = payload.requester_delivery_payload;
+362-  return payload;
+--
+1370-    }
+1371-  };
+1372-}
+1373-
+1374-function aiwB6R95R3D1NormalizeGeneratedArtifact(item, index) {
+1375-  const seq = String(index + 1).padStart(2, "0");
+1376-  const kind = aiwB6R95R3R3OneLine(item?.artifact_kind_code || item?.kind || "document", "document");
+1377-  const title = aiwB6R95R3R3OneLine(item?.title || item?.artifact_title_ja || `成果物${seq}`, `成果物${seq}`);
+1378:  const body = aiwB6R95R3R3Text(item?.body_markdown || item?.body_text || item?.content || "");
+1379-  const suggestedName = item?.file_name || `${seq}_${aiwB6R95R3D1SafeFilePart(title, `artifact_${seq}`)}.md`;
+1380-  const fileName = aiwB6R95R3D1SafeFilePart(suggestedName, `artifact_${seq}.md`).endsWith(".md")
+1381-    ? aiwB6R95R3D1SafeFilePart(suggestedName, `artifact_${seq}.md`)
+1382-    : `${aiwB6R95R3D1SafeFilePart(suggestedName, `artifact_${seq}`)}.md`;
+1383-  return {
+1384-    artifact_no: index + 1,
+1385-    artifact_kind_code: kind,
+1386-    title,
+
+============================================================
+CONTEXT PATTERN=final_output
+============================================================
+
+============================================================
+CONTEXT PATTERN=produced_content
+============================================================
+
+============================================================
+CONTEXT PATTERN=result_payload
+============================================================
+
+============================================================
+CONTEXT PATTERN=response_payload
+============================================================
+
+============================================================
+CONTEXT PATTERN=app_read_payload
+============================================================
+35-    if (text) return text;
+36-  }
+37-  return "";
+38-}
+39-
+40-function aiwB6R96R1G2FindAppPayload(payload) {
+41-  payload = aiwB6R96R1G2Object(payload);
+42-  return aiwB6R96R1G2Object(
+43:    payload.app_read_payload_jsonb ||
+44:    payload.app_read_payload ||
+45-    payload.request_payload_jsonb ||
+46-    payload.request_payload ||
+47-    payload.payload ||
+48-    payload.body ||
+49-    {}
+50-  );
+51-}
+52-
+--
+66-    payload.request_id ||
+67-    payload.runtime_request_id ||
+68-    payload.idempotency_key ||
+69-    payload.app_surface_code ||
+70-    payload.model_code ||
+71-    payload.task_domain_code ||
+72-    payload.task_title ||
+73-    payload.task_instruction_ja ||
+74:    payload.app_read_payload_jsonb ||
+75-    appPayload.task_title ||
+76-    appPayload.task_instruction_ja ||
+77-    appPayload.source_request_ref ||
+78-    /REQUESTED|ACCEPTED|accepted|ok/i.test(statusText)
+79-  );
+80-}
+81-
+82-function aiwB6R96R1G2NormalizeRoleCode(payload, appPayload) {
+--
+369-
+370-function aiwB6R44fText(value) {
+371-  return value == null ? "" : String(value).trim();
+372-}
+373-
+374-function aiwB6R44fExtractSourceRouteMetadata(input) {
+375-  const body = aiwB6R44fPlainObject(input);
+376-  const metadata = aiwB6R44fPlainObject(body.metadata_jsonb);
+377:  const appRead = aiwB6R44fPlainObject(body.app_read_payload_jsonb);
+378-  const source = aiwB6R44fPlainObject(appRead.source);
+379-
+380-  const sourceAppRef = aiwB6R44fText(
+381-    body.source_app_ref ||
+382-    metadata.source_app_ref ||
+383-    source.source_app_ref ||
+384-    body.app_surface_code ||
+385-    "AICompanyManager"
+--
+441-  if (!route.source_route_code) return base;
+442-  return Object.assign({}, base, {
+443-    source: Object.assign({}, aiwB6R44fPlainObject(base.source), route)
+444-  });
+445-}
+446-
+447-function aiwB6R44fExposeSourceRouteOnRow(row) {
+448-  const out = Object.assign({}, aiwB6R44fPlainObject(row));
+449:  const appRead = aiwB6R44fPlainObject(out.app_read_payload_jsonb);
+450-  const source = aiwB6R44fPlainObject(appRead.source);
+451-  const route = aiwB6R44fExtractSourceRouteMetadata(Object.assign({}, out, {
+452-    metadata_jsonb: out.metadata_jsonb,
+453:    app_read_payload_jsonb: aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, body || payload || requestBody || input || {}),
+454-    source_app_ref: out.source_app_ref || source.source_app_ref,
+455-    source_route_code: out.source_route_code || source.source_route_code,
+456-    source_screen_code: out.source_screen_code || source.source_screen_code,
+457-    source_entity_type: out.source_entity_type || source.source_entity_type,
+458-    source_entity_id: out.source_entity_id || source.source_entity_id
+459-  }));
+460-
+461-  if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+462-  if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+463-  if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+464-  if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+465-  if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+466-
+467-  if (route.source_route_code) {
+468:    out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+469-  }
+470-  return out;
+471-}
+472-
+473-function aiwB6R44fExposeSourceRouteOnRows(value) {
+474-  if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+475-  return value;
+476-}
+--
+485-function aiwB6R44gR4PlainObject(value) {
+486-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+487-}
+488-
+489-function aiwB6R44gR4LooksRuntimeRow(row) {
+490-  if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+491-  if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+492-  if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+493:  if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+494-  return false;
+495-}
+496-
+497-function aiwB6R44gR4ExposeSourceRouteRow(row) {
+498-  if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+499-
+500-  const out = aiwB6R44fExposeSourceRouteOnRow(row);
+501:  const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+502-  const source = aiwB6R44gR4PlainObject(appRead.source);
+503-
+504-  if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+505-  if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+506-  if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+507-  if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+508-  if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+509-
+--
+720-  });
+721-}
+722-
+723-function appReadPayload(query) {
+724-  return psqlJson(`
+725-    select coalesce(jsonb_agg(to_jsonb(t) order by request_created_at desc), '[]'::jsonb)::text
+726-    from (
+727-      select p.*, rr.source_route_code
+728:      from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+729-      left join aiworker.runtime_execution_request rr
+730-        on rr.request_id = p.request_id
+731-      where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+732-        and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+733-        and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+734-      order by p.request_created_at desc
+735-      limit :'limit'
+736-    ) t;
+--
+1677-    "    :'output_body_ja',",
+1678-    "    :'output_summary_ja',",
+1679-    "    :'output_payload_jsonb'::jsonb,",
+1680-    "    :'artifacts_jsonb'::jsonb",
+1681-    "  ) as output_id",
+1682-    "),",
+1683-    "board as (",
+1684-    "  select p.*",
+1685:    "  from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p",
+1686-    "  join created c",
+1687-    "    on c.request_id = p.request_id",
+1688-    ")",
+1689-    "select jsonb_build_object(",
+1690-    "  'result', 'completed_internal_draft',",
+1691-    "  'status', 'WORKER_OUTPUT_DONE',",
+1692-    "  'request_id', (select request_id from created),",
+1693-    "  'output_id', (select output_id from worker_output),",
+1694-    "  'idempotency_key', :'idempotency_key',",
+1695-    "  'requester_app_ref', :'source_app_ref',",
+1696-    "  'source_request_ref', :'source_request_ref',",
+1697-    "  'source_route_code', :'source_route_code',",
+1698:    "  'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),",
+1699-    "  'robot_context', :'robot_context_jsonb'::jsonb,",
+1700-    "  'generation_basis', :'generation_basis_jsonb'::jsonb,",    "  'deliverable', jsonb_build_object(",
+1701-    "    'package_kind', 'delivery_package',",
+1702-    "    'deliverable_kind', 'document',",
+1703-    "    'title', :'output_title_ja',",
+1704-    "    'body_format', 'markdown',",
+1705-    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1706-    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+
+============================================================
+CONTEXT PATTERN=delivery
+============================================================
+345-      generated_by: "AIW_B6R96R1G2_MINIMUM_DELIVERABLE_HELPER"
+346-    }
+347-  };
+348-}
+349-
+350-function aiwB6R96R1G2EnsureRequesterDeliveryPayload(payload) {
+351-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+352-
+353:  const current = aiwB6R96R1G2Object(payload.requester_delivery_payload);
+354-  if (aiwB6R96R1G2Text(current.body_markdown) || aiwB6R96R1G2Text(current.body_text)) {
+355-    return payload;
+356-  }
+357-
+358-  if (!aiwB6R96R1G2LooksRuntimePayload(payload)) return payload;
+359-
+360:  payload.requester_delivery_payload = aiwB6R96R1G2BuildRequesterDeliveryPayload(payload);
+361:  payload.deliverable = payload.requester_delivery_payload;
+362-  return payload;
+363-}
+364-// AIW_B6R96R1G2_MINIMUM_DELIVERABLE_HELPER_END
+365-
+366-function aiwB6R44fPlainObject(value) {
+367-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+368-}
+369-
+--
+484-*/
+485-function aiwB6R44gR4PlainObject(value) {
+486-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+487-}
+488-
+489-function aiwB6R44gR4LooksRuntimeRow(row) {
+490-  if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+491-  if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+492:  if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+493-  if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+494-  return false;
+495-}
+496-
+497-function aiwB6R44gR4ExposeSourceRouteRow(row) {
+498-  if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+499-
+500-  const out = aiwB6R44fExposeSourceRouteOnRow(row);
+--
+737-  `, {
+738-    request_id: query.get("request_id") || "",
+739-    request_code: query.get("request_code") || "",
+740-    app_surface_code: query.get("app_surface_code") || "",
+741-    limit: normalizeLimit(query.get("limit"))
+742-  });
+743-}
+744-
+745:function deliveryBoard(query) {
+746-  return psqlJson(`
+747-    select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+748-    from (
+749-      select *
+750:      from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+751-      where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+752-        and (nullif(:'request_code','') is null or request_code = :'request_code')
+753-      order by created_at desc
+754-      limit :'limit'
+755-    ) t;
+756-  `, {
+757-    request_id: query.get("request_id") || "",
+758-    request_code: query.get("request_code") || "",
+--
+1352-  // Therefore file_name / zip_link must already use the exact sanitized filename
+1353-  // that will be written to disk by aiwB6R95R3D1CreateZipAndAttach.
+1354-  const fileName = aiwB6R95R3D1SafeFilePart(rawFileName, "deliverables.zip").endsWith(".zip")
+1355-    ? aiwB6R95R3D1SafeFilePart(rawFileName, "deliverables.zip")
+1356-    : `${aiwB6R95R3D1SafeFilePart(rawFileName, "deliverables")}.zip`;
+1357-  const zipLink = `aiworkeros://runtime-deliverable-zip/${fileName}`;
+1358-
+1359-  return {
+1360:    package_kind: "delivery_package",
+1361-    package_format: "zip",
+1362-    mime_type: "application/zip",
+1363-    zip_id: zipId,
+1364-    file_name: fileName,
+1365-    zip_link: zipLink,
+1366-    zip_ref: {
+1367-      source: "aiworkeros",
+1368-      storage_code: "runtime-deliverable-zip",
+--
+1583-    { name: "manifest.json", content: JSON.stringify(manifest, null, 2) }
+1584-  ];
+1585-
+1586-  const zipBuffer = aiwB6R95R3D1ZipStored(entries);
+1587-  fs.writeFileSync(zipPath, zipBuffer);
+1588-  const stat = fs.statSync(zipPath);
+1589-
+1590-  const zipPublic = {
+1591:    package_kind: "delivery_package",
+1592-    package_format: "zip",
+1593-    mime_type: "application/zip",
+1594-    zip_id: packageMeta.zip_id,
+1595-    file_name: fileName,
+1596-    zip_link: actualZipLink,
+1597-    zip_ref: actualZipRef,
+1598-    byte_size: stat.size,
+1599-    entry_count: entries.length,
+--
+1607-    title: artifact.title,
+1608-    file_name: artifact.file_name,
+1609-    body_format: artifact.body_format
+1610-  }));
+1611-  response.deliverable_package = zipPublic;
+1612-  response.deliverable_zip_ref = actualZipRef;
+1613-  response.deliverable_link = actualZipLink;
+1614-
+1615:  response.requester_delivery_payload = Object.assign({}, response.requester_delivery_payload || {}, {
+1616-    summary_text: summaryText,
+1617-    deliverable_link: actualZipLink,
+1618-    deliverable_package: zipPublic,
+1619-    deliverable_zip_ref: actualZipRef,
+1620-    generated_artifacts: response.generated_artifacts
+1621-  });
+1622-
+1623-  response.deliverable = Object.assign({}, response.deliverable || {}, {
+--
+1693-    "  'output_id', (select output_id from worker_output),",
+1694-    "  'idempotency_key', :'idempotency_key',",
+1695-    "  'requester_app_ref', :'source_app_ref',",
+1696-    "  'source_request_ref', :'source_request_ref',",
+1697-    "  'source_route_code', :'source_route_code',",
+1698-    "  'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),",
+1699-    "  'robot_context', :'robot_context_jsonb'::jsonb,",
+1700-    "  'generation_basis', :'generation_basis_jsonb'::jsonb,",    "  'deliverable', jsonb_build_object(",
+1701:    "    'package_kind', 'delivery_package',",
+1702-    "    'deliverable_kind', 'document',",
+1703-    "    'title', :'output_title_ja',",
+1704-    "    'body_format', 'markdown',",
+1705-    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1706-    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+1707-    "    'body_markdown', :'output_body_ja',",
+1708-    "    'summary_text', :'output_summary_ja',",
+1709-    "    'quality_notes', :'quality_notes',",
+--
+1713-    "    'zip_link', :'deliverable_zip_link'",
+1714-    "  ),",
+1715-    "  'deliverable_ref', jsonb_build_object(",
+1716-    "    'source', 'aiworkeros',",
+1717-    "    'schema', 'aiworker',",
+1718-    "    'table', 'runtime_worker_output',",
+1719-    "    'id', (select output_id from worker_output)::text",
+1720-    "  ),",
+1721:    "  'deliverable_link', :'deliverable_zip_link',",    "  'requester_delivery_payload', jsonb_build_object(",
+1722-    "    'summary_text', :'output_summary_ja',",
+1723-    "    'deliverable_title', :'output_title_ja',",
+1724:    "    'package_kind', 'delivery_package',",
+1725-    "    'deliverable_kind', 'document',",
+1726-    "    'body_format', 'markdown',",
+1727-    "    'generated_artifacts', :'generated_artifacts_jsonb'::jsonb,",
+1728-    "    'deliverable_link', :'deliverable_zip_link',",
+1729-    "    'deliverable_package', :'deliverable_package_jsonb'::jsonb,",
+1730-    "    'deliverable_ref', jsonb_build_object(",
+1731-    "      'source', 'aiworkeros',",
+1732-    "      'schema', 'aiworker',",
+--
+1809-    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+1810-      return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+1811-    }
+1812-
+1813-    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+1814-      return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+1815-    }
+1816-
+1817:    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+1818:      return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+1819-    }
+1820-
+1821-
+1822-    // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+1823-    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+1824-      const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+1825-      const usePurposeCode =
+1826-        url.searchParams.get("use_purpose_code") ||
+--
+2029-    ""
+2030-  );
+2031-}
+2032-
+2033-function aiwB6R97R14OutputId(result) {
+2034-  return String(
+2035-    (result && result.output_id) ||
+2036-    (result && result.deliverable_ref && result.deliverable_ref.id) ||
+2037:    (result && result.requester_delivery_payload && result.requester_delivery_payload.deliverable_ref && result.requester_delivery_payload.deliverable_ref.id) ||
+2038-    ""
+2039-  );
+2040-}
+2041-
+2042-function aiwB6R97R14Summary(result) {
+2043-  return String(
+2044:    (result && result.requester_delivery_payload && result.requester_delivery_payload.summary_text) ||
+2045-    (result && result.deliverable && result.deliverable.summary_text) ||
+2046-    (result && result.summary_text) ||
+2047-    ""
+2048-  );
+2049-}
+2050-
+2051-function aiwB6R97R14DeliverableLink(result) {
+2052-  return String(
+2053-    (result && result.deliverable_link) ||
+2054:    (result && result.requester_delivery_payload && result.requester_delivery_payload.deliverable_link) ||
+2055-    (result && result.deliverable && result.deliverable.zip_link) ||
+2056-    ""
+2057-  );
+2058-}
+2059-
+2060-function aiwB6R97R14MarkFailed(row, error) {
+2061-  const id = row && row.aicm_worker_work_unit_id;
+2062-  if (!aiwB6R97R14IsUuid(id)) return;
+--
+2085-
+2086-  aiwB6R97R14PsqlText(sql);
+2087-}
+2088-
+2089-
+2090-// AIW_B6R97R21_SCHEMA_MISMATCH_REPAIR
+2091-function aiwB6R97R19CAicmArtifactKindCode() {
+2092-  // AIW_B6R97R19C_ARTIFACT_KIND_RESOLVER_FINALIZER_PATCH
+2093:  return "delivery_package";
+2094-}
+2095-
+2096-function aiwB6R97R19CFinalizeGeneratedReviewRows(limit) {
+2097-  const artifactKind = aiwB6R97R19CAicmArtifactKindCode();
+2098-  const safeLimit = Math.max(1, Number(limit || 5) || 5);
+2099-
+2100-  const sql = [
+2101-    "with valid_artifact_kind as (",
+--
+2140-    "  from business.aicm_human_review_item h",
+2141-    "  join updated_unit u on h.related_worker_work_unit_id = u.aicm_worker_work_unit_id",
+2142-    "  where coalesce(h.human_review_status_code,'') = 'pending'",
+2143-    "), updated_review as (",
+2144-    "  update business.aicm_human_review_item h",
+2145-    "  set",
+2146-    "    artifact_kind_code = (select artifact_kind_code from valid_artifact_kind),",
+2147-    "    review_title = coalesce(nullif(h.review_title,''), '納品サマリー確認: ' || coalesce(u.work_unit_name, 'AIWorkerOS成果物')),",
+2148:    "    delivery_summary_text = coalesce(nullif(h.delivery_summary_text,''), 'AIWorkerOS consumer generated deliverable, summary, and delivery package.'),",
+2149-    "    main_changes_text = coalesce(nullif(h.main_changes_text,''), 'AIWorkerOS consumer generated deliverable, summary, and zip link.'),",
+2150-    "    ai_review_result_text = coalesce(nullif(h.ai_review_result_text,''), 'AIWorkerOS consumer completed deliverable generation.'),",
+2151-    "    artifact_link = coalesce(nullif(h.artifact_link,''), u.metadata_jsonb->>'aiworkeros_deliverable_link'),",
+2152-    "    metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2153-    "      'source_route_code', coalesce(u.metadata_jsonb->>'source_route_code', 'aicm_worker_work_unit'),",
+2154-    "      'aiworkeros_request_id', u.metadata_jsonb->>'aiworkeros_request_id',",
+2155-    "      'aiworkeros_output_id', u.metadata_jsonb->>'aiworkeros_output_id',",
+2156-    "      'artifact_kind_code', (select artifact_kind_code from valid_artifact_kind),",
+--
+2167-    "    aicm_user_company_id,",
+2168-    "    aicm_user_company_department_id,",
+2169-    "    aicm_user_company_section_id,",
+2170-    "    related_manager_major_work_item_id,",
+2171-    "    related_worker_work_unit_id,",
+2172-    "    review_kind_code,",
+2173-    "    artifact_kind_code,",
+2174-    "    review_title,",
+2175:    "    delivery_summary_text,",
+2176-    "    main_changes_text,",
+2177-    "    ai_review_result_text,",
+2178-    "    unresolved_issues_text,",
+2179-    "    artifact_link,",
+2180-    "    responsible_ai_label,",
+2181-    "    requested_by_ai_label,",
+2182-    "    human_review_status_code,",
+2183-    "    priority_code,",
+--
+2185-    "  )",
+2186-    "  select",
+2187-    "    u.owner_civilization_id,",
+2188-    "    u.aicm_user_company_id,",
+2189-    "    NULL::uuid,",
+2190-    "    NULL::uuid,",
+2191-    "    NULL::uuid,",
+2192-    "    u.aicm_worker_work_unit_id,",
+2193:    "    'delivery_summary',",
+2194-    "    (select artifact_kind_code from valid_artifact_kind),",
+2195-    "    '納品サマリー確認: ' || coalesce(u.work_unit_name, 'AIWorkerOS成果物'),",
+2196:    "    'AIWorkerOS consumer generated deliverable, summary, and delivery package.',",
+2197-    "    'AIWorkerOS consumer generated deliverable, summary, and zip link.',",
+2198-    "    'AIWorkerOS consumer completed deliverable generation.',",
+2199-    "    '',",
+2200-    "    u.metadata_jsonb->>'aiworkeros_deliverable_link',",
+2201-    "    'AIWorkerOS',",
+2202-    "    'AICompanyManager',",
+2203-    "    'pending',",
+2204-    "    coalesce(nullif(u.priority_code,''), 'normal'),",
+--
+2276-    "  select aicm_human_review_item_id",
+2277-    "  from business.aicm_human_review_item",
+2278-    "  where related_worker_work_unit_id = " + aiwB6R97R14UuidOrNull(workUnitId),
+2279-    "    and coalesce(human_review_status_code,'') = 'pending'",
+2280-    "  limit 1",
+2281-    "), updated as (",
+2282-    "  update business.aicm_human_review_item h",
+2283-    "  set review_title = " + aiwB6R97R14SqlLiteral(title) + ",",
+2284:    "      delivery_summary_text = " + aiwB6R97R14SqlLiteral(summary) + ",",
+2285-    "      artifact_link = " + aiwB6R97R14SqlLiteral(link) + ",",
+2286-    "      ai_review_result_text = 'AIWorkerOS consumer completed deliverable generation.',",
+2287-    "      metadata_jsonb = coalesce(h.metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
+2288-    "        'source_route_code', " + aiwB6R97R14SqlLiteral(sourceRouteCode) + ",",
+2289-    "        'aiworkeros_request_id', " + aiwB6R97R14SqlLiteral(requestId) + ",",
+2290-    "        'aiworkeros_output_id', " + aiwB6R97R14SqlLiteral(outputId) + ",",
+2291-    "        'aiworkeros_result_compact', " + aiwB6R97R14SqlLiteral(compactResultJson) + "::jsonb",
+2292-    "      ),",
+--
+2299-    "    aicm_user_company_id,",
+2300-    "    aicm_user_company_department_id,",
+2301-    "    aicm_user_company_section_id,",
+2302-    "    related_manager_major_work_item_id,",
+2303-    "    related_worker_work_unit_id,",
+2304-    "    review_kind_code,",
+2305-    "    artifact_kind_code,",
+2306-    "    review_title,",
+2307:    "    delivery_summary_text,",
+2308-    "    main_changes_text,",
+2309-    "    ai_review_result_text,",
+2310-    "    unresolved_issues_text,",
+2311-    "    artifact_link,",
+2312-    "    responsible_ai_label,",
+2313-    "    requested_by_ai_label,",
+2314-    "    human_review_status_code,",
+2315-    "    priority_code,",
+--
+2317-    "  )",
+2318-    "  select",
+2319-    "    " + ownerExpr + ",",
+2320-    "    " + companyExpr + ",",
+2321-    "    " + deptExpr + ",",
+2322-    "    " + sectionExpr + ",",
+2323-    "    " + majorExpr + ",",
+2324-    "    " + aiwB6R97R14UuidOrNull(workUnitId) + ",",
+2325:    "    'delivery_summary',",
+2326:    "    'delivery_package',",
+2327-    "    " + aiwB6R97R14SqlLiteral(title) + ",",
+2328-    "    " + aiwB6R97R14SqlLiteral(summary) + ",",
+2329-    "    'AIWorkerOS consumer generated deliverable, summary, and zip link.',",
+2330-    "    'AIWorkerOS consumer completed deliverable generation.',",
+2331-    "    '',",
+2332-    "    " + aiwB6R97R14SqlLiteral(link) + ",",
+2333-    "    'AIWorkerOS',",
+2334-    "    'AICompanyManager',",
+
+============================================================
+CONTEXT PATTERN=accepted
+============================================================
+70-    payload.model_code ||
+71-    payload.task_domain_code ||
+72-    payload.task_title ||
+73-    payload.task_instruction_ja ||
+74-    payload.app_read_payload_jsonb ||
+75-    appPayload.task_title ||
+76-    appPayload.task_instruction_ja ||
+77-    appPayload.source_request_ref ||
+78:    /REQUESTED|ACCEPTED|accepted|ok/i.test(statusText)
+79-  );
+80-}
+81-
+82-function aiwB6R96R1G2NormalizeRoleCode(payload, appPayload) {
+83-  const raw = aiwB6R96R1G2FirstText([
+84-    aiwB6R96R1G2Pick(payload, ["role_code", "worker_role_code", "placement_role_code"]),
+85-    aiwB6R96R1G2Pick(appPayload, ["role_code", "worker_role_code", "placement_role_code"]),
+86-    aiwB6R96R1G2Pick(payload, ["model_code", "aiworker_model_code"]),
+
+============================================================
+CONTEXT PATTERN=REQUESTED_INTERNAL_ONLY
+============================================================
+
+============================================================
+CONTEXT PATTERN=fn_runtime_execution_create_request_with_route_v1
+============================================================
+1652-      throw e;
+1653-    }
+1654-  }
+1655-
+1656-  const deliverable = aiwB6R95R3R3BuildRequesterFacingDeliverable(payload, sourceRouteCode);
+1657-
+1658-  const sql = [
+1659-    "with created as (",
+1660:    "  select aiworker.fn_runtime_execution_create_request_with_route_v1(",
+1661-    "    :'app_surface_code',",
+1662-    "    :'model_code',",
+1663-    "    :'task_domain_code',",
+1664-    "    :'task_title',",
+1665-    "    :'task_instruction_ja',",
+1666-    "    :'source_app_ref',",
+1667-    "    :'source_request_ref',",
+1668-    "    :'requested_by_ref',",
+
+============================================================
+CONTEXT PATTERN=buildRuntimeBrainContext
+============================================================
+535-  }
+536-
+537-  return out;
+538-}
+539-// AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+540-
+541-
+542-const http = require("http");
+543:const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+544-const { URL } = require("url");
+545-const { spawnSync } = require("child_process");
+546-const fs = require("fs");
+547-const path = require("path");
+548-
+549-const appRoot = __dirname;
+550-const envFile = path.join(appRoot, ".env.local");
+551-
+--
+1830-      const domainsRaw = url.searchParams.get("domains") || "";
+1831-      const domainCodes = domainsRaw
+1832-        ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+1833-        : [];
+1834-      const includeMissingSources =
+1835-        url.searchParams.get("include_missing_sources") === "true" ||
+1836-        url.searchParams.get("includeMissingSources") === "true";
+1837-
+1838:      const brainContext = buildRuntimeBrainContext({
+1839-        modelCode,
+1840-        usePurposeCode,
+1841-        domainCodes,
+1842-        includeMissingSources
+1843-      });
+1844-
+1845-      return sendJson(res, 200, {
+1846-        result: "ok",
+
+============================================================
+CONTEXT PATTERN=renderPromptBrainContext
+============================================================
+535-  }
+536-
+537-  return out;
+538-}
+539-// AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+540-
+541-
+542-const http = require("http");
+543:const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+544-const { URL } = require("url");
+545-const { spawnSync } = require("child_process");
+546-const fs = require("fs");
+547-const path = require("path");
+548-
+549-const appRoot = __dirname;
+550-const envFile = path.join(appRoot, ".env.local");
+551-
+--
+1844-
+1845-      return sendJson(res, 200, {
+1846-        result: "ok",
+1847-        external_execution_performed_flag: false,
+1848-        data: {
+1849-          model_code: modelCode,
+1850-          use_purpose_code: brainContext.purposeCode,
+1851-          brain_context: brainContext,
+1852:          prompt_brain_context: renderPromptBrainContext(brainContext)
+1853-        }
+1854-      });
+1855-    }
+1856-
+1857-    if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+1858-      const bodyText = await readBody(req);
+1859-      let payload;
+1860-      try {
+
+============================================================
+CONTEXT PATTERN=POST
+============================================================
+1849-          model_code: modelCode,
+1850-          use_purpose_code: brainContext.purposeCode,
+1851-          brain_context: brainContext,
+1852-          prompt_brain_context: renderPromptBrainContext(brainContext)
+1853-        }
+1854-      });
+1855-    }
+1856-
+1857:    if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+1858-      const bodyText = await readBody(req);
+1859-      let payload;
+1860-      try {
+1861-        payload = bodyText ? JSON.parse(bodyText) : {};
+1862-      } catch (e) {
+1863-        return sendJson(res, 400, {
+1864-          result: "error",
+1865-          error_code: "INVALID_JSON",
+
+============================================================
+CONTEXT PATTERN=GET
+============================================================
+1770-
+1771-  return aiwB6R95R3D1CreateZipAndAttach(responsePayload, deliverable);
+1772-}
+1773-
+1774-const server = http.createServer(async (req, res) => {
+1775-  const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+1776-
+1777-  try {
+1778:    if (req.method === "GET" && url.pathname === "/health") {
+1779-      return sendJson(res, 200, {
+1780-        ok: true,
+1781-        service: "aiworker-runtime-execution-http-api",
+1782-        db: "PERSONA_DATABASE_URL",
+1783-        external_execution: false,
+1784-        pg_apply: false,
+1785-        destructive_action: false
+1786-      });
+--
+1789-    if (!requireAuth(req)) {
+1790-      return sendJson(res, 401, {
+1791-        result: "error",
+1792-        error_code: "UNAUTHORIZED",
+1793-        message: "Missing or invalid Authorization bearer token."
+1794-      });
+1795-    }
+1796-
+1797:    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+1798-      return sendJson(res, 200, { result: "ok", data: endpointReady() });
+1799-    }
+1800-
+1801:    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+1802-      return sendJson(res, 200, { result: "ok", data: apiContracts() });
+1803-    }
+1804-
+1805:    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/persistent-smoke") {
+1806-      return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+1807-    }
+1808-
+1809:    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+1810-      return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+1811-    }
+1812-
+1813:    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+1814-      return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+1815-    }
+1816-
+1817:    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+1818-      return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+1819-    }
+1820-
+1821-
+1822-    // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+1823:    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+1824-      const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+1825-      const usePurposeCode =
+1826-        url.searchParams.get("use_purpose_code") ||
+1827-        url.searchParams.get("purpose_code") ||
+1828-        url.searchParams.get("task_domain_code") ||
+1829-        "reference";
+1830-      const domainsRaw = url.searchParams.get("domains") || "";
+1831-      const domainCodes = domainsRaw
+
+============================================================
+CONTEXT PATTERN=/aiworker/v1/runtime-execution/request
+============================================================
+1849-          model_code: modelCode,
+1850-          use_purpose_code: brainContext.purposeCode,
+1851-          brain_context: brainContext,
+1852-          prompt_brain_context: renderPromptBrainContext(brainContext)
+1853-        }
+1854-      });
+1855-    }
+1856-
+1857:    if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+1858-      const bodyText = await readBody(req);
+1859-      let payload;
+1860-      try {
+1861-        payload = bodyText ? JSON.parse(bodyText) : {};
+1862-      } catch (e) {
+1863-        return sendJson(res, 400, {
+1864-          result: "error",
+1865-          error_code: "INVALID_JSON",
+
+============================================================
+CONTEXT PATTERN=/aiworker/v1/runtime-execution/delivery
+============================================================
+1809-    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+1810-      return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+1811-    }
+1812-
+1813-    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+1814-      return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+1815-    }
+1816-
+1817:    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+1818-      return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+1819-    }
+1820-
+1821-
+1822-    // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+1823-    if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+1824-      const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+1825-      const usePurposeCode =

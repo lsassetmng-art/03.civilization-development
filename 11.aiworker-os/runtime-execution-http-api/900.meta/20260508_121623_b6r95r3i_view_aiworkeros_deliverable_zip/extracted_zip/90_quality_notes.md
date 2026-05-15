@@ -1,0 +1,7 @@
+AIWorkerOS側で生成した一次成果物です。
+設定ロボット: byd1_003_asic_workers3
+役割レイヤー: runtime_resolved_by_aiworker
+タスク領域: operation
+CX参照深度: runtime_policy_resolved
+CX参照広さ: runtime_policy_resolved
+今後の生成エンジン深化では、同じ契約のままロボット特性・CX参照範囲・能力差を本文品質へさらに反映します。

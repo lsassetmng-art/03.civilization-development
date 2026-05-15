@@ -1,0 +1,3 @@
+依頼元アプリでsummary_textとdeliverable_ref/linkを保存する。
+レビュー画面から成果物本文へ辿れるようにする。
+差し戻し時は追加条件をAIWorkerOSへ再依頼する。

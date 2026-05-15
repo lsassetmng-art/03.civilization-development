@@ -1,0 +1,515 @@
+const fs = require("fs");
+
+const [,, serverPath, patchedPath, reportPath] = process.argv;
+if (!serverPath || !patchedPath || !reportPath) {
+  console.error("usage: node patch serverPath patchedPath reportPath");
+  process.exit(2);
+}
+
+let src = fs.readFileSync(serverPath, "utf8");
+
+if (src.includes("AIW_B6R96R1G2_MINIMUM_DELIVERABLE_HELPER_START")) {
+  throw new Error("B6R96R1G2_MARKER_ALREADY_EXISTS");
+}
+
+const helper = `
+// AIW_B6R96R1G2_MINIMUM_DELIVERABLE_HELPER_START
+function aiwB6R96R1G2Text(value) {
+  return String(value === undefined || value === null ? "" : value).trim();
+}
+
+function aiwB6R96R1G2FirstText(values) {
+  for (const value of values) {
+    const text = aiwB6R96R1G2Text(value);
+    if (text) return text;
+  }
+  return "";
+}
+
+function aiwB6R96R1G2Object(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function aiwB6R96R1G2Pick(payload, names) {
+  payload = aiwB6R96R1G2Object(payload);
+  for (const name of names) {
+    const text = aiwB6R96R1G2Text(payload[name]);
+    if (text) return text;
+  }
+  return "";
+}
+
+function aiwB6R96R1G2FindAppPayload(payload) {
+  payload = aiwB6R96R1G2Object(payload);
+  return aiwB6R96R1G2Object(
+    payload.app_read_payload_jsonb ||
+    payload.app_read_payload ||
+    payload.request_payload_jsonb ||
+    payload.request_payload ||
+    payload.payload ||
+    payload.body ||
+    {}
+  );
+}
+
+function aiwB6R96R1G2LooksRuntimePayload(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+
+  const appPayload = aiwB6R96R1G2FindAppPayload(payload);
+  const statusText = aiwB6R96R1G2FirstText([
+    payload.request_status_code,
+    payload.status_code,
+    payload.status,
+    payload.result,
+    payload.reason
+  ]);
+
+  return Boolean(
+    payload.request_id ||
+    payload.runtime_request_id ||
+    payload.idempotency_key ||
+    payload.app_surface_code ||
+    payload.model_code ||
+    payload.task_domain_code ||
+    payload.task_title ||
+    payload.task_instruction_ja ||
+    payload.app_read_payload_jsonb ||
+    appPayload.task_title ||
+    appPayload.task_instruction_ja ||
+    appPayload.source_request_ref ||
+    /REQUESTED|ACCEPTED|accepted|ok/i.test(statusText)
+  );
+}
+
+function aiwB6R96R1G2NormalizeRoleCode(payload, appPayload) {
+  const raw = aiwB6R96R1G2FirstText([
+    aiwB6R96R1G2Pick(payload, ["role_code", "worker_role_code", "placement_role_code"]),
+    aiwB6R96R1G2Pick(appPayload, ["role_code", "worker_role_code", "placement_role_code"]),
+    aiwB6R96R1G2Pick(payload, ["model_code", "aiworker_model_code"]),
+    aiwB6R96R1G2Pick(appPayload, ["model_code", "aiworker_model_code"])
+  ]).toLowerCase();
+
+  if (raw.includes("president") || raw.includes("r5p")) return "president";
+  if (raw.includes("manager") || raw.includes("r5")) return "manager";
+  if (raw.includes("leader") || raw.includes("r4")) return "leader";
+  if (raw.includes("worker") || raw.includes("r3")) return "worker";
+  if (raw.includes("helper") || raw.includes("r1")) return "helper";
+  if (raw.includes("friend")) return "friend";
+  if (raw.includes("lover")) return "lover";
+  return "worker";
+}
+
+function aiwB6R96R1G2CapabilityTier(payload, appPayload) {
+  const model = aiwB6R96R1G2FirstText([
+    aiwB6R96R1G2Pick(payload, ["model_code", "aiworker_model_code"]),
+    aiwB6R1G2PickSafe(appPayload, ["model_code", "aiworker_model_code"])
+  ]).toLowerCase();
+
+  if (model.includes("byd2-003") || model.includes("hd-r5p") || model.includes("hd-r5")) return "high";
+  if (model.includes("byd2-002") || model.includes("hd-r4")) return "standard";
+  if (model.includes("byd1-003") || model.includes("hd-r3")) return "standard_basic";
+  if (model.includes("hd-r1c") || model.includes("hd-r1a") || model.includes("friend") || model.includes("lover")) return "basic_stable";
+  return "standard_basic";
+}
+
+function aiwB6R1G2PickSafe(payload, names) {
+  return aiwB6R96R1G2Pick(payload, names);
+}
+
+function aiwB6R96R1G2ReferenceProfile(tier) {
+  if (tier === "high") {
+    return {
+      reference_depth: "deep",
+      reference_scope: "broad_verified_cx",
+      stability_level: "high",
+      originality_level: "high",
+      specialty_level: "high",
+      prediction_level: "high",
+      review_depth: "advanced"
+    };
+  }
+
+  if (tier === "standard") {
+    return {
+      reference_depth: "standard",
+      reference_scope: "standard_cx",
+      stability_level: "standard",
+      originality_level: "medium",
+      specialty_level: "medium",
+      prediction_level: "medium",
+      review_depth: "standard"
+    };
+  }
+
+  if (tier === "basic_stable") {
+    return {
+      reference_depth: "lightweight",
+      reference_scope: "lightweight_reference_or_legacy_seed",
+      stability_level: "standard",
+      originality_level: "low",
+      specialty_level: "low",
+      prediction_level: "basic",
+      review_depth: "basic"
+    };
+  }
+
+  return {
+    reference_depth: "standard_light",
+    reference_scope: "standard_limited_cx",
+    stability_level: "standard",
+    originality_level: "medium_low",
+    specialty_level: "medium_low",
+    prediction_level: "basic",
+    review_depth: "basic"
+  };
+}
+
+function aiwB6R96R1G2BuildBody(role, title, instruction, referenceProfile) {
+  const safeTitle = title || "AIWorkerOS成果物";
+  const safeInstruction = instruction || "入力指示が不足しています。";
+  const cxNote = "参照範囲: " + referenceProfile.reference_depth + " / " + referenceProfile.reference_scope;
+
+  if (!instruction) {
+    return [
+      "# 作業不能理由レポート",
+      "",
+      "## 結論",
+      "現時点では通常成果物を完成できませんが、最低保証として不足情報レポートを返します。",
+      "",
+      "## 理由",
+      "作業指示または成果物条件が不足しています。",
+      "",
+      "## 不足情報",
+      "- 目的",
+      "- 対象範囲",
+      "- 期待する成果物形式",
+      "- 判断に必要な前提",
+      "",
+      "## 次に必要な入力",
+      "上記の不足情報を追加してください。",
+      "",
+      "## 参照制約",
+      cxNote
+    ].join("\\n");
+  }
+
+  if (role === "president") {
+    return [
+      "# " + safeTitle,
+      "",
+      "## 目的",
+      safeInstruction,
+      "",
+      "## 方針案",
+      "現時点の情報から、実行可能な基本方針を整理します。",
+      "",
+      "## 優先順位",
+      "1. 目的と制約の確認",
+      "2. 実行範囲の整理",
+      "3. Managerへ渡す大項目の明確化",
+      "",
+      "## 成功条件",
+      "次工程のManagerが大項目へ分解できる状態にすること。",
+      "",
+      "## 制約",
+      cxNote,
+      "",
+      "## 次工程",
+      "Managerへ方針を渡し、大項目分解を行ってください。"
+    ].join("\\n");
+  }
+
+  if (role === "manager") {
+    return [
+      "# " + safeTitle,
+      "",
+      "## 全体方針",
+      safeInstruction,
+      "",
+      "## 大項目分解案",
+      "- 目的整理",
+      "- 成果物整理",
+      "- 実行範囲整理",
+      "- 担当/役割候補整理",
+      "- レビュー観点整理",
+      "",
+      "## Leaderへ渡す観点",
+      "各大項目を作業単位へ分解できるよう、目的、入力、成果物、制約を渡します。",
+      "",
+      "## 注意点",
+      cxNote,
+      "",
+      "## 次工程",
+      "Leaderが中項目と作業単位へ分解してください。"
+    ].join("\\n");
+  }
+
+  if (role === "leader") {
+    return [
+      "# " + safeTitle,
+      "",
+      "## 対象",
+      safeInstruction,
+      "",
+      "## 作業単位候補",
+      "- 入力確認",
+      "- 成果物構成作成",
+      "- 本文作成",
+      "- 品質確認",
+      "- 納品準備",
+      "",
+      "## Workerへの引き渡し",
+      "作業目的、期待成果物、制約、確認観点を明示して渡します。",
+      "",
+      "## 注意点",
+      cxNote,
+      "",
+      "## 次工程",
+      "Workerが成果物本文を作成してください。"
+    ].join("\\n");
+  }
+
+  return [
+    "# " + safeTitle,
+    "",
+    "## 概要",
+    safeInstruction,
+    "",
+    "## 本文",
+    "依頼内容に基づき、標準的で安定した成果物を作成します。",
+    "",
+    "### 主要ポイント",
+    "- 目的を整理する",
+    "- 必要な内容を章立てする",
+    "- 確認ポイントを明示する",
+    "- 次工程を示す",
+    "",
+    "## 確認ポイント",
+    "- 目的に合っているか",
+    "- 不足情報が残っていないか",
+    "- 次工程に進めるか",
+    "",
+    "## 未解決事項",
+    "追加情報があれば、より専門的で独自性のある成果物にできます。",
+    "",
+    "## 参照制約",
+    cxNote,
+    "",
+    "## 次工程",
+    "必要に応じて上位ロボットまたは専門ロボットで深掘りしてください。"
+  ].join("\\n");
+}
+
+function aiwB6R96R1G2BuildRequesterDeliveryPayload(payload) {
+  payload = aiwB6R96R1G2Object(payload);
+  const appPayload = aiwB6R96R1G2FindAppPayload(payload);
+
+  const title = aiwB6R96R1G2FirstText([
+    aiwB6R96R1G2Pick(payload, ["task_title", "title", "request_title"]),
+    aiwB6R96R1G2Pick(appPayload, ["task_title", "title", "request_title"]),
+    "AIWorkerOS成果物"
+  ]);
+
+  const instruction = aiwB6R96R1G2FirstText([
+    aiwB6R96R1G2Pick(payload, ["task_instruction_ja", "instruction", "prompt", "task_description"]),
+    aiwB6R96R1G2Pick(appPayload, ["task_instruction_ja", "instruction", "prompt", "task_description"])
+  ]);
+
+  const role = aiwB6R96R1G2NormalizeRoleCode(payload, appPayload);
+  const tier = aiwB6R96R1G2CapabilityTier(payload, appPayload);
+  const referenceProfile = aiwB6R96R1G2ReferenceProfile(tier);
+  const body = aiwB6R96R1G2BuildBody(role, title, instruction, referenceProfile);
+
+  return {
+    contract_version: "requester_deliverable_v1",
+    deliverable_title: title,
+    deliverable_kind: role === "president" ? "policy_proposal" : role === "manager" ? "major_breakdown" : role === "leader" ? "task_decomposition" : "document",
+    body_format: "markdown",
+    body_markdown: body,
+    summary_text: role + " role produced a stable minimum deliverable.",
+    limitations_text: "Performance differences are controlled by CX reference permission and capability profile. Low performance still returns stable output.",
+    unresolved_issues_text: instruction ? "" : "Task instruction is missing or insufficient.",
+    next_steps_text: "Review the deliverable and provide additional constraints if deeper specialty or originality is required.",
+    minimum_guarantee_status: body ? "satisfied" : "blocking_report",
+    performance_profile: {
+      capability_tier: tier,
+      stability_level: referenceProfile.stability_level,
+      originality_level: referenceProfile.originality_level,
+      specialty_level: referenceProfile.specialty_level,
+      prediction_level: referenceProfile.prediction_level,
+      review_depth: referenceProfile.review_depth
+    },
+    reference_usage_profile: referenceProfile,
+    generation_basis: {
+      role_code: role,
+      task_title: title,
+      has_instruction: Boolean(instruction),
+      generated_by: "AIW_B6R96R1G2_MINIMUM_DELIVERABLE_HELPER"
+    }
+  };
+}
+
+function aiwB6R96R1G2EnsureRequesterDeliveryPayload(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+
+  const current = aiwB6R96R1G2Object(payload.requester_delivery_payload);
+  if (aiwB6R96R1G2Text(current.body_markdown) || aiwB6R96R1G2Text(current.body_text)) {
+    return payload;
+  }
+
+  if (!aiwB6R96R1G2LooksRuntimePayload(payload)) return payload;
+
+  payload.requester_delivery_payload = aiwB6R96R1G2BuildRequesterDeliveryPayload(payload);
+  payload.deliverable = payload.requester_delivery_payload;
+  return payload;
+}
+// AIW_B6R96R1G2_MINIMUM_DELIVERABLE_HELPER_END
+
+`;
+
+function findInsertionForHelper(source) {
+  const importIdx = source.lastIndexOf("import ");
+  const requireIdx = source.lastIndexOf("require(");
+  const firstFunctionIdx = source.search(/function\s+[A-Za-z0-9_$]+\s*\(/);
+  const firstConstFunctionIdx = source.search(/const\s+[A-Za-z0-9_$]+\s*=\s*(async\s*)?\(/);
+
+  const candidates = [firstFunctionIdx, firstConstFunctionIdx].filter((v) => v >= 0);
+  if (candidates.length > 0) return Math.min(...candidates);
+  if (importIdx >= 0) {
+    const nl = source.indexOf("\n", importIdx);
+    return nl >= 0 ? nl + 1 : source.length;
+  }
+  if (requireIdx >= 0) {
+    const nl = source.indexOf("\n", requireIdx);
+    return nl >= 0 ? nl + 1 : source.length;
+  }
+  return 0;
+}
+
+function findMatchingParen(source, openIndex) {
+  let depth = 0;
+  let quote = "";
+  let escaped = false;
+  let templateDepth = 0;
+
+  for (let i = openIndex; i < source.length; i += 1) {
+    const ch = source[i];
+
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\\\") {
+        escaped = true;
+        continue;
+      }
+      if (quote === "\`" && ch === "$" && source[i + 1] === "{") {
+        templateDepth += 1;
+        i += 1;
+        continue;
+      }
+      if (quote === "\`" && templateDepth > 0 && ch === "}") {
+        templateDepth -= 1;
+        continue;
+      }
+      if (ch === quote && templateDepth === 0) {
+        quote = "";
+      }
+      continue;
+    }
+
+    if (ch === '"' || ch === "'" || ch === "\`") {
+      quote = ch;
+      continue;
+    }
+
+    if (ch === "(") depth += 1;
+    if (ch === ")") {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+
+  return -1;
+}
+
+function patchJsonStringifyResponses(source) {
+  const token = "JSON.stringify(";
+  const replacements = [];
+  let idx = 0;
+
+  while (true) {
+    idx = source.indexOf(token, idx);
+    if (idx < 0) break;
+
+    const before = source.slice(Math.max(0, idx - 80), idx);
+    const isResponseWrite =
+      before.includes("res.end(") ||
+      before.includes(".end(") ||
+      before.includes("reply.end(") ||
+      before.includes("response.end(");
+
+    if (!isResponseWrite) {
+      idx += token.length;
+      continue;
+    }
+
+    const open = idx + token.length - 1;
+    const close = findMatchingParen(source, open);
+    if (close < 0) {
+      idx += token.length;
+      continue;
+    }
+
+    const exprStart = idx + token.length;
+    const expr = source.slice(exprStart, close).trim();
+
+    if (!expr || expr.includes("aiwB6R96R1G2EnsureRequesterDeliveryPayload")) {
+      idx = close + 1;
+      continue;
+    }
+
+    replacements.push({
+      start: exprStart,
+      end: close,
+      expr
+    });
+
+    idx = close + 1;
+  }
+
+  let patched = source;
+  for (const r of replacements.reverse()) {
+    patched = patched.slice(0, r.start) + "aiwB6R96R1G2EnsureRequesterDeliveryPayload(" + r.expr + ")" + patched.slice(r.end);
+  }
+
+  return { patched, count: replacements.length, replacements };
+}
+
+const helperAt = findInsertionForHelper(src);
+src = src.slice(0, helperAt) + helper + src.slice(helperAt);
+
+const result = patchJsonStringifyResponses(src);
+src = result.patched;
+
+if (result.count < 1) {
+  throw new Error("JSON_RESPONSE_STRINGIFY_ANCHOR_NOT_FOUND");
+}
+
+fs.writeFileSync(patchedPath, src);
+
+fs.writeFileSync(reportPath, JSON.stringify({
+  patch: "B6R96R1G2",
+  anchor: "res.end(JSON.stringify(...)) family",
+  replacementCount: result.count,
+  replacements: result.replacements.map((r) => ({
+    start: r.start,
+    end: r.end,
+    exprPreview: r.expr.slice(0, 300)
+  }))
+}, null, 2));
+
+console.log("PATCHED_PATH=" + patchedPath);
+console.log("REPLACEMENT_COUNT=" + result.count);
+console.log("PATCHED=B6R96R1G2_TEMP_ONLY");

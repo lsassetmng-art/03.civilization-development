@@ -1,0 +1,418 @@
+const fs = require("fs");
+
+const serverPath = process.argv[2];
+const afterPath = process.argv[3];
+
+const src = fs.readFileSync(serverPath, "utf8");
+
+if (!src.includes("function createRuntimeRequest(payload, idempotencyKeyFromHeader)")) {
+  throw new Error("CREATE_RUNTIME_REQUEST_ANCHOR_MISSING");
+}
+if (src.includes("AIWORKEROS_B6R95R3B_OUTPUT_RESPONSE_CONTRACT_START")) {
+  throw new Error("OLD_B6R95R3B_MARKER_EXISTS");
+}
+if (src.includes("AIWORKEROS_B6R95R3B_R3_COMMON_DELIVERABLE_CONTRACT_START")) {
+  throw new Error("R3_MARKER_ALREADY_EXISTS");
+}
+
+function findFunctionBlock(source, functionName) {
+  const anchor = `function ${functionName}(`;
+  const start = source.indexOf(anchor);
+  if (start < 0) throw new Error(`${functionName}_START_NOT_FOUND`);
+
+  const braceStart = source.indexOf("{", start);
+  if (braceStart < 0) throw new Error(`${functionName}_BRACE_NOT_FOUND`);
+
+  let depth = 0;
+  for (let i = braceStart; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === "{") depth++;
+    if (ch === "}") depth--;
+    if (depth === 0) {
+      return {
+        start,
+        end: i + 1,
+        text: source.slice(start, i + 1)
+      };
+    }
+  }
+  throw new Error(`${functionName}_END_NOT_FOUND`);
+}
+
+const block = findFunctionBlock(src, "createRuntimeRequest");
+
+if (!block.text.includes("fn_runtime_execution_create_request_with_route_v1")) {
+  throw new Error("CREATE_REQUEST_FUNCTION_CALL_MISSING");
+}
+if (!block.text.includes("'result', 'accepted'")) {
+  throw new Error("ACCEPTED_RESPONSE_ANCHOR_MISSING");
+}
+if (!block.text.includes("'status', 'REQUESTED_INTERNAL_ONLY'")) {
+  throw new Error("REQUESTED_INTERNAL_ONLY_ANCHOR_MISSING");
+}
+
+const helper = [
+"",
+"// AIWORKEROS_B6R95R3B_R3_COMMON_DELIVERABLE_CONTRACT_START",
+"/*",
+"  B6R95R3B-R3:",
+"  Common requester-facing deliverable contract for AIWorkerOS runtime execution.",
+"",
+"  Canon:",
+"  - This is not AICM-specific.",
+"  - AICM is one consumer among multiple requester apps / OSs.",
+"  - AIWorkerOS creates the deliverable body and first summary.",
+"  - Requester apps store summary_text plus deliverable_ref / deliverable_link.",
+"  - Robot performance differences are represented through robot_context and generation_basis.",
+"",
+"  Boundary:",
+"  - No external execution.",
+"  - No PG apply.",
+"  - No destructive action.",
+"  - No AICM-side change in this patch.",
+"  - No CX22073JW access-control change in this patch.",
+"*/",
+"function aiwB6R95R3R3Text(value) {",
+"  return String(value ?? \"\").replace(/\\r\\n/g, \"\\n\").trim();",
+"}",
+"",
+"function aiwB6R95R3R3OneLine(value, fallback) {",
+"  const text = aiwB6R95R3R3Text(value || fallback || \"\");",
+"  return text.replace(/\\s+/g, \" \").trim();",
+"}",
+"",
+"function aiwB6R95R3R3Clip(value, maxLen) {",
+"  const text = aiwB6R95R3R3Text(value);",
+"  if (text.length <= maxLen) return text;",
+"  return `${text.slice(0, maxLen)}…`;",
+"}",
+"",
+"function aiwB6R95R3R3Lines(items) {",
+"  return items.filter((value) => value !== null && value !== undefined && String(value).trim() !== \"\").join(\"\\n\");",
+"}",
+"",
+"function aiwB6R95R3R3BuildRequesterFacingDeliverable(payload, sourceRouteCode) {",
+"  const requesterAppRef = aiwB6R95R3R3OneLine(payload.source_app_ref, \"HTTP_LOCAL\");",
+"  const sourceRequestRef = aiwB6R95R3R3OneLine(payload.source_request_ref, \"\");",
+"  const appSurfaceCode = aiwB6R95R3R3OneLine(payload.app_surface_code, \"unknown_app_surface\");",
+"  const routeCode = aiwB6R95R3R3OneLine(sourceRouteCode, \"unspecified_route\");",
+"  const taskTitle = aiwB6R95R3R3OneLine(payload.task_title, \"AIWorkerOS成果物\");",
+"  const taskInstruction = aiwB6R95R3R3Text(payload.task_instruction_ja);",
+"  const modelCode = aiwB6R95R3R3OneLine(payload.model_code, \"unknown_model\");",
+"  const roleLayerCode = aiwB6R95R3R3OneLine(payload.role_layer_code || payload.roleLayerCode, \"runtime_resolved_by_aiworker\");",
+"  const seriesCode = aiwB6R95R3R3OneLine(payload.series_code || payload.seriesCode, \"runtime_resolved_by_aiworker\");",
+"  const capabilityProfileCode = aiwB6R95R3R3OneLine(payload.capability_profile_code || payload.capabilityProfileCode, \"runtime_resolved_by_aiworker\");",
+"  const taskDomainCode = aiwB6R95R3R3OneLine(payload.task_domain_code, \"unknown_domain\");",
+"  const cxDepthCode = aiwB6R95R3R3OneLine(payload.cx_reference_depth_code || payload.cxReferenceDepthCode, \"runtime_policy_resolved\");",
+"  const cxBreadthCode = aiwB6R95R3R3OneLine(payload.cx_reference_breadth_code || payload.cxReferenceBreadthCode, \"runtime_policy_resolved\");",
+"",
+"  const robotContext = {",
+"    model_code: modelCode,",
+"    role_layer_code: roleLayerCode,",
+"    series_code: seriesCode,",
+"    capability_profile_code: capabilityProfileCode,",
+"    task_domain_code: taskDomainCode",
+"  };",
+"",
+"  const generationBasis = {",
+"    contract_version: \"B6R95R3B-R3\",",
+"    generation_owner: \"AIWorkerOS\",",
+"    requester_app_ref: requesterAppRef,",
+"    source_request_ref: sourceRequestRef,",
+"    source_route_code: routeCode,",
+"    robot_trait_basis: \"model_code / role_layer_code / series_code / capability_profile_code are carried as generation basis; deeper trait resolution belongs to AIWorkerOS robot profile logic.\",",
+"    cx_depth_basis: cxDepthCode,",
+"    cx_breadth_basis: cxBreadthCode,",
+"    cx_reference_boundary: \"CX22073JW is robot brain/reference data. Access-control remains AIWorkerOS-side, not requester-app-side.\",",
+"    safety_boundary: \"internal_only_no_external_execution_no_pg_apply_no_destructive_action\"",
+"  };",
+"",
+"  const outputTitle = `${taskTitle} 成果物`;",
+"  const summaryText = aiwB6R95R3R3Clip(",
+"    `AIWorkerOSが${modelCode}を成果物生成主体として、${taskTitle}の一次成果物と一次サマリを作成しました。依頼元アプリはこのsummary_textとdeliverable_ref/linkを保存してレビューに利用できます。`,",
+"    700",
+"  );",
+"",
+"  const qualityNotes = aiwB6R95R3R3Lines([",
+"    \"AIWorkerOS側で生成した一次成果物です。\",",
+"    `設定ロボット: ${modelCode}`,",
+"    `役割レイヤー: ${roleLayerCode}`,",
+"    `タスク領域: ${taskDomainCode}`,",
+"    `CX参照深度: ${cxDepthCode}`,",
+"    `CX参照広さ: ${cxBreadthCode}`,",
+"    \"今後の生成エンジン深化では、同じ契約のままロボット特性・CX参照範囲・能力差を本文品質へさらに反映します。\"",
+"  ]);",
+"",
+"  const unresolvedIssues = aiwB6R95R3R3Lines([",
+"    \"この段階では外部実行、PG apply、破壊的操作は行っていません。\",",
+"    \"追加調査・DB変更・実装反映が必要な場合は、依頼元アプリ側の承認/差し戻し工程で判断してください。\"",
+"  ]);",
+"",
+"  const nextSteps = aiwB6R95R3R3Lines([",
+"    \"依頼元アプリでsummary_textとdeliverable_ref/linkを保存する。\",",
+"    \"レビュー画面から成果物本文へ辿れるようにする。\",",
+"    \"差し戻し時は追加条件をAIWorkerOSへ再依頼する。\"",
+"  ]);",
+"",
+"  const bodyMarkdown = aiwB6R95R3R3Lines([",
+"    `# ${taskTitle}`,",
+"    \"\",",
+"    \"## 1. 成果物サマリ\",",
+"    summaryText,",
+"    \"\",",
+"    \"## 2. 生成主体\",",
+"    `- generation_owner: AIWorkerOS`,",
+"    `- requester_app_ref: ${requesterAppRef}`,",
+"    `- source_request_ref: ${sourceRequestRef || \"未指定\"}`,",
+"    `- source_route_code: ${routeCode}`,",
+"    `- app_surface_code: ${appSurfaceCode}`,",
+"    \"\",",
+"    \"## 3. 設定ロボット / 性能差の根拠\",",
+"    `- model_code: ${modelCode}`,",
+"    `- role_layer_code: ${roleLayerCode}`,",
+"    `- series_code: ${seriesCode}`,",
+"    `- capability_profile_code: ${capabilityProfileCode}`,",
+"    `- task_domain_code: ${taskDomainCode}`,",
+"    `- cx_reference_depth_code: ${cxDepthCode}`,",
+"    `- cx_reference_breadth_code: ${cxBreadthCode}`,",
+"    \"\",",
+"    \"## 4. 成果物本文\",",
+"    taskInstruction || \"依頼本文が空のため、タスク名と設定ロボット情報を基準に一次成果物を作成しました。\",",
+"    \"\",",
+"    \"## 5. 品質メモ\",",
+"    qualityNotes,",
+"    \"\",",
+"    \"## 6. 未解決事項\",",
+"    unresolvedIssues,",
+"    \"\",",
+"    \"## 7. 次工程\",",
+"    nextSteps,",
+"    \"\",",
+"    \"## 8. 安全境界\",",
+"    \"- external_execution_performed_flag=false\",",
+"    \"- pg_apply_performed_flag=false\",",
+"    \"- destructive_action_performed_flag=false\",",
+"    \"- CX22073JW brain access control is AIWorkerOS-side responsibility\",",
+"    \"\"",
+"  ]);",
+"",
+"  const outputPayload = {",
+"    contract_version: \"B6R95R3B-R3\",",
+"    contract_name: \"aiworkeros_common_requester_deliverable_contract\",",
+"    deliverable_kind: \"document\",",
+"    body_format: \"markdown\",",
+"    requester_app_ref: requesterAppRef,",
+"    source_request_ref: sourceRequestRef,",
+"    source_route_code: routeCode,",
+"    app_surface_code: appSurfaceCode,",
+"    robot_context: robotContext,",
+"    generation_basis: generationBasis,",
+"    quality_notes: qualityNotes,",
+"    unresolved_issues: unresolvedIssues,",
+"    next_steps: nextSteps,",
+"    external_execution_performed_flag: false,",
+"    pg_apply_performed_flag: false,",
+"    destructive_action_performed_flag: false",
+"  };",
+"",
+"  const artifacts = [",
+"    {",
+"      artifact_kind_code: \"markdown\",",
+"      artifact_title_ja: outputTitle,",
+"      body_format: \"markdown\",",
+"      body_markdown: bodyMarkdown,",
+"      summary_text: summaryText,",
+"      quality_notes: qualityNotes,",
+"      unresolved_issues: unresolvedIssues,",
+"      next_steps: nextSteps,",
+"      robot_context: robotContext,",
+"      generation_basis: generationBasis,",
+"      contract_version: \"B6R95R3B-R3\"",
+"    }",
+"  ];",
+"",
+"  return {",
+"    outputTitle,",
+"    bodyMarkdown,",
+"    summaryText,",
+"    qualityNotes,",
+"    unresolvedIssues,",
+"    nextSteps,",
+"    robotContext,",
+"    generationBasis,",
+"    outputPayload,",
+"    artifacts",
+"  };",
+"}",
+"// AIWORKEROS_B6R95R3B_R3_COMMON_DELIVERABLE_CONTRACT_END",
+""
+].join("\n");
+
+const newFunction = [
+"function createRuntimeRequest(payload, idempotencyKeyFromHeader) {",
+"  const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || \"\";",
+"  const sourceRouteCode = String(",
+"    payload.source_route_code ||",
+"    payload.sourceRouteCode ||",
+"    payload.source_route ||",
+"    \"\"",
+"  ).trim();",
+"  if (!idempotencyKey) {",
+"    const e = new Error(\"Idempotency-Key is required\");",
+"    e.httpStatus = 400;",
+"    throw e;",
+"  }",
+"",
+"  const required = [\"app_surface_code\", \"model_code\", \"task_domain_code\", \"task_title\", \"task_instruction_ja\"];",
+"  for (const key of required) {",
+"    if (!payload[key] || String(payload[key]).trim() === \"\") {",
+"      const e = new Error(`Missing required field: ${key}`);",
+"      e.httpStatus = 400;",
+"      throw e;",
+"    }",
+"  }",
+"",
+"  const deliverable = aiwB6R95R3R3BuildRequesterFacingDeliverable(payload, sourceRouteCode);",
+"",
+"  const sql = [",
+"    \"with created as (\",",
+"    \"  select aiworker.fn_runtime_execution_create_request_with_route_v1(\",",
+"    \"    :'app_surface_code',\",",
+"    \"    :'model_code',\",",
+"    \"    :'task_domain_code',\",",
+"    \"    :'task_title',\",",
+"    \"    :'task_instruction_ja',\",",
+"    \"    :'source_app_ref',\",",
+"    \"    :'source_request_ref',\",",
+"    \"    :'requested_by_ref',\",",
+"    \"    :'idempotency_key',\",",
+"    \"    :'source_route_code'\",",
+"    \"  ) as request_id\",",
+"    \"),\",",
+"    \"worker_output as (\",",
+"    \"  select aiworker.fn_runtime_execution_submit_worker_output(\",",
+"    \"    (select request_id from created),\",",
+"    \"    :'output_title_ja',\",",
+"    \"    :'output_body_ja',\",",
+"    \"    :'output_summary_ja',\",",
+"    \"    :'output_payload_jsonb'::jsonb,\",",
+"    \"    :'artifacts_jsonb'::jsonb\",",
+"    \"  ) as output_id\",",
+"    \"),\",",
+"    \"board as (\",",
+"    \"  select p.*\",",
+"    \"  from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p\",",
+"    \"  join created c\",",
+"    \"    on c.request_id = p.request_id\",",
+"    \")\",",
+"    \"select jsonb_build_object(\",",
+"    \"  'result', 'completed_internal_draft',\",",
+"    \"  'status', 'WORKER_OUTPUT_DONE',\",",
+"    \"  'request_id', (select request_id from created),\",",
+"    \"  'output_id', (select output_id from worker_output),\",",
+"    \"  'idempotency_key', :'idempotency_key',\",",
+"    \"  'requester_app_ref', :'source_app_ref',\",",
+"    \"  'source_request_ref', :'source_request_ref',\",",
+"    \"  'source_route_code', :'source_route_code',\",",
+"    \"  'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),\",",
+"    \"  'robot_context', :'robot_context_jsonb'::jsonb,\",",
+"    \"  'generation_basis', :'generation_basis_jsonb'::jsonb,\",",
+"    \"  'deliverable', jsonb_build_object(\",",
+"    \"    'deliverable_kind', 'document',\",",
+"    \"    'title', :'output_title_ja',\",",
+"    \"    'body_format', 'markdown',\",",
+"    \"    'body_markdown', :'output_body_ja',\",",
+"    \"    'summary_text', :'output_summary_ja',\",",
+"    \"    'quality_notes', :'quality_notes',\",",
+"    \"    'unresolved_issues', :'unresolved_issues',\",",
+"    \"    'next_steps', :'next_steps',\",",
+"    \"    'output_id', (select output_id from worker_output)\",",
+"    \"  ),\",",
+"    \"  'deliverable_ref', jsonb_build_object(\",",
+"    \"    'source', 'aiworkeros',\",",
+"    \"    'schema', 'aiworker',\",",
+"    \"    'table', 'runtime_worker_output',\",",
+"    \"    'id', (select output_id from worker_output)::text\",",
+"    \"  ),\",",
+"    \"  'deliverable_link', concat('aiworkeros://runtime_worker_output/', (select output_id from worker_output)::text),\",",
+"    \"  'requester_delivery_payload', jsonb_build_object(\",",
+"    \"    'summary_text', :'output_summary_ja',\",",
+"    \"    'deliverable_title', :'output_title_ja',\",",
+"    \"    'deliverable_kind', 'document',\",",
+"    \"    'body_format', 'markdown',\",",
+"    \"    'deliverable_link', concat('aiworkeros://runtime_worker_output/', (select output_id from worker_output)::text),\",",
+"    \"    'deliverable_ref', jsonb_build_object(\",",
+"    \"      'source', 'aiworkeros',\",",
+"    \"      'schema', 'aiworker',\",",
+"    \"      'table', 'runtime_worker_output',\",",
+"    \"      'id', (select output_id from worker_output)::text\",",
+"    \"    )\",",
+"    \"  ),\",",
+"    \"  'safety', jsonb_build_object(\",",
+"    \"    'external_execution_performed_flag', false,\",",
+"    \"    'pg_apply_performed_flag', false,\",",
+"    \"    'destructive_action_performed_flag', false\",",
+"    \"  )\",",
+"    \")::text;\"",
+"  ].join(\"\\n\");",
+"",
+"  return psqlJson(sql, {",
+"    app_surface_code: payload.app_surface_code,",
+"    model_code: payload.model_code,",
+"    task_domain_code: payload.task_domain_code,",
+"    task_title: payload.task_title,",
+"    task_instruction_ja: payload.task_instruction_ja,",
+"    source_app_ref: payload.source_app_ref || \"HTTP_LOCAL\",",
+"    source_request_ref: payload.source_request_ref || \"\",",
+"    source_route_code: sourceRouteCode,",
+"    requested_by_ref: payload.requested_by_ref || \"human\",",
+"    idempotency_key: idempotencyKey,",
+"    output_title_ja: deliverable.outputTitle,",
+"    output_body_ja: deliverable.bodyMarkdown,",
+"    output_summary_ja: deliverable.summaryText,",
+"    quality_notes: deliverable.qualityNotes,",
+"    unresolved_issues: deliverable.unresolvedIssues,",
+"    next_steps: deliverable.nextSteps,",
+"    robot_context_jsonb: JSON.stringify(deliverable.robotContext),",
+"    generation_basis_jsonb: JSON.stringify(deliverable.generationBasis),",
+"    output_payload_jsonb: JSON.stringify(deliverable.outputPayload),",
+"    artifacts_jsonb: JSON.stringify(deliverable.artifacts)",
+"  });",
+"}"
+].join("\n");
+
+const patched = src.slice(0, block.start) + helper + newFunction + src.slice(block.end);
+
+const requiredNeedles = [
+  "AIWORKEROS_B6R95R3B_R3_COMMON_DELIVERABLE_CONTRACT_START",
+  "aiworkeros_common_requester_deliverable_contract",
+  "fn_runtime_execution_submit_worker_output",
+  "'requester_delivery_payload'",
+  "'deliverable_link'",
+  "'summary_text', :'output_summary_ja'",
+  "'body_markdown', :'output_body_ja'",
+  "'robot_context', :'robot_context_jsonb'::jsonb",
+  "'generation_basis', :'generation_basis_jsonb'::jsonb"
+];
+
+for (const needle of requiredNeedles) {
+  if (!patched.includes(needle)) {
+    throw new Error(`REQUIRED_PATCH_NEEDLE_MISSING: ${needle}`);
+  }
+}
+
+if (patched.includes("AICM-facing") || patched.includes("AICM向け")) {
+  throw new Error("AICM_SPECIFIC_LABEL_FOUND");
+}
+
+if (patched.includes("fn_runtime_execution_mark_delivery_ready(")) {
+  throw new Error("MARK_DELIVERY_READY_MUST_NOT_BE_ADDED_IN_R3");
+}
+
+fs.writeFileSync(serverPath, patched, "utf8");
+fs.writeFileSync(afterPath, patched, "utf8");
+
+console.log("PATCH_OK");
+console.log(`REPLACED_CREATE_RUNTIME_REQUEST_LINES=${block.text.split(/\r?\n/).length}`);
+console.log(`SERVER_PATH=${serverPath}`);
+console.log(`AFTER_PATH=${afterPath}`);

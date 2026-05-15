@@ -1,0 +1,77 @@
+    24:   const appRead = aiwB6R44fPlainObject(body.app_read_payload_jsonb);
+    57:     body.request_id ||
+    58:     body.runtime_execution_request_id
+    85: function aiwB6R44fMergeSourceRouteIntoAppReadPayload(appReadPayload, input) {
+    86:   const base = aiwB6R44fPlainObject(appReadPayload);
+    96:   const appRead = aiwB6R44fPlainObject(out.app_read_payload_jsonb);
+   100:     app_read_payload_jsonb: aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, body || payload || requestBody || input || {}),
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   126: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_START
+   129:   SendJson boundary wrapper.
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   169:   const out = Object.assign({}, payload);
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   186: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+   229: function sendJson(res, status, payload) {
+   230:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_START
+   232:     payload = aiwB6R44gR4ExposeSourceRoutePayload(payload);
+   234:     // Keep sendJson stable for non-runtime payloads.
+   236:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_END
+   238:   res.writeHead(status, {
+   242:   res.end(JSON.stringify(payload, null, 2));
+   312:     return JSON.parse(text);
+   355:         on rr.request_id = p.request_id
+   356:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   363:     request_id: query.get("request_id") || "",
+   370: function appReadPayload(query) {
+   375:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   377:         on rr.request_id = p.request_id
+   378:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   385:     request_id: query.get("request_id") || "",
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   404:     request_id: query.get("request_id") || "",
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   446:       ) as request_id
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   452:         on c.request_id = p.request_id
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   485:       return sendJson(res, 200, {
+   496:       return sendJson(res, 401, {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+   512:       return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+   516:       return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+   519:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+   520:       return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   551:       return sendJson(res, 200, {
+   565:       let payload;
+   567:         payload = bodyText ? JSON.parse(bodyText) : {};
+   569:         return sendJson(res, 400, {
+   577:       const result = createRuntimeRequest(payload, idempotencyKey);
+   578:       return sendJson(res, 201, result);
+   581:     return sendJson(res, 404, {
+   588:     return sendJson(res, status, {

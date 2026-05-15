@@ -1,0 +1,223 @@
+
+============================================================
+FUNCTION_BLOCK_FOR_PATTERN=/aiworker/v1/runtime-execution/request
+HIT_LINE=563
+BLOCK=523-525
+============================================================
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+
+============================================================
+FUNCTION_BLOCK_FOR_PATTERN=fn_runtime_execution_create_request_with_route_v1
+HIT_LINE=435
+BLOCK=410-478
+============================================================
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+
+============================================================
+FUNCTION_BLOCK_FOR_PATTERN=pipeline-board
+HIT_LINE=515
+BLOCK=475-480
+============================================================
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+
+============================================================
+FUNCTION_BLOCK_FOR_PATTERN=app-read-payload
+HIT_LINE=519
+BLOCK=479-599
+============================================================
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+   509:     }
+   510: 
+   511:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/persistent-smoke") {
+   512:       return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+   513:     }
+   514: 
+   515:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+   516:       return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+   517:     }
+   518: 
+   519:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+   520:       return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+   521:     }
+   522: 
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+   526: 
+   527: 
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+   556:           use_purpose_code: brainContext.purposeCode,
+   557:           brain_context: brainContext,
+   558:           prompt_brain_context: renderPromptBrainContext(brainContext)
+   559:         }
+   560:       });
+   561:     }
+   562: 
+   563:     if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+   564:       const bodyText = await readBody(req);
+   565:       let payload;
+   566:       try {
+   567:         payload = bodyText ? JSON.parse(bodyText) : {};
+   568:       } catch (e) {
+   569:         return sendJson(res, 400, {
+   570:           result: "error",
+   571:           error_code: "INVALID_JSON",
+   572:           message: "Request body must be valid JSON."
+   573:         });
+   574:       }
+   575: 
+   576:       const idempotencyKey = req.headers["idempotency-key"] || "";
+   577:       const result = createRuntimeRequest(payload, idempotencyKey);
+   578:       return sendJson(res, 201, result);
+   579:     }
+   580: 
+   581:     return sendJson(res, 404, {
+   582:       result: "error",
+   583:       error_code: "NOT_FOUND",
+   584:       path: url.pathname
+   585:     });
+   586:   } catch (err) {
+   587:     const status = err.httpStatus || 500;
+   588:     return sendJson(res, status, {
+   589:       result: "error",
+   590:       error_code: status === 400 ? "BAD_REQUEST" : "INTERNAL_ERROR",
+   591:       message: err.message,
+   592:       safety: {
+   593:         external_execution_performed_flag: false,
+   594:         pg_apply_performed_flag: false,
+   595:         destructive_action_performed_flag: false
+   596:       }
+   597:     });
+   598:   }
+   599: });

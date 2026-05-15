@@ -1,0 +1,1 @@
+AIWorkerOSがbyd1_003_asic_workers3を成果物生成主体として、大化の改新 詳細資料の一次成果物と一次サマリを作成しました。依頼元アプリはこのsummary_textとdeliverable_ref/linkを保存してレビューに利用できます。

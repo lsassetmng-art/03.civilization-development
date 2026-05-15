@@ -1,0 +1,4225 @@
+
+============================================================
+PATTERN=/aiworker/v1/runtime-execution/request
+============================================================
+
+--- HIT line=563 window=528-598 ---
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+   556:           use_purpose_code: brainContext.purposeCode,
+   557:           brain_context: brainContext,
+   558:           prompt_brain_context: renderPromptBrainContext(brainContext)
+   559:         }
+   560:       });
+   561:     }
+   562: 
+   563:     if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+   564:       const bodyText = await readBody(req);
+   565:       let payload;
+   566:       try {
+   567:         payload = bodyText ? JSON.parse(bodyText) : {};
+   568:       } catch (e) {
+   569:         return sendJson(res, 400, {
+   570:           result: "error",
+   571:           error_code: "INVALID_JSON",
+   572:           message: "Request body must be valid JSON."
+   573:         });
+   574:       }
+   575: 
+   576:       const idempotencyKey = req.headers["idempotency-key"] || "";
+   577:       const result = createRuntimeRequest(payload, idempotencyKey);
+   578:       return sendJson(res, 201, result);
+   579:     }
+   580: 
+   581:     return sendJson(res, 404, {
+   582:       result: "error",
+   583:       error_code: "NOT_FOUND",
+   584:       path: url.pathname
+   585:     });
+   586:   } catch (err) {
+   587:     const status = err.httpStatus || 500;
+   588:     return sendJson(res, status, {
+   589:       result: "error",
+   590:       error_code: status === 400 ? "BAD_REQUEST" : "INTERNAL_ERROR",
+   591:       message: err.message,
+   592:       safety: {
+   593:         external_execution_performed_flag: false,
+   594:         pg_apply_performed_flag: false,
+   595:         destructive_action_performed_flag: false
+   596:       }
+   597:     });
+   598:   }
+
+============================================================
+PATTERN=fn_runtime_execution_create_request_with_route_v1
+============================================================
+
+--- HIT line=435 window=400-470 ---
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+
+============================================================
+PATTERN=fn_runtime_execution_submit_worker_output
+============================================================
+NO_HIT
+
+============================================================
+PATTERN=fn_runtime_execution_mark_delivery_ready
+============================================================
+NO_HIT
+
+============================================================
+PATTERN=REQUESTED_INTERNAL_ONLY
+============================================================
+
+--- HIT line=456 window=421-491 ---
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+
+============================================================
+PATTERN=accepted
+============================================================
+
+--- HIT line=455 window=420-490 ---
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+
+============================================================
+PATTERN=app-read-payload
+============================================================
+
+--- HIT line=519 window=484-554 ---
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+   509:     }
+   510: 
+   511:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/persistent-smoke") {
+   512:       return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+   513:     }
+   514: 
+   515:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+   516:       return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+   517:     }
+   518: 
+   519:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+   520:       return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+   521:     }
+   522: 
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+   526: 
+   527: 
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+
+============================================================
+PATTERN=pipeline-board
+============================================================
+
+--- HIT line=515 window=480-550 ---
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+   509:     }
+   510: 
+   511:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/persistent-smoke") {
+   512:       return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+   513:     }
+   514: 
+   515:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+   516:       return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+   517:     }
+   518: 
+   519:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+   520:       return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+   521:     }
+   522: 
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+   526: 
+   527: 
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+
+============================================================
+PATTERN=delivery
+============================================================
+
+--- HIT line=139 window=104-174 ---
+   104:     source_entity_type: out.source_entity_type || source.source_entity_type,
+   105:     source_entity_id: out.source_entity_id || source.source_entity_id
+   106:   }));
+   107: 
+   108:   if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+   109:   if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+   110:   if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+   111:   if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+   112:   if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+   113: 
+   114:   if (route.source_route_code) {
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   116:   }
+   117:   return out;
+   118: }
+   119: 
+   120: function aiwB6R44fExposeSourceRouteOnRows(value) {
+   121:   if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+   122:   return value;
+   123: }
+   124: // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_END
+   125: 
+   126: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_START
+   127: /*
+   128:   B6R44G-R4:
+   129:   SendJson boundary wrapper.
+   130:   Exposes source route metadata only for runtime-shaped rows.
+   131: */
+   132: function aiwB6R44gR4PlainObject(value) {
+   133:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+   134: }
+   135: 
+   136: function aiwB6R44gR4LooksRuntimeRow(row) {
+   137:   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   139:   if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   141:   return false;
+   142: }
+   143: 
+   144: function aiwB6R44gR4ExposeSourceRouteRow(row) {
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+
+--- HIT line=392 window=357-427 ---
+   357:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   358:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   359:       order by p.request_created_at desc
+   360:       limit :'limit'
+   361:     ) t;
+   362:   `, {
+   363:     request_id: query.get("request_id") || "",
+   364:     request_code: query.get("request_code") || "",
+   365:     app_surface_code: query.get("app_surface_code") || "",
+   366:     limit: normalizeLimit(query.get("limit"))
+   367:   });
+   368: }
+   369: 
+   370: function appReadPayload(query) {
+   371:   return psqlJson(`
+   372:     select coalesce(jsonb_agg(to_jsonb(t) order by request_created_at desc), '[]'::jsonb)::text
+   373:     from (
+   374:       select p.*, rr.source_route_code
+   375:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   376:       left join aiworker.runtime_execution_request rr
+   377:         on rr.request_id = p.request_id
+   378:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   379:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   380:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   381:       order by p.request_created_at desc
+   382:       limit :'limit'
+   383:     ) t;
+   384:   `, {
+   385:     request_id: query.get("request_id") || "",
+   386:     request_code: query.get("request_code") || "",
+   387:     app_surface_code: query.get("app_surface_code") || "",
+   388:     limit: normalizeLimit(query.get("limit"))
+   389:   });
+   390: }
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+
+--- HIT line=397 window=362-432 ---
+   362:   `, {
+   363:     request_id: query.get("request_id") || "",
+   364:     request_code: query.get("request_code") || "",
+   365:     app_surface_code: query.get("app_surface_code") || "",
+   366:     limit: normalizeLimit(query.get("limit"))
+   367:   });
+   368: }
+   369: 
+   370: function appReadPayload(query) {
+   371:   return psqlJson(`
+   372:     select coalesce(jsonb_agg(to_jsonb(t) order by request_created_at desc), '[]'::jsonb)::text
+   373:     from (
+   374:       select p.*, rr.source_route_code
+   375:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   376:       left join aiworker.runtime_execution_request rr
+   377:         on rr.request_id = p.request_id
+   378:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   379:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   380:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   381:       order by p.request_created_at desc
+   382:       limit :'limit'
+   383:     ) t;
+   384:   `, {
+   385:     request_id: query.get("request_id") || "",
+   386:     request_code: query.get("request_code") || "",
+   387:     app_surface_code: query.get("app_surface_code") || "",
+   388:     limit: normalizeLimit(query.get("limit"))
+   389:   });
+   390: }
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+
+--- HIT line=523 window=488-558 ---
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+   509:     }
+   510: 
+   511:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/persistent-smoke") {
+   512:       return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+   513:     }
+   514: 
+   515:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+   516:       return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+   517:     }
+   518: 
+   519:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+   520:       return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+   521:     }
+   522: 
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+   526: 
+   527: 
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+   556:           use_purpose_code: brainContext.purposeCode,
+   557:           brain_context: brainContext,
+   558:           prompt_brain_context: renderPromptBrainContext(brainContext)
+
+--- HIT line=524 window=489-559 ---
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+   509:     }
+   510: 
+   511:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/persistent-smoke") {
+   512:       return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+   513:     }
+   514: 
+   515:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+   516:       return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+   517:     }
+   518: 
+   519:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+   520:       return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+   521:     }
+   522: 
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+   526: 
+   527: 
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+   556:           use_purpose_code: brainContext.purposeCode,
+   557:           brain_context: brainContext,
+   558:           prompt_brain_context: renderPromptBrainContext(brainContext)
+   559:         }
+
+============================================================
+PATTERN=runtime_worker_output
+============================================================
+NO_HIT
+
+============================================================
+PATTERN=runtime_output_artifact
+============================================================
+NO_HIT
+
+============================================================
+PATTERN=runtime_delivery_package
+============================================================
+NO_HIT
+
+============================================================
+PATTERN=buildRuntimeBrainContext
+============================================================
+
+--- HIT line=190 window=155-225 ---
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+   176:   }
+   177:   if (Array.isArray(out.items)) {
+   178:     out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+   179:   }
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   182:   }
+   183: 
+   184:   return out;
+   185: }
+   186: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+   187: 
+   188: 
+   189: const http = require("http");
+   190: const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+   191: const { URL } = require("url");
+   192: const { spawnSync } = require("child_process");
+   193: const fs = require("fs");
+   194: const path = require("path");
+   195: 
+   196: const appRoot = __dirname;
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+   202:   for (const line of lines) {
+   203:     if (!line || line.trim().startsWith("#")) continue;
+   204:     const idx = line.indexOf("=");
+   205:     if (idx < 0) continue;
+   206:     const key = line.slice(0, idx).trim();
+   207:     const value = line.slice(idx + 1).trim();
+   208:     if (key && process.env[key] === undefined) {
+   209:       process.env[key] = value;
+   210:     }
+   211:   }
+   212: }
+   213: 
+   214: loadDotEnv(envFile);
+   215: 
+   216: const port = Number(process.env.PERSONA_AIWORKEROS_PORT || "8787");
+   217: const authToken = process.env.PERSONA_AIWORKEROS_AUTH_TOKEN;
+   218: if (!authToken) {
+   219:   console.error("ERROR: PERSONA_AIWORKEROS_AUTH_TOKEN is required");
+   220:   process.exit(1);
+   221: }
+   222: const databaseUrl = process.env.PERSONA_DATABASE_URL;
+   223: 
+   224: if (!databaseUrl) {
+   225:   console.error("ERROR: PERSONA_DATABASE_URL is not set");
+
+--- HIT line=544 window=509-579 ---
+   509:     }
+   510: 
+   511:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/persistent-smoke") {
+   512:       return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+   513:     }
+   514: 
+   515:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+   516:       return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+   517:     }
+   518: 
+   519:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+   520:       return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+   521:     }
+   522: 
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+   526: 
+   527: 
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+   556:           use_purpose_code: brainContext.purposeCode,
+   557:           brain_context: brainContext,
+   558:           prompt_brain_context: renderPromptBrainContext(brainContext)
+   559:         }
+   560:       });
+   561:     }
+   562: 
+   563:     if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+   564:       const bodyText = await readBody(req);
+   565:       let payload;
+   566:       try {
+   567:         payload = bodyText ? JSON.parse(bodyText) : {};
+   568:       } catch (e) {
+   569:         return sendJson(res, 400, {
+   570:           result: "error",
+   571:           error_code: "INVALID_JSON",
+   572:           message: "Request body must be valid JSON."
+   573:         });
+   574:       }
+   575: 
+   576:       const idempotencyKey = req.headers["idempotency-key"] || "";
+   577:       const result = createRuntimeRequest(payload, idempotencyKey);
+   578:       return sendJson(res, 201, result);
+   579:     }
+
+============================================================
+PATTERN=renderPromptBrainContext
+============================================================
+
+--- HIT line=190 window=155-225 ---
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+   176:   }
+   177:   if (Array.isArray(out.items)) {
+   178:     out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+   179:   }
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   182:   }
+   183: 
+   184:   return out;
+   185: }
+   186: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+   187: 
+   188: 
+   189: const http = require("http");
+   190: const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+   191: const { URL } = require("url");
+   192: const { spawnSync } = require("child_process");
+   193: const fs = require("fs");
+   194: const path = require("path");
+   195: 
+   196: const appRoot = __dirname;
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+   202:   for (const line of lines) {
+   203:     if (!line || line.trim().startsWith("#")) continue;
+   204:     const idx = line.indexOf("=");
+   205:     if (idx < 0) continue;
+   206:     const key = line.slice(0, idx).trim();
+   207:     const value = line.slice(idx + 1).trim();
+   208:     if (key && process.env[key] === undefined) {
+   209:       process.env[key] = value;
+   210:     }
+   211:   }
+   212: }
+   213: 
+   214: loadDotEnv(envFile);
+   215: 
+   216: const port = Number(process.env.PERSONA_AIWORKEROS_PORT || "8787");
+   217: const authToken = process.env.PERSONA_AIWORKEROS_AUTH_TOKEN;
+   218: if (!authToken) {
+   219:   console.error("ERROR: PERSONA_AIWORKEROS_AUTH_TOKEN is required");
+   220:   process.exit(1);
+   221: }
+   222: const databaseUrl = process.env.PERSONA_DATABASE_URL;
+   223: 
+   224: if (!databaseUrl) {
+   225:   console.error("ERROR: PERSONA_DATABASE_URL is not set");
+
+--- HIT line=558 window=523-593 ---
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+   526: 
+   527: 
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+   556:           use_purpose_code: brainContext.purposeCode,
+   557:           brain_context: brainContext,
+   558:           prompt_brain_context: renderPromptBrainContext(brainContext)
+   559:         }
+   560:       });
+   561:     }
+   562: 
+   563:     if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+   564:       const bodyText = await readBody(req);
+   565:       let payload;
+   566:       try {
+   567:         payload = bodyText ? JSON.parse(bodyText) : {};
+   568:       } catch (e) {
+   569:         return sendJson(res, 400, {
+   570:           result: "error",
+   571:           error_code: "INVALID_JSON",
+   572:           message: "Request body must be valid JSON."
+   573:         });
+   574:       }
+   575: 
+   576:       const idempotencyKey = req.headers["idempotency-key"] || "";
+   577:       const result = createRuntimeRequest(payload, idempotencyKey);
+   578:       return sendJson(res, 201, result);
+   579:     }
+   580: 
+   581:     return sendJson(res, 404, {
+   582:       result: "error",
+   583:       error_code: "NOT_FOUND",
+   584:       path: url.pathname
+   585:     });
+   586:   } catch (err) {
+   587:     const status = err.httpStatus || 500;
+   588:     return sendJson(res, status, {
+   589:       result: "error",
+   590:       error_code: status === 400 ? "BAD_REQUEST" : "INTERNAL_ERROR",
+   591:       message: err.message,
+   592:       safety: {
+   593:         external_execution_performed_flag: false,
+
+============================================================
+PATTERN=request_status_code
+============================================================
+
+--- HIT line=139 window=104-174 ---
+   104:     source_entity_type: out.source_entity_type || source.source_entity_type,
+   105:     source_entity_id: out.source_entity_id || source.source_entity_id
+   106:   }));
+   107: 
+   108:   if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+   109:   if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+   110:   if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+   111:   if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+   112:   if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+   113: 
+   114:   if (route.source_route_code) {
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   116:   }
+   117:   return out;
+   118: }
+   119: 
+   120: function aiwB6R44fExposeSourceRouteOnRows(value) {
+   121:   if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+   122:   return value;
+   123: }
+   124: // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_END
+   125: 
+   126: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_START
+   127: /*
+   128:   B6R44G-R4:
+   129:   SendJson boundary wrapper.
+   130:   Exposes source route metadata only for runtime-shaped rows.
+   131: */
+   132: function aiwB6R44gR4PlainObject(value) {
+   133:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+   134: }
+   135: 
+   136: function aiwB6R44gR4LooksRuntimeRow(row) {
+   137:   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   139:   if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   141:   return false;
+   142: }
+   143: 
+   144: function aiwB6R44gR4ExposeSourceRouteRow(row) {
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+
+============================================================
+PATTERN=result_summary_text
+============================================================
+NO_HIT
+
+============================================================
+PATTERN=delivery_summary_text
+============================================================
+NO_HIT
+
+============================================================
+PATTERN=payload
+============================================================
+
+--- HIT line=24 window=1-59 ---
+     1: 
+     2: // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_START
+     3: /*
+     4:   B6R44F:
+     5:   Preserve source route metadata from app callers.
+     6:   AICompanyManager Workbench uses this to separate:
+     7:   - individual_instruction
+     8:   - task_ledger_worker
+     9:   - president_route_worker
+    10: 
+    11:   This helper is intentionally generic and side-effect-free.
+    12: */
+    13: function aiwB6R44fPlainObject(value) {
+    14:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    15: }
+    16: 
+    17: function aiwB6R44fText(value) {
+    18:   return value == null ? "" : String(value).trim();
+    19: }
+    20: 
+    21: function aiwB6R44fExtractSourceRouteMetadata(input) {
+    22:   const body = aiwB6R44fPlainObject(input);
+    23:   const metadata = aiwB6R44fPlainObject(body.metadata_jsonb);
+    24:   const appRead = aiwB6R44fPlainObject(body.app_read_payload_jsonb);
+    25:   const source = aiwB6R44fPlainObject(appRead.source);
+    26: 
+    27:   const sourceAppRef = aiwB6R44fText(
+    28:     body.source_app_ref ||
+    29:     metadata.source_app_ref ||
+    30:     source.source_app_ref ||
+    31:     body.app_surface_code ||
+    32:     "AICompanyManager"
+    33:   );
+    34: 
+    35:   const sourceRouteCode = aiwB6R44fText(
+    36:     body.source_route_code ||
+    37:     metadata.source_route_code ||
+    38:     source.source_route_code
+    39:   );
+    40: 
+    41:   const sourceScreenCode = aiwB6R44fText(
+    42:     body.source_screen_code ||
+    43:     metadata.source_screen_code ||
+    44:     source.source_screen_code
+    45:   );
+    46: 
+    47:   const sourceEntityType = aiwB6R44fText(
+    48:     body.source_entity_type ||
+    49:     metadata.source_entity_type ||
+    50:     source.source_entity_type
+    51:   );
+    52: 
+    53:   const sourceEntityId = aiwB6R44fText(
+    54:     body.source_entity_id ||
+    55:     metadata.source_entity_id ||
+    56:     source.source_entity_id ||
+    57:     body.request_id ||
+    58:     body.runtime_execution_request_id
+    59:   );
+
+--- HIT line=85 window=50-120 ---
+    50:     source.source_entity_type
+    51:   );
+    52: 
+    53:   const sourceEntityId = aiwB6R44fText(
+    54:     body.source_entity_id ||
+    55:     metadata.source_entity_id ||
+    56:     source.source_entity_id ||
+    57:     body.request_id ||
+    58:     body.runtime_execution_request_id
+    59:   );
+    60: 
+    61:   const route = {};
+    62:   if (sourceAppRef) route.source_app_ref = sourceAppRef;
+    63:   if (sourceRouteCode) route.source_route_code = sourceRouteCode;
+    64:   if (sourceScreenCode) route.source_screen_code = sourceScreenCode;
+    65:   if (sourceEntityType) route.source_entity_type = sourceEntityType;
+    66:   if (sourceEntityId) route.source_entity_id = sourceEntityId;
+    67: 
+    68:   const returnTargetType = aiwB6R44fText(body.return_target_type || metadata.return_target_type || source.return_target_type);
+    69:   const returnTargetId = aiwB6R44fText(body.return_target_id || metadata.return_target_id || source.return_target_id);
+    70:   const reexecuteTargetType = aiwB6R44fText(body.reexecute_target_type || metadata.reexecute_target_type || source.reexecute_target_type);
+    71:   const reexecuteTargetId = aiwB6R44fText(body.reexecute_target_id || metadata.reexecute_target_id || source.reexecute_target_id);
+    72:   const contextRestoreType = aiwB6R44fText(body.context_restore_type || metadata.context_restore_type || source.context_restore_type);
+    73:   const contextRestoreId = aiwB6R44fText(body.context_restore_id || metadata.context_restore_id || source.context_restore_id);
+    74: 
+    75:   if (returnTargetType) route.return_target_type = returnTargetType;
+    76:   if (returnTargetId) route.return_target_id = returnTargetId;
+    77:   if (reexecuteTargetType) route.reexecute_target_type = reexecuteTargetType;
+    78:   if (reexecuteTargetId) route.reexecute_target_id = reexecuteTargetId;
+    79:   if (contextRestoreType) route.context_restore_type = contextRestoreType;
+    80:   if (contextRestoreId) route.context_restore_id = contextRestoreId;
+    81: 
+    82:   return route;
+    83: }
+    84: 
+    85: function aiwB6R44fMergeSourceRouteIntoAppReadPayload(appReadPayload, input) {
+    86:   const base = aiwB6R44fPlainObject(appReadPayload);
+    87:   const route = aiwB6R44fExtractSourceRouteMetadata(input);
+    88:   if (!route.source_route_code) return base;
+    89:   return Object.assign({}, base, {
+    90:     source: Object.assign({}, aiwB6R44fPlainObject(base.source), route)
+    91:   });
+    92: }
+    93: 
+    94: function aiwB6R44fExposeSourceRouteOnRow(row) {
+    95:   const out = Object.assign({}, aiwB6R44fPlainObject(row));
+    96:   const appRead = aiwB6R44fPlainObject(out.app_read_payload_jsonb);
+    97:   const source = aiwB6R44fPlainObject(appRead.source);
+    98:   const route = aiwB6R44fExtractSourceRouteMetadata(Object.assign({}, out, {
+    99:     metadata_jsonb: out.metadata_jsonb,
+   100:     app_read_payload_jsonb: aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, body || payload || requestBody || input || {}),
+   101:     source_app_ref: out.source_app_ref || source.source_app_ref,
+   102:     source_route_code: out.source_route_code || source.source_route_code,
+   103:     source_screen_code: out.source_screen_code || source.source_screen_code,
+   104:     source_entity_type: out.source_entity_type || source.source_entity_type,
+   105:     source_entity_id: out.source_entity_id || source.source_entity_id
+   106:   }));
+   107: 
+   108:   if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+   109:   if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+   110:   if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+   111:   if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+   112:   if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+   113: 
+   114:   if (route.source_route_code) {
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   116:   }
+   117:   return out;
+   118: }
+   119: 
+   120: function aiwB6R44fExposeSourceRouteOnRows(value) {
+
+--- HIT line=86 window=51-121 ---
+    51:   );
+    52: 
+    53:   const sourceEntityId = aiwB6R44fText(
+    54:     body.source_entity_id ||
+    55:     metadata.source_entity_id ||
+    56:     source.source_entity_id ||
+    57:     body.request_id ||
+    58:     body.runtime_execution_request_id
+    59:   );
+    60: 
+    61:   const route = {};
+    62:   if (sourceAppRef) route.source_app_ref = sourceAppRef;
+    63:   if (sourceRouteCode) route.source_route_code = sourceRouteCode;
+    64:   if (sourceScreenCode) route.source_screen_code = sourceScreenCode;
+    65:   if (sourceEntityType) route.source_entity_type = sourceEntityType;
+    66:   if (sourceEntityId) route.source_entity_id = sourceEntityId;
+    67: 
+    68:   const returnTargetType = aiwB6R44fText(body.return_target_type || metadata.return_target_type || source.return_target_type);
+    69:   const returnTargetId = aiwB6R44fText(body.return_target_id || metadata.return_target_id || source.return_target_id);
+    70:   const reexecuteTargetType = aiwB6R44fText(body.reexecute_target_type || metadata.reexecute_target_type || source.reexecute_target_type);
+    71:   const reexecuteTargetId = aiwB6R44fText(body.reexecute_target_id || metadata.reexecute_target_id || source.reexecute_target_id);
+    72:   const contextRestoreType = aiwB6R44fText(body.context_restore_type || metadata.context_restore_type || source.context_restore_type);
+    73:   const contextRestoreId = aiwB6R44fText(body.context_restore_id || metadata.context_restore_id || source.context_restore_id);
+    74: 
+    75:   if (returnTargetType) route.return_target_type = returnTargetType;
+    76:   if (returnTargetId) route.return_target_id = returnTargetId;
+    77:   if (reexecuteTargetType) route.reexecute_target_type = reexecuteTargetType;
+    78:   if (reexecuteTargetId) route.reexecute_target_id = reexecuteTargetId;
+    79:   if (contextRestoreType) route.context_restore_type = contextRestoreType;
+    80:   if (contextRestoreId) route.context_restore_id = contextRestoreId;
+    81: 
+    82:   return route;
+    83: }
+    84: 
+    85: function aiwB6R44fMergeSourceRouteIntoAppReadPayload(appReadPayload, input) {
+    86:   const base = aiwB6R44fPlainObject(appReadPayload);
+    87:   const route = aiwB6R44fExtractSourceRouteMetadata(input);
+    88:   if (!route.source_route_code) return base;
+    89:   return Object.assign({}, base, {
+    90:     source: Object.assign({}, aiwB6R44fPlainObject(base.source), route)
+    91:   });
+    92: }
+    93: 
+    94: function aiwB6R44fExposeSourceRouteOnRow(row) {
+    95:   const out = Object.assign({}, aiwB6R44fPlainObject(row));
+    96:   const appRead = aiwB6R44fPlainObject(out.app_read_payload_jsonb);
+    97:   const source = aiwB6R44fPlainObject(appRead.source);
+    98:   const route = aiwB6R44fExtractSourceRouteMetadata(Object.assign({}, out, {
+    99:     metadata_jsonb: out.metadata_jsonb,
+   100:     app_read_payload_jsonb: aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, body || payload || requestBody || input || {}),
+   101:     source_app_ref: out.source_app_ref || source.source_app_ref,
+   102:     source_route_code: out.source_route_code || source.source_route_code,
+   103:     source_screen_code: out.source_screen_code || source.source_screen_code,
+   104:     source_entity_type: out.source_entity_type || source.source_entity_type,
+   105:     source_entity_id: out.source_entity_id || source.source_entity_id
+   106:   }));
+   107: 
+   108:   if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+   109:   if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+   110:   if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+   111:   if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+   112:   if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+   113: 
+   114:   if (route.source_route_code) {
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   116:   }
+   117:   return out;
+   118: }
+   119: 
+   120: function aiwB6R44fExposeSourceRouteOnRows(value) {
+   121:   if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+
+--- HIT line=96 window=61-131 ---
+    61:   const route = {};
+    62:   if (sourceAppRef) route.source_app_ref = sourceAppRef;
+    63:   if (sourceRouteCode) route.source_route_code = sourceRouteCode;
+    64:   if (sourceScreenCode) route.source_screen_code = sourceScreenCode;
+    65:   if (sourceEntityType) route.source_entity_type = sourceEntityType;
+    66:   if (sourceEntityId) route.source_entity_id = sourceEntityId;
+    67: 
+    68:   const returnTargetType = aiwB6R44fText(body.return_target_type || metadata.return_target_type || source.return_target_type);
+    69:   const returnTargetId = aiwB6R44fText(body.return_target_id || metadata.return_target_id || source.return_target_id);
+    70:   const reexecuteTargetType = aiwB6R44fText(body.reexecute_target_type || metadata.reexecute_target_type || source.reexecute_target_type);
+    71:   const reexecuteTargetId = aiwB6R44fText(body.reexecute_target_id || metadata.reexecute_target_id || source.reexecute_target_id);
+    72:   const contextRestoreType = aiwB6R44fText(body.context_restore_type || metadata.context_restore_type || source.context_restore_type);
+    73:   const contextRestoreId = aiwB6R44fText(body.context_restore_id || metadata.context_restore_id || source.context_restore_id);
+    74: 
+    75:   if (returnTargetType) route.return_target_type = returnTargetType;
+    76:   if (returnTargetId) route.return_target_id = returnTargetId;
+    77:   if (reexecuteTargetType) route.reexecute_target_type = reexecuteTargetType;
+    78:   if (reexecuteTargetId) route.reexecute_target_id = reexecuteTargetId;
+    79:   if (contextRestoreType) route.context_restore_type = contextRestoreType;
+    80:   if (contextRestoreId) route.context_restore_id = contextRestoreId;
+    81: 
+    82:   return route;
+    83: }
+    84: 
+    85: function aiwB6R44fMergeSourceRouteIntoAppReadPayload(appReadPayload, input) {
+    86:   const base = aiwB6R44fPlainObject(appReadPayload);
+    87:   const route = aiwB6R44fExtractSourceRouteMetadata(input);
+    88:   if (!route.source_route_code) return base;
+    89:   return Object.assign({}, base, {
+    90:     source: Object.assign({}, aiwB6R44fPlainObject(base.source), route)
+    91:   });
+    92: }
+    93: 
+    94: function aiwB6R44fExposeSourceRouteOnRow(row) {
+    95:   const out = Object.assign({}, aiwB6R44fPlainObject(row));
+    96:   const appRead = aiwB6R44fPlainObject(out.app_read_payload_jsonb);
+    97:   const source = aiwB6R44fPlainObject(appRead.source);
+    98:   const route = aiwB6R44fExtractSourceRouteMetadata(Object.assign({}, out, {
+    99:     metadata_jsonb: out.metadata_jsonb,
+   100:     app_read_payload_jsonb: aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, body || payload || requestBody || input || {}),
+   101:     source_app_ref: out.source_app_ref || source.source_app_ref,
+   102:     source_route_code: out.source_route_code || source.source_route_code,
+   103:     source_screen_code: out.source_screen_code || source.source_screen_code,
+   104:     source_entity_type: out.source_entity_type || source.source_entity_type,
+   105:     source_entity_id: out.source_entity_id || source.source_entity_id
+   106:   }));
+   107: 
+   108:   if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+   109:   if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+   110:   if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+   111:   if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+   112:   if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+   113: 
+   114:   if (route.source_route_code) {
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   116:   }
+   117:   return out;
+   118: }
+   119: 
+   120: function aiwB6R44fExposeSourceRouteOnRows(value) {
+   121:   if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+   122:   return value;
+   123: }
+   124: // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_END
+   125: 
+   126: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_START
+   127: /*
+   128:   B6R44G-R4:
+   129:   SendJson boundary wrapper.
+   130:   Exposes source route metadata only for runtime-shaped rows.
+   131: */
+
+--- HIT line=100 window=65-135 ---
+    65:   if (sourceEntityType) route.source_entity_type = sourceEntityType;
+    66:   if (sourceEntityId) route.source_entity_id = sourceEntityId;
+    67: 
+    68:   const returnTargetType = aiwB6R44fText(body.return_target_type || metadata.return_target_type || source.return_target_type);
+    69:   const returnTargetId = aiwB6R44fText(body.return_target_id || metadata.return_target_id || source.return_target_id);
+    70:   const reexecuteTargetType = aiwB6R44fText(body.reexecute_target_type || metadata.reexecute_target_type || source.reexecute_target_type);
+    71:   const reexecuteTargetId = aiwB6R44fText(body.reexecute_target_id || metadata.reexecute_target_id || source.reexecute_target_id);
+    72:   const contextRestoreType = aiwB6R44fText(body.context_restore_type || metadata.context_restore_type || source.context_restore_type);
+    73:   const contextRestoreId = aiwB6R44fText(body.context_restore_id || metadata.context_restore_id || source.context_restore_id);
+    74: 
+    75:   if (returnTargetType) route.return_target_type = returnTargetType;
+    76:   if (returnTargetId) route.return_target_id = returnTargetId;
+    77:   if (reexecuteTargetType) route.reexecute_target_type = reexecuteTargetType;
+    78:   if (reexecuteTargetId) route.reexecute_target_id = reexecuteTargetId;
+    79:   if (contextRestoreType) route.context_restore_type = contextRestoreType;
+    80:   if (contextRestoreId) route.context_restore_id = contextRestoreId;
+    81: 
+    82:   return route;
+    83: }
+    84: 
+    85: function aiwB6R44fMergeSourceRouteIntoAppReadPayload(appReadPayload, input) {
+    86:   const base = aiwB6R44fPlainObject(appReadPayload);
+    87:   const route = aiwB6R44fExtractSourceRouteMetadata(input);
+    88:   if (!route.source_route_code) return base;
+    89:   return Object.assign({}, base, {
+    90:     source: Object.assign({}, aiwB6R44fPlainObject(base.source), route)
+    91:   });
+    92: }
+    93: 
+    94: function aiwB6R44fExposeSourceRouteOnRow(row) {
+    95:   const out = Object.assign({}, aiwB6R44fPlainObject(row));
+    96:   const appRead = aiwB6R44fPlainObject(out.app_read_payload_jsonb);
+    97:   const source = aiwB6R44fPlainObject(appRead.source);
+    98:   const route = aiwB6R44fExtractSourceRouteMetadata(Object.assign({}, out, {
+    99:     metadata_jsonb: out.metadata_jsonb,
+   100:     app_read_payload_jsonb: aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, body || payload || requestBody || input || {}),
+   101:     source_app_ref: out.source_app_ref || source.source_app_ref,
+   102:     source_route_code: out.source_route_code || source.source_route_code,
+   103:     source_screen_code: out.source_screen_code || source.source_screen_code,
+   104:     source_entity_type: out.source_entity_type || source.source_entity_type,
+   105:     source_entity_id: out.source_entity_id || source.source_entity_id
+   106:   }));
+   107: 
+   108:   if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+   109:   if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+   110:   if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+   111:   if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+   112:   if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+   113: 
+   114:   if (route.source_route_code) {
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   116:   }
+   117:   return out;
+   118: }
+   119: 
+   120: function aiwB6R44fExposeSourceRouteOnRows(value) {
+   121:   if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+   122:   return value;
+   123: }
+   124: // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_END
+   125: 
+   126: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_START
+   127: /*
+   128:   B6R44G-R4:
+   129:   SendJson boundary wrapper.
+   130:   Exposes source route metadata only for runtime-shaped rows.
+   131: */
+   132: function aiwB6R44gR4PlainObject(value) {
+   133:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+   134: }
+   135: 
+
+--- HIT line=115 window=80-150 ---
+    80:   if (contextRestoreId) route.context_restore_id = contextRestoreId;
+    81: 
+    82:   return route;
+    83: }
+    84: 
+    85: function aiwB6R44fMergeSourceRouteIntoAppReadPayload(appReadPayload, input) {
+    86:   const base = aiwB6R44fPlainObject(appReadPayload);
+    87:   const route = aiwB6R44fExtractSourceRouteMetadata(input);
+    88:   if (!route.source_route_code) return base;
+    89:   return Object.assign({}, base, {
+    90:     source: Object.assign({}, aiwB6R44fPlainObject(base.source), route)
+    91:   });
+    92: }
+    93: 
+    94: function aiwB6R44fExposeSourceRouteOnRow(row) {
+    95:   const out = Object.assign({}, aiwB6R44fPlainObject(row));
+    96:   const appRead = aiwB6R44fPlainObject(out.app_read_payload_jsonb);
+    97:   const source = aiwB6R44fPlainObject(appRead.source);
+    98:   const route = aiwB6R44fExtractSourceRouteMetadata(Object.assign({}, out, {
+    99:     metadata_jsonb: out.metadata_jsonb,
+   100:     app_read_payload_jsonb: aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, body || payload || requestBody || input || {}),
+   101:     source_app_ref: out.source_app_ref || source.source_app_ref,
+   102:     source_route_code: out.source_route_code || source.source_route_code,
+   103:     source_screen_code: out.source_screen_code || source.source_screen_code,
+   104:     source_entity_type: out.source_entity_type || source.source_entity_type,
+   105:     source_entity_id: out.source_entity_id || source.source_entity_id
+   106:   }));
+   107: 
+   108:   if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+   109:   if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+   110:   if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+   111:   if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+   112:   if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+   113: 
+   114:   if (route.source_route_code) {
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   116:   }
+   117:   return out;
+   118: }
+   119: 
+   120: function aiwB6R44fExposeSourceRouteOnRows(value) {
+   121:   if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+   122:   return value;
+   123: }
+   124: // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_END
+   125: 
+   126: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_START
+   127: /*
+   128:   B6R44G-R4:
+   129:   SendJson boundary wrapper.
+   130:   Exposes source route metadata only for runtime-shaped rows.
+   131: */
+   132: function aiwB6R44gR4PlainObject(value) {
+   133:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+   134: }
+   135: 
+   136: function aiwB6R44gR4LooksRuntimeRow(row) {
+   137:   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   139:   if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   141:   return false;
+   142: }
+   143: 
+   144: function aiwB6R44gR4ExposeSourceRouteRow(row) {
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+
+--- HIT line=140 window=105-175 ---
+   105:     source_entity_id: out.source_entity_id || source.source_entity_id
+   106:   }));
+   107: 
+   108:   if (route.source_app_ref && !out.source_app_ref) out.source_app_ref = route.source_app_ref;
+   109:   if (route.source_route_code && !out.source_route_code) out.source_route_code = route.source_route_code;
+   110:   if (route.source_screen_code && !out.source_screen_code) out.source_screen_code = route.source_screen_code;
+   111:   if (route.source_entity_type && !out.source_entity_type) out.source_entity_type = route.source_entity_type;
+   112:   if (route.source_entity_id && !out.source_entity_id) out.source_entity_id = route.source_entity_id;
+   113: 
+   114:   if (route.source_route_code) {
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   116:   }
+   117:   return out;
+   118: }
+   119: 
+   120: function aiwB6R44fExposeSourceRouteOnRows(value) {
+   121:   if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+   122:   return value;
+   123: }
+   124: // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_END
+   125: 
+   126: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_START
+   127: /*
+   128:   B6R44G-R4:
+   129:   SendJson boundary wrapper.
+   130:   Exposes source route metadata only for runtime-shaped rows.
+   131: */
+   132: function aiwB6R44gR4PlainObject(value) {
+   133:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+   134: }
+   135: 
+   136: function aiwB6R44gR4LooksRuntimeRow(row) {
+   137:   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   139:   if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   141:   return false;
+   142: }
+   143: 
+   144: function aiwB6R44gR4ExposeSourceRouteRow(row) {
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+
+--- HIT line=148 window=113-183 ---
+   113: 
+   114:   if (route.source_route_code) {
+   115:     out.app_read_payload_jsonb = aiwB6R44fMergeSourceRouteIntoAppReadPayload(appRead, route);
+   116:   }
+   117:   return out;
+   118: }
+   119: 
+   120: function aiwB6R44fExposeSourceRouteOnRows(value) {
+   121:   if (Array.isArray(value)) return value.map(aiwB6R44fExposeSourceRouteOnRow);
+   122:   return value;
+   123: }
+   124: // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_END
+   125: 
+   126: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_START
+   127: /*
+   128:   B6R44G-R4:
+   129:   SendJson boundary wrapper.
+   130:   Exposes source route metadata only for runtime-shaped rows.
+   131: */
+   132: function aiwB6R44gR4PlainObject(value) {
+   133:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+   134: }
+   135: 
+   136: function aiwB6R44gR4LooksRuntimeRow(row) {
+   137:   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   139:   if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   141:   return false;
+   142: }
+   143: 
+   144: function aiwB6R44gR4ExposeSourceRouteRow(row) {
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+   176:   }
+   177:   if (Array.isArray(out.items)) {
+   178:     out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+   179:   }
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   182:   }
+   183: 
+
+--- HIT line=165 window=130-200 ---
+   130:   Exposes source route metadata only for runtime-shaped rows.
+   131: */
+   132: function aiwB6R44gR4PlainObject(value) {
+   133:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+   134: }
+   135: 
+   136: function aiwB6R44gR4LooksRuntimeRow(row) {
+   137:   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   139:   if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   141:   return false;
+   142: }
+   143: 
+   144: function aiwB6R44gR4ExposeSourceRouteRow(row) {
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+   176:   }
+   177:   if (Array.isArray(out.items)) {
+   178:     out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+   179:   }
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   182:   }
+   183: 
+   184:   return out;
+   185: }
+   186: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+   187: 
+   188: 
+   189: const http = require("http");
+   190: const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+   191: const { URL } = require("url");
+   192: const { spawnSync } = require("child_process");
+   193: const fs = require("fs");
+   194: const path = require("path");
+   195: 
+   196: const appRoot = __dirname;
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+
+--- HIT line=166 window=131-201 ---
+   131: */
+   132: function aiwB6R44gR4PlainObject(value) {
+   133:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+   134: }
+   135: 
+   136: function aiwB6R44gR4LooksRuntimeRow(row) {
+   137:   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   139:   if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   141:   return false;
+   142: }
+   143: 
+   144: function aiwB6R44gR4ExposeSourceRouteRow(row) {
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+   176:   }
+   177:   if (Array.isArray(out.items)) {
+   178:     out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+   179:   }
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   182:   }
+   183: 
+   184:   return out;
+   185: }
+   186: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+   187: 
+   188: 
+   189: const http = require("http");
+   190: const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+   191: const { URL } = require("url");
+   192: const { spawnSync } = require("child_process");
+   193: const fs = require("fs");
+   194: const path = require("path");
+   195: 
+   196: const appRoot = __dirname;
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+
+--- HIT line=167 window=132-202 ---
+   132: function aiwB6R44gR4PlainObject(value) {
+   133:   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+   134: }
+   135: 
+   136: function aiwB6R44gR4LooksRuntimeRow(row) {
+   137:   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   139:   if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   141:   return false;
+   142: }
+   143: 
+   144: function aiwB6R44gR4ExposeSourceRouteRow(row) {
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+   176:   }
+   177:   if (Array.isArray(out.items)) {
+   178:     out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+   179:   }
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   182:   }
+   183: 
+   184:   return out;
+   185: }
+   186: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+   187: 
+   188: 
+   189: const http = require("http");
+   190: const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+   191: const { URL } = require("url");
+   192: const { spawnSync } = require("child_process");
+   193: const fs = require("fs");
+   194: const path = require("path");
+   195: 
+   196: const appRoot = __dirname;
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+   202:   for (const line of lines) {
+
+--- HIT line=169 window=134-204 ---
+   134: }
+   135: 
+   136: function aiwB6R44gR4LooksRuntimeRow(row) {
+   137:   if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+   138:   if (row.request_id || row.runtime_execution_request_id || row.request_code) return true;
+   139:   if (row.request_status_code || row.output_status_code || row.delivery_status_code) return true;
+   140:   if (row.app_surface_code || row.app_read_payload_jsonb) return true;
+   141:   return false;
+   142: }
+   143: 
+   144: function aiwB6R44gR4ExposeSourceRouteRow(row) {
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+   176:   }
+   177:   if (Array.isArray(out.items)) {
+   178:     out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+   179:   }
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   182:   }
+   183: 
+   184:   return out;
+   185: }
+   186: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+   187: 
+   188: 
+   189: const http = require("http");
+   190: const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+   191: const { URL } = require("url");
+   192: const { spawnSync } = require("child_process");
+   193: const fs = require("fs");
+   194: const path = require("path");
+   195: 
+   196: const appRoot = __dirname;
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+   202:   for (const line of lines) {
+   203:     if (!line || line.trim().startsWith("#")) continue;
+   204:     const idx = line.indexOf("=");
+
+--- HIT line=180 window=145-215 ---
+   145:   if (!aiwB6R44gR4LooksRuntimeRow(row)) return row;
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+   176:   }
+   177:   if (Array.isArray(out.items)) {
+   178:     out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+   179:   }
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   182:   }
+   183: 
+   184:   return out;
+   185: }
+   186: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+   187: 
+   188: 
+   189: const http = require("http");
+   190: const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+   191: const { URL } = require("url");
+   192: const { spawnSync } = require("child_process");
+   193: const fs = require("fs");
+   194: const path = require("path");
+   195: 
+   196: const appRoot = __dirname;
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+   202:   for (const line of lines) {
+   203:     if (!line || line.trim().startsWith("#")) continue;
+   204:     const idx = line.indexOf("=");
+   205:     if (idx < 0) continue;
+   206:     const key = line.slice(0, idx).trim();
+   207:     const value = line.slice(idx + 1).trim();
+   208:     if (key && process.env[key] === undefined) {
+   209:       process.env[key] = value;
+   210:     }
+   211:   }
+   212: }
+   213: 
+   214: loadDotEnv(envFile);
+   215: 
+
+--- HIT line=181 window=146-216 ---
+   146: 
+   147:   const out = aiwB6R44fExposeSourceRouteOnRow(row);
+   148:   const appRead = aiwB6R44gR4PlainObject(out.app_read_payload_jsonb);
+   149:   const source = aiwB6R44gR4PlainObject(appRead.source);
+   150: 
+   151:   if (source.source_app_ref && !out.source_app_ref) out.source_app_ref = source.source_app_ref;
+   152:   if (source.source_route_code && !out.source_route_code) out.source_route_code = source.source_route_code;
+   153:   if (source.source_screen_code && !out.source_screen_code) out.source_screen_code = source.source_screen_code;
+   154:   if (source.source_entity_type && !out.source_entity_type) out.source_entity_type = source.source_entity_type;
+   155:   if (source.source_entity_id && !out.source_entity_id) out.source_entity_id = source.source_entity_id;
+   156: 
+   157:   return out;
+   158: }
+   159: 
+   160: function aiwB6R44gR4ExposeSourceRouteRows(rows) {
+   161:   if (!Array.isArray(rows)) return rows;
+   162:   return rows.map(aiwB6R44gR4ExposeSourceRouteRow);
+   163: }
+   164: 
+   165: function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
+   166:   if (!payload || typeof payload !== "object") return payload;
+   167:   if (Array.isArray(payload)) return aiwB6R44gR4ExposeSourceRouteRows(payload);
+   168: 
+   169:   const out = Object.assign({}, payload);
+   170: 
+   171:   if (Array.isArray(out.data)) {
+   172:     out.data = aiwB6R44gR4ExposeSourceRouteRows(out.data);
+   173:   }
+   174:   if (Array.isArray(out.rows)) {
+   175:     out.rows = aiwB6R44gR4ExposeSourceRouteRows(out.rows);
+   176:   }
+   177:   if (Array.isArray(out.items)) {
+   178:     out.items = aiwB6R44gR4ExposeSourceRouteRows(out.items);
+   179:   }
+   180:   if (out.payload && typeof out.payload === "object") {
+   181:     out.payload = aiwB6R44gR4ExposeSourceRoutePayload(out.payload);
+   182:   }
+   183: 
+   184:   return out;
+   185: }
+   186: // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_SOURCE_ROUTE_HELPER_END
+   187: 
+   188: 
+   189: const http = require("http");
+   190: const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+   191: const { URL } = require("url");
+   192: const { spawnSync } = require("child_process");
+   193: const fs = require("fs");
+   194: const path = require("path");
+   195: 
+   196: const appRoot = __dirname;
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+   202:   for (const line of lines) {
+   203:     if (!line || line.trim().startsWith("#")) continue;
+   204:     const idx = line.indexOf("=");
+   205:     if (idx < 0) continue;
+   206:     const key = line.slice(0, idx).trim();
+   207:     const value = line.slice(idx + 1).trim();
+   208:     if (key && process.env[key] === undefined) {
+   209:       process.env[key] = value;
+   210:     }
+   211:   }
+   212: }
+   213: 
+   214: loadDotEnv(envFile);
+   215: 
+   216: const port = Number(process.env.PERSONA_AIWORKEROS_PORT || "8787");
+
+--- HIT line=229 window=194-264 ---
+   194: const path = require("path");
+   195: 
+   196: const appRoot = __dirname;
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+   202:   for (const line of lines) {
+   203:     if (!line || line.trim().startsWith("#")) continue;
+   204:     const idx = line.indexOf("=");
+   205:     if (idx < 0) continue;
+   206:     const key = line.slice(0, idx).trim();
+   207:     const value = line.slice(idx + 1).trim();
+   208:     if (key && process.env[key] === undefined) {
+   209:       process.env[key] = value;
+   210:     }
+   211:   }
+   212: }
+   213: 
+   214: loadDotEnv(envFile);
+   215: 
+   216: const port = Number(process.env.PERSONA_AIWORKEROS_PORT || "8787");
+   217: const authToken = process.env.PERSONA_AIWORKEROS_AUTH_TOKEN;
+   218: if (!authToken) {
+   219:   console.error("ERROR: PERSONA_AIWORKEROS_AUTH_TOKEN is required");
+   220:   process.exit(1);
+   221: }
+   222: const databaseUrl = process.env.PERSONA_DATABASE_URL;
+   223: 
+   224: if (!databaseUrl) {
+   225:   console.error("ERROR: PERSONA_DATABASE_URL is not set");
+   226:   process.exit(1);
+   227: }
+   228: 
+   229: function sendJson(res, status, payload) {
+   230:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_START
+   231:   try {
+   232:     payload = aiwB6R44gR4ExposeSourceRoutePayload(payload);
+   233:   } catch (_b6r44gR4Error) {
+   234:     // Keep sendJson stable for non-runtime payloads.
+   235:   }
+   236:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_END
+   237: 
+   238:   res.writeHead(status, {
+   239:     "Content-Type": "application/json; charset=utf-8",
+   240:     "Cache-Control": "no-store"
+   241:   });
+   242:   res.end(JSON.stringify(payload, null, 2));
+   243: }
+   244: 
+   245: function readBody(req) {
+   246:   return new Promise((resolve, reject) => {
+   247:     let body = "";
+   248:     req.on("data", chunk => {
+   249:       body += chunk;
+   250:       if (body.length > 1024 * 1024) {
+   251:         reject(new Error("Request body too large"));
+   252:         req.destroy();
+   253:       }
+   254:     });
+   255:     req.on("end", () => resolve(body));
+   256:     req.on("error", reject);
+   257:   });
+   258: }
+   259: 
+   260: function requireAuth(req) {
+   261:   const auth = req.headers["authorization"] || "";
+   262:   return auth === `Bearer ${authToken}`;
+   263: }
+   264: 
+
+--- HIT line=232 window=197-267 ---
+   197: const envFile = path.join(appRoot, ".env.local");
+   198: 
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+   202:   for (const line of lines) {
+   203:     if (!line || line.trim().startsWith("#")) continue;
+   204:     const idx = line.indexOf("=");
+   205:     if (idx < 0) continue;
+   206:     const key = line.slice(0, idx).trim();
+   207:     const value = line.slice(idx + 1).trim();
+   208:     if (key && process.env[key] === undefined) {
+   209:       process.env[key] = value;
+   210:     }
+   211:   }
+   212: }
+   213: 
+   214: loadDotEnv(envFile);
+   215: 
+   216: const port = Number(process.env.PERSONA_AIWORKEROS_PORT || "8787");
+   217: const authToken = process.env.PERSONA_AIWORKEROS_AUTH_TOKEN;
+   218: if (!authToken) {
+   219:   console.error("ERROR: PERSONA_AIWORKEROS_AUTH_TOKEN is required");
+   220:   process.exit(1);
+   221: }
+   222: const databaseUrl = process.env.PERSONA_DATABASE_URL;
+   223: 
+   224: if (!databaseUrl) {
+   225:   console.error("ERROR: PERSONA_DATABASE_URL is not set");
+   226:   process.exit(1);
+   227: }
+   228: 
+   229: function sendJson(res, status, payload) {
+   230:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_START
+   231:   try {
+   232:     payload = aiwB6R44gR4ExposeSourceRoutePayload(payload);
+   233:   } catch (_b6r44gR4Error) {
+   234:     // Keep sendJson stable for non-runtime payloads.
+   235:   }
+   236:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_END
+   237: 
+   238:   res.writeHead(status, {
+   239:     "Content-Type": "application/json; charset=utf-8",
+   240:     "Cache-Control": "no-store"
+   241:   });
+   242:   res.end(JSON.stringify(payload, null, 2));
+   243: }
+   244: 
+   245: function readBody(req) {
+   246:   return new Promise((resolve, reject) => {
+   247:     let body = "";
+   248:     req.on("data", chunk => {
+   249:       body += chunk;
+   250:       if (body.length > 1024 * 1024) {
+   251:         reject(new Error("Request body too large"));
+   252:         req.destroy();
+   253:       }
+   254:     });
+   255:     req.on("end", () => resolve(body));
+   256:     req.on("error", reject);
+   257:   });
+   258: }
+   259: 
+   260: function requireAuth(req) {
+   261:   const auth = req.headers["authorization"] || "";
+   262:   return auth === `Bearer ${authToken}`;
+   263: }
+   264: 
+   265: function normalizeLimit(value) {
+   266:   const n = Number(value || "20");
+   267:   if (!Number.isFinite(n)) return 20;
+
+--- HIT line=234 window=199-269 ---
+   199: function loadDotEnv(filePath) {
+   200:   if (!fs.existsSync(filePath)) return;
+   201:   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+   202:   for (const line of lines) {
+   203:     if (!line || line.trim().startsWith("#")) continue;
+   204:     const idx = line.indexOf("=");
+   205:     if (idx < 0) continue;
+   206:     const key = line.slice(0, idx).trim();
+   207:     const value = line.slice(idx + 1).trim();
+   208:     if (key && process.env[key] === undefined) {
+   209:       process.env[key] = value;
+   210:     }
+   211:   }
+   212: }
+   213: 
+   214: loadDotEnv(envFile);
+   215: 
+   216: const port = Number(process.env.PERSONA_AIWORKEROS_PORT || "8787");
+   217: const authToken = process.env.PERSONA_AIWORKEROS_AUTH_TOKEN;
+   218: if (!authToken) {
+   219:   console.error("ERROR: PERSONA_AIWORKEROS_AUTH_TOKEN is required");
+   220:   process.exit(1);
+   221: }
+   222: const databaseUrl = process.env.PERSONA_DATABASE_URL;
+   223: 
+   224: if (!databaseUrl) {
+   225:   console.error("ERROR: PERSONA_DATABASE_URL is not set");
+   226:   process.exit(1);
+   227: }
+   228: 
+   229: function sendJson(res, status, payload) {
+   230:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_START
+   231:   try {
+   232:     payload = aiwB6R44gR4ExposeSourceRoutePayload(payload);
+   233:   } catch (_b6r44gR4Error) {
+   234:     // Keep sendJson stable for non-runtime payloads.
+   235:   }
+   236:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_END
+   237: 
+   238:   res.writeHead(status, {
+   239:     "Content-Type": "application/json; charset=utf-8",
+   240:     "Cache-Control": "no-store"
+   241:   });
+   242:   res.end(JSON.stringify(payload, null, 2));
+   243: }
+   244: 
+   245: function readBody(req) {
+   246:   return new Promise((resolve, reject) => {
+   247:     let body = "";
+   248:     req.on("data", chunk => {
+   249:       body += chunk;
+   250:       if (body.length > 1024 * 1024) {
+   251:         reject(new Error("Request body too large"));
+   252:         req.destroy();
+   253:       }
+   254:     });
+   255:     req.on("end", () => resolve(body));
+   256:     req.on("error", reject);
+   257:   });
+   258: }
+   259: 
+   260: function requireAuth(req) {
+   261:   const auth = req.headers["authorization"] || "";
+   262:   return auth === `Bearer ${authToken}`;
+   263: }
+   264: 
+   265: function normalizeLimit(value) {
+   266:   const n = Number(value || "20");
+   267:   if (!Number.isFinite(n)) return 20;
+   268:   return Math.max(1, Math.min(100, Math.floor(n)));
+   269: }
+
+--- HIT line=242 window=207-277 ---
+   207:     const value = line.slice(idx + 1).trim();
+   208:     if (key && process.env[key] === undefined) {
+   209:       process.env[key] = value;
+   210:     }
+   211:   }
+   212: }
+   213: 
+   214: loadDotEnv(envFile);
+   215: 
+   216: const port = Number(process.env.PERSONA_AIWORKEROS_PORT || "8787");
+   217: const authToken = process.env.PERSONA_AIWORKEROS_AUTH_TOKEN;
+   218: if (!authToken) {
+   219:   console.error("ERROR: PERSONA_AIWORKEROS_AUTH_TOKEN is required");
+   220:   process.exit(1);
+   221: }
+   222: const databaseUrl = process.env.PERSONA_DATABASE_URL;
+   223: 
+   224: if (!databaseUrl) {
+   225:   console.error("ERROR: PERSONA_DATABASE_URL is not set");
+   226:   process.exit(1);
+   227: }
+   228: 
+   229: function sendJson(res, status, payload) {
+   230:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_START
+   231:   try {
+   232:     payload = aiwB6R44gR4ExposeSourceRoutePayload(payload);
+   233:   } catch (_b6r44gR4Error) {
+   234:     // Keep sendJson stable for non-runtime payloads.
+   235:   }
+   236:   // AIWORKEROS_V10L_C2G_B6R44G_R4_SENDJSON_BODY_WRAP_END
+   237: 
+   238:   res.writeHead(status, {
+   239:     "Content-Type": "application/json; charset=utf-8",
+   240:     "Cache-Control": "no-store"
+   241:   });
+   242:   res.end(JSON.stringify(payload, null, 2));
+   243: }
+   244: 
+   245: function readBody(req) {
+   246:   return new Promise((resolve, reject) => {
+   247:     let body = "";
+   248:     req.on("data", chunk => {
+   249:       body += chunk;
+   250:       if (body.length > 1024 * 1024) {
+   251:         reject(new Error("Request body too large"));
+   252:         req.destroy();
+   253:       }
+   254:     });
+   255:     req.on("end", () => resolve(body));
+   256:     req.on("error", reject);
+   257:   });
+   258: }
+   259: 
+   260: function requireAuth(req) {
+   261:   const auth = req.headers["authorization"] || "";
+   262:   return auth === `Bearer ${authToken}`;
+   263: }
+   264: 
+   265: function normalizeLimit(value) {
+   266:   const n = Number(value || "20");
+   267:   if (!Number.isFinite(n)) return 20;
+   268:   return Math.max(1, Math.min(100, Math.floor(n)));
+   269: }
+   270: 
+   271: /**
+   272:  * IMPORTANT:
+   273:  * Do not pass SQL using `psql -c` here.
+   274:  * In the previous version, psql variables like :'app_surface_code'
+   275:  * were not substituted and were sent to PostgreSQL as-is.
+   276:  *
+   277:  * This fixed version passes SQL via stdin.
+
+--- HIT line=370 window=335-405 ---
+   335:   `);
+   336: }
+   337: 
+   338: function persistentSmoke() {
+   339:   return psqlJson(`
+   340:     select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)::text
+   341:     from (
+   342:       select *
+   343:       from aiworker.vw_app_aiworker_runtime_execution_persistent_smoke_board_v1
+   344:     ) t;
+   345:   `);
+   346: }
+   347: 
+   348: function pipelineBoard(query) {
+   349:   return psqlJson(`
+   350:     select coalesce(jsonb_agg(to_jsonb(t) order by request_created_at desc), '[]'::jsonb)::text
+   351:     from (
+   352:       select p.*, rr.source_route_code
+   353:       from aiworker.vw_app_aiworker_runtime_full_pipeline_board_v1 p
+   354:       left join aiworker.runtime_execution_request rr
+   355:         on rr.request_id = p.request_id
+   356:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   357:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   358:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   359:       order by p.request_created_at desc
+   360:       limit :'limit'
+   361:     ) t;
+   362:   `, {
+   363:     request_id: query.get("request_id") || "",
+   364:     request_code: query.get("request_code") || "",
+   365:     app_surface_code: query.get("app_surface_code") || "",
+   366:     limit: normalizeLimit(query.get("limit"))
+   367:   });
+   368: }
+   369: 
+   370: function appReadPayload(query) {
+   371:   return psqlJson(`
+   372:     select coalesce(jsonb_agg(to_jsonb(t) order by request_created_at desc), '[]'::jsonb)::text
+   373:     from (
+   374:       select p.*, rr.source_route_code
+   375:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   376:       left join aiworker.runtime_execution_request rr
+   377:         on rr.request_id = p.request_id
+   378:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   379:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   380:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   381:       order by p.request_created_at desc
+   382:       limit :'limit'
+   383:     ) t;
+   384:   `, {
+   385:     request_id: query.get("request_id") || "",
+   386:     request_code: query.get("request_code") || "",
+   387:     app_surface_code: query.get("app_surface_code") || "",
+   388:     limit: normalizeLimit(query.get("limit"))
+   389:   });
+   390: }
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+
+--- HIT line=375 window=340-410 ---
+   340:     select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)::text
+   341:     from (
+   342:       select *
+   343:       from aiworker.vw_app_aiworker_runtime_execution_persistent_smoke_board_v1
+   344:     ) t;
+   345:   `);
+   346: }
+   347: 
+   348: function pipelineBoard(query) {
+   349:   return psqlJson(`
+   350:     select coalesce(jsonb_agg(to_jsonb(t) order by request_created_at desc), '[]'::jsonb)::text
+   351:     from (
+   352:       select p.*, rr.source_route_code
+   353:       from aiworker.vw_app_aiworker_runtime_full_pipeline_board_v1 p
+   354:       left join aiworker.runtime_execution_request rr
+   355:         on rr.request_id = p.request_id
+   356:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   357:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   358:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   359:       order by p.request_created_at desc
+   360:       limit :'limit'
+   361:     ) t;
+   362:   `, {
+   363:     request_id: query.get("request_id") || "",
+   364:     request_code: query.get("request_code") || "",
+   365:     app_surface_code: query.get("app_surface_code") || "",
+   366:     limit: normalizeLimit(query.get("limit"))
+   367:   });
+   368: }
+   369: 
+   370: function appReadPayload(query) {
+   371:   return psqlJson(`
+   372:     select coalesce(jsonb_agg(to_jsonb(t) order by request_created_at desc), '[]'::jsonb)::text
+   373:     from (
+   374:       select p.*, rr.source_route_code
+   375:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   376:       left join aiworker.runtime_execution_request rr
+   377:         on rr.request_id = p.request_id
+   378:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   379:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   380:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   381:       order by p.request_created_at desc
+   382:       limit :'limit'
+   383:     ) t;
+   384:   `, {
+   385:     request_id: query.get("request_id") || "",
+   386:     request_code: query.get("request_code") || "",
+   387:     app_surface_code: query.get("app_surface_code") || "",
+   388:     limit: normalizeLimit(query.get("limit"))
+   389:   });
+   390: }
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+
+--- HIT line=410 window=375-445 ---
+   375:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   376:       left join aiworker.runtime_execution_request rr
+   377:         on rr.request_id = p.request_id
+   378:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   379:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   380:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   381:       order by p.request_created_at desc
+   382:       limit :'limit'
+   383:     ) t;
+   384:   `, {
+   385:     request_id: query.get("request_id") || "",
+   386:     request_code: query.get("request_code") || "",
+   387:     app_surface_code: query.get("app_surface_code") || "",
+   388:     limit: normalizeLimit(query.get("limit"))
+   389:   });
+   390: }
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+
+--- HIT line=411 window=376-446 ---
+   376:       left join aiworker.runtime_execution_request rr
+   377:         on rr.request_id = p.request_id
+   378:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   379:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   380:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   381:       order by p.request_created_at desc
+   382:       limit :'limit'
+   383:     ) t;
+   384:   `, {
+   385:     request_id: query.get("request_id") || "",
+   386:     request_code: query.get("request_code") || "",
+   387:     app_surface_code: query.get("app_surface_code") || "",
+   388:     limit: normalizeLimit(query.get("limit"))
+   389:   });
+   390: }
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+
+--- HIT line=413 window=378-448 ---
+   378:       where (nullif(:'request_id','') is null or p.request_id::text = :'request_id')
+   379:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   380:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   381:       order by p.request_created_at desc
+   382:       limit :'limit'
+   383:     ) t;
+   384:   `, {
+   385:     request_id: query.get("request_id") || "",
+   386:     request_code: query.get("request_code") || "",
+   387:     app_surface_code: query.get("app_surface_code") || "",
+   388:     limit: normalizeLimit(query.get("limit"))
+   389:   });
+   390: }
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+
+--- HIT line=414 window=379-449 ---
+   379:         and (nullif(:'request_code','') is null or p.request_code = :'request_code')
+   380:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   381:       order by p.request_created_at desc
+   382:       limit :'limit'
+   383:     ) t;
+   384:   `, {
+   385:     request_id: query.get("request_id") || "",
+   386:     request_code: query.get("request_code") || "",
+   387:     app_surface_code: query.get("app_surface_code") || "",
+   388:     limit: normalizeLimit(query.get("limit"))
+   389:   });
+   390: }
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+
+--- HIT line=415 window=380-450 ---
+   380:         and (nullif(:'app_surface_code','') is null or p.app_surface_code = :'app_surface_code')
+   381:       order by p.request_created_at desc
+   382:       limit :'limit'
+   383:     ) t;
+   384:   `, {
+   385:     request_id: query.get("request_id") || "",
+   386:     request_code: query.get("request_code") || "",
+   387:     app_surface_code: query.get("app_surface_code") || "",
+   388:     limit: normalizeLimit(query.get("limit"))
+   389:   });
+   390: }
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+
+--- HIT line=426 window=391-461 ---
+   391: 
+   392: function deliveryBoard(query) {
+   393:   return psqlJson(`
+   394:     select coalesce(jsonb_agg(to_jsonb(t) order by created_at desc), '[]'::jsonb)::text
+   395:     from (
+   396:       select *
+   397:       from aiworker.vw_app_aiworker_runtime_delivery_board_v1
+   398:       where (nullif(:'request_id','') is null or request_id::text = :'request_id')
+   399:         and (nullif(:'request_code','') is null or request_code = :'request_code')
+   400:       order by created_at desc
+   401:       limit :'limit'
+   402:     ) t;
+   403:   `, {
+   404:     request_id: query.get("request_id") || "",
+   405:     request_code: query.get("request_code") || "",
+   406:     limit: normalizeLimit(query.get("limit"))
+   407:   });
+   408: }
+   409: 
+   410: function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+   411:   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
+   412:   const sourceRouteCode = String(
+   413:     payload.source_route_code ||
+   414:     payload.sourceRouteCode ||
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+
+--- HIT line=450 window=415-485 ---
+   415:     payload.source_route ||
+   416:     ""
+   417:   ).trim();
+   418:   if (!idempotencyKey) {
+   419:     const e = new Error("Idempotency-Key is required");
+   420:     e.httpStatus = 400;
+   421:     throw e;
+   422:   }
+   423: 
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+
+--- HIT line=459 window=424-494 ---
+   424:   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
+   425:   for (const key of required) {
+   426:     if (!payload[key] || String(payload[key]).trim() === "") {
+   427:       const e = new Error(`Missing required field: ${key}`);
+   428:       e.httpStatus = 400;
+   429:       throw e;
+   430:     }
+   431:   }
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+
+--- HIT line=467 window=432-502 ---
+   432: 
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+
+--- HIT line=468 window=433-503 ---
+   433:   return psqlJson(`
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+
+--- HIT line=469 window=434-504 ---
+   434:     with created as (
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+
+--- HIT line=470 window=435-505 ---
+   435:       select aiworker.fn_runtime_execution_create_request_with_route_v1(
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+
+--- HIT line=471 window=436-506 ---
+   436:         :'app_surface_code',
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+
+--- HIT line=472 window=437-507 ---
+   437:         :'model_code',
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+
+--- HIT line=473 window=438-508 ---
+   438:         :'task_domain_code',
+   439:         :'task_title',
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+
+--- HIT line=475 window=440-510 ---
+   440:         :'task_instruction_ja',
+   441:         :'source_app_ref',
+   442:         :'source_request_ref',
+   443:         :'requested_by_ref',
+   444:         :'idempotency_key',
+   445:         :'source_route_code'
+   446:       ) as request_id
+   447:     ),
+   448:     board as (
+   449:       select p.*
+   450:       from aiworker.vw_app_aiworker_runtime_execution_app_read_payload_v1 p
+   451:       join created c
+   452:         on c.request_id = p.request_id
+   453:     )
+   454:     select jsonb_build_object(
+   455:       'result', 'accepted',
+   456:       'status', 'REQUESTED_INTERNAL_ONLY',
+   457:       'request_id', (select request_id from created),
+   458:       'idempotency_key', :'idempotency_key',
+   459:       'payload', coalesce((select app_read_payload_jsonb from board limit 1), '{}'::jsonb),
+   460:       'safety', jsonb_build_object(
+   461:         'external_execution_performed_flag', false,
+   462:         'pg_apply_performed_flag', false,
+   463:         'destructive_action_performed_flag', false
+   464:       )
+   465:     )::text;
+   466:   `, {
+   467:     app_surface_code: payload.app_surface_code,
+   468:     model_code: payload.model_code,
+   469:     task_domain_code: payload.task_domain_code,
+   470:     task_title: payload.task_title,
+   471:     task_instruction_ja: payload.task_instruction_ja,
+   472:     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
+   473:     source_request_ref: payload.source_request_ref || "",
+   474:     source_route_code: sourceRouteCode,
+   475:     requested_by_ref: payload.requested_by_ref || "human",
+   476:     idempotency_key: idempotencyKey
+   477:   });
+   478: }
+   479: 
+   480: const server = http.createServer(async (req, res) => {
+   481:   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+   482: 
+   483:   try {
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+   509:     }
+   510: 
+
+--- HIT line=519 window=484-554 ---
+   484:     if (req.method === "GET" && url.pathname === "/health") {
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+   509:     }
+   510: 
+   511:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/persistent-smoke") {
+   512:       return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+   513:     }
+   514: 
+   515:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+   516:       return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+   517:     }
+   518: 
+   519:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+   520:       return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+   521:     }
+   522: 
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+   526: 
+   527: 
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+
+--- HIT line=520 window=485-555 ---
+   485:       return sendJson(res, 200, {
+   486:         ok: true,
+   487:         service: "aiworker-runtime-execution-http-api",
+   488:         db: "PERSONA_DATABASE_URL",
+   489:         external_execution: false,
+   490:         pg_apply: false,
+   491:         destructive_action: false
+   492:       });
+   493:     }
+   494: 
+   495:     if (!requireAuth(req)) {
+   496:       return sendJson(res, 401, {
+   497:         result: "error",
+   498:         error_code: "UNAUTHORIZED",
+   499:         message: "Missing or invalid Authorization bearer token."
+   500:       });
+   501:     }
+   502: 
+   503:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/endpoint-ready") {
+   504:       return sendJson(res, 200, { result: "ok", data: endpointReady() });
+   505:     }
+   506: 
+   507:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/api-contract") {
+   508:       return sendJson(res, 200, { result: "ok", data: apiContracts() });
+   509:     }
+   510: 
+   511:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/persistent-smoke") {
+   512:       return sendJson(res, 200, { result: "ok", data: persistentSmoke() });
+   513:     }
+   514: 
+   515:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/pipeline-board") {
+   516:       return sendJson(res, 200, { result: "ok", data: pipelineBoard(url.searchParams) });
+   517:     }
+   518: 
+   519:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/app-read-payload") {
+   520:       return sendJson(res, 200, { result: "ok", data: appReadPayload(url.searchParams) });
+   521:     }
+   522: 
+   523:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/delivery") {
+   524:       return sendJson(res, 200, { result: "ok", data: deliveryBoard(url.searchParams) });
+   525:     }
+   526: 
+   527: 
+   528:     // BRAIN_CONTEXT_BRIDGE_ROUTE_V1
+   529:     if (req.method === "GET" && url.pathname === "/aiworker/v1/runtime-execution/brain-context") {
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+
+--- HIT line=565 window=530-600 ---
+   530:       const modelCode = url.searchParams.get("model_code") || url.searchParams.get("modelCode") || "";
+   531:       const usePurposeCode =
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+   556:           use_purpose_code: brainContext.purposeCode,
+   557:           brain_context: brainContext,
+   558:           prompt_brain_context: renderPromptBrainContext(brainContext)
+   559:         }
+   560:       });
+   561:     }
+   562: 
+   563:     if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+   564:       const bodyText = await readBody(req);
+   565:       let payload;
+   566:       try {
+   567:         payload = bodyText ? JSON.parse(bodyText) : {};
+   568:       } catch (e) {
+   569:         return sendJson(res, 400, {
+   570:           result: "error",
+   571:           error_code: "INVALID_JSON",
+   572:           message: "Request body must be valid JSON."
+   573:         });
+   574:       }
+   575: 
+   576:       const idempotencyKey = req.headers["idempotency-key"] || "";
+   577:       const result = createRuntimeRequest(payload, idempotencyKey);
+   578:       return sendJson(res, 201, result);
+   579:     }
+   580: 
+   581:     return sendJson(res, 404, {
+   582:       result: "error",
+   583:       error_code: "NOT_FOUND",
+   584:       path: url.pathname
+   585:     });
+   586:   } catch (err) {
+   587:     const status = err.httpStatus || 500;
+   588:     return sendJson(res, status, {
+   589:       result: "error",
+   590:       error_code: status === 400 ? "BAD_REQUEST" : "INTERNAL_ERROR",
+   591:       message: err.message,
+   592:       safety: {
+   593:         external_execution_performed_flag: false,
+   594:         pg_apply_performed_flag: false,
+   595:         destructive_action_performed_flag: false
+   596:       }
+   597:     });
+   598:   }
+   599: });
+   600: 
+
+--- HIT line=567 window=532-602 ---
+   532:         url.searchParams.get("use_purpose_code") ||
+   533:         url.searchParams.get("purpose_code") ||
+   534:         url.searchParams.get("task_domain_code") ||
+   535:         "reference";
+   536:       const domainsRaw = url.searchParams.get("domains") || "";
+   537:       const domainCodes = domainsRaw
+   538:         ? domainsRaw.split(",").map((value) => value.trim()).filter(Boolean)
+   539:         : [];
+   540:       const includeMissingSources =
+   541:         url.searchParams.get("include_missing_sources") === "true" ||
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+   556:           use_purpose_code: brainContext.purposeCode,
+   557:           brain_context: brainContext,
+   558:           prompt_brain_context: renderPromptBrainContext(brainContext)
+   559:         }
+   560:       });
+   561:     }
+   562: 
+   563:     if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+   564:       const bodyText = await readBody(req);
+   565:       let payload;
+   566:       try {
+   567:         payload = bodyText ? JSON.parse(bodyText) : {};
+   568:       } catch (e) {
+   569:         return sendJson(res, 400, {
+   570:           result: "error",
+   571:           error_code: "INVALID_JSON",
+   572:           message: "Request body must be valid JSON."
+   573:         });
+   574:       }
+   575: 
+   576:       const idempotencyKey = req.headers["idempotency-key"] || "";
+   577:       const result = createRuntimeRequest(payload, idempotencyKey);
+   578:       return sendJson(res, 201, result);
+   579:     }
+   580: 
+   581:     return sendJson(res, 404, {
+   582:       result: "error",
+   583:       error_code: "NOT_FOUND",
+   584:       path: url.pathname
+   585:     });
+   586:   } catch (err) {
+   587:     const status = err.httpStatus || 500;
+   588:     return sendJson(res, status, {
+   589:       result: "error",
+   590:       error_code: status === 400 ? "BAD_REQUEST" : "INTERNAL_ERROR",
+   591:       message: err.message,
+   592:       safety: {
+   593:         external_execution_performed_flag: false,
+   594:         pg_apply_performed_flag: false,
+   595:         destructive_action_performed_flag: false
+   596:       }
+   597:     });
+   598:   }
+   599: });
+   600: 
+   601: server.listen(port, "127.0.0.1", () => {
+   602:   console.log(`AIWorkerOS runtime execution HTTP API listening on http://127.0.0.1:${port}`);
+
+--- HIT line=577 window=542-604 ---
+   542:         url.searchParams.get("includeMissingSources") === "true";
+   543: 
+   544:       const brainContext = buildRuntimeBrainContext({
+   545:         modelCode,
+   546:         usePurposeCode,
+   547:         domainCodes,
+   548:         includeMissingSources
+   549:       });
+   550: 
+   551:       return sendJson(res, 200, {
+   552:         result: "ok",
+   553:         external_execution_performed_flag: false,
+   554:         data: {
+   555:           model_code: modelCode,
+   556:           use_purpose_code: brainContext.purposeCode,
+   557:           brain_context: brainContext,
+   558:           prompt_brain_context: renderPromptBrainContext(brainContext)
+   559:         }
+   560:       });
+   561:     }
+   562: 
+   563:     if (req.method === "POST" && url.pathname === "/aiworker/v1/runtime-execution/request") {
+   564:       const bodyText = await readBody(req);
+   565:       let payload;
+   566:       try {
+   567:         payload = bodyText ? JSON.parse(bodyText) : {};
+   568:       } catch (e) {
+   569:         return sendJson(res, 400, {
+   570:           result: "error",
+   571:           error_code: "INVALID_JSON",
+   572:           message: "Request body must be valid JSON."
+   573:         });
+   574:       }
+   575: 
+   576:       const idempotencyKey = req.headers["idempotency-key"] || "";
+   577:       const result = createRuntimeRequest(payload, idempotencyKey);
+   578:       return sendJson(res, 201, result);
+   579:     }
+   580: 
+   581:     return sendJson(res, 404, {
+   582:       result: "error",
+   583:       error_code: "NOT_FOUND",
+   584:       path: url.pathname
+   585:     });
+   586:   } catch (err) {
+   587:     const status = err.httpStatus || 500;
+   588:     return sendJson(res, status, {
+   589:       result: "error",
+   590:       error_code: status === 400 ? "BAD_REQUEST" : "INTERNAL_ERROR",
+   591:       message: err.message,
+   592:       safety: {
+   593:         external_execution_performed_flag: false,
+   594:         pg_apply_performed_flag: false,
+   595:         destructive_action_performed_flag: false
+   596:       }
+   597:     });
+   598:   }
+   599: });
+   600: 
+   601: server.listen(port, "127.0.0.1", () => {
+   602:   console.log(`AIWorkerOS runtime execution HTTP API listening on http://127.0.0.1:${port}`);
+   603: });
+   604: 
+
+============================================================
+PATTERN=response
+============================================================
+NO_HIT
