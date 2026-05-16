@@ -186,6 +186,282 @@ function runPsqlJson(sql) {
   }
 }
 
+
+// B6R98R4D2B_SOURCE_MATERIAL_UPLOAD_START
+function aicmB6R98R4D2BSourceText(value) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function aicmB6R98R4D2BTmpRoot() {
+  return path.join(APP_ROOT, "storage", "runtime-source-files", "tmp");
+}
+
+function aicmB6R98R4D2BSafeFileName(value) {
+  const raw = aicmB6R98R4D2BSourceText(value).trim() || "source.txt";
+  const base = path.basename(raw).replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+  return base || "source.txt";
+}
+
+function aicmB6R98R4D2BSourceRefSlug(value) {
+  return aicmB6R98R4D2BSourceText(value || "manual")
+    .replace(/[^A-Za-z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80) || "manual";
+}
+
+function aicmB6R98R4D2BClassifySourceMaterial(fileName, mimeType) {
+  const safeName = aicmB6R98R4D2BSafeFileName(fileName);
+  const ext = path.extname(safeName).toLowerCase();
+  const mt = aicmB6R98R4D2BSourceText(mimeType).toLowerCase();
+
+  const textExt = {
+    ".txt": true,
+    ".text": true,
+    ".md": true,
+    ".markdown": true,
+    ".csv": true,
+    ".json": true,
+    ".jsonl": true,
+    ".yaml": true,
+    ".yml": true,
+    ".xml": true,
+    ".html": true,
+    ".htm": true,
+    ".css": true,
+    ".js": true,
+    ".mjs": true,
+    ".cjs": true,
+    ".ts": true,
+    ".tsx": true,
+    ".jsx": true,
+    ".sql": true,
+    ".log": true,
+    ".svg": true
+  };
+
+  const imageExt = {
+    ".jpg": true,
+    ".jpeg": true,
+    ".png": true,
+    ".webp": true,
+    ".gif": true
+  };
+
+  const audioExt = {
+    ".mp3": true,
+    ".wav": true,
+    ".m4a": true,
+    ".aac": true,
+    ".ogg": true,
+    ".flac": true,
+    ".mid": true,
+    ".midi": true
+  };
+
+  if (textExt[ext] || mt.indexOf("text/") === 0 || mt.indexOf("json") >= 0 || mt.indexOf("xml") >= 0 || mt.indexOf("svg") >= 0) {
+    return "text";
+  }
+
+  if (imageExt[ext] || mt.indexOf("image/") === 0) {
+    return "image";
+  }
+
+  if (audioExt[ext] || mt.indexOf("audio/") === 0) {
+    return "audio";
+  }
+
+  if (ext === ".pdf" || mt === "application/pdf") {
+    return "pdf";
+  }
+
+  return "unsupported";
+}
+
+function aicmB6R98R4D2BIsTextLike(fileName, mimeType) {
+  return aicmB6R98R4D2BClassifySourceMaterial(fileName, mimeType) === "text";
+}
+function aicmB6R98R4D2BHeaderParam(value, name) {
+  const re = new RegExp(name + '="([^"]*)"');
+  const m = re.exec(value || "");
+  return m ? m[1] : "";
+}
+
+function aicmB6R98R4D2BMultipartBoundary(contentType) {
+  const m = /boundary=([^;]+)/i.exec(contentType || "");
+  return m ? m[1].replace(/^"|"$/g, "") : "";
+}
+
+function aicmB6R98R4D2BReadRawBody(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+    req.on("data", (chunk) => {
+      total += chunk.length;
+      if (total > maxBytes) {
+        reject(new Error("SOURCE_MATERIAL_UPLOAD_TOO_LARGE"));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+function aicmB6R98R4D2BParseMultipart(buffer, boundary) {
+  const raw = buffer.toString("latin1");
+  const delimiter = "--" + boundary;
+  const parts = [];
+
+  raw.split(delimiter).forEach((part) => {
+    if (!part || part === "--" || part === "--\r\n") return;
+
+    let text = part;
+    if (text.startsWith("\r\n")) text = text.slice(2);
+    if (text.endsWith("\r\n")) text = text.slice(0, -2);
+    if (text.endsWith("--")) text = text.slice(0, -2);
+
+    const headerEnd = text.indexOf("\r\n\r\n");
+    if (headerEnd < 0) return;
+
+    const headerText = text.slice(0, headerEnd);
+    let bodyText = text.slice(headerEnd + 4);
+    if (bodyText.endsWith("\r\n")) bodyText = bodyText.slice(0, -2);
+
+    const headers = {};
+    headerText.split("\r\n").forEach((line) => {
+      const idx = line.indexOf(":");
+      if (idx > 0) headers[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
+    });
+
+    const disposition = headers["content-disposition"] || "";
+    parts.push({
+      name: aicmB6R98R4D2BHeaderParam(disposition, "name"),
+      filename: aicmB6R98R4D2BHeaderParam(disposition, "filename"),
+      content_type: headers["content-type"] || "",
+      body_buffer: Buffer.from(bodyText, "latin1"),
+      body_text: bodyText
+    });
+  });
+
+  return parts;
+}
+
+async function aicmB6R98R4D2BHandleSourceMaterialUpload(req) {
+  const contentType = req.headers["content-type"] || "";
+  const boundary = aicmB6R98R4D2BMultipartBoundary(contentType);
+  if (!boundary) throw new Error("MULTIPART_BOUNDARY_REQUIRED");
+
+  const maxFiles = 3;
+  const maxBytesPerFile = 2 * 1024 * 1024;
+  const maxRequestBytes = (maxFiles * maxBytesPerFile) + (512 * 1024);
+
+  const bodyBuffer = await aicmB6R98R4D2BReadRawBody(req, maxRequestBytes);
+  const parts = aicmB6R98R4D2BParseMultipart(bodyBuffer, boundary);
+
+  const sourceRequestRefPart = parts.find((part) => part.name === "source_request_ref");
+  const sourceRequestRef = aicmB6R98R4D2BSourceText(sourceRequestRefPart ? sourceRequestRefPart.body_buffer.toString("utf8") : "manual");
+  const sourceSurfaceCodePart = parts.find((part) => part.name === "source_surface_code");
+  const sourceSurfaceCode = aicmB6R98R4D2BSourceText(sourceSurfaceCodePart ? sourceSurfaceCodePart.body_buffer.toString("utf8") : "aicm_individual_request");
+
+  const fileParts = parts.filter((part) => part.filename);
+  if (fileParts.length > maxFiles) throw new Error("SOURCE_MATERIAL_FILE_COUNT_EXCEEDED");
+
+  const tmpRoot = aicmB6R98R4D2BTmpRoot();
+  const targetDir = path.join(tmpRoot, aicmB6R98R4D2BSourceRefSlug(sourceRequestRef));
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  const savedPaths = [];
+  const metadata = [];
+
+  fileParts.forEach((part, index) => {
+    const originalFileName = aicmB6R98R4D2BSafeFileName(part.filename || ("source_" + String(index + 1) + ".txt"));
+    const mimeType = part.content_type || "text/plain";
+    const byteSize = part.body_buffer.length;
+
+    if (byteSize > maxBytesPerFile) throw new Error("SOURCE_MATERIAL_FILE_TOO_LARGE: " + originalFileName);
+    const sourceMaterialType = aicmB6R98R4D2BClassifySourceMaterial(originalFileName, mimeType);
+    if (sourceMaterialType === "unsupported") throw new Error("SOURCE_MATERIAL_FILE_TYPE_NOT_SUPPORTED: " + originalFileName);
+
+    const storedFileName = [
+      String(index + 1).padStart(2, "0"),
+      String(Date.now()),
+      originalFileName
+    ].join("_");
+
+    const absPath = path.join(targetDir, storedFileName);
+    fs.writeFileSync(absPath, part.body_buffer);
+
+    savedPaths.push(absPath);
+    metadata.push({
+      source_kind: "local_upload_tmp",
+      source_surface_code: sourceSurfaceCode,
+      original_file_name: originalFileName,
+      saved_path: absPath,
+      mime_type: mimeType,
+      size_bytes: byteSize,
+      source_material_type: sourceMaterialType,
+      aiworker_read_mode: sourceMaterialType === "text" ? "text_body_readable" : "asset_reference_path",
+      upload_timing: "execute_button_only",
+      uploaded_at: new Date().toISOString()
+    });
+  });
+
+  return {
+    result: "ok",
+    api_identifier: SERVER_MARK,
+    upload_timing: "execute_button_only",
+    source_request_ref: sourceRequestRef,
+    saved_paths: savedPaths,
+    reference_files_text: savedPaths.join("\n"),
+    source_materials_metadata: metadata,
+    local_upload_count: metadata.length
+  };
+}
+
+function aicmB6R98R4D2BIsUnderTmpRoot(absPath) {
+  const root = path.resolve(aicmB6R98R4D2BTmpRoot());
+  const target = path.resolve(absPath);
+  return target === root || target.startsWith(root + path.sep);
+}
+
+function aicmB6R98R4D2BCleanupSourceMaterials(paths) {
+  const rows = Array.isArray(paths) ? paths : [];
+  const deleted = [];
+  const skipped = [];
+
+  rows.forEach((rawPath) => {
+    const text = aicmB6R98R4D2BSourceText(rawPath).trim();
+    if (!text) return;
+
+    const absPath = path.resolve(text);
+    if (!aicmB6R98R4D2BIsUnderTmpRoot(absPath)) {
+      skipped.push({ path: text, reason: "outside_tmp_root" });
+      return;
+    }
+
+    try {
+      if (fs.existsSync(absPath) && fs.statSync(absPath).isFile()) {
+        fs.unlinkSync(absPath);
+        deleted.push(absPath);
+      } else {
+        skipped.push({ path: absPath, reason: "not_found_or_not_file" });
+      }
+    } catch (error) {
+      skipped.push({ path: absPath, reason: "delete_error", message: error && error.message ? error.message : String(error) });
+    }
+  });
+
+  return {
+    result: "ok",
+    api_identifier: SERVER_MARK,
+    deleted_paths: deleted,
+    skipped_paths: skipped
+  };
+}
+// B6R98R4D2B_SOURCE_MATERIAL_UPLOAD_END
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -1915,6 +2191,153 @@ function createIndividualRuntimeHumanReviewItemB6R44S(requestBody, runtimePayloa
 // B6R97R32B_START
 // 個別依頼はAIWorkerOSへ即時fetchせず、AICM共通Workerキューへ登録する。
 // AIWorkerOS consumer が aiworkeros_execution_state=waiting / retryable を拾って実行する。
+
+// B6R98R4D_SOURCE_MATERIAL_STORAGE_START
+function aicmB6R98R4DSourceText(value) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function aicmB6R98R4DSafeFileName(value) {
+  const raw = aicmB6R98R4DSourceText(value).trim() || "source.txt";
+  const base = path.basename(raw).replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+  return base || "source.txt";
+}
+
+function aicmB6R98R4DTextLikeFileName(fileName, mimeType) {
+  const ext = path.extname(aicmB6R98R4DSafeFileName(fileName)).toLowerCase();
+  const allowedExt = {
+    ".txt": true,
+    ".text": true,
+    ".md": true,
+    ".markdown": true,
+    ".csv": true,
+    ".json": true,
+    ".jsonl": true,
+    ".yaml": true,
+    ".yml": true,
+    ".xml": true,
+    ".html": true,
+    ".htm": true,
+    ".css": true,
+    ".js": true,
+    ".mjs": true,
+    ".cjs": true,
+    ".ts": true,
+    ".tsx": true,
+    ".jsx": true,
+    ".sql": true,
+    ".log": true
+  };
+  const mt = aicmB6R98R4DSourceText(mimeType).toLowerCase();
+  return !!allowedExt[ext] || mt.indexOf("text/") === 0 || mt.indexOf("json") >= 0 || mt.indexOf("xml") >= 0;
+}
+
+function aicmB6R98R4DNormalizeSourceMaterials(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+  return [];
+}
+
+function aicmB6R98R4DJoinNonemptyText(values) {
+  const out = [];
+  (Array.isArray(values) ? values : []).forEach((value) => {
+    const text = aicmB6R98R4DSourceText(value).trim();
+    if (text) out.push(text);
+  });
+  return out.join("\n");
+}
+
+function aicmB6R98R4DStorageDay() {
+  return new Date().toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+function aicmB6R98R4DSourceRefSlug(sourceRequestRef) {
+  return aicmB6R98R4DSourceText(sourceRequestRef || "manual")
+    .replace(/[^A-Za-z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80) || "manual";
+}
+
+function aicmB6R98R4DSaveSourceMaterials(args) {
+  args = args || {};
+  const sourceMaterials = aicmB6R98R4DNormalizeSourceMaterials(args.source_materials);
+  const maxFiles = 5;
+  const maxChars = 1024 * 512;
+
+  const savedPaths = [];
+  const metadata = [];
+  const rejected = [];
+
+  const storageRoot = path.join(APP_ROOT, "storage", "runtime-source-files", aicmB6R98R4DStorageDay());
+  fs.mkdirSync(storageRoot, { recursive: true });
+
+  sourceMaterials.slice(0, maxFiles).forEach((item, index) => {
+    item = item && typeof item === "object" ? item : {};
+    const sourceKind = aicmB6R98R4DSourceText(item.source_kind || item.sourceKind);
+    if (sourceKind !== "local_upload") return;
+
+    const originalFileName = aicmB6R98R4DSafeFileName(item.original_file_name || item.file_name || ("source_" + String(index + 1) + ".txt"));
+    const mimeType = aicmB6R98R4DSourceText(item.mime_type || item.mimeType || "text/plain");
+    const bodyText = aicmB6R98R4DSourceText(item.body_text || item.bodyText || item.content_text || item.contentText);
+
+    if (!bodyText.trim()) {
+      rejected.push({ original_file_name: originalFileName, reason: "empty_body_text" });
+      return;
+    }
+
+    if (!aicmB6R98R4DTextLikeFileName(originalFileName, mimeType)) {
+      rejected.push({ original_file_name: originalFileName, reason: "not_text_like" });
+      return;
+    }
+
+    if (bodyText.length > maxChars) {
+      rejected.push({ original_file_name: originalFileName, reason: "body_too_large", char_count: bodyText.length });
+      return;
+    }
+
+    const fileName = [
+      aicmB6R98R4DSourceRefSlug(args.source_request_ref),
+      String(index + 1).padStart(2, "0"),
+      originalFileName
+    ].join("_");
+
+    const absPath = path.join(storageRoot, fileName);
+    fs.writeFileSync(absPath, bodyText, "utf8");
+
+    savedPaths.push(absPath);
+    metadata.push({
+      source_kind: "local_upload",
+      original_file_name: originalFileName,
+      saved_path: absPath,
+      mime_type: mimeType,
+      size_bytes: Number(item.size_bytes || item.sizeBytes || Buffer.byteLength(bodyText, "utf8")),
+      char_count: bodyText.length,
+      encoding: "utf-8",
+      stored_at: new Date().toISOString()
+    });
+  });
+
+  if (sourceMaterials.length > maxFiles) {
+    rejected.push({ reason: "max_files_exceeded", received_count: sourceMaterials.length, max_files: maxFiles });
+  }
+
+  return {
+    saved_paths: savedPaths,
+    source_materials_metadata: metadata,
+    rejected: rejected,
+    local_upload_count: metadata.length
+  };
+}
+// B6R98R4D_SOURCE_MATERIAL_STORAGE_END
+
 function aicmB6R97R32BIsIndividualInstruction(body) {
   const sourceRouteCode = String(
     (body && (body.source_route_code || body.sourceRouteCode || body.source_route)) || ""
@@ -1963,6 +2386,24 @@ function createIndividualRuntimeQueuedWorkerWorkUnitB6R97R32B(body) {
 
   const title = requiredText(body.task_title || body.title, "task_title");
   const instruction = requiredText(body.task_instruction_ja || body.task_instruction || body.instruction, "task_instruction_ja");
+  const referenceFilesText = aicmWorkerRuntimeDefault(
+    body.reference_files_text ||
+    body.referenceFilesText ||
+    body.source_file_paths ||
+    body.source_file_path ||
+    body.source_data_paths ||
+    body.source_data_path ||
+    body.source_reference_paths ||
+    body.source_reference_path,
+    ""
+  );
+  const sourceFilePathText = aicmWorkerRuntimeDefault(
+    body.source_file_path ||
+    body.source_data_path ||
+    body.source_reference_path ||
+    referenceFilesText,
+    ""
+  );
 
   const taskDomainCode = aicmWorkerRuntimeDefault(body.task_domain_code, "business_operation");
   const workTypeCode = aicmB6R97R32BWorkType(body.work_type_code || body.task_domain_code);
@@ -1975,6 +2416,12 @@ function createIndividualRuntimeQueuedWorkerWorkUnitB6R97R32B(body) {
     "個別依頼Worker"
   );
   const priorityCode = aicmHumanReviewPriority(body.priority_code || "normal");
+  const sourceMaterialSaveResult = aicmB6R98R4DSaveSourceMaterials({
+    source_materials: body.source_materials || body.sourceMaterials,
+    source_request_ref: sourceRequestRef
+  });
+  const effectiveReferenceFilesText = aicmB6R98R4DJoinNonemptyText([referenceFilesText].concat(sourceMaterialSaveResult.saved_paths || []));
+  const effectiveSourceFilePathText = aicmB6R98R4DJoinNonemptyText([sourceFilePathText].concat(sourceMaterialSaveResult.saved_paths || []));
 
   const baseMetadata = {
     source_app_ref: "AICompanyManager",
@@ -1983,6 +2430,15 @@ function createIndividualRuntimeQueuedWorkerWorkUnitB6R97R32B(body) {
     source_entity_type: "worker_work_unit",
     source_request_ref: sourceRequestRef,
     idempotency_key: idempotencyKey,
+    reference_files_text: effectiveReferenceFilesText,
+    source_file_path: effectiveSourceFilePathText,
+    source_file_paths: effectiveReferenceFilesText,
+    source_data_path: effectiveSourceFilePathText,
+    source_data_paths: effectiveReferenceFilesText,
+    source_material_mode: body.source_material_mode || "local_upload_and_path",
+    source_materials: sourceMaterialSaveResult.source_materials_metadata,
+    source_material_rejected: sourceMaterialSaveResult.rejected,
+    local_upload_count: sourceMaterialSaveResult.local_upload_count,
     app_surface_code: "ai_company_manager",
     model_code: modelCode,
     task_domain_code: taskDomainCode,
@@ -2025,7 +2481,7 @@ function createIndividualRuntimeQueuedWorkerWorkUnitB6R97R32B(body) {
     "    " + sqlLiteral(title) + ", " + sqlLiteral(instruction) + ", " + sqlLiteral("manual") + ",",
     "    " + sqlLiteral("AI実行Workbench") + ", " + sqlLiteral("個別依頼") + ",",
     "    " + sqlLiteral("decomposed") + ", " + sqlLiteral("completed") + ", " + sqlLiteral(priorityCode) + ",",
-    "    " + sqlLiteral("") + ", " + sqlLiteral("") + ", " + sqlLiteral("") + ",",
+    "    " + sqlLiteral(effectiveReferenceFilesText) + ", " + sqlLiteral("") + ", " + sqlLiteral("") + ",",
     "    " + sqlLiteral("B6R97R32B individual request queue wrapper") + ", " + sqlLiteral("") + ", 100,",
     "    " + metadataSql + " || jsonb_build_object(" + sqlLiteral("queue_wrapper_level") + ", " + sqlLiteral("manager_major") + ")",
     "  WHERE NOT EXISTS (SELECT 1 FROM existing_worker)",
@@ -2086,7 +2542,7 @@ function createIndividualRuntimeQueuedWorkerWorkUnitB6R97R32B(body) {
     "    " + sqlLiteral("個別依頼: " + title) + ",",
     "    " + sqlLiteral("AIWorkerOS consumer が実行し、成果物をレビューへ回付する") + ",",
     "    " + sqlLiteral("受付済み。AIWorkerOS実行待ちです。") + ", " + sqlLiteral("") + ",",
-    "    " + sqlLiteral("") + ", " + sqlLiteral("") + ", " + sqlLiteral("") + ",",
+    "    " + sqlLiteral(effectiveReferenceFilesText) + ", " + sqlLiteral("") + ", " + sqlLiteral("") + ",",
     "    " + sqlLiteral("B6R97R32B individual request queued for AIWorkerOS consumer") + ", im.display_order,",
     "    " + metadataSql + " || jsonb_build_object(",
     "      " + sqlLiteral("source_manager_major_work_item_id") + ", im.aicm_manager_major_work_item_id::text,",
@@ -2121,6 +2577,11 @@ function createIndividualRuntimeQueuedWorkerWorkUnitB6R97R32B(body) {
     "    'source_app_ref', 'AICompanyManager',",
     "    'source_route_code', 'individual_instruction',",
     "    'source_request_ref', " + sqlLiteral(sourceRequestRef) + ",",
+    "    'reference_files_text', " + sqlLiteral(effectiveReferenceFilesText) + ",",
+    "    'source_file_path', " + sqlLiteral(effectiveSourceFilePathText) + ",",
+    "    'source_file_paths', " + sqlLiteral(effectiveReferenceFilesText) + ",",
+    "    'source_material_mode', " + sqlLiteral(body.source_material_mode || "local_upload_and_path") + ",",
+    "    'local_upload_count', " + String(sourceMaterialSaveResult.local_upload_count || 0) + ",",
     "    'idempotency_key', " + sqlLiteral(idempotencyKey) + ",",
     "    'related_worker_work_unit_id', COALESCE((SELECT aicm_worker_work_unit_id::text FROM final_worker), '')",
     "  ),",
@@ -5156,6 +5617,27 @@ if (route === "/api/aicm/v2/placement/create" && req.method === "POST") {
       res.end(String(payload.content || ""));
       return true;
     }
+    if (route === "/api/aicm/v2/source-material-upload" && req.method === "POST") {
+      try {
+        const payload = await aicmB6R98R4D2BHandleSourceMaterialUpload(req);
+        sendJson(res, 200, payload);
+      } catch (error) {
+        sendJson(res, 400, {
+          result: "error",
+          api_identifier: SERVER_MARK,
+          error_message: safePublicError(error)
+        });
+      }
+      return true;
+    }
+
+    if (route === "/api/aicm/v2/source-material-cleanup" && req.method === "POST") {
+      const requestBody = await readBody(req);
+      const payload = aicmB6R98R4D2BCleanupSourceMaterials(requestBody.saved_paths || requestBody.paths || []);
+      sendJson(res, 200, payload);
+      return true;
+    }
+
     if (route === "/api/aicm/v2/worker-runtime/request" && req.method === "POST") {
       const requestBody = await readBody(req);
       requestBody.source_app_ref = requestBody.source_app_ref || "AICompanyManager";

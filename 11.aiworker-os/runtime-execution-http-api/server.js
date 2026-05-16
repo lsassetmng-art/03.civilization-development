@@ -1310,9 +1310,414 @@ function aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(deliverable, payload, sou
   return safeDeliverable;
 }
 
+
+// B6R98R3B_SOURCE_FILE_READER_START
+// Read local source/reference files declared by requester payload.
+// Scope:
+// - reference_files_text / supplemental_materials_text / applicable_rules_text
+// - task_instruction_ja lines such as "参照ファイル: /path/to/file.md"
+// Safety:
+// - local files only
+// - allowed roots only
+// - text-like extensions only
+// - size/total limits
+function aiwB6R98R3BSourceText(value) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function aiwB6R98R3BFlattenPayloadValues(value, out, depth) {
+  if (!out) out = [];
+  if (depth > 5) return out;
+
+  if (value === null || value === undefined) return out;
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    out.push(String(value));
+    return out;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => aiwB6R98R3BFlattenPayloadValues(item, out, depth + 1));
+    return out;
+  }
+
+  if (typeof value === "object") {
+    Object.keys(value).forEach((key) => {
+      const lower = String(key || "").toLowerCase();
+      if (
+        lower.includes("reference") ||
+        lower.includes("supplemental") ||
+        lower.includes("file") ||
+        lower.includes("path") ||
+        lower.includes("source") ||
+        lower.includes("rule") ||
+        lower.includes("instruction") ||
+        lower.includes("context")
+      ) {
+        aiwB6R98R3BFlattenPayloadValues(value[key], out, depth + 1);
+      }
+    });
+  }
+
+  return out;
+}
+
+function aiwB6R98R3BMaybeParseJsonText(text) {
+  const raw = aiwB6R98R3BSourceText(text).trim();
+  if (!raw) return null;
+  if (!raw.startsWith("{") && !raw.startsWith("[")) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+}
+
+function aiwB6R98R3BCollectTextSources(payload) {
+  const sources = [];
+  const directKeys = [
+    "reference_files_text",
+    "supplemental_materials_text",
+    "applicable_rules_text",
+    "source_file_path",
+    "source_file_paths",
+    "source_data_path",
+    "source_data_paths",
+    "source_reference_path",
+    "source_reference_paths",
+    "source_material_path",
+    "source_material_paths",
+    "task_instruction_ja",
+    "instruction",
+    "input_context_text",
+    "expected_output_text"
+  ];
+
+  directKeys.forEach((key) => {
+    if (payload && payload[key] !== undefined && payload[key] !== null) {
+      const raw = payload[key];
+      sources.push(aiwB6R98R3BSourceText(raw));
+      const parsed = aiwB6R98R3BMaybeParseJsonText(raw);
+      if (parsed) aiwB6R98R3BFlattenPayloadValues(parsed, sources, 0);
+    }
+  });
+
+  ["payload", "request_payload", "input_json", "body", "request", "runtime_request", "metadata_jsonb", "metadata"].forEach((key) => {
+    const nested = payload && payload[key];
+    if (nested) aiwB6R98R3BFlattenPayloadValues(nested, sources, 0);
+  });
+
+  return sources.filter(Boolean);
+}
+
+function aiwB6R98R3BHomeDir() {
+  return process.env.HOME || "/data/data/com.termux/files/home";
+}
+
+function aiwB6R98R3BNormalizeCandidatePath(candidate) {
+  let text = aiwB6R98R3BSourceText(candidate).trim();
+  if (!text) return "";
+
+  text = text.replace(/[\u0000]/g, "");
+  text = text.replace(/^['"\s]+|['"\s]+$/g, "");
+  text = text.replace(/[),;，、。]+$/g, "");
+
+  if (text.startsWith("file://")) {
+    text = text.slice("file://".length);
+  }
+
+  if (text.startsWith("~/")) {
+    text = aiwB6R98R3BHomeDir() + text.slice(1);
+  }
+
+  return text;
+}
+
+function aiwB6R98R3BAllowedRoots() {
+  const defaults = [
+    aiwB6R98R3BHomeDir(),
+    "/data/data/com.termux/files/home",
+    "/mnt/data"
+  ];
+
+  const envRoots = aiwB6R98R3BSourceText(process.env.AIWORKEROS_SOURCE_FILE_ALLOWED_ROOTS)
+    .split(":")
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  const roots = defaults.concat(envRoots);
+  return Array.from(new Set(roots)).map((root) => path.resolve(root));
+}
+
+function aiwB6R98R3BIsUnderAllowedRoot(absPath) {
+  const normalized = path.resolve(absPath);
+  return aiwB6R98R3BAllowedRoots().some((root) => {
+    return normalized === root || normalized.startsWith(root + path.sep);
+  });
+}
+
+function aiwB6R98R3BIsTextLikeFile(absPath) {
+  const ext = path.extname(absPath).toLowerCase();
+  const allowed = {
+    ".txt": true,
+    ".text": true,
+    ".md": true,
+    ".markdown": true,
+    ".csv": true,
+    ".json": true,
+    ".jsonl": true,
+    ".yaml": true,
+    ".yml": true,
+    ".xml": true,
+    ".html": true,
+    ".htm": true,
+    ".css": true,
+    ".js": true,
+    ".mjs": true,
+    ".cjs": true,
+    ".ts": true,
+    ".tsx": true,
+    ".jsx": true,
+    ".sql": true,
+    ".log": true
+  };
+  return !!allowed[ext];
+}
+
+function aiwB6R98R3BExtractCandidatePathsFromText(text) {
+  const raw = aiwB6R98R3BSourceText(text);
+  if (!raw.trim()) return [];
+
+  const candidates = [];
+
+  const jsonParsed = aiwB6R98R3BMaybeParseJsonText(raw);
+  if (jsonParsed) {
+    const values = aiwB6R98R3BFlattenPayloadValues(jsonParsed, [], 0);
+    values.forEach((v) => candidates.push(v));
+  }
+
+  const regex = /(?:file:\/\/)?(?:~\/|\/data\/data\/com\.termux\/files\/home\/|\/mnt\/data\/)[^\s"'<>]+/g;
+  let match;
+  while ((match = regex.exec(raw)) !== null) {
+    candidates.push(match[0]);
+  }
+
+  return candidates
+    .map(aiwB6R98R3BNormalizeCandidatePath)
+    .filter(Boolean);
+}
+
+function aiwB6R98R3BCollectCandidatePaths(payload) {
+  const sources = aiwB6R98R3BCollectTextSources(payload);
+  const all = [];
+  sources.forEach((text) => {
+    aiwB6R98R3BExtractCandidatePathsFromText(text).forEach((candidate) => all.push(candidate));
+  });
+  return Array.from(new Set(all));
+}
+
+function aiwB6R98R3BReadSourceFiles(payload) {
+  const candidates = aiwB6R98R3BCollectCandidatePaths(payload);
+  const maxFiles = Math.max(1, Math.min(10, Number(process.env.AIWORKEROS_SOURCE_FILE_MAX_FILES || "5") || 5));
+  const maxBytes = Math.max(1024, Math.min(2 * 1024 * 1024, Number(process.env.AIWORKEROS_SOURCE_FILE_MAX_BYTES || "2097152") || 2097152));
+  const maxTotalChars = Math.max(4000, Math.min(120000, Number(process.env.AIWORKEROS_SOURCE_FILE_MAX_TOTAL_CHARS || "60000") || 60000));
+
+  const rows = [];
+  const rejected = [];
+  let totalChars = 0;
+
+  for (const candidate of candidates) {
+    if (rows.length >= maxFiles) {
+      rejected.push({ path: candidate, reason: "max_files_exceeded" });
+      continue;
+    }
+
+    const normalized = aiwB6R98R3BNormalizeCandidatePath(candidate);
+    const absPath = path.resolve(normalized);
+
+    try {
+      if (!aiwB6R98R3BIsUnderAllowedRoot(absPath)) {
+        rejected.push({ path: candidate, reason: "outside_allowed_roots" });
+        continue;
+      }
+
+      if (!aiwB6R98R3BIsTextLikeFile(absPath)) {
+        rejected.push({ path: candidate, reason: "not_text_like_extension" });
+        continue;
+      }
+
+      if (!fs.existsSync(absPath)) {
+        rejected.push({ path: candidate, reason: "not_found" });
+        continue;
+      }
+
+      const stat = fs.statSync(absPath);
+      if (!stat.isFile()) {
+        rejected.push({ path: candidate, reason: "not_file" });
+        continue;
+      }
+
+      if (stat.size > maxBytes) {
+        rejected.push({ path: candidate, reason: "file_too_large", size: stat.size });
+        continue;
+      }
+
+      let body = fs.readFileSync(absPath, "utf8");
+      if (body.length > maxTotalChars - totalChars) {
+        body = body.slice(0, Math.max(0, maxTotalChars - totalChars));
+      }
+
+      totalChars += body.length;
+      rows.push({
+        path: absPath,
+        byte_size: stat.size,
+        char_count: body.length,
+        body_text: body
+      });
+
+      if (totalChars >= maxTotalChars) break;
+    } catch (error) {
+      rejected.push({
+        path: candidate,
+        reason: "read_error",
+        message: error && error.message ? error.message : String(error)
+      });
+    }
+  }
+
+  return {
+    candidates,
+    rows,
+    rejected,
+    limits: {
+      max_files: maxFiles,
+      max_bytes_per_file: maxBytes,
+      max_total_chars: maxTotalChars
+    }
+  };
+}
+
+function aiwB6R98R3BSourceFilesMarkdown(sourceFiles) {
+  const rows = sourceFiles && Array.isArray(sourceFiles.rows) ? sourceFiles.rows : [];
+  if (!rows.length) return "";
+
+  const blocks = [
+    "## 元データ/参照ファイル本文",
+    "",
+    "以下は依頼元から渡されたローカル参照ファイルをAIWorkerOSが読み込んだ内容です。成果物作成では、この内容を入力根拠として扱います。"
+  ];
+
+  rows.forEach((row, index) => {
+    blocks.push("");
+    blocks.push("### 参照ファイル " + String(index + 1));
+    blocks.push("- path: " + row.path);
+    blocks.push("- byte_size: " + String(row.byte_size));
+    blocks.push("");
+    blocks.push("~~~text");
+    blocks.push(row.body_text || "");
+    blocks.push("~~~");
+  });
+
+  return blocks.join("\n");
+}
+
+function aiwB6R98R3BEnhanceDeliverableWithSourceFiles(deliverable, payload, sourceRouteCode) {
+  const safeDeliverable = deliverable || {};
+  const sourceFiles = aiwB6R98R3BReadSourceFiles(payload);
+  const markdown = aiwB6R98R3BSourceFilesMarkdown(sourceFiles);
+
+  safeDeliverable.robotContext = Object.assign({}, safeDeliverable.robotContext || {}, {
+    source_file_reader_patch_code: "B6R98R3B",
+    source_file_candidates_count: sourceFiles.candidates.length,
+    source_files_used_count: sourceFiles.rows.length,
+    source_files_rejected_count: sourceFiles.rejected.length
+  });
+
+  safeDeliverable.generationBasis = Object.assign({}, safeDeliverable.generationBasis || {}, {
+    source_file_reader_patch_code: "B6R98R3B",
+    source_file_reader_enabled: true,
+    source_file_candidates_count: sourceFiles.candidates.length,
+    source_files_used_count: sourceFiles.rows.length,
+    source_files_rejected: sourceFiles.rejected.slice(0, 10),
+    source_route_code: String(sourceRouteCode || "")
+  });
+
+  safeDeliverable.outputPayload = Object.assign({}, safeDeliverable.outputPayload || {}, {
+    source_file_reader: {
+      patch_code: "B6R98R3B",
+      candidates_count: sourceFiles.candidates.length,
+      used_count: sourceFiles.rows.length,
+      rejected_count: sourceFiles.rejected.length,
+      used_files: sourceFiles.rows.map((row) => ({
+        path: row.path,
+        byte_size: row.byte_size,
+        char_count: row.char_count
+      }))
+    }
+  });
+
+  if (!sourceFiles.rows.length) {
+    return safeDeliverable;
+  }
+
+  const currentBody = aiwB6R98R3BSourceText(safeDeliverable.bodyMarkdown || safeDeliverable.body_markdown || "");
+  const enhancedBody = [
+    currentBody,
+    "",
+    markdown
+  ].join("\n").trim();
+
+  safeDeliverable.bodyMarkdown = enhancedBody;
+
+  if (Array.isArray(safeDeliverable.generatedArtifacts)) {
+    safeDeliverable.generatedArtifacts = safeDeliverable.generatedArtifacts.map((artifact) => {
+      if (artifact && artifact.file_name === "01_main_deliverable.md") {
+        return Object.assign({}, artifact, { body_markdown: enhancedBody });
+      }
+      return artifact;
+    });
+  }
+
+  if (safeDeliverable.outputPayload && Array.isArray(safeDeliverable.outputPayload.generated_artifacts)) {
+    safeDeliverable.outputPayload.generated_artifacts = safeDeliverable.outputPayload.generated_artifacts.map((artifact) => {
+      if (artifact && artifact.file_name === "01_main_deliverable.md") {
+        return Object.assign({}, artifact, { body_markdown: enhancedBody });
+      }
+      return artifact;
+    });
+  }
+
+  if (Array.isArray(safeDeliverable.artifacts)) {
+    safeDeliverable.artifacts = safeDeliverable.artifacts.map((artifact) => {
+      if (artifact && artifact.body_markdown) {
+        return Object.assign({}, artifact, { body_markdown: enhancedBody });
+      }
+      return artifact;
+    });
+  }
+
+  const currentQualityNotes = aiwB6R98R3BSourceText(safeDeliverable.qualityNotes || "");
+  safeDeliverable.qualityNotes = [
+    currentQualityNotes,
+    "source file reader patch: B6R98R3B",
+    "source files used: " + String(sourceFiles.rows.length),
+    "source file candidates: " + String(sourceFiles.candidates.length)
+  ].filter(Boolean).join("\n");
+
+  if (!safeDeliverable.summaryText || !String(safeDeliverable.summaryText).trim()) {
+    safeDeliverable.summaryText = "元データ/参照ファイルを読み込み、成果物生成に反映しました。";
+  } else {
+    safeDeliverable.summaryText = String(safeDeliverable.summaryText) + " 元データ/参照ファイルも読み込み済みです。";
+  }
+
+  return safeDeliverable;
+}
+// B6R98R3B_SOURCE_FILE_READER_END
+
 function aiwB6R95R3R3BuildRequesterFacingDeliverable(payload, sourceRouteCode) {
   const baseDeliverable = aiwB6R95R3R3BuildRequesterFacingDeliverableBaseB6R95R3Z24(payload, sourceRouteCode);
-  return aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(baseDeliverable, payload, sourceRouteCode);
+  const cxDeliverable = aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(baseDeliverable, payload, sourceRouteCode);
+  return aiwB6R98R3BEnhanceDeliverableWithSourceFiles(cxDeliverable, payload, sourceRouteCode);
 }
 /* B6R95R3Z_R24_CX_MATERIAL_BODY_GENERATION_PATCH_END */
 
@@ -2433,3 +2838,262 @@ function aiwB6R97R14StartConsumer() {
 
 setTimeout(aiwB6R97R14StartConsumer, 1500);
 // AIW_B6R97R14_QUEUE_CONSUMER_END
+
+// B6R98R4F1C_SOURCE_MATERIAL_TMP_CLEANUP_START
+// Completed source material tmp cleanup.
+// Deletes only AICM runtime-source-files/tmp files after worker_unit reaches completed/review_waiting.
+// No cleanup for waiting/running/retryable states.
+const aiwB6R98R4F1CFs = require("node:fs");
+const aiwB6R98R4F1CPath = require("node:path");
+const aiwB6R98R4F1CChildProcess = require("node:child_process");
+
+const AIW_B6R98R4F1C_PATCH_CODE = "B6R98R4F1C";
+const AIW_B6R98R4F1C_TMP_ROOT = process.env.AICM_SOURCE_MATERIAL_TMP_ROOT ||
+  "/data/data/com.termux/files/home/03.civilization-development/03.business-os/AICompanyManager/storage/runtime-source-files/tmp";
+
+function aiwB6R98R4F1CText(value) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function aiwB6R98R4F1CTmpRootResolved() {
+  return aiwB6R98R4F1CPath.resolve(AIW_B6R98R4F1C_TMP_ROOT);
+}
+
+function aiwB6R98R4F1CIsUnderTmpRoot(value) {
+  const target = aiwB6R98R4F1CPath.resolve(aiwB6R98R4F1CText(value));
+  const root = aiwB6R98R4F1CTmpRootResolved();
+  return target === root || target.startsWith(root + aiwB6R98R4F1CPath.sep);
+}
+
+function aiwB6R98R4F1CEscapeRegExp(value) {
+  return aiwB6R98R4F1CText(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function aiwB6R98R4F1CExtractTmpPaths(row) {
+  const text = [
+    aiwB6R98R4F1CText(row.reference_files_text),
+    aiwB6R98R4F1CText(row.metadata_text)
+  ].join("\n");
+
+  const root = aiwB6R98R4F1CEscapeRegExp(aiwB6R98R4F1CTmpRootResolved());
+  const re = new RegExp(root + "[^\\s\"'\\]\\},]+", "g");
+  const found = text.match(re) || [];
+  const unique = [];
+
+  found.forEach((rawPath) => {
+    const cleanPath = aiwB6R98R4F1CText(rawPath).trim();
+    if (!cleanPath) return;
+    if (!aiwB6R98R4F1CIsUnderTmpRoot(cleanPath)) return;
+    if (!unique.includes(cleanPath)) unique.push(cleanPath);
+  });
+
+  return unique;
+}
+
+function aiwB6R98R4F1CRunPsql(sql, timeoutMs) {
+  const dbUrl = process.env.PERSONA_DATABASE_URL;
+  if (!dbUrl) {
+    return {
+      ok: false,
+      stdout: "",
+      stderr: "PERSONA_DATABASE_URL is not set",
+      status: 1
+    };
+  }
+
+  const result = aiwB6R98R4F1CChildProcess.spawnSync(
+    "psql",
+    [dbUrl, "-v", "ON_ERROR_STOP=1", "-X", "-q", "-t", "-A"],
+    {
+      input: sql,
+      encoding: "utf8",
+      timeout: timeoutMs || 20000,
+      maxBuffer: 1024 * 1024 * 4
+    }
+  );
+
+  return {
+    ok: result.status === 0,
+    stdout: result.stdout || "",
+    stderr: result.stderr || "",
+    status: result.status
+  };
+}
+
+function aiwB6R98R4F1CLoadEligibleRows() {
+  const sql = [
+    "select jsonb_build_object(",
+    "  'id', aicm_worker_work_unit_id::text,",
+    "  'reference_files_text', coalesce(reference_files_text,''),",
+    "  'metadata_text', coalesce(metadata_jsonb::text,''),",
+    "  'work_status_code', work_status_code,",
+    "  'review_status_code', review_status_code,",
+    "  'aiworkeros_execution_state', coalesce(metadata_jsonb->>'aiworkeros_execution_state',''),",
+    "  'aiworkeros_consumer_claim_state', coalesce(metadata_jsonb->>'aiworkeros_consumer_claim_state',''),",
+    "  'aiworkeros_retryable', coalesce(metadata_jsonb->>'aiworkeros_retryable','false')",
+    ")::text",
+    "from business.aicm_worker_work_unit",
+    "where (reference_files_text ilike '%runtime-source-files/tmp%' or metadata_jsonb::text ilike '%runtime-source-files/tmp%')",
+    "  and work_status_code = 'review_waiting'",
+    "  and review_status_code = 'waiting'",
+    "  and coalesce(metadata_jsonb->>'aiworkeros_execution_state','') = 'completed'",
+    "  and coalesce(metadata_jsonb->>'aiworkeros_consumer_claim_state','') = 'completed'",
+    "  and coalesce(metadata_jsonb->>'aiworkeros_retryable','false') in ('false','')",
+    "  and coalesce(metadata_jsonb->>'source_material_tmp_cleanup_state','') not in ('deleted','completed')",
+    "order by updated_at desc",
+    "limit 20;"
+  ].join("\n");
+
+  const result = aiwB6R98R4F1CRunPsql(sql, 20000);
+  if (!result.ok) {
+    console.error("[B6R98R4F1C] cleanup eligible load failed", result.stderr);
+    return [];
+  }
+
+  return result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch (_) {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function aiwB6R98R4F1CDeleteTmpPaths(paths) {
+  const deleted = [];
+  const skipped = [];
+
+  (Array.isArray(paths) ? paths : []).forEach((rawPath) => {
+    const target = aiwB6R98R4F1CPath.resolve(aiwB6R98R4F1CText(rawPath));
+    if (!aiwB6R98R4F1CIsUnderTmpRoot(target)) {
+      skipped.push({ path: rawPath, reason: "outside_tmp_root" });
+      return;
+    }
+
+    try {
+      if (aiwB6R98R4F1CFs.existsSync(target) && aiwB6R98R4F1CFs.statSync(target).isFile()) {
+        aiwB6R98R4F1CFs.unlinkSync(target);
+        deleted.push(target);
+      } else {
+        skipped.push({ path: target, reason: "not_found_or_not_file" });
+      }
+    } catch (error) {
+      skipped.push({
+        path: target,
+        reason: "delete_error",
+        message: error && error.message ? error.message : String(error)
+      });
+    }
+  });
+
+  return { deleted, skipped };
+}
+
+function aiwB6R98R4F1CJsonLiteral(value) {
+  return "'" + JSON.stringify(value).replace(/'/g, "''") + "'::jsonb";
+}
+
+function aiwB6R98R4F1CUpdateCleanupMetadata(row, cleanupResult) {
+  const deletedCount = cleanupResult.deleted.length;
+  const skippedCount = cleanupResult.skipped.length;
+  const state = deletedCount > 0 ? "deleted" : "completed";
+
+  const metadataPatch = {
+    source_material_tmp_cleanup_state: state,
+    source_material_tmp_cleanup_at: new Date().toISOString(),
+    source_material_tmp_cleanup_patch_code: AIW_B6R98R4F1C_PATCH_CODE,
+    source_material_tmp_cleanup_deleted_count: deletedCount,
+    source_material_tmp_cleanup_skipped_count: skippedCount,
+    source_material_tmp_cleanup_deleted_paths: cleanupResult.deleted,
+    source_material_tmp_cleanup_skipped_paths: cleanupResult.skipped
+  };
+
+  const id = aiwB6R98R4F1CText(row.id).replace(/'/g, "''");
+
+  const sql = [
+    "update business.aicm_worker_work_unit",
+    "set metadata_jsonb = coalesce(metadata_jsonb, '{}'::jsonb) || " + aiwB6R98R4F1CJsonLiteral(metadataPatch) + ",",
+    "    updated_at = now()",
+    "where aicm_worker_work_unit_id = '" + id + "'::uuid",
+    "  and work_status_code = 'review_waiting'",
+    "  and review_status_code = 'waiting'",
+    "  and coalesce(metadata_jsonb->>'aiworkeros_execution_state','') = 'completed'",
+    "  and coalesce(metadata_jsonb->>'aiworkeros_consumer_claim_state','') = 'completed'",
+    "  and coalesce(metadata_jsonb->>'aiworkeros_retryable','false') in ('false','')",
+    "  and coalesce(metadata_jsonb->>'source_material_tmp_cleanup_state','') not in ('deleted','completed');"
+  ].join("\n");
+
+  const result = aiwB6R98R4F1CRunPsql(sql, 20000);
+  if (!result.ok) {
+    console.error("[B6R98R4F1C] cleanup metadata update failed", row.id, result.stderr);
+  }
+
+  return result.ok;
+}
+
+function aiwB6R98R4F1CRunCleanupOnce() {
+  if (process.env.AIWORKEROS_SOURCE_MATERIAL_CLEANUP_DISABLED === "1") {
+    return { ok: true, disabled: true };
+  }
+
+  const rows = aiwB6R98R4F1CLoadEligibleRows();
+  let deletedTotal = 0;
+  let skippedTotal = 0;
+  let updatedTotal = 0;
+
+  rows.forEach((row) => {
+    const paths = aiwB6R98R4F1CExtractTmpPaths(row);
+    const cleanupResult = aiwB6R98R4F1CDeleteTmpPaths(paths);
+    deletedTotal += cleanupResult.deleted.length;
+    skippedTotal += cleanupResult.skipped.length;
+    if (aiwB6R98R4F1CUpdateCleanupMetadata(row, cleanupResult)) {
+      updatedTotal += 1;
+    }
+  });
+
+  if (rows.length || deletedTotal || skippedTotal) {
+    console.log("[B6R98R4F1C] source material tmp cleanup", JSON.stringify({
+      rows: rows.length,
+      deleted: deletedTotal,
+      skipped: skippedTotal,
+      updated: updatedTotal
+    }));
+  }
+
+  return {
+    ok: true,
+    rows: rows.length,
+    deleted: deletedTotal,
+    skipped: skippedTotal,
+    updated: updatedTotal
+  };
+}
+
+function aiwB6R98R4F1CScheduleCleanup() {
+  if (globalThis.__AIW_B6R98R4F1C_SOURCE_MATERIAL_CLEANUP_SCHEDULED__) return;
+  globalThis.__AIW_B6R98R4F1C_SOURCE_MATERIAL_CLEANUP_SCHEDULED__ = true;
+
+  setTimeout(() => {
+    try {
+      aiwB6R98R4F1CRunCleanupOnce();
+    } catch (error) {
+      console.error("[B6R98R4F1C] initial cleanup failed", error && error.stack ? error.stack : error);
+    }
+  }, 1500);
+
+  setInterval(() => {
+    try {
+      aiwB6R98R4F1CRunCleanupOnce();
+    } catch (error) {
+      console.error("[B6R98R4F1C] interval cleanup failed", error && error.stack ? error.stack : error);
+    }
+  }, Number(process.env.AIWORKEROS_SOURCE_MATERIAL_CLEANUP_INTERVAL_MS || "60000"));
+}
+
+aiwB6R98R4F1CScheduleCleanup();
+// B6R98R4F1C_SOURCE_MATERIAL_TMP_CLEANUP_END

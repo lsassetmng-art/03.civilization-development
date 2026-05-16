@@ -12872,6 +12872,166 @@ function aicmWrtDomainOptions() {
     }).join("");
   }
 
+
+// B6R98R4D_SOURCE_MATERIAL_INPUT_START
+// Reusable SourceMaterialInput candidate.
+// AICM individual request: local_upload + local_path.
+// AIOperationDesk reuse: local_upload only by passing allowPath=false.
+function aicmB6R98R4DSourceText(value) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function aicmB6R98R4DParseJsonArray(text) {
+  var raw = aicmB6R98R4DSourceText(text).trim();
+  if (!raw) return [];
+  try {
+    var parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function aicmB6R98R4DSelectedSourceMaterials() {
+  return aicmB6R98R4DParseJsonArray(aicmWrtValue("aicm-worker-runtime-source-materials-json"));
+}
+
+function aicmB6R98R4DLocalUploadCount(materials) {
+  materials = Array.isArray(materials) ? materials : [];
+  var count = 0;
+  for (var i = 0; i < materials.length; i += 1) {
+    if (
+      materials[i] &&
+      (
+        materials[i].source_kind === "local_upload" ||
+        materials[i].source_kind === "local_upload_pending"
+      )
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function aicmB6R98R4DSetSourceMaterialNote(text, isError) {
+  var el = typeof document !== "undefined" ? document.getElementById("aicm-worker-runtime-source-material-note") : null;
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = isError ? "aicm-core-empty aicm-error-text" : "aicm-core-empty";
+}
+
+function aicmB6R98R4DSetSourceMaterials(materials) {
+  var el = typeof document !== "undefined" ? document.getElementById("aicm-worker-runtime-source-materials-json") : null;
+  if (el) {
+    el.value = JSON.stringify(Array.isArray(materials) ? materials : []);
+  }
+}
+
+function aicmB6R98R4DReadFileAsText(file) {
+  if (file && typeof file.text === "function") {
+    return file.text();
+  }
+
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() {
+      resolve(String(reader.result || ""));
+    };
+    reader.onerror = function() {
+      reject(reader.error || new Error("FILE_READ_FAILED"));
+    };
+    reader.readAsText(file);
+  });
+}
+
+function aicmB6R98R4DNormalizeUploadFile(file, bodyText) {
+  return {
+    source_kind: "local_upload",
+    original_file_name: file && file.name ? String(file.name) : "source.txt",
+    mime_type: file && file.type ? String(file.type) : "text/plain",
+    size_bytes: Number(file && file.size ? file.size : 0),
+    body_text: aicmB6R98R4DSourceText(bodyText),
+    encoding: "utf-8",
+    captured_at: new Date().toISOString()
+  };
+}
+
+function aicmB6R98R4DHandleSourceMaterialFileInput(input) {
+  var files = input && input.files ? Array.prototype.slice.call(input.files) : [];
+  var maxFiles = 3;
+  var maxBytes = 2 * 1024 * 1024;
+
+  if (typeof state === "object" && state) {
+    state.workerRuntimeSourceMaterialReadInFlight = true;
+  }
+
+  aicmB6R98R4DSetSourceMaterials([]);
+
+  if (!files.length) {
+    if (typeof state === "object" && state) state.workerRuntimeSourceMaterialReadInFlight = false;
+    aicmB6R98R4DSetSourceMaterialNote("ローカルファイルは未選択です。", false);
+    return;
+  }
+
+  if (files.length > maxFiles) {
+    if (typeof state === "object" && state) state.workerRuntimeSourceMaterialReadInFlight = false;
+    aicmB6R98R4DSetSourceMaterialNote("ローカルファイルは最大" + String(maxFiles) + "件までです。", true);
+    input.value = "";
+    return;
+  }
+
+  for (var i = 0; i < files.length; i += 1) {
+    if (Number(files[i].size || 0) > maxBytes) {
+      if (typeof state === "object" && state) state.workerRuntimeSourceMaterialReadInFlight = false;
+      aicmB6R98R4DSetSourceMaterialNote("ファイルが大きすぎます: " + String(files[i].name || "") + " / 最大2MB", true);
+      input.value = "";
+      return;
+    }
+  }
+
+  if (typeof state === "object" && state) {
+    state.workerRuntimeSourceMaterialFiles = files;
+    state.workerRuntimeSourceMaterialReadInFlight = false;
+  }
+
+  var materials = files.map(function(file) {
+    return {
+      source_kind: "local_upload_pending",
+      original_file_name: file && file.name ? String(file.name) : "source.txt",
+      mime_type: file && file.type ? String(file.type) : "text/plain",
+      size_bytes: Number(file && file.size ? file.size : 0),
+      upload_timing: "execute_button_only"
+    };
+  });
+
+  aicmB6R98R4DSetSourceMaterials(materials);
+  aicmB6R98R4DSetSourceMaterialNote("ローカルファイル選択済み: " + String(materials.length) + "件。確定して実行時に一時アップロードします。", false);
+}
+
+function aicmB6R98R4DSourceMaterialInputHtml(options) {
+  options = options || {};
+  var allowLocalUpload = options.allowLocalUpload !== false;
+  var allowPath = options.allowPath !== false;
+  var surfaceCode = aicmWrtEscape(options.surfaceCode || "aicm_individual_request");
+
+  return [
+    '<div class="aicm-core-card" data-source-material-input="1" data-source-material-surface="' + surfaceCode + '" data-allow-local-upload="' + (allowLocalUpload ? "1" : "0") + '" data-allow-path="' + (allowPath ? "1" : "0") + '">',
+    '  <p class="aicm-eyebrow">元データ</p>',
+    '  <h3>元データ/参照ファイル</h3>',
+    allowLocalUpload ? '  <label>ローカルファイル選択<input id="aicm-worker-runtime-source-upload" type="file" multiple accept=".txt,.md,.markdown,.csv,.json,.jsonl,.yaml,.yml,.xml,.html,.htm,.css,.js,.mjs,.cjs,.ts,.tsx,.jsx,.sql,.log,.jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.mp3,.wav,.m4a,.aac,.ogg,.flac,.mid,.midi,text/*,image/*,audio/*,application/json,application/pdf" onchange="window.aicmB6R98R4DHandleSourceMaterialFileInput(this)"></label>' : '',
+    allowLocalUpload ? '  <textarea id="aicm-worker-runtime-source-materials-json" style="display:none" aria-hidden="true" tabindex="-1"></textarea>' : '',
+    allowLocalUpload ? '  <p id="aicm-worker-runtime-source-material-note" class="aicm-core-empty">ローカルファイルは最大3件、1件2MBまで。テキスト・画像・PDF・音声を選択できます。ファイルは「確定して実行」押下時だけ一時アップロードします。</p>' : '',
+    allowPath ? '  <label>パス直接入力<textarea id="aicm-worker-runtime-reference-files" rows="4" placeholder="/data/data/com.termux/files/home/.../design.md&#10;/data/data/com.termux/files/home/.../spec.md"></textarea></label>' : '',
+    allowPath ? '  <p class="aicm-core-empty">複数ある場合は改行で入力してください。AIWorkerOS側で許可root配下のテキスト系ファイルだけ読み込みます。</p>' : '',
+    '</div>'
+  ].join("");
+}
+
+if (typeof window !== "undefined") {
+  window.aicmB6R98R4DHandleSourceMaterialFileInput = aicmB6R98R4DHandleSourceMaterialFileInput;
+}
+// B6R98R4D_SOURCE_MATERIAL_INPUT_END
+
 function aicmWrtDefaultSourceRequestRef() {
     return "manual:" + String(Date.now());
   }
@@ -13298,6 +13458,7 @@ function renderWorkerRuntimeRequestBaseAxtR9R1() {
       '  <label>作業種別<select id="aicm-worker-runtime-task-domain">' + aicmWrtDomainOptions() + '</select></label>',
       '  <label>作業タイトル<input id="aicm-worker-runtime-title" type="text" placeholder="例: UI修正案の作成"></label>',
       '  <label>作業指示<textarea id="aicm-worker-runtime-instruction" rows="7" placeholder="何を、どの条件で、どこまで作業するかを書いてください。"></textarea></label>',
+      aicmB6R98R4DSourceMaterialInputHtml({ allowLocalUpload: true, allowPath: true, surfaceCode: "aicm_individual_request" }),
       '  <input id="aicm-worker-runtime-source-ref" type="hidden" value="">',
       '  <p class="aicm-core-empty">AIWorkerOS tokenはブラウザには出しません。確定後、AICompanyManager serverが中継します。通常業務は部門別タスク台帳から連続実行し、この画面は補助/例外/検証用Workbenchです。</p>',
       '</section>',
@@ -13338,6 +13499,12 @@ function buildWorkerRuntimePendingPayload() {
     var instruction = aicmWrtValue("aicm-worker-runtime-instruction");
     if (!instruction) throw new Error("作業指示を入力してください。");
 
+    var referenceFilesText = aicmWrtValue("aicm-worker-runtime-reference-files");
+    if (state && state.workerRuntimeSourceMaterialReadInFlight) {
+      throw new Error("ローカルファイルを読み込み中です。完了後に確認へ進んでください。");
+    }
+    var sourceMaterials = aicmB6R98R4DSelectedSourceMaterials();
+
     var sourceRef = aicmWrtValue("aicm-worker-runtime-source-ref") || aicmWrtDefaultSourceRequestRef();
     var idempotencyKey = aicmWrtBuildIdempotencyKey(sourceRef, placementId);
 
@@ -13356,6 +13523,12 @@ function buildWorkerRuntimePendingPayload() {
         task_domain_code: aicmWrtValue("aicm-worker-runtime-task-domain") || "business_operation",
         task_title: title,
         task_instruction_ja: instruction,
+        reference_files_text: referenceFilesText,
+        source_file_path: referenceFilesText,
+        source_file_paths: referenceFilesText,
+        source_materials: sourceMaterials,
+        source_material_mode: "local_upload_and_path",
+        local_upload_count: aicmB6R98R4DLocalUploadCount(sourceMaterials),
         source_app_ref: "AICompanyManager",
         source_request_ref: sourceRef,
         requested_by_ref: "human",
@@ -13387,6 +13560,8 @@ function renderWorkerRuntimeConfirm() {
       ["task_domain_code", body.task_domain_code],
       ["作業タイトル", body.task_title],
       ["作業指示", body.task_instruction_ja],
+      ["元データ/参照ファイルパス", body.reference_files_text || "-"],
+      ["ローカルファイル選択", String(body.local_upload_count || 0) + "件"],
       ["idempotency_key", body.idempotency_key]
     ];
 
@@ -13410,6 +13585,105 @@ function renderWorkerRuntimeConfirm() {
       '</section>'
     ].join(""));
   }
+
+
+// B6R98R4D2B_UPLOAD_ON_EXECUTE_START
+function aicmB6R98R4D2BSelectedFiles() {
+  if (typeof state !== "object" || !state || !Array.isArray(state.workerRuntimeSourceMaterialFiles)) return [];
+  return state.workerRuntimeSourceMaterialFiles.filter(function(file) { return !!file; });
+}
+
+function aicmB6R98R4D2BJoinPathLines(values) {
+  var rows = [];
+  (Array.isArray(values) ? values : []).forEach(function(value) {
+    String(value === undefined || value === null ? "" : value).split(/\r?\n/).forEach(function(line) {
+      var text = String(line || "").trim();
+      if (text) rows.push(text);
+    });
+  });
+  return rows.filter(function(value, index, array) {
+    return array.indexOf(value) === index;
+  }).join("\n");
+}
+
+async function aicmB6R98R4D2BUploadSelectedFiles(sourceRequestRef) {
+  var files = aicmB6R98R4D2BSelectedFiles();
+  if (!files.length) {
+    return {
+      result: "ok",
+      saved_paths: [],
+      source_materials_metadata: [],
+      local_upload_count: 0
+    };
+  }
+
+  var formData = new FormData();
+  formData.append("source_request_ref", sourceRequestRef || aicmWrtDefaultSourceRequestRef());
+  formData.append("source_surface_code", "aicm_individual_request");
+
+  files.forEach(function(file) {
+    formData.append("source_files", file, file && file.name ? file.name : "source.txt");
+  });
+
+  var response = await fetch("/api/aicm/v2/source-material-upload", {
+    method: "POST",
+    body: formData
+  });
+
+  var json = await response.json().catch(function() { return {}; });
+  if (!response.ok || !json || json.result !== "ok") {
+    throw new Error((json && (json.error_message || json.message || json.error)) || "元データファイルの一時アップロードに失敗しました。");
+  }
+
+  return json;
+}
+
+async function aicmB6R98R4D2BCleanupUploadedFiles(paths) {
+  paths = Array.isArray(paths) ? paths : [];
+  if (!paths.length) return;
+
+  try {
+    await aicmWrtPostJson("/api/aicm/v2/source-material-cleanup", {
+      saved_paths: paths,
+      cleanup_reason: "worker_runtime_request_failed"
+    });
+  } catch (_) {
+    // cleanup is best-effort; request failure message must remain primary
+  }
+}
+
+async function aicmB6R98R4D2BPreparePayloadForExecute(payload) {
+  payload = payload || {};
+  var body = payload.body || {};
+  var sourceRequestRef = body.source_request_ref || aicmWrtDefaultSourceRequestRef();
+  var uploadResult = await aicmB6R98R4D2BUploadSelectedFiles(sourceRequestRef);
+  var savedPaths = Array.isArray(uploadResult.saved_paths) ? uploadResult.saved_paths : [];
+
+  if (!savedPaths.length) {
+    payload.b6r98r4d2b_uploaded_paths = [];
+    return payload;
+  }
+
+  var mergedReferenceFilesText = aicmB6R98R4D2BJoinPathLines([
+    body.reference_files_text,
+    savedPaths.join("\n")
+  ]);
+
+  var preparedBody = Object.assign({}, body, {
+    reference_files_text: mergedReferenceFilesText,
+    source_file_path: mergedReferenceFilesText,
+    source_file_paths: mergedReferenceFilesText,
+    source_material_mode: "local_upload_and_path",
+    source_materials: Array.isArray(uploadResult.source_materials_metadata) ? uploadResult.source_materials_metadata : [],
+    local_upload_count: Number(uploadResult.local_upload_count || savedPaths.length || 0)
+  });
+
+  return Object.assign({}, payload, {
+    body: preparedBody,
+    b6r98r4d2b_uploaded_paths: savedPaths
+  });
+}
+// B6R98R4D2B_UPLOAD_ON_EXECUTE_END
 
 async function aicmWrtPostJson(path, body) {
     var response = await fetch(path, {
@@ -13439,13 +13713,17 @@ async function executeWorkerRuntimeConfirmBaseAxtR9R1() {
     }
 
     try {
+      payload = await aicmB6R98R4D2BPreparePayloadForExecute(payload);
       var result = await aicmWrtPostJson(payload.endpoint, payload.body);
       state.pendingWorkerRuntimeRequest = null;
+      state.workerRuntimeSourceMaterialFiles = [];
+      aicmB6R98R4DSetSourceMaterials([]);
       state.workerRuntimeLastResult = result;
       state.screen = "worker-runtime-request";
       setMessage("ok", "AI実行Workbenchを作成しました。");
       if (typeof render === "function") render();
     } catch (error) {
+      await aicmB6R98R4D2BCleanupUploadedFiles(payload && payload.b6r98r4d2b_uploaded_paths);
       setMessage("error", error && error.message ? error.message : "AI実行Workbenchに失敗しました。");
       if (typeof render === "function") render();
     }
