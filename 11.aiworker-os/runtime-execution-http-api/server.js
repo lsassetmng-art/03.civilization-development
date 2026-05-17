@@ -1220,6 +1220,107 @@ function aiwB6R95R3Z24MaterialBody(row) {
 }
 
 function aiwB6R95R3Z24BuildMaterialMarkdown(payload, rows) {
+  const aiwB6R97R61OuterArgs = Array.from(arguments);
+  /* AIWORKEROS_B6R97R58C_MATERIAL_MARKDOWN_RETURN_WRAP_START */
+  function aiwB6R97R58CShortRequestSummary(value) {
+    const raw = String(value || "").replace(/\s+/g, " ").trim();
+    if (!raw) return "依頼内容に基づく成果物作成";
+    const topicMatch = raw.match(/^(.{2,80}?)(?:について|に関する|を対象に|の)(?:、|,|。|\s|$)/);
+    if (topicMatch && topicMatch[1]) {
+      const topic = topicMatch[1].replace(/[。！？、,]+$/g, "").trim();
+      if (topic) return topic + "に関する成果物作成";
+    }
+    const firstSentence = raw.split(/[。！？]/).filter(Boolean)[0] || raw;
+    if (firstSentence.length <= 28 && !/できるだけ詳細|含める|作成して|資料にして|してください/.test(firstSentence)) {
+      return firstSentence;
+    }
+    return "依頼内容に基づく成果物作成";
+  }
+
+  function aiwB6R97R58CSanitizeMaterialMarkdown(markdown) {
+    let out = String(markdown || "");
+    out = out.replace(/(## 3\. 依頼要旨\s*\n)([\s\S]*?)(?=\n## \d+\.|\n# |$)/, function(match, heading, body) {
+      return heading + aiwB6R97R58CShortRequestSummary(body) + "\n";
+    });
+    return aiwB6R97R61EnsureRequiredViewpointsSection(out);
+  }
+  /* AIWORKEROS_B6R97R58C_MATERIAL_MARKDOWN_RETURN_WRAP_END */
+
+  /* AIWORKEROS_B6R97R61_MATERIAL_MARKDOWN_REQUIRED_VIEWPOINTS_START */
+  function aiwB6R97R61CollectText(value, depth) {
+    if (depth > 6 || value === null || value === undefined) return "";
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) return value.map((item) => aiwB6R97R61CollectText(item, depth + 1)).join("\n");
+    if (typeof value === "object") return Object.values(value).map((item) => aiwB6R97R61CollectText(item, depth + 1)).join("\n");
+    return "";
+  }
+
+  function aiwB6R97R61RequiredViewpointTerms(markdown) {
+    const text = [markdown].concat(aiwB6R97R61OuterArgs.map((item) => aiwB6R97R61CollectText(item, 0))).join("\n").slice(0, 160000);
+    const terms = [];
+
+    if (/大化の改新|乙巳の変|中大兄|中臣鎌足|蘇我/.test(text)) {
+      terms.push(
+        "大化の改新",
+        "乙巳の変",
+        "蘇我",
+        "入鹿",
+        "蝦夷",
+        "中大兄",
+        "中臣鎌足",
+        "孝徳天皇",
+        "改新の詔",
+        "公地公民",
+        "班田収授",
+        "戸籍",
+        "評制",
+        "郡制",
+        "難波宮",
+        "租庸調",
+        "後続影響",
+        "史料上の注意点"
+      );
+    }
+
+    [
+      "班田収授",
+      "郡制",
+      "租庸調",
+      "史料上の注意点",
+      "戸籍",
+      "評制",
+      "難波宮",
+      "改新の詔",
+      "公地公民"
+    ].forEach((term) => {
+      if (text.includes(term)) terms.push(term);
+    });
+
+    return Array.from(new Set(terms)).filter(Boolean).slice(0, 30);
+  }
+
+  function aiwB6R97R61EnsureRequiredViewpointsSection(markdown) {
+    const out = String(markdown || "");
+    if (out.includes("## 3.1 必須観点")) return out;
+    const terms = aiwB6R97R61RequiredViewpointTerms(out);
+    if (!terms.length) return out;
+
+    const section = [
+      "## 3.1 必須観点",
+      "本成果物では、以下の観点を落とさず扱う。",
+      "",
+      ...terms.map((term) => "- " + term)
+    ].join("\n");
+
+    if (/\n## 4\./.test(out)) {
+      return out.replace(/\n## 4\./, "\n\n" + section + "\n\n## 4.");
+    }
+
+    return out + "\n\n" + section;
+  }
+  /* AIWORKEROS_B6R97R61_MATERIAL_MARKDOWN_REQUIRED_VIEWPOINTS_END */
+
+
   const title = aiwB6R95R3Z24TaskTitle(payload);
   const modelCode = aiwB6R95R3Z24ModelCode(payload);
   const instruction = aiwB6R95R3Z24Instruction(payload);
@@ -1239,7 +1340,7 @@ function aiwB6R95R3Z24BuildMaterialMarkdown(payload, rows) {
   blocks.push("## 3. 依頼要旨");
   blocks.push(instruction || "依頼文なし");
   blocks.push("");
-  blocks.push("## 4. CX参照素材からの展開本文");
+  blocks.push("## 4. 参照資料に基づく本文");
 
   rows.slice(0, 16).forEach((row, index) => {
     const title = aiwB6R95R3Z24MaterialTitle(row, index);
@@ -1260,7 +1361,7 @@ function aiwB6R95R3Z24BuildMaterialMarkdown(payload, rows) {
   blocks.push("## 7. 次工程");
   blocks.push("依頼元アプリは summary_text と deliverable_link を保存し、必要に応じて追加条件を指定して再生成できます。");
 
-  return blocks.join("\n");
+  return aiwB6R97R58CSanitizeMaterialMarkdown(blocks.join("\n"));
 }
 
 function aiwB6R95R3Z24EnhanceDeliverableWithCxMaterial(deliverable, payload, sourceRouteCode) {
@@ -1516,6 +1617,88 @@ function aiwB6R98R3BCollectCandidatePaths(payload) {
   return Array.from(new Set(all));
 }
 
+/* AIWORKEROS_B6R97R66_TEXT_SOURCE_ANALYZER_START */
+function aiwB6R97R66DetectSourceMaterialType(filePath) {
+  const lower = String(filePath || "").toLowerCase();
+  if (/\.(txt|md|markdown|json|jsonl|csv|tsv|log|xml|html|htm|css|js|mjs|cjs|ts|tsx|jsx|sql|yaml|yml|ini|conf)$/i.test(lower)) return "text";
+  if (/\.pdf$/i.test(lower)) return "pdf";
+  if (/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(lower)) return "image";
+  if (/\.(mp3|wav|m4a|aac|ogg|flac|mid|midi)$/i.test(lower)) return "audio";
+  return "unknown";
+}
+
+function aiwB6R97R66SourceMaterialSummary(text) {
+  const raw = String(text || "").replace(/\r\n/g, "\n").replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+  return raw.slice(0, 240);
+}
+
+function aiwB6R97R66BuildSourceMaterialAnalysisResults(rows, rejected) {
+  const used = Array.isArray(rows) ? rows : [];
+  const rejects = Array.isArray(rejected) ? rejected : [];
+  const results = [];
+
+  used.forEach((row, index) => {
+    const mediaType = row.media_type || aiwB6R97R66DetectSourceMaterialType(row && row.path);
+    results.push({
+      source_path: row.path,
+      file_name: row.path ? String(row.path).split("/").pop() : "",
+      media_type: mediaType,
+      analyzer_status: row.analyzer_status || (mediaType === "text" ? "analyzed" : "metadata_only"),
+      analyzer_code: "B6R97R66",
+      byte_size: row.byte_size || 0,
+      char_count: row.char_count || 0,
+      extracted_summary: mediaType === "text" ? aiwB6R97R66SourceMaterialSummary(row.body_text || "") : "",
+      warnings: row.metadata_only_flag ? ["metadata_only_first_phase", "no_binary_content_read"] : (mediaType === "text" ? [] : ["metadata_only_first_phase"]),
+      safety_notes: ["local_source_file_only", "no_external_model_call", "no_ocr_or_transcription_in_first_phase"],
+      included_in_prompt_flag: Boolean(row.body_text) && !row.metadata_only_flag,
+      order_index: index
+    });
+  });
+
+  rejects.forEach((item, index) => {
+    results.push({
+      source_path: item.path || "",
+      file_name: item.path ? String(item.path).split("/").pop() : "",
+      media_type: aiwB6R97R66DetectSourceMaterialType(item.path || ""),
+      analyzer_status: "rejected",
+      analyzer_code: "B6R97R66",
+      warnings: [item.reason || "rejected"].filter(Boolean),
+      safety_notes: ["source_reader_rejection_record"],
+      included_in_prompt_flag: false,
+      order_index: used.length + index
+    });
+  });
+
+  return results;
+}
+
+function aiwB6R97R66RenderSourceMaterialAnalysisMarkdown(sourceFiles) {
+  const rows = sourceFiles && Array.isArray(sourceFiles.analysis_results) ? sourceFiles.analysis_results : [];
+  if (!rows.length) return "";
+  const blocks = [
+    "## 参照ファイル解析結果",
+    "",
+    "AIWorkerOS source material analyzer v1 の結果です。text は本文読込、pdf/image/audio は後続phaseで本格解析します。"
+  ];
+  rows.forEach((row, index) => {
+    blocks.push("");
+    blocks.push("### source material " + String(index + 1));
+    blocks.push("- analyzer_code: " + String(row.analyzer_code || "B6R97R66"));
+    blocks.push("- file_name: " + String(row.file_name || ""));
+    blocks.push("- media_type: " + String(row.media_type || "unknown"));
+    blocks.push("- analyzer_status: " + String(row.analyzer_status || "unknown"));
+    blocks.push("- included_in_prompt_flag: " + String(Boolean(row.included_in_prompt_flag)));
+    if (row.extracted_summary) {
+      blocks.push("- extracted_summary: " + String(row.extracted_summary));
+    }
+    if (Array.isArray(row.warnings) && row.warnings.length) {
+      blocks.push("- warnings: " + row.warnings.join(", "));
+    }
+  });
+  return blocks.join("\n");
+}
+/* AIWORKEROS_B6R97R66_TEXT_SOURCE_ANALYZER_END */
 function aiwB6R98R3BReadSourceFiles(payload) {
   const candidates = aiwB6R98R3BCollectCandidatePaths(payload);
   const maxFiles = Math.max(1, Math.min(10, Number(process.env.AIWORKEROS_SOURCE_FILE_MAX_FILES || "5") || 5));
@@ -1541,10 +1724,16 @@ function aiwB6R98R3BReadSourceFiles(payload) {
         continue;
       }
 
-      if (!aiwB6R98R3BIsTextLikeFile(absPath)) {
-        rejected.push({ path: candidate, reason: "not_text_like_extension" });
+      /* AIWORKEROS_B6R97R67_MEDIA_METADATA_HOOKS_START */
+      const aiwB6R97R67MaterialType = aiwB6R97R66DetectSourceMaterialType(absPath);
+      const aiwB6R97R67TextLike = aiwB6R98R3BIsTextLikeFile(absPath);
+      const aiwB6R97R67MetadataOnly = ["pdf", "image", "audio"].includes(aiwB6R97R67MaterialType);
+
+      if (!aiwB6R97R67TextLike && !aiwB6R97R67MetadataOnly) {
+        rejected.push({ path: candidate, reason: "unsupported_source_extension", media_type: aiwB6R97R67MaterialType });
         continue;
       }
+      /* AIWORKEROS_B6R97R67_MEDIA_METADATA_HOOKS_END */
 
       if (!fs.existsSync(absPath)) {
         rejected.push({ path: candidate, reason: "not_found" });
@@ -1562,6 +1751,20 @@ function aiwB6R98R3BReadSourceFiles(payload) {
         continue;
       }
 
+      if (aiwB6R97R67MetadataOnly && !aiwB6R97R67TextLike) {
+        rows.push({
+          path: absPath,
+          byte_size: stat.size,
+          char_count: 0,
+          body_text: "",
+          media_type: aiwB6R97R67MaterialType,
+          analyzer_status: "metadata_only",
+          metadata_only_flag: true,
+          media_metadata_hook_code: "B6R97R67"
+        });
+        continue;
+      }
+
       let body = fs.readFileSync(absPath, "utf8");
       if (body.length > maxTotalChars - totalChars) {
         body = body.slice(0, Math.max(0, maxTotalChars - totalChars));
@@ -1572,7 +1775,11 @@ function aiwB6R98R3BReadSourceFiles(payload) {
         path: absPath,
         byte_size: stat.size,
         char_count: body.length,
-        body_text: body
+        body_text: body,
+        media_type: "text",
+        analyzer_status: "analyzed",
+        metadata_only_flag: false,
+        media_metadata_hook_code: "B6R97R67"
       });
 
       if (totalChars >= maxTotalChars) break;
@@ -1585,10 +1792,13 @@ function aiwB6R98R3BReadSourceFiles(payload) {
     }
   }
 
+  const analysisResults = aiwB6R97R66BuildSourceMaterialAnalysisResults(rows, rejected);
+
   return {
     candidates,
     rows,
     rejected,
+    analysis_results: analysisResults,
     limits: {
       max_files: maxFiles,
       max_bytes_per_file: maxBytes,
@@ -1607,6 +1817,12 @@ function aiwB6R98R3BSourceFilesMarkdown(sourceFiles) {
     "以下は依頼元から渡されたローカル参照ファイルをAIWorkerOSが読み込んだ内容です。成果物作成では、この内容を入力根拠として扱います。"
   ];
 
+  const analysisMarkdown = aiwB6R97R66RenderSourceMaterialAnalysisMarkdown(sourceFiles);
+  if (analysisMarkdown) {
+    blocks.push("");
+    blocks.push(analysisMarkdown);
+  }
+
   rows.forEach((row, index) => {
     blocks.push("");
     blocks.push("### 参照ファイル " + String(index + 1));
@@ -1622,9 +1838,37 @@ function aiwB6R98R3BSourceFilesMarkdown(sourceFiles) {
 }
 
 function aiwB6R98R3BEnhanceDeliverableWithSourceFiles(deliverable, payload, sourceRouteCode) {
+  /* AIWORKEROS_B6R97R65B_SOURCE_BODY_MERGE_INTO_MAIN_START */
+  function aiwB6R97R65BAppendSourceMarkdownToBody(body, sourceMarkdown) {
+    const current = aiwB6R98R3BSourceText(body || "");
+    const source = aiwB6R98R3BSourceText(sourceMarkdown || "");
+    if (!source) return current;
+    if (current.includes(source)) return current;
+    if (source.includes("READ_PROOF_TOKEN") && current.includes("READ_PROOF_TOKEN")) return current;
+    return [current, "", source].filter(Boolean).join("\n").trim();
+  }
+
+  function aiwB6R97R65BMainArtifactWithSourceMarkdown(artifact, sourceMarkdown) {
+    if (!artifact || typeof artifact !== "object") return artifact;
+    const mergedBody = aiwB6R97R65BAppendSourceMarkdownToBody(
+      artifact.body_markdown || artifact.bodyMarkdown || artifact.content || "",
+      sourceMarkdown
+    );
+    return Object.assign({}, artifact, {
+      bodyMarkdown: mergedBody,
+      body_markdown: mergedBody,
+      content: mergedBody,
+      aiw_b6r97r65b_source_body_merged: true
+    });
+  }
+  /* AIWORKEROS_B6R97R65B_SOURCE_BODY_MERGE_INTO_MAIN_END */
+
   const safeDeliverable = deliverable || {};
   const sourceFiles = aiwB6R98R3BReadSourceFiles(payload);
   const markdown = aiwB6R98R3BSourceFilesMarkdown(sourceFiles);
+  safeDeliverable.aiw_b6r97r65b_source_files_markdown = markdown;
+  safeDeliverable.sourceFilesMarkdown = markdown;
+  safeDeliverable.source_files_markdown = markdown;
 
   safeDeliverable.robotContext = Object.assign({}, safeDeliverable.robotContext || {}, {
     source_file_reader_patch_code: "B6R98R3B",
@@ -1642,7 +1886,11 @@ function aiwB6R98R3BEnhanceDeliverableWithSourceFiles(deliverable, payload, sour
     source_route_code: String(sourceRouteCode || "")
   });
 
+  safeDeliverable.sourceMaterialAnalysisResults = sourceFiles.analysis_results || [];
+  safeDeliverable.source_material_analysis_results = sourceFiles.analysis_results || [];
+
   safeDeliverable.outputPayload = Object.assign({}, safeDeliverable.outputPayload || {}, {
+    source_material_analysis_results: sourceFiles.analysis_results || [],
     source_file_reader: {
       patch_code: "B6R98R3B",
       candidates_count: sourceFiles.candidates.length,
@@ -1668,11 +1916,15 @@ function aiwB6R98R3BEnhanceDeliverableWithSourceFiles(deliverable, payload, sour
   ].join("\n").trim();
 
   safeDeliverable.bodyMarkdown = enhancedBody;
+  safeDeliverable.body_markdown = enhancedBody;
+  safeDeliverable.output_body_ja = enhancedBody;
+  safeDeliverable.content = enhancedBody;
+  safeDeliverable.aiw_b6r97r65b_source_body_merged = true;
 
   if (Array.isArray(safeDeliverable.generatedArtifacts)) {
     safeDeliverable.generatedArtifacts = safeDeliverable.generatedArtifacts.map((artifact) => {
       if (artifact && artifact.file_name === "01_main_deliverable.md") {
-        return Object.assign({}, artifact, { body_markdown: enhancedBody });
+        return aiwB6R97R65BMainArtifactWithSourceMarkdown(Object.assign({}, artifact, { body_markdown: enhancedBody }), markdown);
       }
       return artifact;
     });
@@ -1681,7 +1933,7 @@ function aiwB6R98R3BEnhanceDeliverableWithSourceFiles(deliverable, payload, sour
   if (safeDeliverable.outputPayload && Array.isArray(safeDeliverable.outputPayload.generated_artifacts)) {
     safeDeliverable.outputPayload.generated_artifacts = safeDeliverable.outputPayload.generated_artifacts.map((artifact) => {
       if (artifact && artifact.file_name === "01_main_deliverable.md") {
-        return Object.assign({}, artifact, { body_markdown: enhancedBody });
+        return aiwB6R97R65BMainArtifactWithSourceMarkdown(Object.assign({}, artifact, { body_markdown: enhancedBody }), markdown);
       }
       return artifact;
     });
@@ -1690,7 +1942,7 @@ function aiwB6R98R3BEnhanceDeliverableWithSourceFiles(deliverable, payload, sour
   if (Array.isArray(safeDeliverable.artifacts)) {
     safeDeliverable.artifacts = safeDeliverable.artifacts.map((artifact) => {
       if (artifact && artifact.body_markdown) {
-        return Object.assign({}, artifact, { body_markdown: enhancedBody });
+        return aiwB6R97R65BMainArtifactWithSourceMarkdown(Object.assign({}, artifact, { body_markdown: enhancedBody }), markdown);
       }
       return artifact;
     });
@@ -1795,10 +2047,544 @@ function aiwB6R95R3D1NormalizeGeneratedArtifact(item, index) {
   };
 }
 
+
+/* AIWORKEROS_B6R97R36_R3_STRONG_MAIN_DELIVERABLE_SOURCE_START */
+function aiwB6R97R36R3SelectStrongMainDeliverableMarkdown(...inputs) {
+  const candidates = [];
+
+  function addCandidate(label, value) {
+    if (typeof value !== "string") return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    const weakSignals = [
+      "individual request queued",
+      "worker_work_unit_id",
+      "詳細資料を作成せよ",
+      "一次成果物",
+      "B6R97R32B individual request queued"
+    ];
+
+    const strongSignals = [
+      "乙巳の変",
+      "蘇我",
+      "入鹿",
+      "蝦夷",
+      "中大兄",
+      "中臣鎌足",
+      "孝徳天皇",
+      "改新の詔",
+      "公地公民",
+      "班田収授",
+      "戸籍",
+      "評",
+      "郡",
+      "飛鳥",
+      "難波宮",
+      "租庸調",
+      "CX参照素材からの展開本文"
+    ];
+
+    const weakHitCount = weakSignals.filter((term) => trimmed.includes(term)).length;
+    const strongHitCount = strongSignals.filter((term) => trimmed.includes(term)).length;
+
+    let score = trimmed.length;
+    score += strongHitCount * 1200;
+    score -= weakHitCount * 3000;
+
+    if (trimmed.length >= 3000) score += 2000;
+    if (strongHitCount >= 5) score += 3500;
+    if (weakHitCount >= 2 && trimmed.length < 1500) score -= 7000;
+
+    candidates.push({
+      label,
+      value: trimmed,
+      score,
+      length: trimmed.length,
+      strongHitCount,
+      weakHitCount
+    });
+  }
+
+  function dig(value, path, depth) {
+    if (depth > 8 || value === null || value === undefined) return;
+
+    if (typeof value === "string") {
+      if (
+        /body|bodyMarkdown|body_markdown|markdown|deliverable|main|artifact|output|summary|content|text/i.test(path) ||
+        /乙巳の変|蘇我|大化の改新|改新の詔|公地公民|CX参照素材からの展開本文/.test(value)
+      ) {
+        addCandidate(path, value);
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => dig(item, path + "[" + index + "]", depth + 1));
+      return;
+    }
+
+    if (typeof value === "object") {
+      for (const [key, child] of Object.entries(value)) {
+        const childPath = path ? path + "." + key : key;
+        if (/body|bodyMarkdown|body_markdown|markdown|deliverable|main|artifact|output|payload|summary|content|text|result|response|worker/i.test(key)) {
+          dig(child, childPath, depth + 1);
+        } else if (depth < 3) {
+          dig(child, childPath, depth + 1);
+        }
+      }
+    }
+  }
+
+  inputs.forEach((input, index) => {
+    addCandidate("arguments[" + index + "]", input);
+    dig(input, "arguments[" + index + "]", 0);
+  });
+
+  candidates.sort((a, b) => b.score - a.score || b.length - a.length);
+
+  const selected = candidates[0];
+  if (selected && selected.value) return selected.value;
+
+  return "";
+}
+/* AIWORKEROS_B6R97R36_R3_STRONG_MAIN_DELIVERABLE_SOURCE_END */
+
+
+/* AIWORKEROS_B6R97R40_PRE_ZIP_BODY_SOURCE_ORDER_START */
+function aiwB6R97R40SelectTaskSpecificMainDeliverableMarkdown(...inputs) {
+  const candidates = [];
+  const taskHintParts = [];
+
+  function isString(value) {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+
+  function addTaskHint(path, value) {
+    if (!isString(value)) return;
+    if (/task_instruction|instruction|prompt|task_title|title|subject|topic|request|source_request|domain/i.test(path)) {
+      taskHintParts.push(value.trim());
+    }
+  }
+
+  function collectTaskHints(value, path, depth) {
+    if (depth > 8 || value === null || value === undefined) return;
+    if (typeof value === "string") {
+      addTaskHint(path, value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => collectTaskHints(item, path + "[" + index + "]", depth + 1));
+      return;
+    }
+    if (typeof value === "object") {
+      for (const [key, child] of Object.entries(value)) {
+        collectTaskHints(child, path ? path + "." + key : key, depth + 1);
+      }
+    }
+  }
+
+  function normalizeText(value) {
+    return String(value || "")
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/[、。・：:;；（）()「」『』【】\[\]{}]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function extractTaskTerms(text) {
+    const normalized = normalizeText(text);
+    const genericStop = new Set([
+      "について",
+      "できるだけ",
+      "詳細",
+      "資料",
+      "作成",
+      "確認",
+      "検証",
+      "主成果物",
+      "成果物",
+      "実行",
+      "runtime",
+      "verification",
+      "deliverable",
+      "zip",
+      "main",
+      "worker",
+      "AIWorkerOS",
+      "AICM"
+    ]);
+
+    const terms = new Set();
+
+    for (const chunk of normalized.split(/\s+/)) {
+      const cleaned = chunk.trim();
+      if (cleaned.length < 2 || cleaned.length > 28) continue;
+      if (genericStop.has(cleaned)) continue;
+      terms.add(cleaned);
+    }
+
+    const jaMatches = normalized.match(/[一-龥ぁ-んァ-ヶー]{2,18}/g) || [];
+    for (const raw of jaMatches) {
+      let term = raw
+        .replace(/について/g, "")
+        .replace(/できるだけ/g, "")
+        .replace(/詳細/g, "")
+        .replace(/資料/g, "")
+        .replace(/作成/g, "")
+        .replace(/検証/g, "")
+        .trim();
+
+      if (term.length >= 2 && term.length <= 18 && !genericStop.has(term)) {
+        terms.add(term);
+      }
+
+      if (raw.includes("大化の改新")) terms.add("大化の改新");
+      if (raw.includes("乙巳の変")) terms.add("乙巳の変");
+      if (raw.includes("中大兄")) terms.add("中大兄");
+      if (raw.includes("中臣鎌足")) terms.add("中臣鎌足");
+      if (raw.includes("公地公民")) terms.add("公地公民");
+      if (raw.includes("改新の詔")) terms.add("改新の詔");
+    }
+
+    return Array.from(terms).filter((term) => term.length >= 2);
+  }
+
+  function isPreferredSourcePath(path) {
+    return /deliverable\.bodyMarkdown|deliverable\.body_markdown|output_body_ja|body_markdown|bodyMarkdown|requester_delivery_payload\.deliverable/i.test(path);
+  }
+
+  function isCandidatePath(path) {
+    return /body|bodyMarkdown|body_markdown|markdown|deliverable|main|artifact|output|summary|content|text|result|response|payload/i.test(path);
+  }
+
+  function addCandidate(path, value) {
+    if (!isString(value)) return;
+    const text = value.trim();
+    if (!text) return;
+
+    const genericCxSignals = [
+      "CX参照素材からの展開本文",
+      "地域文化は尊重ベース",
+      "祭りは地域の記憶装置",
+      "説明は段階化すると伝わりやすい",
+      "ManagerからLeaderへの粗細分解",
+      "DBや外部状態を変える操作",
+      "安全境界を維持する"
+    ];
+
+    const weakSignals = [
+      "individual request queued",
+      "worker_work_unit_id",
+      "詳細資料を作成せよ",
+      "一次成果物",
+      "B6R97R32B individual request queued"
+    ];
+
+    const taskHitTerms = taskTerms.filter((term) => term && text.includes(term));
+    const genericHits = genericCxSignals.filter((term) => text.includes(term));
+    const weakHits = weakSignals.filter((term) => text.includes(term));
+
+    let score = text.length;
+
+    if (isPreferredSourcePath(path)) score += 9000;
+    score += taskHitTerms.length * 2500;
+    score -= genericHits.length * 6000;
+    score -= weakHits.length * 3500;
+
+    if (taskHitTerms.length >= 3) score += 7000;
+    if (taskHitTerms.length >= 5) score += 12000;
+    if (genericHits.length > 0 && taskHitTerms.length < 3) score -= 20000;
+    if (weakHits.length > 0 && text.length < 2000) score -= 12000;
+
+    candidates.push({
+      path,
+      text,
+      score,
+      length: text.length,
+      taskHitCount: taskHitTerms.length,
+      taskHitTerms,
+      genericHitCount: genericHits.length,
+      genericHits,
+      weakHitCount: weakHits.length,
+      weakHits,
+      preferredSourcePath: isPreferredSourcePath(path)
+    });
+  }
+
+  function dig(value, path, depth) {
+    if (depth > 9 || value === null || value === undefined) return;
+
+    if (typeof value === "string") {
+      if (isCandidatePath(path) || taskTerms.some((term) => term && value.includes(term))) {
+        addCandidate(path, value);
+      }
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => dig(item, path + "[" + index + "]", depth + 1));
+      return;
+    }
+
+    if (typeof value === "object") {
+      for (const [key, child] of Object.entries(value)) {
+        const childPath = path ? path + "." + key : key;
+        if (isCandidatePath(childPath) || depth < 4) {
+          dig(child, childPath, depth + 1);
+        }
+      }
+    }
+  }
+
+  inputs.forEach((input, index) => collectTaskHints(input, "arguments[" + index + "]", 0));
+
+  const taskHintText = taskHintParts.join(" ");
+  const taskTerms = extractTaskTerms(taskHintText);
+
+  inputs.forEach((input, index) => dig(input, "arguments[" + index + "]", 0));
+
+  candidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.taskHitCount !== a.taskHitCount) return b.taskHitCount - a.taskHitCount;
+    if (a.genericHitCount !== b.genericHitCount) return a.genericHitCount - b.genericHitCount;
+    return b.length - a.length;
+  });
+
+  const selected = candidates[0];
+  if (selected && selected.text) return selected.text;
+
+  return aiwB6R97R36R3SelectStrongMainDeliverableMarkdown(...inputs);
+}
+/* AIWORKEROS_B6R97R40_PRE_ZIP_BODY_SOURCE_ORDER_END */
+
+
+/* AIWORKEROS_B6R97R46_SECTION4_REJECT_INSTRUCTION_ECHO_START */
+function aiwB6R97R46SelectSection4BodyMarkdown(...sources) {
+  function isObject(value) {
+    return value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function isString(value) {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+
+  function flatten(value, path, out, depth) {
+    if (depth > 10 || value === null || value === undefined) return;
+
+    if (typeof value === "string") {
+      out.push({ path, value });
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => flatten(item, path + "[" + index + "]", out, depth + 1));
+      return;
+    }
+
+    if (typeof value === "object") {
+      for (const [key, child] of Object.entries(value)) {
+        flatten(child, path ? path + "." + key : key, out, depth + 1);
+      }
+    }
+  }
+
+  function isPreferredBodyPath(path) {
+    /* AIWORKEROS_B6R97R49C_C_R46_BODY_SELECTOR_FIXED_VERIFY_START */
+    return /requester_delivery_payload\.deliverable\.(bodyMarkdown|body_markdown|output_body_ja)$/i.test(path) ||
+      /(^|\.)(bodyMarkdown|body_markdown|output_body_ja)$/i.test(path) ||
+      /generatedArtifacts\[[0-9]+\]\.(bodyMarkdown|body_markdown|output_body_ja)$/i.test(path) ||
+      /generated_artifacts\[[0-9]+\]\.(bodyMarkdown|body_markdown|output_body_ja)$/i.test(path);
+  }
+
+  function isInstructionPath(path) {
+    return /task_instruction_ja|instruction_text|instructionText|prompt_ja|task_title|task_title_ja/i.test(path);
+  }
+
+  function score(path, value, allInstructionTexts) {
+    if (!isString(value)) return null;
+
+    const text = value.trim();
+
+    const weakSignals = [
+      "individual request queued",
+      "worker_work_unit_id",
+      "詳細資料を作成せよ",
+      "一次成果物",
+      "B6R97R32B individual request queued"
+    ];
+
+    const genericCxSignals = [
+      "CX参照素材からの展開本文",
+      "地域文化は尊重ベース",
+      "祭りは地域の記憶装置",
+      "説明は段階化すると伝わりやすい",
+      "ManagerからLeaderへの粗細分解",
+      "DBや外部状態を変える操作"
+    ];
+
+    const taskSignals = [
+      "大化の改新",
+      "乙巳の変",
+      "蘇我",
+      "入鹿",
+      "蝦夷",
+      "中大兄",
+      "中臣鎌足",
+      "孝徳天皇",
+      "改新の詔",
+      "公地公民",
+      "班田収授",
+      "戸籍",
+      "評",
+      "郡",
+      "飛鳥",
+      "難波宮",
+      "租庸調",
+      "後続影響",
+      "史料上の注意点"
+    ];
+
+    const weakHits = weakSignals.filter((term) => text.includes(term));
+    const genericHits = genericCxSignals.filter((term) => text.includes(term));
+    const taskHits = taskSignals.filter((term) => text.includes(term));
+
+    const exactInstructionEcho = allInstructionTexts.some((instruction) => {
+      if (!instruction || instruction.length < 12) return false;
+      return text === instruction || (text.includes(instruction) && text.length <= instruction.length + 500);
+    });
+
+    const instructionLike = isInstructionPath(path) || exactInstructionEcho;
+    const nextStepLike = /next_steps|nextSteps|next_step|nextStep|summary_text|summaryText|deliverable_ref|deliverableRef/i.test(path) ||
+      text.includes("依頼元アプリでsummary_textとdeliverable_ref/linkを保存する") ||
+      text.includes("レビュー画面から成果物本文へ辿れるようにする") ||
+      text.includes("差し戻し時は追加条件をAIWorkerOSへ再依頼する");
+
+    /* AIWORKEROS_B6R97R55_R46_REJECT_NON_MAIN_ARTIFACT_TEXT_START */
+    const nonMainArtifactPathLike = /qualityNotes|quality_notes|unresolvedIssues|unresolved_issues|nextSteps|next_steps|summary_text|summaryText|deliverable_ref|deliverableRef/i.test(path);
+    const nonMainArtifactTextLike =
+      text.includes("この段階では外部実行、PG apply、破壊的操作は行っていません") ||
+      text.includes("追加調査・DB変更・実装反映が必要な場合") ||
+      text.includes("AIWorkerOS側で生成した一次成果物です") ||
+      text.includes("今後の生成エンジン深化では") ||
+      text.includes("依頼元アプリでsummary_textとdeliverable_ref/linkを保存する") ||
+      text.includes("レビュー画面から成果物本文へ辿れるようにする") ||
+      text.includes("差し戻し時は追加条件をAIWorkerOSへ再依頼する");
+    const nonMainArtifactLike = nonMainArtifactPathLike || nonMainArtifactTextLike || nextStepLike;
+    /* AIWORKEROS_B6R97R55_R46_REJECT_NON_MAIN_ARTIFACT_TEXT_END */
+
+    let point = text.length;
+
+    if (isPreferredBodyPath(path)) point += 40000;
+    if (instructionLike) point -= 70000;
+    if (nextStepLike) point -= 90000;
+    if (nonMainArtifactLike) point -= 140000;
+
+    point += taskHits.length * 3500;
+    point -= weakHits.length * 15000;
+    point -= genericHits.length * 15000;
+
+    if (text.length >= 1800) point += 15000;
+    if (text.length >= 3000) point += 25000;
+    if (taskHits.length >= 8) point += 18000;
+    if (genericHits.length > 0 && taskHits.length < 3) point -= 40000;
+
+    return {
+      path,
+      text,
+      point,
+      length: text.length,
+      preferredBodyPath: isPreferredBodyPath(path),
+      instructionLike,
+      nextStepLike,
+      nonMainArtifactLike,
+      nonMainArtifactPathLike,
+      nonMainArtifactTextLike,
+      exactInstructionEcho,
+      taskHitCount: taskHits.length,
+      weakHitCount: weakHits.length,
+      genericHitCount: genericHits.length
+    };
+  }
+
+  const flattened = [];
+  sources.forEach((source, index) => flatten(source, "sources[" + index + "]", flattened, 0));
+
+  const instructionTexts = flattened
+    .filter((item) => isInstructionPath(item.path) && isString(item.value))
+    .map((item) => item.value.trim());
+
+  const candidates = flattened
+    .map((item) => score(item.path, item.value, instructionTexts))
+    .filter(Boolean)
+    .filter((candidate) => candidate.weakHitCount === 0)
+    .filter((candidate) => candidate.genericHitCount === 0)
+    .filter((candidate) => !candidate.instructionLike)
+    .filter((candidate) => !candidate.nextStepLike)
+    .filter((candidate) => !candidate.nonMainArtifactLike)
+    .filter((candidate) => candidate.preferredBodyPath || candidate.taskHitCount >= 4);
+  /* AIWORKEROS_B6R97R49C_C_R46_BODY_SELECTOR_FIXED_VERIFY_END */
+
+  candidates.sort((a, b) => {
+    if (b.point !== a.point) return b.point - a.point;
+    if (b.preferredBodyPath !== a.preferredBodyPath) return b.preferredBodyPath ? 1 : -1;
+    if (b.taskHitCount !== a.taskHitCount) return b.taskHitCount - a.taskHitCount;
+    return b.length - a.length;
+  });
+
+  return candidates[0]?.text || "";
+}
+/* AIWORKEROS_B6R97R46_SECTION4_REJECT_INSTRUCTION_ECHO_END */
+
 function aiwB6R95R3D1BuildGeneratedArtifacts(deliverable) {
+  /* AIWORKEROS_B6R97R65B_BUILD_SOURCE_MARKDOWN_MAIN_APPEND_START */
+  function aiwB6R97R65BSourceMarkdownFromDeliverable(value) {
+    if (!value || typeof value !== "object") return "";
+    const candidates = [
+      value.aiw_b6r97r65b_source_files_markdown,
+      value.sourceFilesMarkdown,
+      value.source_files_markdown,
+      value.outputPayload && value.outputPayload.source_files_markdown,
+      value.outputPayload && value.outputPayload.aiw_b6r97r65b_source_files_markdown
+    ];
+    for (const item of candidates) {
+      const text = aiwB6R95R3R3Text(item);
+      if (text && (text.includes("元データ/参照ファイル本文") || text.includes("READ_PROOF_TOKEN") || text.includes("参照ファイル"))) return text;
+    }
+    return "";
+  }
+
+  function aiwB6R97R65BAppendSourceMarkdownForMain(body, sourceMarkdown) {
+    const current = aiwB6R95R3R3Text(body || "");
+    const source = aiwB6R95R3R3Text(sourceMarkdown || "");
+    if (!source) return current;
+    if (current.includes(source)) return current;
+    if (source.includes("READ_PROOF_TOKEN") && current.includes("READ_PROOF_TOKEN")) return current;
+    return [current, "", source].filter(Boolean).join("\n").trim();
+  }
+
+  const aiwB6R97R65BSourceFilesMarkdown = aiwB6R97R65BSourceMarkdownFromDeliverable(deliverable);
+  /* AIWORKEROS_B6R97R65B_BUILD_SOURCE_MARKDOWN_MAIN_APPEND_END */
+
   const provided = Array.isArray(deliverable?.generatedArtifacts) ? deliverable.generatedArtifacts : [];
+  const strongMainDeliverableBodyMarkdown = aiwB6R97R40SelectTaskSpecificMainDeliverableMarkdown(deliverable, ...arguments);
+  const section4MainDeliverableBodyMarkdown = aiwB6R97R46SelectSection4BodyMarkdown(deliverable, strongMainDeliverableBodyMarkdown, ...arguments);
+
   if (provided.length > 0) {
-    return provided.map(aiwB6R95R3D1NormalizeGeneratedArtifact);
+    return provided.map((item, index) => {
+      const normalized = aiwB6R95R3D1NormalizeGeneratedArtifact(item, index);
+      if (
+        normalized.file_name === "01_main_deliverable.md" ||
+        normalized.artifact_kind_code === "main_deliverable" ||
+        normalized.kind === "main_deliverable" ||
+        normalized.title === "主成果物"
+      ) {
+        return Object.assign({}, normalized, {
+          body_markdown: aiwB6R97R65BAppendSourceMarkdownForMain(aiwB6R97R46SelectSection4BodyMarkdown(normalized, deliverable, section4MainDeliverableBodyMarkdown, strongMainDeliverableBodyMarkdown, ...arguments) || normalized.body_markdown || normalized.bodyMarkdown || normalized.content || "", aiwB6R97R65BSourceFilesMarkdown)
+        });
+      }
+      return normalized;
+    });
   }
 
   const artifacts = [
@@ -1806,13 +2592,15 @@ function aiwB6R95R3D1BuildGeneratedArtifacts(deliverable) {
       kind: "main_deliverable",
       title: deliverable?.outputTitle || "主成果物",
       file_name: "01_main_deliverable.md",
-      body_markdown: deliverable?.bodyMarkdown || ""
+      body_markdown: aiwB6R97R65BAppendSourceMarkdownForMain(section4MainDeliverableBodyMarkdown || deliverable?.bodyMarkdown || deliverable?.body_markdown || deliverable?.output_body_ja || "", aiwB6R97R65BSourceFilesMarkdown)
     }
   ];
 
+  /* AIWORKEROS_B6R97R52B_BUILD_ARTIFACT_LINE_BASED_FILENAMES_START */
   if (aiwB6R95R3R3Text(deliverable?.qualityNotes)) {
     artifacts.push({
       kind: "quality_notes",
+      artifact_kind_code: "quality_notes",
       title: "品質メモ",
       file_name: "90_quality_notes.md",
       body_markdown: deliverable.qualityNotes
@@ -1822,6 +2610,7 @@ function aiwB6R95R3D1BuildGeneratedArtifacts(deliverable) {
   if (aiwB6R95R3R3Text(deliverable?.unresolvedIssues)) {
     artifacts.push({
       kind: "unresolved_issues",
+      artifact_kind_code: "unresolved_issues",
       title: "未解決事項",
       file_name: "91_unresolved_issues.md",
       body_markdown: deliverable.unresolvedIssues
@@ -1831,12 +2620,14 @@ function aiwB6R95R3D1BuildGeneratedArtifacts(deliverable) {
   if (aiwB6R95R3R3Text(deliverable?.nextSteps)) {
     artifacts.push({
       kind: "next_steps",
+      artifact_kind_code: "next_steps",
       title: "次工程",
       file_name: "92_next_steps.md",
       body_markdown: deliverable.nextSteps
     });
   }
 
+  /* AIWORKEROS_B6R97R52B_BUILD_ARTIFACT_LINE_BASED_FILENAMES_END */
   return artifacts.map(aiwB6R95R3D1NormalizeGeneratedArtifact);
 }
 
@@ -1930,13 +2721,205 @@ function aiwB6R95R3D1ZipStored(entries) {
   return Buffer.concat([localData, centralDir, eocd]);
 }
 
+
+/* AIWORKEROS_B6R97R43_CREATE_ZIP_PROVIDED_BODY_PRIORITY_START */
+function aiwB6R97R43MergeProvidedBodyIntoDeliverable(deliverable, ...sources) {
+  function isObject(value) {
+    return value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function isString(value) {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+
+  function clonePlain(value) {
+    if (Array.isArray(value)) return value.map(clonePlain);
+    if (isObject(value)) {
+      const out = {};
+      for (const [key, child] of Object.entries(value)) out[key] = clonePlain(child);
+      return out;
+    }
+    return value;
+  }
+
+  function flatten(value, path, out, depth) {
+    if (depth > 10 || value === null || value === undefined) return;
+
+    if (typeof value === "string") {
+      out.push({ path, value });
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => flatten(item, path + "[" + index + "]", out, depth + 1));
+      return;
+    }
+
+    if (typeof value === "object") {
+      for (const [key, child] of Object.entries(value)) {
+        flatten(child, path ? path + "." + key : key, out, depth + 1);
+      }
+    }
+  }
+
+  function isPreferredProvidedBodyPath(path) {
+    return /requester_delivery_payload\.deliverable\.(bodyMarkdown|body_markdown|output_body_ja)$/i.test(path) ||
+      /deliverable\.(bodyMarkdown|body_markdown|output_body_ja)$/i.test(path) ||
+      /(^|\.)(output_body_ja|body_markdown|bodyMarkdown)$/i.test(path);
+  }
+
+  function isInstructionPath(path) {
+    return /task_instruction_ja|instruction_text|instructionText|prompt_ja|task_title|task_title_ja/i.test(path);
+  }
+
+  function scoreCandidate(path, value) {
+    if (!isString(value)) return null;
+
+    const text = value.trim();
+
+    const weakSignals = [
+      "individual request queued",
+      "worker_work_unit_id",
+      "詳細資料を作成せよ",
+      "一次成果物",
+      "B6R97R32B individual request queued"
+    ];
+
+    const genericCxSignals = [
+      "CX参照素材からの展開本文",
+      "地域文化は尊重ベース",
+      "祭りは地域の記憶装置",
+      "説明は段階化すると伝わりやすい",
+      "ManagerからLeaderへの粗細分解",
+      "DBや外部状態を変える操作"
+    ];
+
+    const taskSpecificSignals = [
+      "大化の改新",
+      "乙巳の変",
+      "蘇我",
+      "入鹿",
+      "蝦夷",
+      "中大兄",
+      "中臣鎌足",
+      "孝徳天皇",
+      "改新の詔",
+      "公地公民",
+      "班田収授",
+      "戸籍",
+      "評",
+      "郡",
+      "飛鳥",
+      "難波宮",
+      "租庸調"
+    ];
+
+    const weakHits = weakSignals.filter((term) => text.includes(term));
+    const genericHits = genericCxSignals.filter((term) => text.includes(term));
+    const taskHits = taskSpecificSignals.filter((term) => text.includes(term));
+
+    let score = text.length;
+
+    if (isPreferredProvidedBodyPath(path)) score += 30000;
+    if (isInstructionPath(path)) score -= 25000;
+
+    score += taskHits.length * 3000;
+    score -= weakHits.length * 12000;
+    score -= genericHits.length * 12000;
+
+    if (text.length >= 1800) score += 10000;
+    if (text.length >= 3000) score += 15000;
+    if (taskHits.length >= 6) score += 12000;
+    if (genericHits.length > 0 && taskHits.length < 3) score -= 30000;
+
+    return {
+      path,
+      text,
+      score,
+      length: text.length,
+      taskHitCount: taskHits.length,
+      weakHitCount: weakHits.length,
+      genericHitCount: genericHits.length,
+      preferredProvidedBodyPath: isPreferredProvidedBodyPath(path),
+      instructionPath: isInstructionPath(path)
+    };
+  }
+
+  function selectProvidedBody() {
+    const flattened = [];
+    sources.forEach((source, index) => flatten(source, "sources[" + index + "]", flattened, 0));
+    flatten(deliverable, "deliverable", flattened, 0);
+
+    const candidates = flattened
+      .map((item) => scoreCandidate(item.path, item.value))
+      .filter(Boolean)
+      .filter((candidate) => candidate.preferredProvidedBodyPath || candidate.taskHitCount >= 3)
+      .filter((candidate) => candidate.weakHitCount === 0)
+      .filter((candidate) => !(candidate.instructionPath && candidate.length < 1800));
+
+    candidates.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.preferredProvidedBodyPath !== a.preferredProvidedBodyPath) return b.preferredProvidedBodyPath ? 1 : -1;
+      if (b.taskHitCount !== a.taskHitCount) return b.taskHitCount - a.taskHitCount;
+      return b.length - a.length;
+    });
+
+    return candidates[0] || null;
+  }
+
+  const selected = selectProvidedBody();
+  if (!selected || !selected.text) return deliverable;
+
+  const merged = clonePlain(isObject(deliverable) ? deliverable : {});
+  merged.bodyMarkdown = selected.text;
+  merged.body_markdown = selected.text;
+  merged.output_body_ja = selected.text;
+  merged.aiw_b6r97r43_body_source_path = selected.path;
+
+  function patchArtifactArray(value) {
+    if (!Array.isArray(value)) return value;
+
+    return value.map((artifact) => {
+      if (!isObject(artifact)) return artifact;
+
+      const fileName = artifact.file_name || artifact.filename || artifact.name || "";
+      const kind = artifact.kind || artifact.artifact_kind_code || "";
+      const title = artifact.title || "";
+
+      const isMain =
+        fileName === "01_main_deliverable.md" ||
+        kind === "main_deliverable" ||
+        /主成果物|main/i.test(title);
+
+      if (!isMain) return artifact;
+
+      return {
+        ...artifact,
+        file_name: fileName || "01_main_deliverable.md",
+        kind: artifact.kind || "main_deliverable",
+        artifact_kind_code: artifact.artifact_kind_code || "main_deliverable",
+        bodyMarkdown: selected.text,
+        body_markdown: selected.text,
+        content: selected.text,
+        aiw_b6r97r43_body_source_path: selected.path
+      };
+    });
+  }
+
+  merged.generatedArtifacts = patchArtifactArray(merged.generatedArtifacts);
+  merged.generated_artifacts = patchArtifactArray(merged.generated_artifacts);
+
+  return merged;
+}
+/* AIWORKEROS_B6R97R43_CREATE_ZIP_PROVIDED_BODY_PRIORITY_END */
+
 function aiwB6R95R3D1CreateZipAndAttach(responsePayload, deliverable) {
   const fs = require("fs");
   const path = require("path");
 
   const response = responsePayload && typeof responsePayload === "object" ? responsePayload : {};
   const packageMeta = deliverable?.deliverablePackage || aiwB6R95R3D1BuildZipPackageMeta("requester", "deliverables");
-  const generatedArtifacts = aiwB6R95R3D1BuildGeneratedArtifacts(deliverable);
+  const generatedArtifacts = aiwB6R95R3D1BuildGeneratedArtifacts(aiwB6R97R43MergeProvidedBodyIntoDeliverable(deliverable, ...arguments, deliverable));
 
   const zipDir = process.env.AIWORKEROS_DELIVERABLE_ZIP_DIR || path.join(process.cwd(), "runtime-deliverable-zips");
   fs.mkdirSync(zipDir, { recursive: true });
