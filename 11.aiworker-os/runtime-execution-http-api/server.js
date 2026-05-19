@@ -1,4 +1,13 @@
 
+
+// GKD4E_R3_GUARDRAIL_COMMONJS_START
+const guardrailRuntimePreflight = require("./guardrail/guardrail-runtime-preflight.cjs");
+
+async function gkd4eR3RunRuntimeGuardrailPreflight(runtimeRequest) {
+  return guardrailRuntimePreflight.runAndPersistGuardrailPreflight(runtimeRequest);
+}
+// GKD4E_R3_GUARDRAIL_COMMONJS_END
+
 // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_START
 /*
   B6R44F:
@@ -3018,6 +3027,540 @@ function aiwB6R95R3D1CreateZipAndAttach(responsePayload, deliverable) {
 }
 // AIWORKEROS_B6R95R3D_R1_MULTI_ARTIFACT_ZIP_CONTRACT_END
 // AIWORKEROS_B6R95R3B_R3_COMMON_DELIVERABLE_CONTRACT_END
+
+// AIW_R78_QUEUE_INTAKE_ADAPTER_START
+/**
+ * R78 AIWorkerOS queue intake adapter helpers.
+ *
+ * Responsibility:
+ * - normalize one source-material queue/request item
+ * - validate source file refs before runtime request construction
+ * - produce a runtime-request-compatible handoff shape
+ *
+ * Boundary:
+ * - AIWorkerOS only
+ * - no AICM route
+ * - no DB write
+ * - no API POST
+ * - no consumer rewrite
+ */
+function aiwR78IsPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function aiwR78ToString(value) {
+  if (typeof value === "string") return value.trim();
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function aiwR78NormalizeArray(value) {
+  if (Array.isArray(value)) return value.filter((item) => item !== null && item !== undefined);
+  if (value === null || value === undefined || value === "") return [];
+  return [value];
+}
+
+function aiwR78CollectSourceFiles(queueItem) {
+  if (!aiwR78IsPlainObject(queueItem)) return [];
+  const candidates = [
+    queueItem.source_files,
+    queueItem.sourceFiles,
+    queueItem.source_file_refs,
+    queueItem.sourceFileRefs,
+    queueItem.attachments,
+    queueItem.attachment_refs,
+    queueItem.file_refs,
+    queueItem.fileRefs,
+  ];
+
+  const collected = [];
+  for (const candidate of candidates) {
+    for (const item of aiwR78NormalizeArray(candidate)) {
+      if (aiwR78IsPlainObject(item)) {
+        collected.push(item);
+      } else {
+        const pathValue = aiwR78ToString(item);
+        if (pathValue) {
+          collected.push({
+            path: pathValue,
+            source_file_ref: pathValue,
+          });
+        }
+      }
+    }
+  }
+  return collected;
+}
+
+function aiwR78GetSourceFilePath(sourceFile) {
+  if (!aiwR78IsPlainObject(sourceFile)) return "";
+  return aiwR78ToString(
+    sourceFile.path ||
+    sourceFile.file_path ||
+    sourceFile.filePath ||
+    sourceFile.absolute_path ||
+    sourceFile.absolutePath ||
+    sourceFile.saved_path ||
+    sourceFile.savedPath ||
+    sourceFile.source_path ||
+    sourceFile.sourcePath
+  );
+}
+
+function aiwR78NormalizeSourceFileRef(sourceFile, index) {
+  const normalized = aiwR78IsPlainObject(sourceFile) ? { ...sourceFile } : {};
+  const sourcePath = aiwR78GetSourceFilePath(normalized);
+
+  return {
+    source_file_ref: aiwR78ToString(
+      normalized.source_file_ref ||
+      normalized.sourceFileRef ||
+      normalized.file_ref ||
+      normalized.fileRef ||
+      normalized.id ||
+      normalized.ref ||
+      sourcePath ||
+      "source_file_" + index
+    ),
+    path: sourcePath,
+    original_name: aiwR78ToString(
+      normalized.original_name ||
+      normalized.originalName ||
+      normalized.filename ||
+      normalized.name
+    ),
+    mime_type: aiwR78ToString(
+      normalized.mime_type ||
+      normalized.mimeType ||
+      normalized.mimetype ||
+      normalized.content_type ||
+      normalized.contentType
+    ),
+    size_bytes: Number(normalized.size_bytes || normalized.sizeBytes || normalized.size || 0) || 0,
+    sha256: aiwR78ToString(normalized.sha256 || normalized.hash || ""),
+    uploaded_by_app: aiwR78ToString(normalized.uploaded_by_app || normalized.uploadedByApp || ""),
+    ownership_scope: aiwR78ToString(normalized.ownership_scope || normalized.ownershipScope || ""),
+    retention_policy: aiwR78ToString(normalized.retention_policy || normalized.retentionPolicy || ""),
+    raw: normalized,
+  };
+}
+
+function aiwR78ResolveAllowedSourceFile(sourcePath, options = {}) {
+  const fs = require("node:fs");
+  const path = require("node:path");
+
+  const warnings = [];
+  const rawPath = aiwR78ToString(sourcePath);
+  if (!rawPath) {
+    return {
+      ok: false,
+      reason: "MISSING_PATH",
+      message: "source file path is required",
+      retryable: false,
+      warnings,
+    };
+  }
+
+  if (rawPath.includes("\0")) {
+    return {
+      ok: false,
+      reason: "INVALID_PATH",
+      message: "source file path contains invalid null byte",
+      retryable: false,
+      warnings,
+    };
+  }
+
+  const normalizedPath = path.normalize(rawPath);
+  const pathSegments = normalizedPath.split(/[\\/]+/);
+  if (pathSegments.includes("..")) {
+    return {
+      ok: false,
+      reason: "PATH_TRAVERSAL_REJECTED",
+      message: "source file path traversal is not allowed",
+      retryable: false,
+      warnings,
+    };
+  }
+
+  const allowedRoots = aiwR78NormalizeArray(options.allowedSourceRoots)
+    .map((root) => aiwR78ToString(root))
+    .filter(Boolean);
+
+  let absolutePath = path.isAbsolute(normalizedPath)
+    ? normalizedPath
+    : path.resolve(options.baseDir || process.cwd(), normalizedPath);
+
+  let realFilePath = absolutePath;
+  try {
+    realFilePath = fs.realpathSync(absolutePath);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "FILE_NOT_FOUND",
+      message: "source file does not exist or cannot be resolved",
+      retryable: false,
+      path: absolutePath,
+      warnings,
+    };
+  }
+
+  if (allowedRoots.length > 0) {
+    const realAllowedRoots = [];
+    for (const root of allowedRoots) {
+      try {
+        realAllowedRoots.push(fs.realpathSync(root));
+      } catch (error) {
+        warnings.push({
+          code: "ALLOWED_ROOT_NOT_FOUND",
+          path: root,
+        });
+      }
+    }
+
+    const insideAllowedRoot = realAllowedRoots.some((root) => {
+      const relative = path.relative(root, realFilePath);
+      return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+    });
+
+    if (!insideAllowedRoot) {
+      return {
+        ok: false,
+        reason: "FILE_OUTSIDE_ALLOWED_ROOT",
+        message: "source file is outside allowed roots",
+        retryable: false,
+        path: realFilePath,
+        warnings,
+      };
+    }
+  }
+
+  let stat;
+  try {
+    stat = fs.statSync(realFilePath);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "FILE_STAT_FAILED",
+      message: "source file cannot be inspected",
+      retryable: false,
+      path: realFilePath,
+      warnings,
+    };
+  }
+
+  if (!stat.isFile()) {
+    return {
+      ok: false,
+      reason: "NOT_A_FILE",
+      message: "source path is not a file",
+      retryable: false,
+      path: realFilePath,
+      warnings,
+    };
+  }
+
+  const maxBytes = Number(options.maxBytes || options.maxSourceFileBytes || 2 * 1024 * 1024);
+  if (maxBytes > 0 && stat.size > maxBytes) {
+    return {
+      ok: false,
+      reason: "FILE_TOO_LARGE",
+      message: "source file exceeds allowed size",
+      retryable: false,
+      path: realFilePath,
+      size_bytes: stat.size,
+      max_bytes: maxBytes,
+      warnings,
+    };
+  }
+
+  try {
+    fs.accessSync(realFilePath, fs.constants.R_OK);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "FILE_NOT_READABLE",
+      message: "source file is not readable",
+      retryable: false,
+      path: realFilePath,
+      warnings,
+    };
+  }
+
+  return {
+    ok: true,
+    path: realFilePath,
+    size_bytes: stat.size,
+    warnings,
+  };
+}
+
+function aiwR78ValidateSourceFileRef(sourceFile, options = {}) {
+  const normalized = aiwR78NormalizeSourceFileRef(sourceFile, options.index || 0);
+  const resolved = aiwR78ResolveAllowedSourceFile(normalized.path, options);
+
+  if (!resolved.ok) {
+    return {
+      ok: false,
+      source_file_ref: normalized.source_file_ref,
+      reason: resolved.reason,
+      message: resolved.message,
+      retryable: Boolean(resolved.retryable),
+      warnings: resolved.warnings || [],
+      source_file: normalized,
+    };
+  }
+
+  return {
+    ok: true,
+    source_file: {
+      ...normalized,
+      path: resolved.path,
+      size_bytes: resolved.size_bytes || normalized.size_bytes,
+    },
+    warnings: resolved.warnings || [],
+  };
+}
+
+function aiwR78NormalizeInstruction(queueItem) {
+  const instructionSource = aiwR78IsPlainObject(queueItem && queueItem.instruction)
+    ? queueItem.instruction
+    : queueItem || {};
+
+  return {
+    title: aiwR78ToString(
+      instructionSource.title ||
+      instructionSource.task_title ||
+      instructionSource.taskTitle ||
+      queueItem.title ||
+      queueItem.task_title ||
+      queueItem.taskTitle
+    ),
+    body: aiwR78ToString(
+      instructionSource.body ||
+      instructionSource.instruction ||
+      instructionSource.prompt ||
+      instructionSource.text ||
+      queueItem.instruction ||
+      queueItem.prompt ||
+      queueItem.text ||
+      queueItem.request_text ||
+      queueItem.requestText
+    ),
+    output_type: aiwR78ToString(
+      instructionSource.output_type ||
+      instructionSource.outputType ||
+      queueItem.output_type ||
+      queueItem.outputType ||
+      "document"
+    ),
+    required_viewpoints: aiwR78NormalizeArray(
+      instructionSource.required_viewpoints ||
+      instructionSource.requiredViewpoints ||
+      queueItem.required_viewpoints ||
+      queueItem.requiredViewpoints
+    ).map(aiwR78ToString).filter(Boolean),
+    constraints: aiwR78NormalizeArray(
+      instructionSource.constraints ||
+      queueItem.constraints
+    ).map(aiwR78ToString).filter(Boolean),
+  };
+}
+
+function aiwR78NormalizeSourceMaterialQueueItem(queueItem, options = {}) {
+  const warnings = [];
+  if (!aiwR78IsPlainObject(queueItem)) {
+    return {
+      ok: false,
+      reason: "INVALID_QUEUE_ITEM",
+      message: "queue item must be an object",
+      retryable: false,
+      warnings,
+    };
+  }
+
+  const rawSourceFiles = aiwR78CollectSourceFiles(queueItem);
+  const validatedSourceFiles = [];
+  const validationErrors = [];
+
+  rawSourceFiles.forEach((sourceFile, index) => {
+    const result = aiwR78ValidateSourceFileRef(sourceFile, { ...options, index });
+    if (result.ok) {
+      validatedSourceFiles.push(result.source_file);
+      warnings.push(...(result.warnings || []));
+    } else {
+      validationErrors.push(result);
+      warnings.push(...(result.warnings || []));
+    }
+  });
+
+  if (validationErrors.length > 0 && options.rejectOnInvalidSourceFile !== false) {
+    return {
+      ok: false,
+      reason: "SOURCE_FILE_VALIDATION_FAILED",
+      message: "one or more source files failed validation",
+      retryable: false,
+      validation_errors: validationErrors,
+      warnings,
+    };
+  }
+
+  const instruction = aiwR78NormalizeInstruction(queueItem);
+
+  return {
+    ok: true,
+    normalized_request: {
+      request_id: aiwR78ToString(queueItem.request_id || queueItem.requestId || queueItem.id || ""),
+      source_app_ref: aiwR78ToString(queueItem.source_app_ref || queueItem.sourceAppRef || queueItem.source_app || queueItem.sourceApp || ""),
+      source_app_request_ref: aiwR78ToString(queueItem.source_app_request_ref || queueItem.sourceAppRequestRef || queueItem.external_request_id || queueItem.externalRequestId || ""),
+      source_surface_ref: aiwR78ToString(queueItem.source_surface_ref || queueItem.sourceSurfaceRef || ""),
+      requested_by_role: aiwR78ToString(queueItem.requested_by_role || queueItem.requestedByRole || ""),
+      robot: aiwR78IsPlainObject(queueItem.robot) ? { ...queueItem.robot } : {
+        model_code: aiwR78ToString(queueItem.model_code || queueItem.modelCode || ""),
+        role_code: aiwR78ToString(queueItem.role_code || queueItem.roleCode || ""),
+        capability_profile_ref: aiwR78ToString(queueItem.capability_profile_ref || queueItem.capabilityProfileRef || ""),
+      },
+      instruction,
+      source_files: validatedSourceFiles,
+      source_material_used: validatedSourceFiles.length > 0,
+      output_contract: {
+        summary_text_required: true,
+        deliverable_ref_required: true,
+        zip_required: true,
+        main_deliverable_name: "01_main_deliverable.md",
+        ...(aiwR78IsPlainObject(queueItem.output_contract) ? queueItem.output_contract : {}),
+      },
+    },
+    validated_source_files: validatedSourceFiles,
+    validation_errors: validationErrors,
+    warnings,
+  };
+}
+
+function aiwR78BuildRuntimeRequestFromQueueItem(queueItem, options = {}) {
+  const normalized = aiwR78NormalizeSourceMaterialQueueItem(queueItem, options);
+  if (!normalized.ok) {
+    return normalized;
+  }
+
+  const request = normalized.normalized_request;
+  return {
+    ok: true,
+    runtime_request: {
+      request_id: request.request_id,
+      source_app_ref: request.source_app_ref,
+      source_app_request_ref: request.source_app_request_ref,
+      source_surface_ref: request.source_surface_ref,
+      requested_by_role: request.requested_by_role,
+      robot: request.robot,
+      instruction: request.instruction.body,
+      instruction_title: request.instruction.title,
+      output_type: request.instruction.output_type,
+      required_viewpoints: request.instruction.required_viewpoints,
+      constraints: request.instruction.constraints,
+      source_files: request.source_files,
+      source_material_used: request.source_material_used,
+      source_material_contract: {
+        source_file_count: request.source_files.length,
+        media_metadata_hook_allowed: true,
+        text_source_analyzer_allowed: true,
+      },
+      output_contract: request.output_contract,
+    },
+    validated_source_files: normalized.validated_source_files,
+    warnings: normalized.warnings,
+  };
+}
+// AIW_R78_QUEUE_INTAKE_ADAPTER_END
+
+// AIW_R78_QUEUE_INTAKE_WIRING_START
+/**
+ * R78 source material wiring wrapper.
+ *
+ * This wrapper is intentionally narrow:
+ * - only active when the first createRuntimeRequest payload contains source file refs
+ * - preserves existing payload flow for non-source requests
+ * - returns structured validation failure for invalid source material refs
+ */
+function aiwR78HasSourceMaterialInput(value) {
+  if (!aiwR78IsPlainObject(value)) return false;
+  const fields = [
+    value.source_files,
+    value.sourceFiles,
+    value.source_file_refs,
+    value.sourceFileRefs,
+    value.attachments,
+    value.attachment_refs,
+    value.file_refs,
+    value.fileRefs,
+  ];
+  return fields.some((field) => Array.isArray(field) ? field.length > 0 : Boolean(field));
+}
+
+function aiwR78ResolveRuntimeAllowedSourceRoots(payload) {
+  const roots = [];
+  if (aiwR78IsPlainObject(payload)) {
+    roots.push(...aiwR78NormalizeArray(payload.allowed_source_roots));
+    roots.push(...aiwR78NormalizeArray(payload.allowedSourceRoots));
+    roots.push(...aiwR78NormalizeArray(payload.source_material_roots));
+    roots.push(...aiwR78NormalizeArray(payload.sourceMaterialRoots));
+  }
+  return roots.map(aiwR78ToString).filter(Boolean);
+}
+
+function aiwR78MergeRuntimePayload(existingPayload, runtimeRequest) {
+  if (!aiwR78IsPlainObject(existingPayload)) {
+    return runtimeRequest;
+  }
+  if (!aiwR78IsPlainObject(runtimeRequest)) {
+    return existingPayload;
+  }
+  return {
+    ...existingPayload,
+    ...runtimeRequest,
+    robot: {
+      ...(aiwR78IsPlainObject(existingPayload.robot) ? existingPayload.robot : {}),
+      ...(aiwR78IsPlainObject(runtimeRequest.robot) ? runtimeRequest.robot : {}),
+    },
+    output_contract: {
+      ...(aiwR78IsPlainObject(existingPayload.output_contract) ? existingPayload.output_contract : {}),
+      ...(aiwR78IsPlainObject(runtimeRequest.output_contract) ? runtimeRequest.output_contract : {}),
+    },
+  };
+}
+
+async function aiwR78CreateRuntimeRequestWithSourceMaterial(...args) {
+  const payload = args[0];
+
+  if (!aiwR78HasSourceMaterialInput(payload)) {
+    return createRuntimeRequest(...args);
+  }
+
+  const adapterResult = aiwR78BuildRuntimeRequestFromQueueItem(payload, {
+    allowedSourceRoots: aiwR78ResolveRuntimeAllowedSourceRoots(payload),
+    maxBytes: Number(payload && (payload.max_source_file_bytes || payload.maxSourceFileBytes)) || 2 * 1024 * 1024,
+    rejectOnInvalidSourceFile: true,
+  });
+
+  if (!adapterResult.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      reason: adapterResult.reason || "SOURCE_MATERIAL_VALIDATION_FAILED",
+      message: adapterResult.message || "source material validation failed",
+      retryable: Boolean(adapterResult.retryable),
+      aiw_r78_source_material_intake: true,
+      validation_errors: adapterResult.validation_errors || [],
+      warnings: adapterResult.warnings || [],
+    };
+  }
+
+  args[0] = aiwR78MergeRuntimePayload(payload, adapterResult.runtime_request);
+  return createRuntimeRequest(...args);
+}
+// AIW_R78_QUEUE_INTAKE_WIRING_END
+
+
 function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
   const sourceRouteCode = String(
@@ -3772,7 +4315,7 @@ async function aiwB6R97R14ConsumerOnce(reason) {
       const payload = aiwB6R97R14BuildPayload(row);
       const idempotencyKey = "aiworker-consumer-b6r97r14:" + String(row.aicm_worker_work_unit_id || "");
       try {
-        const result = createRuntimeRequest(payload, idempotencyKey);
+        const result = aiwR78CreateRuntimeRequestWithSourceMaterial(payload, idempotencyKey); // AIW_R78_QUEUE_INTAKE_WIRING_CALL
         aiwB6R97R14RecordSuccess(row, result, payload);
         processed += 1;
       } catch (error) {
