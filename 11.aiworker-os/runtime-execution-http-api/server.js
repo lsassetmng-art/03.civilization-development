@@ -3437,7 +3437,7 @@ function aiwR78NormalizeSourceMaterialQueueItem(queueItem, options = {}) {
   };
 }
 
-function aiwR78BuildRuntimeRequestFromQueueItem(queueItem, options = {}) {
+function aiwR78BuildRuntimeRequestFromQueueItemBaseR79G8R6(queueItem, options = {}) {
   const normalized = aiwR78NormalizeSourceMaterialQueueItem(queueItem, options);
   if (!normalized.ok) {
     return normalized;
@@ -3471,6 +3471,347 @@ function aiwR78BuildRuntimeRequestFromQueueItem(queueItem, options = {}) {
     warnings: normalized.warnings,
   };
 }
+
+
+// AIW_R79G8R6_COMPANY_POLICY_NORMALIZER_START
+function aiwR79G8R6IsPlainObject(value) {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function aiwR79G8R6TrimString(value) {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function aiwR79G8R6Array(value) {
+  if (value == null) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => aiwR79G8R6Array(item)).filter((item) => item != null && item !== "");
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  return [value];
+}
+
+function aiwR79G8R6MergeArrayDedupe(...values) {
+  const seen = new Set();
+  const out = [];
+  for (const item of values.flatMap((value) => aiwR79G8R6Array(value))) {
+    const key = typeof item === "string" ? item.trim() : JSON.stringify(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(typeof item === "string" ? item.trim() : item);
+  }
+  return out;
+}
+
+function aiwR79G8R6FirstText(...values) {
+  for (const value of values) {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) return trimmed;
+    }
+  }
+  return undefined;
+}
+
+function aiwR79G8R6FirstObject(...values) {
+  for (const value of values) {
+    if (aiwR79G8R6IsPlainObject(value)) return value;
+  }
+  return {};
+}
+
+function aiwR79G8R6HasCompanyReferenceScope(payload) {
+  if (!aiwR79G8R6IsPlainObject(payload)) return false;
+  return Boolean(
+    payload.company_reference_file ||
+    payload.companyReferenceFile ||
+    payload.company_reference_files ||
+    payload.companyReferenceFiles ||
+    payload.reference_file ||
+    payload.referenceFile ||
+    payload.related_file ||
+    payload.relatedFile ||
+    payload.company_attachment ||
+    payload.companyAttachment ||
+    payload.company_attachments ||
+    payload.companyAttachments ||
+    payload.company_policy ||
+    payload.companyPolicy ||
+    payload.company_settings ||
+    payload.companySetting ||
+    payload.company_policy_context ||
+    payload.companyPolicyContext
+  );
+}
+
+function aiwR79G8R6NormalizeReferenceFiles(payload, context) {
+  const existing = aiwR79G8R6Array(context.company_reference_files || context.companyReferenceFiles);
+  const candidates = aiwR79G8R6Array(
+    payload.company_reference_files ||
+    payload.companyReferenceFiles ||
+    payload.company_reference_file ||
+    payload.companyReferenceFile ||
+    payload.reference_file ||
+    payload.referenceFile ||
+    payload.related_file ||
+    payload.relatedFile ||
+    payload.company_attachment ||
+    payload.companyAttachment ||
+    payload.company_attachments ||
+    payload.companyAttachments
+  );
+
+  const normalized = [];
+  for (const item of [...existing, ...candidates]) {
+    if (typeof item === "string") {
+      normalized.push({ source_file_ref: item });
+    } else if (aiwR79G8R6IsPlainObject(item)) {
+      normalized.push({ ...item });
+    }
+  }
+
+  const seen = new Set();
+  const out = [];
+  for (const item of normalized) {
+    const key = JSON.stringify({
+      source_file_ref: item.source_file_ref || item.sourceFileRef || "",
+      path: item.path || "",
+      display_name: item.display_name || item.displayName || item.name || "",
+      mime_type: item.mime_type || item.mimeType || ""
+    });
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+function aiwR79G8R6NormalizeCompanyPolicyContext(payload) {
+  if (!aiwR79G8R6IsPlainObject(payload)) return undefined;
+
+  const existingContext = aiwR79G8R6FirstObject(
+    payload.company_policy_context,
+    payload.companyPolicyContext,
+    payload.policy_context,
+    payload.policyContext
+  );
+
+  const companyPolicy = aiwR79G8R6FirstObject(
+    payload.company_policy,
+    payload.companyPolicy,
+    payload.company_settings,
+    payload.companySetting
+  );
+
+  const companyRules = aiwR79G8R6FirstObject(
+    payload.company_rules,
+    payload.companyRules
+  );
+
+  const context = { ...existingContext };
+
+  const presidentPolicy = aiwR79G8R6FirstText(
+    context.president_policy,
+    context.presidentPolicy,
+    companyPolicy.president_policy,
+    companyPolicy.presidentPolicy,
+    companyRules.president_policy,
+    companyRules.presidentPolicy,
+    payload.president_policy,
+    payload.presidentPolicy
+  );
+  if (presidentPolicy) context.president_policy = presidentPolicy;
+
+  const commonRules = aiwR79G8R6FirstText(
+    context.company_common_rules,
+    context.companyCommonRules,
+    companyPolicy.company_common_rules,
+    companyPolicy.companyCommonRules,
+    companyPolicy.company_rules,
+    companyPolicy.companyRules,
+    companyRules.company_common_rules,
+    companyRules.companyCommonRules,
+    companyRules.body,
+    payload.company_common_rules,
+    payload.companyCommonRules,
+    payload.company_rules_text,
+    payload.companyRulesText
+  );
+  if (commonRules) context.company_common_rules = commonRules;
+
+  const prohibitedItems = aiwR79G8R6MergeArrayDedupe(
+    context.prohibited_items,
+    context.prohibitedItems,
+    companyPolicy.prohibited_items,
+    companyPolicy.prohibitedItems,
+    companyPolicy.forbidden_items,
+    companyPolicy.forbiddenItems,
+    companyRules.prohibited_items,
+    companyRules.prohibitedItems,
+    payload.prohibited_items,
+    payload.prohibitedItems,
+    payload.forbidden_items,
+    payload.forbiddenItems
+  );
+  if (prohibitedItems.length > 0) context.prohibited_items = prohibitedItems;
+
+  const constraints = aiwR79G8R6MergeArrayDedupe(
+    context.constraints,
+    companyPolicy.constraints,
+    companyPolicy.company_constraints,
+    companyPolicy.companyConstraints,
+    companyRules.constraints,
+    companyRules.company_constraints,
+    companyRules.companyConstraints,
+    payload.company_constraints,
+    payload.companyConstraints
+  );
+  if (constraints.length > 0) context.constraints = constraints;
+
+  const qualityStandards = aiwR79G8R6MergeArrayDedupe(
+    context.quality_standards,
+    context.qualityStandards,
+    companyPolicy.quality_standards,
+    companyPolicy.qualityStandards,
+    companyRules.quality_standards,
+    companyRules.qualityStandards,
+    payload.quality_standards,
+    payload.qualityStandards
+  );
+  if (qualityStandards.length > 0) context.quality_standards = qualityStandards;
+
+  const deliveryStandards = aiwR79G8R6MergeArrayDedupe(
+    context.delivery_standards,
+    context.deliveryStandards,
+    companyPolicy.delivery_standards,
+    companyPolicy.deliveryStandards,
+    companyRules.delivery_standards,
+    companyRules.deliveryStandards,
+    payload.delivery_standards,
+    payload.deliveryStandards
+  );
+  if (deliveryStandards.length > 0) context.delivery_standards = deliveryStandards;
+
+  const safetyRules = aiwR79G8R6MergeArrayDedupe(
+    context.safety_expression_rules,
+    context.safetyExpressionRules,
+    context.safety_rules,
+    context.safetyRules,
+    companyPolicy.safety_expression_rules,
+    companyPolicy.safetyExpressionRules,
+    companyPolicy.safety_rules,
+    companyPolicy.safetyRules,
+    companyRules.safety_expression_rules,
+    companyRules.safetyExpressionRules,
+    companyRules.safety_rules,
+    companyRules.safetyRules,
+    payload.safety_expression_rules,
+    payload.safetyExpressionRules,
+    payload.safety_rules,
+    payload.safetyRules
+  );
+  if (safetyRules.length > 0) context.safety_expression_rules = safetyRules;
+
+  const referenceMaterialText = aiwR79G8R6FirstText(
+    context.company_reference_material_text,
+    context.companyReferenceMaterialText,
+    companyPolicy.company_reference_material_text,
+    companyPolicy.companyReferenceMaterialText,
+    companyPolicy.reference_material_text,
+    companyPolicy.referenceMaterialText,
+    companyPolicy.material_text,
+    companyPolicy.materialText,
+    companyRules.company_reference_material_text,
+    companyRules.companyReferenceMaterialText,
+    payload.company_reference_material_text,
+    payload.companyReferenceMaterialText,
+    payload.reference_material_text,
+    payload.referenceMaterialText,
+    payload.material_text,
+    payload.materialText,
+    payload.policy_material_text,
+    payload.policyMaterialText,
+    aiwR79G8R6HasCompanyReferenceScope(payload) ? payload.extracted_text : undefined,
+    aiwR79G8R6HasCompanyReferenceScope(payload) ? payload.extractedText : undefined
+  );
+  if (referenceMaterialText) context.company_reference_material_text = referenceMaterialText;
+
+  const referenceFiles = aiwR79G8R6NormalizeReferenceFiles(payload, context);
+  if (referenceFiles.length > 0) context.company_reference_files = referenceFiles;
+
+  return Object.keys(context).length > 0 ? context : undefined;
+}
+
+function aiwR79G8R6NormalizeCompanyPolicyPayload(payload) {
+  if (!aiwR79G8R6IsPlainObject(payload)) return payload;
+
+  const normalized = { ...payload };
+  const context = aiwR79G8R6NormalizeCompanyPolicyContext(payload);
+
+  if (context && Object.keys(context).length > 0) {
+    normalized.company_policy_context = context;
+  }
+
+  return normalized;
+}
+
+function aiwR79G8R6NormalizeRuntimeRequestResult(result) {
+  if (!aiwR79G8R6IsPlainObject(result)) return result;
+
+  if (aiwR79G8R6IsPlainObject(result.payload)) {
+    return { ...result, payload: aiwR79G8R6NormalizeCompanyPolicyPayload(result.payload) };
+  }
+
+  if (aiwR79G8R6IsPlainObject(result.runtime_payload)) {
+    return { ...result, runtime_payload: aiwR79G8R6NormalizeCompanyPolicyPayload(result.runtime_payload) };
+  }
+
+  if (aiwR79G8R6IsPlainObject(result.runtimePayload)) {
+    return { ...result, runtimePayload: aiwR79G8R6NormalizeCompanyPolicyPayload(result.runtimePayload) };
+  }
+
+  if (aiwR79G8R6IsPlainObject(result.runtime_request) && aiwR79G8R6IsPlainObject(result.runtime_request.payload)) {
+    return {
+      ...result,
+      runtime_request: {
+        ...result.runtime_request,
+        payload: aiwR79G8R6NormalizeCompanyPolicyPayload(result.runtime_request.payload)
+      }
+    };
+  }
+
+  if (aiwR79G8R6IsPlainObject(result.runtimeRequest) && aiwR79G8R6IsPlainObject(result.runtimeRequest.payload)) {
+    return {
+      ...result,
+      runtimeRequest: {
+        ...result.runtimeRequest,
+        payload: aiwR79G8R6NormalizeCompanyPolicyPayload(result.runtimeRequest.payload)
+      }
+    };
+  }
+
+  return aiwR79G8R6NormalizeCompanyPolicyPayload(result);
+}
+
+function aiwR79G8R6NormalizeBuildArgs(argsLike) {
+  const args = Array.from(argsLike || []);
+  if (args.length > 0 && aiwR79G8R6IsPlainObject(args[0])) {
+    args[0] = aiwR79G8R6NormalizeCompanyPolicyPayload(args[0]);
+  }
+  return args;
+}
+
+function aiwR78BuildRuntimeRequestFromQueueItem(...args) {
+  const normalizedArgs = aiwR79G8R6NormalizeBuildArgs(args);
+  const baseResult = aiwR78BuildRuntimeRequestFromQueueItemBaseR79G8R6(...normalizedArgs);
+  return aiwR79G8R6NormalizeRuntimeRequestResult(baseResult);
+}
+// AIW_R79G8R6_COMPANY_POLICY_NORMALIZER_END
 // AIW_R78_QUEUE_INTAKE_ADAPTER_END
 
 // AIW_R78_QUEUE_INTAKE_WIRING_START
