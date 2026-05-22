@@ -362,6 +362,18 @@ function sqlUuid(value) {
   return sqlLit(value) + "::uuid";
 }
 
+function sqlSetCurrentCivilizationContext(context) {
+  const civilizationId = context && context.owner_civilization_id
+    ? String(context.owner_civilization_id)
+    : "";
+
+  if (!isUuidLike(civilizationId)) {
+    throw new Error("invalid_current_civilization_context");
+  }
+
+  return "SELECT set_config('app.current_civilization_id', " + sqlLit(civilizationId) + ", true);";
+}
+
 function sqlInt(value, fallback) {
   const n = Number(value);
   if (!Number.isFinite(n)) return String(fallback);
@@ -489,6 +501,7 @@ function persistQuote(body, context, mode) {
 
   const sql = `
 BEGIN;
+${sqlSetCurrentCivilizationContext(context)}
 
 WITH ins_contract AS (
   INSERT INTO business.worker_rental_contract (
@@ -624,6 +637,822 @@ ${txEnd}
   };
 }
 
+function confirmContract(body, context) {
+  const contextCheck = validateCivilizationContext(context);
+
+  if (!contextCheck.ok || !contextCheck.persist_allowed || !context.owner_civilization_id) {
+    return {
+      ok: false,
+      error: contextCheck.error || "civilization_context_required_for_confirm",
+      owner_civilization_id: context && context.owner_civilization_id ? context.owner_civilization_id : null
+    };
+  }
+
+  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+  if (!isUuidLike(contractId)) {
+    return {
+      ok: false,
+      error: "invalid_rental_contract_id"
+    };
+  }
+
+  const owner = context.owner_civilization_id;
+
+  const sql = `
+BEGIN;
+${sqlSetCurrentCivilizationContext(context)}
+
+WITH target AS (
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    user_id,
+    worker_owner_schema,
+    worker_id,
+    worker_type,
+    rental_starts_at,
+    rental_ends_at,
+    rental_total_minutes
+  FROM business.worker_rental_contract
+  WHERE rental_contract_id = ${sqlUuid(contractId)}
+    AND owner_civilization_id = ${sqlUuid(owner)}
+    AND contract_status = 'quoted'
+  FOR UPDATE
+),
+upd AS (
+  UPDATE business.worker_rental_contract c
+  SET
+    contract_status = 'confirmed',
+    updated_at = now(),
+    metadata_jsonb = COALESCE(c.metadata_jsonb, '{}'::jsonb)
+      || jsonb_build_object(
+        'confirmed_at', now(),
+        'confirm_source', 'RobotRentalStore',
+        'payment_required_later', true
+      )
+  FROM target t
+  WHERE c.rental_contract_id = t.rental_contract_id
+  RETURNING
+    c.rental_contract_id,
+    c.owner_civilization_id,
+    c.contract_status
+),
+hist AS (
+  INSERT INTO business.worker_rental_status_history (
+    rental_contract_id,
+    owner_civilization_id,
+    from_status,
+    to_status,
+    reason
+  )
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    'quoted',
+    'confirmed',
+    'user confirmed rental application'
+  FROM upd
+  RETURNING rental_status_history_id
+),
+period AS (
+  INSERT INTO business.worker_rental_period (
+    rental_contract_id,
+    owner_civilization_id,
+    user_id,
+    worker_owner_schema,
+    worker_id,
+    worker_type,
+    period_status,
+    starts_at,
+    ends_at,
+    actual_started_at,
+    actual_ended_at,
+    remaining_seconds_snapshot
+  )
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    user_id,
+    worker_owner_schema,
+    worker_id,
+    worker_type,
+    'pending',
+    rental_starts_at,
+    rental_ends_at,
+    NULL,
+    NULL,
+    CASE
+      WHEN rental_total_minutes IS NULL THEN NULL
+      ELSE rental_total_minutes * 60
+    END
+  FROM target
+  RETURNING rental_period_id
+)
+SELECT
+  'CONFIRM_RESULT',
+  (SELECT rental_contract_id::text FROM upd),
+  (SELECT owner_civilization_id::text FROM upd),
+  (SELECT contract_status FROM upd),
+  (SELECT rental_period_id::text FROM period),
+  (SELECT rental_status_history_id::text FROM hist);
+
+COMMIT;
+`;
+
+  const out = psql(sql).trim();
+  const line = out.split("\n").find((x) => x.startsWith("CONFIRM_RESULT\t")) || "";
+  const parts = line.split("\t");
+
+  if (parts.length < 6 || !parts[1]) {
+    return {
+      ok: false,
+      error: "contract_not_found_or_not_quoted_or_owner_mismatch",
+      rental_contract_id: contractId,
+      owner_civilization_id: owner,
+      detail: out
+    };
+  }
+
+  return {
+    ok: true,
+    rental_contract_id: parts[1],
+    owner_civilization_id: parts[2],
+    contract_status: parts[3],
+    rental_period_id: parts[4],
+    rental_status_history_id: parts[5],
+    payment_status: "not_implemented",
+    next_action: "payment_or_start_flow"
+  };
+}
+
+
+function createPaymentIntent(body, context) {
+  const contextCheck = validateCivilizationContext(context);
+
+  if (!contextCheck.ok || !contextCheck.persist_allowed || !context.owner_civilization_id) {
+    return {
+      ok: false,
+      error: contextCheck.error || "civilization_context_required_for_payment_intent",
+      owner_civilization_id: context && context.owner_civilization_id ? context.owner_civilization_id : null
+    };
+  }
+
+  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+  if (!isUuidLike(contractId)) {
+    return {
+      ok: false,
+      error: "invalid_rental_contract_id"
+    };
+  }
+
+  const owner = context.owner_civilization_id;
+  const providerCode = String(body.provider_code || "local_placeholder");
+
+  const sql = `
+BEGIN;
+${sqlSetCurrentCivilizationContext(context)}
+
+WITH target AS (
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    user_id,
+    final_price_jpy
+  FROM business.worker_rental_contract
+  WHERE rental_contract_id = ${sqlUuid(contractId)}
+    AND owner_civilization_id = ${sqlUuid(owner)}
+    AND contract_status = 'confirmed'
+  FOR UPDATE
+),
+existing AS (
+  SELECT
+    rental_payment_intent_id,
+    rental_contract_id,
+    owner_civilization_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference
+  FROM business.worker_rental_payment_intent
+  WHERE rental_contract_id = ${sqlUuid(contractId)}
+    AND owner_civilization_id = ${sqlUuid(owner)}
+    AND payment_status = 'pending'
+  ORDER BY created_at DESC
+  LIMIT 1
+),
+inserted AS (
+  INSERT INTO business.worker_rental_payment_intent (
+    rental_contract_id,
+    owner_civilization_id,
+    user_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference
+  )
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    user_id,
+    final_price_jpy,
+    'JPY',
+    'pending',
+    ${sqlLit(providerCode)},
+    'robot-rental-local-' || rental_contract_id::text
+  FROM target
+  WHERE NOT EXISTS (SELECT 1 FROM existing)
+  RETURNING
+    rental_payment_intent_id,
+    rental_contract_id,
+    owner_civilization_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference
+),
+result AS (
+  SELECT
+    rental_payment_intent_id,
+    rental_contract_id,
+    owner_civilization_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference,
+    false AS reused_existing
+  FROM inserted
+  UNION ALL
+  SELECT
+    rental_payment_intent_id,
+    rental_contract_id,
+    owner_civilization_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference,
+    true AS reused_existing
+  FROM existing
+)
+SELECT
+  'PAYMENT_INTENT_RESULT',
+  rental_payment_intent_id::text,
+  rental_contract_id::text,
+  owner_civilization_id::text,
+  amount_jpy::text,
+  currency_code,
+  payment_status,
+  provider_code,
+  provider_reference,
+  reused_existing::text
+FROM result
+LIMIT 1;
+
+COMMIT;
+`;
+
+  const out = psql(sql).trim();
+  const line = out.split("\n").find((x) => x.startsWith("PAYMENT_INTENT_RESULT\t")) || "";
+  const parts = line.split("\t");
+
+  if (parts.length < 10 || !parts[1]) {
+    return {
+      ok: false,
+      error: "contract_not_found_or_not_confirmed_or_owner_mismatch",
+      rental_contract_id: contractId,
+      owner_civilization_id: owner,
+      detail: out
+    };
+  }
+
+  return {
+    ok: true,
+    rental_payment_intent_id: parts[1],
+    rental_contract_id: parts[2],
+    owner_civilization_id: parts[3],
+    amount_jpy: Number(parts[4]),
+    currency_code: parts[5],
+    payment_status: parts[6],
+    provider_code: parts[7],
+    provider_reference: parts[8],
+    reused_existing: parts[9] === "true",
+    next_action: "external_payment_provider_or_local_payment_flow"
+  };
+}
+
+function startRental(body, context) {
+  const contextCheck = validateCivilizationContext(context);
+
+  if (!contextCheck.ok || !contextCheck.persist_allowed || !context.owner_civilization_id) {
+    return {
+      ok: false,
+      error: contextCheck.error || "civilization_context_required_for_rental_start",
+      owner_civilization_id: context && context.owner_civilization_id ? context.owner_civilization_id : null
+    };
+  }
+
+  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+  if (!isUuidLike(contractId)) {
+    return {
+      ok: false,
+      error: "invalid_rental_contract_id"
+    };
+  }
+
+  const owner = context.owner_civilization_id;
+
+  const sql = `
+BEGIN;
+${sqlSetCurrentCivilizationContext(context)}
+
+WITH target AS (
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    contract_status,
+    rental_total_minutes
+  FROM business.worker_rental_contract
+  WHERE rental_contract_id = ${sqlUuid(contractId)}
+    AND owner_civilization_id = ${sqlUuid(owner)}
+    AND contract_status = 'confirmed'
+  FOR UPDATE
+),
+pay AS (
+  SELECT
+    rental_payment_intent_id,
+    rental_contract_id,
+    owner_civilization_id,
+    payment_status
+  FROM business.worker_rental_payment_intent
+  WHERE rental_contract_id = ${sqlUuid(contractId)}
+    AND owner_civilization_id = ${sqlUuid(owner)}
+    AND payment_status IN ('pending', 'authorized')
+  ORDER BY created_at DESC
+  LIMIT 1
+),
+pay_update AS (
+  UPDATE business.worker_rental_payment_intent p
+  SET
+    payment_status = CASE
+      WHEN p.payment_status = 'pending' THEN 'authorized'
+      ELSE p.payment_status
+    END,
+    updated_at = now()
+  FROM pay
+  WHERE p.rental_payment_intent_id = pay.rental_payment_intent_id
+  RETURNING
+    p.rental_payment_intent_id,
+    p.payment_status
+),
+upd_contract AS (
+  UPDATE business.worker_rental_contract c
+  SET
+    contract_status = 'active',
+    updated_at = now(),
+    metadata_jsonb = COALESCE(c.metadata_jsonb, '{}'::jsonb)
+      || jsonb_build_object(
+        'started_at', now(),
+        'start_source', 'RobotRentalStore',
+        'payment_provider_status', 'local_placeholder_authorized'
+      )
+  FROM target t
+  JOIN pay_update p ON true
+  WHERE c.rental_contract_id = t.rental_contract_id
+  RETURNING
+    c.rental_contract_id,
+    c.owner_civilization_id,
+    c.contract_status,
+    c.rental_total_minutes
+),
+upd_period AS (
+  UPDATE business.worker_rental_period p
+  SET
+    period_status = 'active',
+    actual_started_at = COALESCE(p.actual_started_at, now()),
+    remaining_seconds_snapshot = COALESCE(
+      p.remaining_seconds_snapshot,
+      CASE
+        WHEN upd_contract.rental_total_minutes IS NULL THEN NULL
+        ELSE upd_contract.rental_total_minutes * 60
+      END
+    ),
+    updated_at = now()
+  FROM upd_contract
+  WHERE p.rental_contract_id = upd_contract.rental_contract_id
+    AND p.owner_civilization_id = upd_contract.owner_civilization_id
+    AND p.period_status = 'pending'
+  RETURNING
+    p.rental_period_id,
+    p.period_status,
+    p.actual_started_at::text,
+    COALESCE(p.remaining_seconds_snapshot::text, '') AS remaining_seconds_snapshot
+),
+hist AS (
+  INSERT INTO business.worker_rental_status_history (
+    rental_contract_id,
+    owner_civilization_id,
+    from_status,
+    to_status,
+    reason
+  )
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    'confirmed',
+    'active',
+    'user started rental'
+  FROM upd_contract
+  RETURNING rental_status_history_id
+)
+SELECT
+  'START_RESULT',
+  (SELECT rental_contract_id::text FROM upd_contract),
+  (SELECT owner_civilization_id::text FROM upd_contract),
+  (SELECT contract_status FROM upd_contract),
+  (SELECT rental_period_id::text FROM upd_period),
+  (SELECT period_status FROM upd_period),
+  (SELECT actual_started_at FROM upd_period),
+  (SELECT remaining_seconds_snapshot FROM upd_period),
+  (SELECT rental_status_history_id::text FROM hist),
+  (SELECT rental_payment_intent_id::text FROM pay_update),
+  (SELECT payment_status FROM pay_update);
+
+COMMIT;
+`;
+
+  const out = psql(sql).trim();
+  const line = out.split("\n").find((x) => x.startsWith("START_RESULT\t")) || "";
+  const parts = line.split("\t");
+
+  if (parts.length < 11 || !parts[1]) {
+    return {
+      ok: false,
+      error: "contract_not_confirmed_or_payment_intent_missing_or_owner_mismatch",
+      rental_contract_id: contractId,
+      owner_civilization_id: owner,
+      detail: out
+    };
+  }
+
+  return {
+    ok: true,
+    rental_contract_id: parts[1],
+    owner_civilization_id: parts[2],
+    contract_status: parts[3],
+    rental_period_id: parts[4],
+    period_status: parts[5],
+    actual_started_at: parts[6],
+    remaining_seconds_snapshot: parts[7] ? Number(parts[7]) : null,
+    rental_status_history_id: parts[8],
+    rental_payment_intent_id: parts[9],
+    payment_status: parts[10],
+    next_action: "rental_active"
+  };
+}
+
+function endRental(body, context) {
+  const contextCheck = validateCivilizationContext(context);
+
+  if (!contextCheck.ok || !contextCheck.persist_allowed || !context.owner_civilization_id) {
+    return {
+      ok: false,
+      error: contextCheck.error || "civilization_context_required_for_rental_end",
+      owner_civilization_id: context && context.owner_civilization_id ? context.owner_civilization_id : null
+    };
+  }
+
+  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+  const endedReason = String(body.ended_reason || "user ended rental").trim();
+
+  if (!isUuidLike(contractId)) {
+    return { ok: false, error: "invalid_rental_contract_id" };
+  }
+
+  const owner = context.owner_civilization_id;
+
+  const sql = `
+BEGIN;
+${sqlSetCurrentCivilizationContext(context)}
+
+WITH target AS (
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    app_code,
+    service_code,
+    user_id,
+    worker_owner_schema,
+    worker_id,
+    worker_type,
+    contract_status
+  FROM business.worker_rental_contract
+  WHERE rental_contract_id = ${sqlUuid(contractId)}
+    AND owner_civilization_id = ${sqlUuid(owner)}
+    AND contract_status = 'active'
+  FOR UPDATE
+),
+active_period AS (
+  SELECT
+    p.rental_period_id,
+    p.rental_contract_id,
+    p.owner_civilization_id,
+    p.period_status,
+    p.actual_started_at
+  FROM business.worker_rental_period p
+  JOIN target t
+    ON t.rental_contract_id = p.rental_contract_id
+   AND t.owner_civilization_id = p.owner_civilization_id
+  WHERE p.period_status = 'active'
+  ORDER BY p.created_at DESC
+  LIMIT 1
+),
+upd_contract AS (
+  UPDATE business.worker_rental_contract c
+  SET
+    contract_status = 'ended',
+    updated_at = now(),
+    metadata_jsonb = COALESCE(c.metadata_jsonb, '{}'::jsonb)
+      || jsonb_build_object(
+        'ended_at', now(),
+        'end_source', 'RobotRentalStore'
+      )
+  FROM target t
+  WHERE c.rental_contract_id = t.rental_contract_id
+  RETURNING
+    c.rental_contract_id,
+    c.owner_civilization_id,
+    c.app_code,
+    c.service_code,
+    c.user_id,
+    c.worker_owner_schema,
+    c.worker_id,
+    c.worker_type,
+    c.contract_status
+),
+upd_period AS (
+  UPDATE business.worker_rental_period p
+  SET
+    period_status = 'ended',
+    actual_ended_at = COALESCE(p.actual_ended_at, now()),
+    remaining_seconds_snapshot = 0,
+    updated_at = now()
+  FROM active_period ap
+  WHERE p.rental_period_id = ap.rental_period_id
+  RETURNING
+    p.rental_period_id,
+    p.period_status,
+    p.actual_started_at::text AS actual_started_at,
+    p.actual_ended_at::text AS actual_ended_at,
+    0::integer AS remaining_seconds_snapshot,
+    GREATEST(
+      0,
+      FLOOR(EXTRACT(EPOCH FROM (COALESCE(p.actual_ended_at, now()) - p.actual_started_at)))
+    )::integer AS used_seconds
+),
+hist AS (
+  INSERT INTO business.worker_rental_status_history (
+    rental_contract_id,
+    owner_civilization_id,
+    from_status,
+    to_status,
+    reason
+  )
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    'active',
+    'ended',
+    ${sqlLit(endedReason)}
+  FROM upd_contract
+  RETURNING rental_status_history_id
+),
+summary AS (
+  INSERT INTO business.worker_rental_end_summary (
+    rental_contract_id,
+    rental_period_id,
+    owner_civilization_id,
+    app_code,
+    service_code,
+    user_id,
+    worker_owner_schema,
+    worker_id,
+    worker_type,
+    ended_reason,
+    used_seconds,
+    summary_text
+  )
+  SELECT
+    c.rental_contract_id,
+    p.rental_period_id,
+    c.owner_civilization_id,
+    c.app_code,
+    c.service_code,
+    c.user_id,
+    c.worker_owner_schema,
+    c.worker_id,
+    c.worker_type,
+    ${sqlLit(endedReason)},
+    p.used_seconds,
+    'RobotRentalStore rental ended by user'
+  FROM upd_contract c
+  JOIN upd_period p ON true
+  RETURNING rental_end_summary_id
+)
+SELECT
+  'END_RESULT',
+  (SELECT rental_contract_id::text FROM upd_contract),
+  (SELECT owner_civilization_id::text FROM upd_contract),
+  (SELECT contract_status FROM upd_contract),
+  (SELECT rental_period_id::text FROM upd_period),
+  (SELECT period_status FROM upd_period),
+  (SELECT actual_ended_at FROM upd_period),
+  (SELECT remaining_seconds_snapshot::text FROM upd_period),
+  (SELECT used_seconds::text FROM upd_period),
+  (SELECT rental_status_history_id::text FROM hist),
+  (SELECT rental_end_summary_id::text FROM summary);
+
+COMMIT;
+`;
+
+  const out = psql(sql).trim();
+  const line = out.split("\n").find((x) => x.startsWith("END_RESULT\t")) || "";
+  const parts = line.split("\t");
+
+  if (parts.length < 11 || !parts[1]) {
+    return {
+      ok: false,
+      error: "contract_not_active_or_active_period_missing_or_owner_mismatch",
+      rental_contract_id: contractId,
+      owner_civilization_id: owner,
+      detail: out
+    };
+  }
+
+  return {
+    ok: true,
+    rental_contract_id: parts[1],
+    owner_civilization_id: parts[2],
+    contract_status: parts[3],
+    rental_period_id: parts[4],
+    period_status: parts[5],
+    actual_ended_at: parts[6],
+    remaining_seconds_snapshot: Number(parts[7]),
+    used_seconds: Number(parts[8]),
+    rental_status_history_id: parts[9],
+    rental_end_summary_id: parts[10],
+    next_action: "rental_ended"
+  };
+}
+
+
+function cancelRental(body, context) {
+  const contextCheck = validateCivilizationContext(context);
+
+  if (!contextCheck.ok || !contextCheck.persist_allowed || !context.owner_civilization_id) {
+    return {
+      ok: false,
+      error: contextCheck.error || "civilization_context_required_for_rental_cancel",
+      owner_civilization_id: context && context.owner_civilization_id ? context.owner_civilization_id : null
+    };
+  }
+
+  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+  const cancelReason = String(body.cancel_reason || "user canceled rental").trim();
+
+  if (!isUuidLike(contractId)) {
+    return { ok: false, error: "invalid_rental_contract_id" };
+  }
+
+  const owner = context.owner_civilization_id;
+
+  const sql = `
+BEGIN;
+${sqlSetCurrentCivilizationContext(context)}
+
+WITH target AS (
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    contract_status
+  FROM business.worker_rental_contract
+  WHERE rental_contract_id = ${sqlUuid(contractId)}
+    AND owner_civilization_id = ${sqlUuid(owner)}
+    AND contract_status IN ('quoted', 'confirmed')
+  FOR UPDATE
+),
+upd_contract AS (
+  UPDATE business.worker_rental_contract c
+  SET
+    contract_status = 'canceled',
+    updated_at = now(),
+    metadata_jsonb = COALESCE(c.metadata_jsonb, '{}'::jsonb)
+      || jsonb_build_object(
+        'canceled_at', now(),
+        'cancel_source', 'RobotRentalStore',
+        'cancel_reason', ${sqlLit(cancelReason)}
+      )
+  FROM target t
+  WHERE c.rental_contract_id = t.rental_contract_id
+  RETURNING
+    c.rental_contract_id,
+    c.owner_civilization_id,
+    t.contract_status AS from_status,
+    c.contract_status
+),
+upd_period AS (
+  UPDATE business.worker_rental_period p
+  SET
+    period_status = 'canceled',
+    actual_ended_at = COALESCE(p.actual_ended_at, now()),
+    remaining_seconds_snapshot = 0,
+    updated_at = now()
+  FROM upd_contract c
+  WHERE p.rental_contract_id = c.rental_contract_id
+    AND p.owner_civilization_id = c.owner_civilization_id
+    AND p.period_status IN ('pending')
+  RETURNING
+    p.rental_period_id,
+    p.period_status
+),
+upd_payment AS (
+  UPDATE business.worker_rental_payment_intent pi
+  SET
+    payment_status = 'canceled',
+    updated_at = now()
+  FROM upd_contract c
+  WHERE pi.rental_contract_id = c.rental_contract_id
+    AND pi.owner_civilization_id = c.owner_civilization_id
+    AND pi.payment_status IN ('pending', 'authorized')
+  RETURNING
+    pi.rental_payment_intent_id,
+    pi.payment_status
+),
+hist AS (
+  INSERT INTO business.worker_rental_status_history (
+    rental_contract_id,
+    owner_civilization_id,
+    from_status,
+    to_status,
+    reason
+  )
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    from_status,
+    'canceled',
+    ${sqlLit(cancelReason)}
+  FROM upd_contract
+  RETURNING rental_status_history_id
+)
+SELECT
+  'CANCEL_RESULT',
+  (SELECT rental_contract_id::text FROM upd_contract),
+  (SELECT owner_civilization_id::text FROM upd_contract),
+  (SELECT from_status FROM upd_contract),
+  (SELECT contract_status FROM upd_contract),
+  COALESCE((SELECT rental_period_id::text FROM upd_period LIMIT 1), ''),
+  COALESCE((SELECT period_status FROM upd_period LIMIT 1), ''),
+  COALESCE((SELECT rental_payment_intent_id::text FROM upd_payment LIMIT 1), ''),
+  COALESCE((SELECT payment_status FROM upd_payment LIMIT 1), ''),
+  (SELECT rental_status_history_id::text FROM hist);
+
+COMMIT;
+`;
+
+  const out = psql(sql).trim();
+  const line = out.split("\n").find((x) => x.startsWith("CANCEL_RESULT\t")) || "";
+  const parts = line.split("\t");
+
+  if (parts.length < 10 || !parts[1]) {
+    return {
+      ok: false,
+      error: "contract_not_cancelable_or_owner_mismatch",
+      rental_contract_id: contractId,
+      owner_civilization_id: owner,
+      detail: out
+    };
+  }
+
+  return {
+    ok: true,
+    rental_contract_id: parts[1],
+    owner_civilization_id: parts[2],
+    from_status: parts[3],
+    contract_status: parts[4],
+    rental_period_id: parts[5] || null,
+    period_status: parts[6] || null,
+    rental_payment_intent_id: parts[7] || null,
+    payment_status: parts[8] || null,
+    rental_status_history_id: parts[9],
+    next_action: "rental_canceled"
+  };
+}
+
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
@@ -677,6 +1506,51 @@ const server = http.createServer(async (req, res) => {
         read_only: true,
         item
       });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/rentals/cancel") {
+      const raw = await readBody(req);
+      const body = raw ? JSON.parse(raw) : {};
+      const context = getCivilizationContext(req);
+      const result = cancelRental(body, context);
+      sendJson(res, result.ok ? 200 : 400, result);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/rentals/end") {
+      const raw = await readBody(req);
+      const body = raw ? JSON.parse(raw) : {};
+      const context = getCivilizationContext(req);
+      const result = endRental(body, context);
+      sendJson(res, result.ok ? 200 : 400, result);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/rentals/start") {
+      const raw = await readBody(req);
+      const body = raw ? JSON.parse(raw) : {};
+      const context = getCivilizationContext(req);
+      const result = startRental(body, context);
+      sendJson(res, result.ok ? 200 : 400, result);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/payments/intent/create") {
+      const raw = await readBody(req);
+      const body = raw ? JSON.parse(raw) : {};
+      const context = getCivilizationContext(req);
+      const result = createPaymentIntent(body, context);
+      sendJson(res, result.ok ? 200 : 400, result);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/contracts/confirm") {
+      const raw = await readBody(req);
+      const body = raw ? JSON.parse(raw) : {};
+      const context = getCivilizationContext(req);
+      const result = confirmContract(body, context);
+      sendJson(res, result.ok ? 200 : 400, result);
       return;
     }
 

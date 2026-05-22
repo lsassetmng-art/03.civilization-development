@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RobotRentalStore - ロボットレンタル</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --line: #dfe3ee;
+      --text: #172033;
+      --muted: #667085;
+      --accent: #335cff;
+      --soft: #eef2ff;
+      --danger: #fff1f2;
+      --warn: #fff7ed;
+      --ok: #ecfdf3;
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    header { padding: 28px; background: linear-gradient(135deg, #101828, #263b88); color: white; }
+    header h1 { margin: 0 0 8px; font-size: 28px; }
+    header p { margin: 0; color: #d7defa; }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .badge { display: inline-flex; padding: 6px 10px; border-radius: 999px; font-size: 12px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); }
+    main { display: grid; grid-template-columns: 260px minmax(0, 1fr) 340px; gap: 18px; padding: 18px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: 0 10px 30px rgba(15,23,42,.06); }
+    .panel h2 { margin: 0 0 12px; font-size: 16px; }
+    label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    select, input, button { width: 100%; min-height: 40px; border-radius: 12px; border: 1px solid var(--line); padding: 8px 10px; font: inherit; background: white; }
+    button { cursor: pointer; border: 0; background: var(--accent); color: white; font-weight: 700; }
+    button.secondary { background: var(--soft); color: var(--accent); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+    .card { border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: white; }
+    .card h3 { margin: 0 0 4px; font-size: 16px; }
+    .meta { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+    .chip { font-size: 12px; border-radius: 999px; padding: 4px 8px; background: var(--soft); color: #283a8f; }
+    .chip.conversation { background: #fdf2f8; color: #9d174d; }
+    .chip.combat { background: var(--warn); color: #9a3412; }
+    .price { margin: 12px 0; font-weight: 800; font-size: 18px; }
+    .note { border-radius: 14px; padding: 10px; font-size: 12px; line-height: 1.55; color: #344054; background: #f8fafc; border: 1px solid var(--line); }
+    .note.warn { background: var(--warn); }
+    .note.danger { background: var(--danger); }
+    .note.ok { background: var(--ok); }
+    .detail-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+    .summary-row { display: flex; justify-content: space-between; gap: 10px; margin: 8px 0; font-size: 14px; }
+    .summary-row strong { font-size: 18px; }
+    .status { margin-top: 10px; font-size: 12px; color: #d7defa; }
+    .stack { display: grid; gap: 8px; }
+    @media (max-width: 1040px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ロボットレンタル</h1>
+    <p>仕事・雑談・接客・補助に使えるAIロボットを選んでレンタルします。</p>
+    <div class="badges">
+      <span class="badge">BusinessOS</span>
+      <span class="badge">ロボットレンタル</span>
+      <span class="badge">申込確認対応</span>
+    </div>
+    <div id="apiStatus" class="status">ロボット一覧を読み込み中...</div>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <h2>絞り込み</h2>
+
+      <label>シリーズ</label>
+      <select id="seriesFilter">
+        <option value="">すべて</option>
+        <option value="HD">HD</option>
+        <option value="LoVerS">LoVerS</option>
+        <option value="Beyond">Beyond</option>
+        <option value="MEGAMI">MEGAMI</option>
+      </select>
+
+      <label>ロール</label>
+      <select id="roleFilter">
+        <option value="">すべて</option>
+        <option>Worker</option>
+        <option>Helper</option>
+        <option>Leader</option>
+        <option>Manager</option>
+        <option>Advisor</option>
+        <option>Specialist</option>
+        <option>Friend</option>
+        <option>Lover</option>
+        <option>Butler</option>
+        <option>Security</option>
+        <option>CombatSpecialist</option>
+        <option>TacticalLeader</option>
+        <option>StrategicCommander</option>
+      </select>
+
+      <label>検索</label>
+      <input id="searchInput" placeholder="型番・機種名・用途" />
+
+      <div style="height:12px"></div>
+      <button class="secondary" onclick="loadCatalog()">再読込</button>
+
+      <div style="height:14px"></div>
+      <div class="note">
+        ロボットを選択し、見積を保存してから申込を確定してください。
+      </div>
+    </aside>
+
+    <section class="panel">
+      <h2>レンタル可能ロボット</h2>
+      <div id="cardGrid" class="grid"></div>
+    </section>
+
+    <aside class="panel">
+      <h2>選択中</h2>
+      <div id="detail"></div>
+
+      <label>レンタル単位</label>
+      <select id="unit">
+        <option value="hour">時間</option>
+      </select>
+
+      <label>数量</label>
+      <input id="qty" type="number" value="1" min="1" />
+
+      <label>期間</label>
+      <input id="duration" type="number" value="1" min="1" />
+
+      <div style="height:12px"></div>
+      <div class="summary-row"><span>小計</span><span id="subtotal">-</span></div>
+      <div class="summary-row"><span>割引予定</span><span>未適用</span></div>
+      <div class="summary-row"><span><strong>合計</strong></span><strong id="total">-</strong></div>
+
+      <div style="height:12px"></div>
+      <div class="stack">
+        <button onclick="saveQuotePersist()">見積を保存</button>
+        <button onclick="confirmContract()">申込を確定</button>
+      </div>
+
+      <div style="height:12px"></div>
+      <div id="saveResult" class="note">保存後、申込を確定できます。</div>
+    </aside>
+  </main>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:9020";
+    const SESSION_CIVILIZATION_ID = "00000000-0000-4000-8000-000000000001";
+
+    const fallbackRobots = [
+      { model_code: "HD-R3", model_name_ja: "ワーカー", series_code: "HD", manufacturer_code: "helios_dynamics", role_codes: ["Worker"], starting_price_jpy: 500, rental_units: ["hour","day","month"], safety_group: "business", short_description: "汎用AIワーカー。", safety_note: "業務系ロールです。" },
+      { model_code: "LVS-12Fv015", model_name_ja: "ビジネスヤンデレ", series_code: "LoVerS", manufacturer_code: "lavi_corporation", role_codes: ["Lover"], starting_price_jpy: 500, rental_units: ["minute","hour"], safety_group: "conversation", short_description: "擬似恋人型演出ロール。", safety_note: "実在恋愛・成人向け性的サービス・監視・脅し・依存誘導は禁止です。" },
+      { model_code: "HD-R2S", model_name_ja: "スナイパー", series_code: "HD", manufacturer_code: "helios_dynamics", role_codes: ["CombatSpecialist","Security","Battler"], starting_price_jpy: 800, rental_units: ["hour","day"], safety_group: "combat_security_crisis", short_description: "戦闘専門系。", safety_note: "現実の危害実行支援ではなく、フィクション・警備設計・危機対応・世界観用途に限定します。" }
+    ];
+
+    let robots = [];
+    let selected = null;
+    let savedRentalContractId = "";
+
+    function authHeaders() {
+      return { "X-Civilization-Id": SESSION_CIVILIZATION_ID };
+    }
+
+    function chipClass(role) {
+      if (["Friend", "Lover"].includes(role)) return "chip conversation";
+      if (["Battler", "Security", "CombatSpecialist", "TacticalLeader", "StrategicCommander"].includes(role)) return "chip combat";
+      return "chip";
+    }
+
+    async function loadCatalog() {
+      const status = document.getElementById("apiStatus");
+      try {
+        status.textContent = "ロボット一覧を読み込み中...";
+        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/catalog`);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || "catalog failed");
+        robots = json.items || [];
+        selected = robots[0] || null;
+        status.textContent = `${robots.length}件のロボットを表示中`;
+      } catch (err) {
+        robots = fallbackRobots;
+        selected = robots[0];
+        status.textContent = "ロボット一覧を表示中";
+      }
+      renderCards();
+      renderDetail();
+    }
+
+    function filteredRobots() {
+      const series = document.getElementById("seriesFilter").value;
+      const role = document.getElementById("roleFilter").value;
+      const search = document.getElementById("searchInput").value.toLowerCase();
+
+      return robots.filter((r) => {
+        if (series && r.series_code !== series) return false;
+        if (role && !(r.role_codes || []).includes(role)) return false;
+        if (search) {
+          const text = [
+            r.model_code,
+            r.model_name_ja,
+            r.series_code,
+            r.manufacturer_code,
+            (r.role_codes || []).join(" "),
+            r.short_description
+          ].join(" ").toLowerCase();
+          if (!text.includes(search)) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderCards() {
+      const list = filteredRobots();
+      document.getElementById("cardGrid").innerHTML = list.map((r) => `
+        <article class="card">
+          <h3>${r.model_name_ja || r.model_code}</h3>
+          <div class="meta">${r.model_code} / ${r.series_code || "-"} / ${r.manufacturer_code || "-"}</div>
+          <div>${r.short_description || ""}</div>
+          <div class="chips">${(r.role_codes || []).map(role => `<span class="${chipClass(role)}">${role}</span>`).join("")}</div>
+          <div class="price">¥${Number(r.starting_price_jpy || 0).toLocaleString()}〜</div>
+          <button onclick="selectRobot('${r.model_code}')">詳細を見る</button>
+        </article>
+      `).join("");
+    }
+
+    function selectRobot(code) {
+      selected = robots.find((r) => r.model_code === code) || robots[0] || null;
+      savedRentalContractId = "";
+      renderDetail();
+      document.getElementById("saveResult").className = "note";
+      document.getElementById("saveResult").textContent = "保存後、申込を確定できます。";
+    }
+
+    function unitLabel(unit) {
+      return { minute: "分", hour: "時間", day: "日", month: "月", year: "年" }[unit] || unit;
+    }
+
+    function renderDetail() {
+      if (!selected) {
+        document.getElementById("detail").innerHTML = `<div class="note">ロボットを選択してください。</div>`;
+        return;
+      }
+
+      const group = selected.safety_group;
+      const safetyClass = group === "combat_security_crisis" ? "warn" : (selected.role_codes || []).includes("Lover") ? "danger" : "";
+      const units = selected.rental_units || ["hour"];
+
+      document.getElementById("detail").innerHTML = `
+        <div class="detail-title">${selected.model_name_ja || selected.model_code}</div>
+        <div class="meta">${selected.model_code} / ${selected.series_code || "-"}</div>
+        <div>${selected.short_description || ""}</div>
+        <div class="chips">${(selected.role_codes || []).map(role => `<span class="${chipClass(role)}">${role}</span>`).join("")}</div>
+        <div class="note ${safetyClass}">${selected.safety_note || ""}</div>
+      `;
+
+      document.getElementById("unit").innerHTML = units.map((u) => `<option value="${u}">${unitLabel(u)}</option>`).join("");
+      calcLocal();
+    }
+
+    function requestBody() {
+      if (!selected) throw new Error("ロボット未選択");
+
+      return {
+        app_code: "RobotRentalStore",
+        model_code: selected.model_code,
+        role_code: (selected.role_codes || [])[0] || "",
+        rental_unit: document.getElementById("unit").value,
+        duration_quantity: Number(document.getElementById("duration").value || 1),
+        quantity: Number(document.getElementById("qty").value || 1),
+        use_free_ticket: false,
+        locale: "ja"
+      };
+    }
+
+    function calcLocal() {
+      if (!selected) return;
+      const qty = Number(document.getElementById("qty").value || 1);
+      const duration = Number(document.getElementById("duration").value || 1);
+      const subtotal = Number(selected.starting_price_jpy || 0) * qty * duration;
+      document.getElementById("subtotal").textContent = `¥${subtotal.toLocaleString()}`;
+      document.getElementById("total").textContent = `¥${subtotal.toLocaleString()}`;
+    }
+
+    function renderSaveResult(json) {
+      const q = json.quote || {};
+      document.getElementById("subtotal").textContent = `¥${Number(q.subtotal_jpy || 0).toLocaleString()}`;
+      document.getElementById("total").textContent = `¥${Number(q.total_jpy || 0).toLocaleString()}`;
+
+      savedRentalContractId = json.rental_contract_id || "";
+
+      const result = document.getElementById("saveResult");
+      result.className = "note ok";
+      result.innerHTML = `
+        <strong>見積を保存しました</strong><br>
+        見積番号: ${savedRentalContractId || "-"}<br>
+        状態: ${json.contract_status || "quoted"}<br>
+        合計: ¥${Number(q.total_jpy || 0).toLocaleString()}
+      `;
+    }
+
+    function renderConfirmResult(json) {
+      const result = document.getElementById("saveResult");
+      result.className = "note ok";
+      result.innerHTML = `
+        <strong>申込を確定しました</strong><br>
+        申込番号: ${json.rental_contract_id || "-"}<br>
+        状態: ${json.contract_status || "confirmed"}<br>
+        次の手続き: 決済・利用開始準備
+      `;
+    }
+
+    async function saveQuotePersist() {
+      if (!selected) return;
+
+      const ok = confirm("見積を保存します。よろしいですか？");
+      if (!ok) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/quote/persist`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...authHeaders() },
+          body: JSON.stringify(requestBody())
+        });
+
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || "保存に失敗しました");
+
+        renderSaveResult(json);
+      } catch (err) {
+        document.getElementById("saveResult").className = "note danger";
+        document.getElementById("saveResult").textContent = `見積保存失敗: ${err.message}`;
+      }
+    }
+
+    async function confirmContract() {
+      if (!savedRentalContractId) {
+        alert("先に見積を保存してください。");
+        return;
+      }
+
+      const ok = confirm("申込を確定します。よろしいですか？");
+      if (!ok) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/contracts/confirm`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+        });
+
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || "申込確定に失敗しました");
+
+        renderConfirmResult(json);
+      } catch (err) {
+        document.getElementById("saveResult").className = "note danger";
+        document.getElementById("saveResult").textContent = `申込確定失敗: ${err.message}`;
+      }
+    }
+
+    document.getElementById("seriesFilter").addEventListener("change", renderCards);
+    document.getElementById("roleFilter").addEventListener("change", renderCards);
+    document.getElementById("searchInput").addEventListener("input", renderCards);
+    document.getElementById("qty").addEventListener("input", calcLocal);
+    document.getElementById("duration").addEventListener("input", calcLocal);
+
+    loadCatalog();
+  </script>
+</body>
+</html>

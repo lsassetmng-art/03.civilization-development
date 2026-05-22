@@ -1,0 +1,131 @@
+TITLE_LINES
+6:  <title>RobotRentalStore - ロボットレンタル</title>
+32:    select, input, button { width: 100%; min-height: 40px; border-radius: 12px; border: 1px solid var(--line); padding: 8px 10px; font: inherit; background: white; }
+33:    button { cursor: pointer; border: 0; background: var(--accent); color: white; font-weight: 700; }
+34:    button.secondary { background: var(--soft); color: var(--accent); }
+51:    .status { margin-top: 10px; font-size: 12px; color: #d7defa; }
+58:    <h1>ロボットレンタル</h1>
+63:      <span class="badge">利用開始対応</span>
+65:    <div id="apiStatus" class="status">ロボット一覧を読み込み中...</div>
+70:      <h2>絞り込み</h2>
+73:      <select id="seriesFilter">
+79:      </select>
+82:      <select id="roleFilter">
+90:        <option>Friend</option>
+97:      </select>
+100:      <input id="searchInput" placeholder="型番・機種名・用途" />
+103:      <button class="secondary" onclick="loadCatalog()">再読込</button>
+107:        見積保存、申込確定、決済予定作成、利用開始の順に進めます。
+112:      <h2>レンタル可能ロボット</h2>
+117:      <h2>選択中</h2>
+121:      <select id="unit">
+123:      </select>
+126:      <input id="qty" type="number" value="1" min="1" />
+129:      <input id="duration" type="number" value="1" min="1" />
+138:        <button onclick="saveQuotePersist()">見積を保存</button>
+139:        <button onclick="confirmContract()">申込を確定</button>
+140:        <button onclick="createPaymentIntent()">決済へ進む</button>
+141:        <button onclick="cancelRental()">申込をキャンセル</button>
+142:        <button onclick="startRental()">利用開始</button>
+143:        <button onclick="endRental()">利用終了</button>
+147:      <div id="saveResult" class="note">見積保存後、申込確定・決済・利用開始へ進めます。</div>
+156:      { model_code: "HD-R3", model_name_ja: "ワーカー", series_code: "HD", manufacturer_code: "helios_dynamics", role_codes: ["Worker"], starting_price_jpy: 500, rental_units: ["hour","day","month"], safety_group: "business", short_description: "汎用AIワーカー。", safety_note: "業務系ロールです。" },
+157:      { model_code: "LVS-12Fv015", model_name_ja: "ビジネスヤンデレ", series_code: "LoVerS", manufacturer_code: "lavi_corporation", role_codes: ["Lover"], starting_price_jpy: 500, rental_units: ["minute","hour"], safety_group: "conversation", short_description: "擬似恋人型演出ロール。", safety_note: "実在恋愛・成人向け性的サービス・監視・脅し・依存誘導は禁止です。" },
+158:      { model_code: "HD-R2S", model_name_ja: "スナイパー", series_code: "HD", manufacturer_code: "helios_dynamics", role_codes: ["CombatSpecialist","Security","Battler"], starting_price_jpy: 800, rental_units: ["hour","day"], safety_group: "combat_security_crisis", short_description: "戦闘専門系。", safety_note: "現実の危害実行支援ではなく、フィクション・警備設計・危機対応・世界観用途に限定します。" }
+162:    let selected = null;
+170:      if (["Friend", "Lover"].includes(role)) return "chip conversation";
+176:      const status = document.getElementById("apiStatus");
+178:        status.textContent = "ロボット一覧を読み込み中...";
+183:        selected = robots[0] || null;
+184:        status.textContent = `${robots.length}件のロボットを表示中`;
+187:        selected = robots[0];
+188:        status.textContent = "ロボット一覧を表示中";
+190:      renderCards();
+191:      renderDetail();
+217:    function renderCards() {
+225:          <div class="price">¥${Number(r.starting_price_jpy || 0).toLocaleString()}〜</div>
+226:          <button onclick="selectRobot('${r.model_code}')">詳細を見る</button>
+231:    function selectRobot(code) {
+232:      selected = robots.find((r) => r.model_code === code) || robots[0] || null;
+234:      renderDetail();
+236:      document.getElementById("saveResult").textContent = "見積保存後、申込確定・決済・利用開始へ進めます。";
+243:    function renderDetail() {
+244:      if (!selected) {
+249:      const group = selected.safety_group;
+250:      const safetyClass = group === "combat_security_crisis" ? "warn" : (selected.role_codes || []).includes("Lover") ? "danger" : "";
+251:      const units = selected.rental_units || ["hour"];
+254:        <div class="detail-title">${selected.model_name_ja || selected.model_code}</div>
+255:        <div class="meta">${selected.model_code} / ${selected.series_code || "-"}</div>
+256:        <div>${selected.short_description || ""}</div>
+257:        <div class="chips">${(selected.role_codes || []).map(role => `<span class="${chipClass(role)}">${role}</span>`).join("")}</div>
+258:        <div class="note ${safetyClass}">${selected.safety_note || ""}</div>
+266:      if (!selected) throw new Error("ロボット未選択");
+270:        model_code: selected.model_code,
+271:        role_code: (selected.role_codes || [])[0] || "",
+281:      if (!selected) return;
+284:      const subtotal = Number(selected.starting_price_jpy || 0) * qty * duration;
+289:    function renderMessage(html, ok = true) {
+296:      if (!selected) return;
+298:      const ok = confirm("見積を保存します。よろしいですか？");
+302:        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/quote/persist`, {
+311:        const q = json.quote || {};
+312:        savedRentalContractId = json.rental_contract_id || "";
+316:        renderMessage(`
+317:          <strong>見積を保存しました</strong><br>
+318:          見積番号: ${savedRentalContractId || "-"}<br>
+319:          状態: ${json.contract_status || "quoted"}<br>
+323:        renderMessage(`見積保存失敗: ${err.message}`, false);
+329:        alert("先に見積を保存してください。");
+333:      const ok = confirm("申込を確定します。よろしいですか？");
+337:        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/contracts/confirm`, {
+340:          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+344:        if (!json.ok) throw new Error(json.error || "申込確定に失敗しました");
+346:        renderMessage(`
+347:          <strong>申込を確定しました</strong><br>
+348:          申込番号: ${json.rental_contract_id || "-"}<br>
+349:          状態: ${json.contract_status || "confirmed"}<br>
+350:          次の手続き: 決済へ進む
+353:        renderMessage(`申込確定失敗: ${err.message}`, false);
+359:        alert("先に見積保存と申込確定を行ってください。");
+363:      const ok = confirm("決済予定を作成します。よろしいですか？");
+367:        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/payments/intent/create`, {
+370:          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+374:        if (!json.ok) throw new Error(json.error || "決済予定の作成に失敗しました");
+376:        renderMessage(`
+377:          <strong>決済予定を作成しました</strong><br>
+378:          決済予定番号: ${json.rental_payment_intent_id || "-"}<br>
+380:          状態: ${json.payment_status || "pending"}
+383:        renderMessage(`決済予定作成失敗: ${err.message}`, false);
+387:    async function startRental() {
+389:        alert("先に見積保存、申込確定、決済予定作成を行ってください。");
+393:      const ok = confirm("利用を開始します。よろしいですか？");
+397:        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/rentals/start`, {
+400:          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+404:        if (!json.ok) throw new Error(json.error || "利用開始に失敗しました");
+406:        renderMessage(`
+407:          <strong>利用開始しました</strong><br>
+408:          契約番号: ${json.rental_contract_id || "-"}<br>
+409:          状態: ${json.contract_status || "active"}<br>
+410:          レンタル状態: ${json.period_status || "active"}<br>
+414:        renderMessage(`利用開始失敗: ${err.message}`, false);
+418:    document.getElementById("seriesFilter").addEventListener("change", renderCards);
+419:    document.getElementById("roleFilter").addEventListener("change", renderCards);
+420:    document.getElementById("searchInput").addEventListener("input", renderCards);
+421:    document.getElementById("qty").addEventListener("input", calcLocal);
+422:    document.getElementById("duration").addEventListener("input", calcLocal);
+426:async function endRental(){
+427:  if(!savedRentalContractId){alert("先に利用開始まで進めてください。");return;}
+428:  if(!confirm("利用を終了します。よろしいですか？"))return;
+430:    const json=await postJson("/api/v1/business/robot-rental/rentals/end",{rental_contract_id:savedRentalContractId,ended_reason:"user ended rental"});
+431:    renderMessage(`<strong>利用終了しました</strong><br>契約番号: ${json.rental_contract_id}<br>状態: ${json.contract_status||"ended"}<br>レンタル状態: ${json.period_status||"ended"}<br>利用秒数: ${json.used_seconds??"-"}`);
+432:  }catch(e){renderMessage(`利用終了失敗: ${e.message}`,false);}
+436:async function cancelRental(){
+437:  if(!savedRentalContractId){alert("先に見積を保存してください。");return;}
+438:  if(!confirm("申込をキャンセルします。よろしいですか？"))return;
+440:    const json=await postJson("/api/v1/business/robot-rental/rentals/cancel",{rental_contract_id:savedRentalContractId,cancel_reason:"user canceled rental"});
+441:    renderMessage(`<strong>申込をキャンセルしました</strong><br>契約番号: ${json.rental_contract_id}<br>変更前: ${json.from_status||"-"}<br>状態: ${json.contract_status||"canceled"}`);
+442:  }catch(e){renderMessage(`キャンセル失敗: ${e.message}`,false);}
+
+SCRIPT_ENDPOINT_LINES
+
+DEBUG_SUSPECT_LINES

@@ -1,0 +1,22 @@
+function psql(sql) {
+  if (!DATABASE_URL) {
+    throw new Error("PERSONA_DATABASE_URL is not set");
+  }
+
+  const result = spawnSync("psql", [
+    DATABASE_URL,
+    "-qAt",
+    "-F", "\t",
+    "-v", "ON_ERROR_STOP=1"
+  ], {
+    input: sql,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 20
+  });
+
+  if (result.status !== 0) {
+    throw new Error((result.stderr || result.stdout || "psql_failed").trim());
+  }
+
+  return String(result.stdout || "");
+}

@@ -60,7 +60,7 @@
     <div class="badges">
       <span class="badge">BusinessOS</span>
       <span class="badge">ロボットレンタル</span>
-      <span class="badge">見積保存対応</span>
+      <span class="badge">利用開始対応</span>
     </div>
     <div id="apiStatus" class="status">ロボット一覧を読み込み中...</div>
   </header>
@@ -104,7 +104,7 @@
 
       <div style="height:14px"></div>
       <div class="note">
-        ロボットを選択し、レンタル条件を確認してから見積を保存してください。
+        見積保存、申込確定、決済予定作成、利用開始の順に進めます。
       </div>
     </aside>
 
@@ -136,11 +136,15 @@
       <div style="height:12px"></div>
       <div class="stack">
         <button onclick="saveQuotePersist()">見積を保存</button>
-        <button class="secondary" onclick="alert('申込確認は次の工程で対応します')">申込確認へ進む</button>
+        <button onclick="confirmContract()">申込を確定</button>
+        <button onclick="createPaymentIntent()">決済へ進む</button>
+        <button onclick="cancelRental()">申込をキャンセル</button>
+        <button onclick="startRental()">利用開始</button>
+        <button onclick="endRental()">利用終了</button>
       </div>
 
       <div style="height:12px"></div>
-      <div id="saveResult" class="note">保存後、見積番号が表示されます。</div>
+      <div id="saveResult" class="note">見積保存後、申込確定・決済・利用開始へ進めます。</div>
     </aside>
   </main>
 
@@ -156,6 +160,7 @@
 
     let robots = [];
     let selected = null;
+    let savedRentalContractId = "";
 
     function authHeaders() {
       return { "X-Civilization-Id": SESSION_CIVILIZATION_ID };
@@ -225,7 +230,10 @@
 
     function selectRobot(code) {
       selected = robots.find((r) => r.model_code === code) || robots[0] || null;
+      savedRentalContractId = "";
       renderDetail();
+      document.getElementById("saveResult").className = "note";
+      document.getElementById("saveResult").textContent = "見積保存後、申込確定・決済・利用開始へ進めます。";
     }
 
     function unitLabel(unit) {
@@ -278,19 +286,10 @@
       document.getElementById("total").textContent = `¥${subtotal.toLocaleString()}`;
     }
 
-    function renderSaveResult(json) {
-      const q = json.quote || {};
-      document.getElementById("subtotal").textContent = `¥${Number(q.subtotal_jpy || 0).toLocaleString()}`;
-      document.getElementById("total").textContent = `¥${Number(q.total_jpy || 0).toLocaleString()}`;
-
+    function renderMessage(html, ok = true) {
       const result = document.getElementById("saveResult");
-      result.className = "note ok";
-      result.innerHTML = `
-        <strong>見積を保存しました</strong><br>
-        見積番号: ${json.rental_contract_id || "-"}<br>
-        状態: ${json.contract_status || "quoted"}<br>
-        合計: ¥${Number(q.total_jpy || 0).toLocaleString()}
-      `;
+      result.className = ok ? "note ok" : "note danger";
+      result.innerHTML = html;
     }
 
     async function saveQuotePersist() {
@@ -309,10 +308,110 @@
         const json = await res.json();
         if (!json.ok) throw new Error(json.error || "保存に失敗しました");
 
-        renderSaveResult(json);
+        const q = json.quote || {};
+        savedRentalContractId = json.rental_contract_id || "";
+        document.getElementById("subtotal").textContent = `¥${Number(q.subtotal_jpy || 0).toLocaleString()}`;
+        document.getElementById("total").textContent = `¥${Number(q.total_jpy || 0).toLocaleString()}`;
+
+        renderMessage(`
+          <strong>見積を保存しました</strong><br>
+          見積番号: ${savedRentalContractId || "-"}<br>
+          状態: ${json.contract_status || "quoted"}<br>
+          合計: ¥${Number(q.total_jpy || 0).toLocaleString()}
+        `);
       } catch (err) {
-        document.getElementById("saveResult").className = "note danger";
-        document.getElementById("saveResult").textContent = `見積保存失敗: ${err.message}`;
+        renderMessage(`見積保存失敗: ${err.message}`, false);
+      }
+    }
+
+    async function confirmContract() {
+      if (!savedRentalContractId) {
+        alert("先に見積を保存してください。");
+        return;
+      }
+
+      const ok = confirm("申込を確定します。よろしいですか？");
+      if (!ok) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/contracts/confirm`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+        });
+
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || "申込確定に失敗しました");
+
+        renderMessage(`
+          <strong>申込を確定しました</strong><br>
+          申込番号: ${json.rental_contract_id || "-"}<br>
+          状態: ${json.contract_status || "confirmed"}<br>
+          次の手続き: 決済へ進む
+        `);
+      } catch (err) {
+        renderMessage(`申込確定失敗: ${err.message}`, false);
+      }
+    }
+
+    async function createPaymentIntent() {
+      if (!savedRentalContractId) {
+        alert("先に見積保存と申込確定を行ってください。");
+        return;
+      }
+
+      const ok = confirm("決済予定を作成します。よろしいですか？");
+      if (!ok) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/payments/intent/create`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+        });
+
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || "決済予定の作成に失敗しました");
+
+        renderMessage(`
+          <strong>決済予定を作成しました</strong><br>
+          決済予定番号: ${json.rental_payment_intent_id || "-"}<br>
+          金額: ¥${Number(json.amount_jpy || 0).toLocaleString()}<br>
+          状態: ${json.payment_status || "pending"}
+        `);
+      } catch (err) {
+        renderMessage(`決済予定作成失敗: ${err.message}`, false);
+      }
+    }
+
+    async function startRental() {
+      if (!savedRentalContractId) {
+        alert("先に見積保存、申込確定、決済予定作成を行ってください。");
+        return;
+      }
+
+      const ok = confirm("利用を開始します。よろしいですか？");
+      if (!ok) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/rentals/start`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+        });
+
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || "利用開始に失敗しました");
+
+        renderMessage(`
+          <strong>利用開始しました</strong><br>
+          契約番号: ${json.rental_contract_id || "-"}<br>
+          状態: ${json.contract_status || "active"}<br>
+          レンタル状態: ${json.period_status || "active"}<br>
+          残り秒数: ${json.remaining_seconds_snapshot ?? "-"}
+        `);
+      } catch (err) {
+        renderMessage(`利用開始失敗: ${err.message}`, false);
       }
     }
 
@@ -323,6 +422,26 @@
     document.getElementById("duration").addEventListener("input", calcLocal);
 
     loadCatalog();
-  </script>
+  
+async function endRental(){
+  if(!savedRentalContractId){alert("先に利用開始まで進めてください。");return;}
+  if(!confirm("利用を終了します。よろしいですか？"))return;
+  try{
+    const json=await postJson("/api/v1/business/robot-rental/rentals/end",{rental_contract_id:savedRentalContractId,ended_reason:"user ended rental"});
+    renderMessage(`<strong>利用終了しました</strong><br>契約番号: ${json.rental_contract_id}<br>状態: ${json.contract_status||"ended"}<br>レンタル状態: ${json.period_status||"ended"}<br>利用秒数: ${json.used_seconds??"-"}`);
+  }catch(e){renderMessage(`利用終了失敗: ${e.message}`,false);}
+}
+
+
+async function cancelRental(){
+  if(!savedRentalContractId){alert("先に見積を保存してください。");return;}
+  if(!confirm("申込をキャンセルします。よろしいですか？"))return;
+  try{
+    const json=await postJson("/api/v1/business/robot-rental/rentals/cancel",{rental_contract_id:savedRentalContractId,cancel_reason:"user canceled rental"});
+    renderMessage(`<strong>申込をキャンセルしました</strong><br>契約番号: ${json.rental_contract_id}<br>変更前: ${json.from_status||"-"}<br>状態: ${json.contract_status||"canceled"}`);
+  }catch(e){renderMessage(`キャンセル失敗: ${e.message}`,false);}
+}
+
+</script>
 </body>
 </html>

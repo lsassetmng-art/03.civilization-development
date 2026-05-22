@@ -1,0 +1,83 @@
+function quote(body, context) {
+  const contextCheck = validateCivilizationContext(context);
+
+  if (!contextCheck.ok) {
+    return {
+      ok: false,
+      error: contextCheck.error,
+      owner_civilization_id: context && context.owner_civilization_id ? context.owner_civilization_id : null,
+      dry_run: true,
+      no_persist: true
+    };
+  }
+
+  const items = getCatalog();
+  const modelCode = String(body.model_code || "");
+  const roleCode = String(body.role_code || "");
+  const rentalUnit = String(body.rental_unit || "hour");
+  const duration = Math.max(1, Number(body.duration_quantity || 1));
+  const quantity = Math.max(1, Number(body.quantity || 1));
+
+  const item = items.find((x) => x.model_code === modelCode);
+
+  if (!item) {
+    return {
+      ok: false,
+      error: "model_not_found",
+      model_code: modelCode,
+      dry_run: true,
+      no_persist: true
+    };
+  }
+
+  if (roleCode && !item.role_codes.includes(roleCode)) {
+    return {
+      ok: false,
+      error: "role_not_supported_for_model",
+      model_code: modelCode,
+      role_code: roleCode,
+      supported_role_codes: item.role_codes,
+      dry_run: true,
+      no_persist: true
+    };
+  }
+
+  if (!item.rental_units.includes(rentalUnit)) {
+    return {
+      ok: false,
+      error: "rental_unit_not_supported",
+      rental_unit: rentalUnit,
+      supported_rental_units: item.rental_units,
+      dry_run: true,
+      no_persist: true
+    };
+  }
+
+  const subtotal = item.starting_price_jpy * duration * quantity;
+  const discount = body.use_free_ticket ? Math.min(subtotal, item.starting_price_jpy) : 0;
+
+  return {
+    ok: true,
+    dry_run: true,
+    no_persist: true,
+    owner_civilization_id: context && context.owner_civilization_id ? context.owner_civilization_id : null,
+    civilization_context_present: Boolean(context && context.civilization_context_present),
+    civilization_context_source: context ? context.civilization_context_source : "missing",
+    context_required_for_persist: true,
+    persist_allowed: Boolean(contextCheck.persist_allowed),
+    quote: {
+      quote_id: "dryrun-" + Date.now(),
+      app_code: "RobotRentalStore",
+      model_code: item.model_code,
+      model_name_ja: item.model_name_ja,
+      role_code: roleCode || item.role_codes[0] || "",
+      rental_unit: rentalUnit,
+      duration_quantity: duration,
+      quantity,
+      subtotal_jpy: subtotal,
+      discount_jpy: discount,
+      total_jpy: subtotal - discount,
+      price_source: item.price_source
+    }
+  };
+}

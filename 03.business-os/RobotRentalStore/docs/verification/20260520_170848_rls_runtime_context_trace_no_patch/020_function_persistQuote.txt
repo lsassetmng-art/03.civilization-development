@@ -1,0 +1,161 @@
+function persistQuote(body, context, mode) {
+  const dry = quote(body, context);
+
+  if (!dry.ok) {
+    return dry;
+  }
+
+  if (!dry.persist_allowed || !dry.owner_civilization_id) {
+    return {
+      ok: false,
+      error: "civilization_context_required_for_persist",
+      dry_run: false,
+      no_persist: true,
+      owner_civilization_id: dry.owner_civilization_id || null,
+      persist_allowed: false
+    };
+  }
+
+  const q = dry.quote;
+  const owner = dry.owner_civilization_id;
+  const shouldRollback = mode === "rollback_smoke";
+
+  const txEnd = shouldRollback ? "ROLLBACK;" : "COMMIT;";
+  const smokeLabel = shouldRollback ? "quote_rollback_smoke" : "quote_persist";
+
+  const sql = `
+BEGIN;
+
+WITH ins_contract AS (
+  INSERT INTO business.worker_rental_contract (
+    owner_civilization_id,
+    user_id,
+    target_company_id,
+    erp_company_id,
+    app_code,
+    service_code,
+    worker_owner_schema,
+    worker_type,
+    aiworker_model_code,
+    role_code,
+    rental_unit_kind,
+    rental_unit_count,
+    rental_total_minutes,
+    base_price_jpy,
+    applied_entitlement_count,
+    free_unit_count,
+    paid_unit_count,
+    final_price_jpy,
+    contract_status,
+    price_version,
+    locale,
+    metadata_jsonb
+  )
+  VALUES (
+    ${sqlUuid(owner)},
+    NULL,
+    ${sqlUuid(body.target_company_id || null)},
+    ${sqlUuid(body.erp_company_id || null)},
+    ${sqlLit("RobotRentalStore")},
+    ${sqlLit("robot_rental_store")},
+    ${sqlLit("aiworker")},
+    ${sqlLit("robot")},
+    ${sqlLit(q.model_code)},
+    ${sqlLit(q.role_code)},
+    ${sqlLit(q.rental_unit)},
+    ${sqlInt(q.duration_quantity, 1)},
+    ${rentalMinutes(q.rental_unit, q.duration_quantity) === null ? "NULL" : sqlInt(rentalMinutes(q.rental_unit, q.duration_quantity), 0)},
+    ${sqlInt(q.subtotal_jpy, 0)},
+    ${body.use_free_ticket ? "1" : "0"},
+    ${body.use_free_ticket ? "1" : "0"},
+    ${sqlInt(q.quantity, 1)},
+    ${sqlInt(q.total_jpy, 0)},
+    ${sqlLit("quoted")},
+    ${sqlLit(q.price_source || "prototype_default_until_price_catalog_connected")},
+    ${sqlLit(body.locale || "ja")},
+    jsonb_build_object(
+      'source_endpoint', ${sqlLit(smokeLabel)},
+      'no_payment_yet', true,
+      'contract_confirmed', false,
+      'request_body', ${sqlLit(JSON.stringify(body))}::jsonb
+    )
+  )
+  RETURNING rental_contract_id, owner_civilization_id
+),
+ins_line AS (
+  INSERT INTO business.worker_rental_contract_line (
+    rental_contract_id,
+    owner_civilization_id,
+    line_type,
+    rental_unit_kind,
+    rental_unit_count,
+    quantity,
+    unit_price_jpy,
+    amount_jpy,
+    note
+  )
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    ${sqlLit("rental_base")},
+    ${sqlLit(q.rental_unit)},
+    ${sqlInt(q.duration_quantity, 1)},
+    ${sqlInt(q.quantity, 1)},
+    ${sqlInt(q.subtotal_jpy, 0)},
+    ${sqlInt(q.total_jpy, 0)},
+    ${sqlLit(shouldRollback ? "rollback smoke quote" : "persistent quote")}
+  FROM ins_contract
+  RETURNING rental_contract_line_id
+),
+ins_history AS (
+  INSERT INTO business.worker_rental_status_history (
+    rental_contract_id,
+    owner_civilization_id,
+    from_status,
+    to_status,
+    reason
+  )
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    NULL,
+    ${sqlLit("quoted")},
+    ${sqlLit(shouldRollback ? "rollback smoke" : "persistent quote")}
+  FROM ins_contract
+  RETURNING rental_status_history_id
+)
+SELECT
+  'QUOTE_RESULT',
+  (SELECT rental_contract_id::text FROM ins_contract),
+  (SELECT rental_contract_line_id::text FROM ins_line),
+  (SELECT rental_status_history_id::text FROM ins_history);
+
+${txEnd}
+`;
+
+  const out = psql(sql).trim();
+  const line = out.split("\n").find((x) => x.startsWith("QUOTE_RESULT\t")) || "";
+  const parts = line.split("\t");
+
+  if (parts.length < 4) {
+    return {
+      ok: false,
+      error: "quote_insert_result_missing",
+      detail: out,
+      rollback_smoke: shouldRollback
+    };
+  }
+
+  return {
+    ok: true,
+    dry_run: false,
+    no_persist: shouldRollback,
+    rollback_smoke: shouldRollback,
+    contract_status: "quoted",
+    owner_civilization_id: owner,
+    rental_contract_id: parts[1],
+    rental_contract_line_id: parts[2],
+    rental_status_history_id: parts[3],
+    quote: q
+  };
+}

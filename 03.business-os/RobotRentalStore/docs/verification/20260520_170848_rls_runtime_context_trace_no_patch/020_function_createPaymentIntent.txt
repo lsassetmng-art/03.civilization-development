@@ -1,0 +1,156 @@
+function createPaymentIntent(body, context) {
+  const contextCheck = validateCivilizationContext(context);
+
+  if (!contextCheck.ok || !contextCheck.persist_allowed || !context.owner_civilization_id) {
+    return {
+      ok: false,
+      error: contextCheck.error || "civilization_context_required_for_payment_intent",
+      owner_civilization_id: context && context.owner_civilization_id ? context.owner_civilization_id : null
+    };
+  }
+
+  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+  if (!isUuidLike(contractId)) {
+    return {
+      ok: false,
+      error: "invalid_rental_contract_id"
+    };
+  }
+
+  const owner = context.owner_civilization_id;
+  const providerCode = String(body.provider_code || "local_placeholder");
+
+  const sql = `
+BEGIN;
+
+WITH target AS (
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    user_id,
+    final_price_jpy
+  FROM business.worker_rental_contract
+  WHERE rental_contract_id = ${sqlUuid(contractId)}
+    AND owner_civilization_id = ${sqlUuid(owner)}
+    AND contract_status = 'confirmed'
+  FOR UPDATE
+),
+existing AS (
+  SELECT
+    rental_payment_intent_id,
+    rental_contract_id,
+    owner_civilization_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference
+  FROM business.worker_rental_payment_intent
+  WHERE rental_contract_id = ${sqlUuid(contractId)}
+    AND owner_civilization_id = ${sqlUuid(owner)}
+    AND payment_status = 'pending'
+  ORDER BY created_at DESC
+  LIMIT 1
+),
+inserted AS (
+  INSERT INTO business.worker_rental_payment_intent (
+    rental_contract_id,
+    owner_civilization_id,
+    user_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference
+  )
+  SELECT
+    rental_contract_id,
+    owner_civilization_id,
+    user_id,
+    final_price_jpy,
+    'JPY',
+    'pending',
+    ${sqlLit(providerCode)},
+    'robot-rental-local-' || rental_contract_id::text
+  FROM target
+  WHERE NOT EXISTS (SELECT 1 FROM existing)
+  RETURNING
+    rental_payment_intent_id,
+    rental_contract_id,
+    owner_civilization_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference
+),
+result AS (
+  SELECT
+    rental_payment_intent_id,
+    rental_contract_id,
+    owner_civilization_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference,
+    false AS reused_existing
+  FROM inserted
+  UNION ALL
+  SELECT
+    rental_payment_intent_id,
+    rental_contract_id,
+    owner_civilization_id,
+    amount_jpy,
+    currency_code,
+    payment_status,
+    provider_code,
+    provider_reference,
+    true AS reused_existing
+  FROM existing
+)
+SELECT
+  'PAYMENT_INTENT_RESULT',
+  rental_payment_intent_id::text,
+  rental_contract_id::text,
+  owner_civilization_id::text,
+  amount_jpy::text,
+  currency_code,
+  payment_status,
+  provider_code,
+  provider_reference,
+  reused_existing::text
+FROM result
+LIMIT 1;
+
+COMMIT;
+`;
+
+  const out = psql(sql).trim();
+  const line = out.split("\n").find((x) => x.startsWith("PAYMENT_INTENT_RESULT\t")) || "";
+  const parts = line.split("\t");
+
+  if (parts.length < 10 || !parts[1]) {
+    return {
+      ok: false,
+      error: "contract_not_found_or_not_confirmed_or_owner_mismatch",
+      rental_contract_id: contractId,
+      owner_civilization_id: owner,
+      detail: out
+    };
+  }
+
+  return {
+    ok: true,
+    rental_payment_intent_id: parts[1],
+    rental_contract_id: parts[2],
+    owner_civilization_id: parts[3],
+    amount_jpy: Number(parts[4]),
+    currency_code: parts[5],
+    payment_status: parts[6],
+    provider_code: parts[7],
+    provider_reference: parts[8],
+    reused_existing: parts[9] === "true",
+    next_action: "external_payment_provider_or_local_payment_flow"
+  };
+}
