@@ -3870,11 +3870,219 @@ function aiwR78MergeRuntimePayload(existingPayload, runtimeRequest) {
   };
 }
 
+
+// AIW_R83_RUNTIME_KNOWLEDGE_ROUTING_HELPER_START
+function aiwR83HasRuntimeKnowledgeRoutingInput(payload) {
+  if (!aiwR78IsPlainObject(payload)) return false;
+  return Boolean(
+    aiwR78HasSourceMaterialInput(payload) ||
+    aiwR78NormalizeArray(payload.required_viewpoints).length ||
+    aiwR78NormalizeArray(payload.requiredViewpoints).length ||
+    aiwR78NormalizeArray(payload.constraints).length ||
+    aiwR78NormalizeArray(payload.runtime_constraints).length ||
+    aiwR78NormalizeArray(payload.runtimeConstraints).length ||
+    aiwR78ToString(payload.taskKind || payload.task_kind) ||
+    aiwR78ToString(payload.robot_id || payload.robotId || payload.ai_worker_id || payload.aiWorkerId) ||
+    aiwR78IsPlainObject(payload.robot) ||
+    aiwR78IsPlainObject(payload.robotProfile) ||
+    aiwR78IsPlainObject(payload.robot_profile) ||
+    aiwR78IsPlainObject(payload.capabilityProfile) ||
+    aiwR78IsPlainObject(payload.capability_profile)
+  );
+}
+
+function aiwR83CollectRuntimeKnowledgeRoutingHints(payload) {
+  const safePayload = aiwR78IsPlainObject(payload) ? payload : {};
+  return {
+    patch_code: "R83_C",
+    stage: "before_create_runtime_request",
+    source_material_present: aiwR78HasSourceMaterialInput(safePayload),
+    required_viewpoints_present: Boolean(
+      aiwR78NormalizeArray(safePayload.required_viewpoints).length ||
+      aiwR78NormalizeArray(safePayload.requiredViewpoints).length
+    ),
+    constraints_present: Boolean(
+      aiwR78NormalizeArray(safePayload.constraints).length ||
+      aiwR78NormalizeArray(safePayload.runtime_constraints).length ||
+      aiwR78NormalizeArray(safePayload.runtimeConstraints).length
+    ),
+    task_kind: aiwR78ToString(safePayload.taskKind || safePayload.task_kind),
+    robot_profile_hint_present: Boolean(
+      aiwR78ToString(safePayload.robot_id || safePayload.robotId || safePayload.ai_worker_id || safePayload.aiWorkerId) ||
+      aiwR78IsPlainObject(safePayload.robot) ||
+      aiwR78IsPlainObject(safePayload.robotProfile) ||
+      aiwR78IsPlainObject(safePayload.robot_profile) ||
+      aiwR78IsPlainObject(safePayload.capabilityProfile) ||
+      aiwR78IsPlainObject(safePayload.capability_profile)
+    )
+  };
+}
+
+function aiwR83PickRegistryAdapterFunction(adapterModule) {
+  if (!aiwR78IsPlainObject(adapterModule)) return null;
+  const preferredNames = [
+    "readRuntimeKnowledgeRoutingRegistry",
+    "readKnowledgeRoutingRegistry",
+    "readRegistryRuntimeContext",
+    "readRegistryRoutingContext",
+    "readRegistryForRuntime",
+    "readRegistry",
+    "default"
+  ];
+  for (const name of preferredNames) {
+    if (typeof adapterModule[name] === "function") return adapterModule[name];
+  }
+  return Object.keys(adapterModule)
+    .sort()
+    .map((name) => adapterModule[name])
+    .find((value) => typeof value === "function") || null;
+}
+
+async function aiwR83ReadRuntimeKnowledgeRoutingRegistry(queryFn, requestContext) {
+  if (typeof queryFn !== "function") {
+    return {
+      ok: true,
+      adapter_called: false,
+      reason: "QUERY_FN_NOT_AVAILABLE"
+    };
+  }
+
+  try {
+    const adapterModule = await import("./lib/knowledge-domain-brain/registry-read-adapter.mjs");
+    const adapterFn = aiwR83PickRegistryAdapterFunction(adapterModule);
+    if (typeof adapterFn !== "function") {
+      return {
+        ok: false,
+        adapter_called: false,
+        reason: "REGISTRY_ADAPTER_FUNCTION_NOT_FOUND"
+      };
+    }
+
+    const input = {
+      queryFn,
+      requestContext: requestContext || {},
+      payload: requestContext && requestContext.payload,
+      runtimeRequest: requestContext && requestContext.runtimeRequest,
+      hints: requestContext && requestContext.hints,
+      patch_code: "R83_C"
+    };
+
+    try {
+      const result = await adapterFn(input);
+      return {
+        ok: true,
+        adapter_called: true,
+        invocation_shape: "object",
+        result
+      };
+    } catch (firstError) {
+      const result = await adapterFn(queryFn, input);
+      return {
+        ok: true,
+        adapter_called: true,
+        invocation_shape: "queryFn_object",
+        result,
+        first_error_message: firstError && firstError.message ? String(firstError.message) : String(firstError || "")
+      };
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      adapter_called: false,
+      reason: "REGISTRY_ADAPTER_IMPORT_OR_CALL_FAILED",
+      message: error && error.message ? String(error.message) : String(error || "")
+    };
+  }
+}
+
+async function aiwR83NormalizeRuntimeKnowledgeRoutingContext(payload, runtimeRequest, options) {
+  const safeOptions = aiwR78IsPlainObject(options) ? options : {};
+  const safePayload = aiwR78IsPlainObject(payload) ? payload : {};
+  const safeRuntimeRequest = aiwR78IsPlainObject(runtimeRequest) ? runtimeRequest : {};
+  const hasRoutingInput = aiwR83HasRuntimeKnowledgeRoutingInput(safePayload);
+
+  if (!hasRoutingInput) {
+    return {
+      ok: true,
+      shouldMerge: false,
+      patch_code: "R83_C",
+      reason: "NO_RUNTIME_KNOWLEDGE_ROUTING_INPUT"
+    };
+  }
+
+  const hints = aiwR83CollectRuntimeKnowledgeRoutingHints(safePayload);
+  const queryFn = typeof safeOptions.queryFn === "function" ? safeOptions.queryFn : null;
+  const registryRead = await aiwR83ReadRuntimeKnowledgeRoutingRegistry(queryFn, {
+    payload: safePayload,
+    runtimeRequest: safeRuntimeRequest,
+    hints,
+    routeCode: safeOptions.routeCode || ""
+  });
+
+  return {
+    ok: true,
+    shouldMerge: true,
+    patch_code: "R83_C",
+    helper_code: "aiwR83NormalizeRuntimeKnowledgeRoutingContext",
+    stage: "before_create_runtime_request",
+    query_fn_available: typeof queryFn === "function",
+    adapter_enabled: Boolean(registryRead && registryRead.adapter_called),
+    registry_read_status: registryRead && registryRead.ok ? "ok" : "not_resolved",
+    registry_read_reason: registryRead && registryRead.reason ? registryRead.reason : "",
+    hints,
+    registry_result: registryRead && registryRead.result ? registryRead.result : null,
+    warnings: registryRead && registryRead.ok === false ? [registryRead.message || registryRead.reason || "REGISTRY_READ_NOT_AVAILABLE"] : []
+  };
+}
+
+function aiwR83MergeRuntimeKnowledgeRoutingContext(runtimeRequest, routingContext) {
+  if (!aiwR78IsPlainObject(runtimeRequest)) return runtimeRequest;
+  if (!aiwR78IsPlainObject(routingContext) || !routingContext.shouldMerge) return runtimeRequest;
+
+  const existingOutputPayload = aiwR78IsPlainObject(runtimeRequest.outputPayload) ? runtimeRequest.outputPayload : {};
+  const existingGenerationBasis = aiwR78IsPlainObject(runtimeRequest.generationBasis) ? runtimeRequest.generationBasis : {};
+  const existingRobotContext = aiwR78IsPlainObject(runtimeRequest.robotContext) ? runtimeRequest.robotContext : {};
+
+  return {
+    ...runtimeRequest,
+    aiw_r83_runtime_knowledge_routing: routingContext,
+    runtimeKnowledgeRoutingContext: routingContext,
+    outputPayload: {
+      ...existingOutputPayload,
+      aiw_r83_runtime_knowledge_routing: routingContext
+    },
+    generationBasis: {
+      ...existingGenerationBasis,
+      aiw_r83_runtime_knowledge_routing: routingContext
+    },
+    robotContext: {
+      ...existingRobotContext,
+      aiw_r83_runtime_knowledge_routing: {
+        patch_code: "R83_C",
+        stage: routingContext.stage || "before_create_runtime_request",
+        query_fn_available: Boolean(routingContext.query_fn_available),
+        adapter_enabled: Boolean(routingContext.adapter_enabled),
+        registry_read_status: routingContext.registry_read_status || "not_resolved"
+      }
+    }
+  };
+}
+
+async function aiwR83CreateRuntimeRequestWithKnowledgeRouting(...args) {
+  const payload = args[0];
+  const routingContext = await aiwR83NormalizeRuntimeKnowledgeRoutingContext(payload, payload, {
+    routeCode: "runtime_request_wrapper"
+  });
+  args[0] = aiwR83MergeRuntimeKnowledgeRoutingContext(payload, routingContext);
+  return createRuntimeRequest(...args);
+}
+// AIW_R83_RUNTIME_KNOWLEDGE_ROUTING_HELPER_END
+
 async function aiwR78CreateRuntimeRequestWithSourceMaterial(...args) {
   const payload = args[0];
 
   if (!aiwR78HasSourceMaterialInput(payload)) {
-    return createRuntimeRequest(...args);
+    return aiwR83CreateRuntimeRequestWithKnowledgeRouting(...args);
   }
 
   const adapterResult = aiwR78BuildRuntimeRequestFromQueueItem(payload, {
@@ -3897,7 +4105,7 @@ async function aiwR78CreateRuntimeRequestWithSourceMaterial(...args) {
   }
 
   args[0] = aiwR78MergeRuntimePayload(payload, adapterResult.runtime_request);
-  return createRuntimeRequest(...args);
+  return aiwR83CreateRuntimeRequestWithKnowledgeRouting(...args);
 }
 // AIW_R78_QUEUE_INTAKE_WIRING_END
 
