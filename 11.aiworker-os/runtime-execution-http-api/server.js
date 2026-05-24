@@ -4068,10 +4068,86 @@ function aiwR83MergeRuntimeKnowledgeRoutingContext(runtimeRequest, routingContex
   };
 }
 
+
+// AIW_R83_REAL_QUERYFN_WIRING_START
+function aiwR83NormalizeSqlText(sql) {
+  return typeof sql === "string" ? sql.trim() : "";
+}
+
+function aiwR83IsReadOnlyRegistrySql(sql) {
+  const text = aiwR83NormalizeSqlText(sql);
+  if (!text) return false;
+
+  const compact = text
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\n\r]*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  if (!compact) return false;
+  if (!(compact.startsWith("select ") || compact.startsWith("with "))) return false;
+
+  const withoutTrailingSemi = compact.endsWith(";") ? compact.slice(0, -1).trim() : compact;
+  if (withoutTrailingSemi.includes(";")) return false;
+
+  if (/\b(insert|update|delete|merge|create|alter|drop|truncate|grant|revoke|vacuum|analyze|copy|call|do|execute)\b/.test(withoutTrailingSemi)) {
+    return false;
+  }
+
+  return true;
+}
+
+function aiwR83CanUseQueryParams(params) {
+  return params === undefined || params === null || (Array.isArray(params) && params.length === 0);
+}
+
+async function aiwR83RuntimeKnowledgeRoutingQueryFn(sql, params) {
+  if (!aiwR83IsReadOnlyRegistrySql(sql)) {
+    return {
+      rows: [],
+      rowCount: 0,
+      aiw_r83_query_rejected: true,
+      reason: "R83_QUERYFN_REJECTED_NON_READONLY_SQL"
+    };
+  }
+
+  if (!aiwR83CanUseQueryParams(params)) {
+    return {
+      rows: [],
+      rowCount: 0,
+      aiw_r83_query_rejected: true,
+      reason: "R83_QUERYFN_REJECTED_PARAMS_UNSUPPORTED"
+    };
+  }
+
+  const result = await aiwB6R95R3Z24RunPsqlJson(sql);
+
+  if (Array.isArray(result)) {
+    return { rows: result, rowCount: result.length };
+  }
+
+  if (result && Array.isArray(result.rows)) {
+    return result;
+  }
+
+  if (result && Array.isArray(result.data)) {
+    return { rows: result.data, rowCount: result.data.length };
+  }
+
+  return {
+    rows: [],
+    rowCount: 0,
+    aiw_r83_unexpected_result_shape: true
+  };
+}
+// AIW_R83_REAL_QUERYFN_WIRING_END
+
 async function aiwR83CreateRuntimeRequestWithKnowledgeRouting(...args) {
   const payload = args[0];
   const routingContext = await aiwR83NormalizeRuntimeKnowledgeRoutingContext(payload, payload, {
-    routeCode: "runtime_request_wrapper"
+    routeCode: "runtime_request_wrapper",
+      queryFn: aiwR83RuntimeKnowledgeRoutingQueryFn
   });
   args[0] = aiwR83MergeRuntimeKnowledgeRoutingContext(payload, routingContext);
   return createRuntimeRequest(...args);
