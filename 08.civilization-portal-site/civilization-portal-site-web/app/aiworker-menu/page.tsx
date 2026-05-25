@@ -37,9 +37,10 @@ export default function Page() {
         {
           id: "aiworker-contract-view",
           label: "AI Worker契約閲覧",
+  route: "/aiworker-menu/aiworker-contracts",
           asset,
           position: "bottom",
-          status: "準備中",
+          status: "利用可能",
           ariaLabel: "AI Worker契約閲覧 準備中",
         },
         {

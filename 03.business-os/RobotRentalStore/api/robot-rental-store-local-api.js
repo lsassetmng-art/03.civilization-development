@@ -1453,9 +1453,307 @@ COMMIT;
 }
 
 
+
+// AIWORKER_CONTRACT_VIEWER_R2_START
+function requireCivilizationContextForContractRead(req) {
+  const context = getCivilizationContext(req);
+  const check = validateCivilizationContext(context);
+
+  if (!check.ok) {
+    return {
+      ok: false,
+      status: 400,
+      error: check.error || "invalid_civilization_context"
+    };
+  }
+
+  if (!check.persist_allowed || !context.owner_civilization_id) {
+    return {
+      ok: false,
+      status: 400,
+      error: "civilization_context_required"
+    };
+  }
+
+  return {
+    ok: true,
+    context,
+    owner_civilization_id: context.owner_civilization_id
+  };
+}
+
+function clampContractViewerLimit(value) {
+  const n = Number(value || 50);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(1, Math.min(100, Math.trunc(n)));
+}
+
+function parsePrefixedJsonRows(text) {
+  const rows = [];
+  for (const line of String(text || "").trim().split("\n").filter(Boolean)) {
+    const tab = line.indexOf("\t");
+    if (tab < 0) continue;
+    const kind = line.slice(0, tab);
+    const jsonText = line.slice(tab + 1);
+    rows.push({ kind, value: JSON.parse(jsonText) });
+  }
+  return rows;
+}
+
+function listContracts(req, url) {
+  const contextResult = requireCivilizationContextForContractRead(req);
+  if (!contextResult.ok) return contextResult;
+
+  const owner = contextResult.owner_civilization_id;
+  const status = String(url.searchParams.get("status") || "").trim();
+  const allowedStatuses = new Set(["", "quoted", "confirmed", "active", "ended", "canceled"]);
+
+  if (!allowedStatuses.has(status)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_contract_status"
+    };
+  }
+
+  const limit = clampContractViewerLimit(url.searchParams.get("limit"));
+  const statusWhere = status ? `AND c.contract_status = ${sqlLit(status)}` : "";
+
+  const out = psql(`
+BEGIN;
+SELECT set_config('app.current_civilization_id', ${sqlLit(owner)}, true);
+
+WITH base AS (
+  SELECT
+    c.rental_contract_id,
+    c.owner_civilization_id,
+    c.app_code,
+    c.service_code,
+    c.aiworker_model_code,
+    c.role_code,
+    c.rental_unit_kind,
+    c.rental_unit_count,
+    c.rental_total_minutes,
+    c.contract_status,
+    c.base_price_jpy,
+    c.final_price_jpy,
+    c.created_at,
+    c.updated_at,
+    (
+      SELECT pi.payment_status
+      FROM business.worker_rental_payment_intent pi
+      WHERE pi.owner_civilization_id = c.owner_civilization_id
+        AND pi.rental_contract_id = c.rental_contract_id
+      ORDER BY pi.created_at DESC
+      LIMIT 1
+    ) AS payment_status,
+    (
+      SELECT p.period_status
+      FROM business.worker_rental_period p
+      WHERE p.owner_civilization_id = c.owner_civilization_id
+        AND p.rental_contract_id = c.rental_contract_id
+      ORDER BY p.created_at DESC
+      LIMIT 1
+    ) AS period_status,
+    (
+      SELECT p.remaining_seconds_snapshot
+      FROM business.worker_rental_period p
+      WHERE p.owner_civilization_id = c.owner_civilization_id
+        AND p.rental_contract_id = c.rental_contract_id
+      ORDER BY p.created_at DESC
+      LIMIT 1
+    ) AS remaining_seconds_snapshot,
+    (
+      SELECT sh.to_status
+      FROM business.worker_rental_status_history sh
+      WHERE sh.owner_civilization_id = c.owner_civilization_id
+        AND sh.rental_contract_id = c.rental_contract_id
+      ORDER BY sh.created_at DESC
+      LIMIT 1
+    ) AS latest_status_event
+  FROM business.worker_rental_contract c
+  WHERE c.owner_civilization_id = ${sqlUuid(owner)}
+    ${statusWhere}
+  ORDER BY c.created_at DESC
+  LIMIT ${limit}
+)
+SELECT
+  'CONTRACT' AS row_kind,
+  jsonb_build_object(
+    'rental_contract_id', rental_contract_id,
+    'owner_civilization_id', owner_civilization_id,
+    'app_code', app_code,
+    'service_code', service_code,
+    'aiworker_model_code', aiworker_model_code,
+    'role_code', role_code,
+    'rental_unit_kind', rental_unit_kind,
+    'rental_unit_count', rental_unit_count,
+    'rental_total_minutes', rental_total_minutes,
+    'contract_status', contract_status,
+    'base_price_jpy', base_price_jpy,
+    'final_price_jpy', final_price_jpy,
+    'created_at', created_at,
+    'updated_at', updated_at,
+    'payment_status', payment_status,
+    'period_status', period_status,
+    'remaining_seconds_snapshot', remaining_seconds_snapshot,
+    'latest_status_event', latest_status_event
+  )::text
+FROM base;
+
+ROLLBACK;
+`);
+
+  const contracts = parsePrefixedJsonRows(out)
+    .filter((row) => row.kind === "CONTRACT")
+    .map((row) => row.value);
+
+  return {
+    ok: true,
+    status: 200,
+    owner_civilization_id: owner,
+    contracts
+  };
+}
+
+function getContractDetail(req, rentalContractId) {
+  const contextResult = requireCivilizationContextForContractRead(req);
+  if (!contextResult.ok) return contextResult;
+
+  if (!isUuidLike(rentalContractId)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_rental_contract_id"
+    };
+  }
+
+  const owner = contextResult.owner_civilization_id;
+
+  const out = psql(`
+BEGIN;
+SELECT set_config('app.current_civilization_id', ${sqlLit(owner)}, true);
+
+SELECT 'CONTRACT' AS row_kind, to_jsonb(c)::text
+FROM business.worker_rental_contract c
+WHERE c.owner_civilization_id = ${sqlUuid(owner)}
+  AND c.rental_contract_id = ${sqlUuid(rentalContractId)}
+
+UNION ALL
+
+SELECT 'LINE' AS row_kind, to_jsonb(l)::text
+FROM business.worker_rental_contract_line l
+WHERE l.owner_civilization_id = ${sqlUuid(owner)}
+  AND l.rental_contract_id = ${sqlUuid(rentalContractId)}
+
+UNION ALL
+
+SELECT 'PERIOD' AS row_kind, to_jsonb(p)::text
+FROM business.worker_rental_period p
+WHERE p.owner_civilization_id = ${sqlUuid(owner)}
+  AND p.rental_contract_id = ${sqlUuid(rentalContractId)}
+
+UNION ALL
+
+SELECT 'PAYMENT_INTENT' AS row_kind, to_jsonb(pi)::text
+FROM business.worker_rental_payment_intent pi
+WHERE pi.owner_civilization_id = ${sqlUuid(owner)}
+  AND pi.rental_contract_id = ${sqlUuid(rentalContractId)}
+
+UNION ALL
+
+SELECT 'STATUS_HISTORY' AS row_kind, to_jsonb(sh)::text
+FROM business.worker_rental_status_history sh
+WHERE sh.owner_civilization_id = ${sqlUuid(owner)}
+  AND sh.rental_contract_id = ${sqlUuid(rentalContractId)}
+
+UNION ALL
+
+SELECT 'END_SUMMARY' AS row_kind, to_jsonb(es)::text
+FROM business.worker_rental_end_summary es
+WHERE es.owner_civilization_id = ${sqlUuid(owner)}
+  AND es.rental_contract_id = ${sqlUuid(rentalContractId)}
+
+UNION ALL
+
+SELECT 'USAGE_LOG' AS row_kind, to_jsonb(ul)::text
+FROM business.worker_rental_usage_log ul
+WHERE ul.owner_civilization_id = ${sqlUuid(owner)}
+  AND ul.rental_contract_id = ${sqlUuid(rentalContractId)}
+
+UNION ALL
+
+SELECT 'SAFETY_EVENT' AS row_kind, to_jsonb(se)::text
+FROM business.worker_rental_safety_event se
+WHERE se.owner_civilization_id = ${sqlUuid(owner)}
+  AND se.rental_contract_id = ${sqlUuid(rentalContractId)};
+
+ROLLBACK;
+`);
+
+  const result = {
+    ok: true,
+    status: 200,
+    owner_civilization_id: owner,
+    contract: null,
+    lines: [],
+    periods: [],
+    payment_intents: [],
+    status_history: [],
+    end_summaries: [],
+    usage_logs: [],
+    safety_events: []
+  };
+
+  for (const row of parsePrefixedJsonRows(out)) {
+    if (row.kind === "CONTRACT") result.contract = row.value;
+    else if (row.kind === "LINE") result.lines.push(row.value);
+    else if (row.kind === "PERIOD") result.periods.push(row.value);
+    else if (row.kind === "PAYMENT_INTENT") result.payment_intents.push(row.value);
+    else if (row.kind === "STATUS_HISTORY") result.status_history.push(row.value);
+    else if (row.kind === "END_SUMMARY") result.end_summaries.push(row.value);
+    else if (row.kind === "USAGE_LOG") result.usage_logs.push(row.value);
+    else if (row.kind === "SAFETY_EVENT") result.safety_events.push(row.value);
+  }
+
+  if (!result.contract) {
+    return {
+      ok: false,
+      status: 404,
+      error: "contract_not_found"
+    };
+  }
+
+  return result;
+}
+// AIWORKER_CONTRACT_VIEWER_R2_END
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+
+  // AIWORKER_CONTRACT_VIEWER_R2_ROUTE_START
+  if (req.method === "GET" && url.pathname === "/api/v1/business/robot-rental/contracts") {
+    try {
+      const result = listContracts(req, url);
+      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+    } catch (err) {
+      sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
+    }
+    return;
+  }
+
+  const aiworkerContractDetailMatch = url.pathname.match(/^\/api\/v1\/business\/robot-rental\/contracts\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+  if (req.method === "GET" && aiworkerContractDetailMatch) {
+    try {
+      const result = getContractDetail(req, aiworkerContractDetailMatch[1]);
+      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+    } catch (err) {
+      sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
+    }
+    return;
+  }
+  // AIWORKER_CONTRACT_VIEWER_R2_ROUTE_END
 
     if (req.method === "OPTIONS") {
       sendJson(res, 200, { ok: true });

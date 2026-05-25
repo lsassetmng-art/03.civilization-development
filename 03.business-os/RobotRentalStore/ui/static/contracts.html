@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Worker契約閲覧</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #667085;
+      --line: #dfe3ee;
+      --accent: #335cff;
+      --soft: #eef2ff;
+      --ok: #ecfdf3;
+      --warn: #fff7ed;
+      --danger: #fff1f2;
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      padding: 24px;
+      background: linear-gradient(135deg, #101828, #263b88);
+      color: white;
+    }
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+      line-height: 1.2;
+    }
+    header p {
+      margin: 0;
+      color: #d7defa;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+    main {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 18px;
+      padding: 18px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(15,23,42,.06);
+    }
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    select, button {
+      width: 100%;
+      min-height: 42px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      font: inherit;
+      background: white;
+    }
+    button {
+      cursor: pointer;
+      border: 0;
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+    }
+    button.secondary {
+      background: var(--soft);
+      color: var(--accent);
+    }
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+    .contract-card {
+      width: 100%;
+      text-align: left;
+      color: var(--text);
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: none;
+    }
+    .contract-card:hover {
+      border-color: #b7c2ff;
+      background: #fbfcff;
+    }
+    .contract-card.active {
+      border-color: var(--accent);
+      background: var(--soft);
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .card-title {
+      font-weight: 800;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+    .card-sub {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 12px;
+      font-weight: 800;
+      background: var(--soft);
+      color: #283a8f;
+    }
+    .badge.active { background: var(--ok); color: #027a48; }
+    .badge.ended { background: #f2f4f7; color: #475467; }
+    .badge.canceled { background: var(--danger); color: #be123c; }
+    .badge.confirmed { background: #eff8ff; color: #175cd3; }
+    .badge.quoted { background: var(--warn); color: #b45309; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .summary-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+      background: #fbfcff;
+    }
+    .summary-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .summary-item strong {
+      display: block;
+      font-size: 14px;
+      word-break: break-word;
+    }
+    .empty, .error, .loading {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: #fbfcff;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+    .error {
+      background: var(--danger);
+      color: #9f1239;
+      border-color: #fecdd3;
+    }
+    .detail-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+    .detail-title {
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1.4;
+    }
+    .detail-sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+      line-height: 1.6;
+    }
+    .section {
+      margin-top: 16px;
+    }
+    .section h3 {
+      font-size: 14px;
+      margin: 0 0 8px;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: 8px;
+      border-top: 1px solid var(--line);
+      padding: 9px 0;
+      font-size: 13px;
+    }
+    .kv span {
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .kv strong {
+      font-weight: 600;
+      word-break: break-word;
+    }
+    .mini-list {
+      display: grid;
+      gap: 8px;
+    }
+    .mini-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+      background: #fbfcff;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .actions button {
+      width: auto;
+      min-width: 140px;
+    }
+    @media (max-width: 820px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+      header {
+        padding: 20px;
+      }
+      .kv {
+        grid-template-columns: 1fr;
+        gap: 2px;
+      }
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI Worker契約閲覧</h1>
+    <p>現在のログイン状態に紐づくAI Worker契約を確認できます。一覧から契約を選択すると詳細を表示します。</p>
+  </header>
+
+  <main>
+    <section class="panel" aria-label="契約一覧">
+      <h2>契約一覧</h2>
+      <div class="toolbar">
+        <div>
+          <label for="statusFilter">状態で絞り込み</label>
+          <select id="statusFilter">
+            <option value="">すべて</option>
+            <option value="quoted">見積保存済み</option>
+            <option value="confirmed">申込確定済み</option>
+            <option value="active">利用中</option>
+            <option value="ended">利用終了</option>
+            <option value="canceled">キャンセル済み</option>
+          </select>
+        </div>
+        <button id="reloadButton" type="button">再読み込み</button>
+      </div>
+      <div id="listStatus" class="loading">契約一覧を読み込み中です。</div>
+      <div id="contractList" class="list" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" aria-label="契約詳細">
+      <div id="detailRoot">
+        <div class="empty">左の契約一覧から確認したい契約を選択してください。</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API_ORIGIN = "http://127.0.0.1:9020";
+    const DEFAULT_CONTEXT_ID = "00000000-0000-4000-8000-000000000001";
+
+    const statusLabels = {
+      quoted: "見積保存済み",
+      confirmed: "申込確定済み",
+      active: "利用中",
+      ended: "利用終了",
+      canceled: "キャンセル済み"
+    };
+
+    let selectedContractId = "";
+
+    function getContextId() {
+      return (
+        window.CIVILIZATION_ID ||
+        window.__CIVILIZATION_ID__ ||
+        sessionStorage.getItem("civilizationId") ||
+        localStorage.getItem("civilizationId") ||
+        DEFAULT_CONTEXT_ID
+      );
+    }
+
+    function authHeaders() {
+      return { "X-Civilization-Id": getContextId() };
+    }
+
+    function text(value) {
+      if (value === null || value === undefined || value === "") return "-";
+      return String(value);
+    }
+
+    function money(value) {
+      if (value === null || value === undefined || value === "") return "-";
+      const n = Number(value);
+      if (!Number.isFinite(n)) return text(value);
+      return n.toLocaleString("ja-JP") + "円";
+    }
+
+    function dateText(value) {
+      if (!value) return "-";
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return text(value);
+      return d.toLocaleString("ja-JP");
+    }
+
+    function statusLabel(status) {
+      return statusLabels[status] || text(status);
+    }
+
+    function safe(value) {
+      return text(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    async function fetchJson(path) {
+      const response = await fetch(API_ORIGIN + path, {
+        method: "GET",
+        headers: authHeaders()
+      });
+
+      const payload = await response.json().catch(() => ({
+        ok: false,
+        error: "invalid_response"
+      }));
+
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || "request_failed");
+      }
+
+      return payload;
+    }
+
+    function setListStatus(kind, message) {
+      const el = document.getElementById("listStatus");
+      el.className = kind;
+      el.textContent = message;
+    }
+
+    function renderContracts(contracts) {
+      const root = document.getElementById("contractList");
+      root.innerHTML = "";
+
+      if (!contracts.length) {
+        setListStatus("empty", "表示できる契約はありません。");
+        return;
+      }
+
+      document.getElementById("listStatus").textContent = "";
+      document.getElementById("listStatus").className = "empty";
+      document.getElementById("listStatus").style.display = "none";
+
+      for (const contract of contracts) {
+        const id = contract.rental_contract_id;
+        const status = contract.contract_status || "";
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "contract-card" + (id === selectedContractId ? " active" : "");
+        card.dataset.contractId = id;
+        card.innerHTML = [
+          '<div class="card-top">',
+            '<div>',
+              '<div class="card-title">' + safe(contract.aiworker_model_code) + ' / ' + safe(contract.role_code) + '</div>',
+              '<div class="card-sub">' + safe(contract.rental_unit_kind) + ' × ' + safe(contract.rental_unit_count) + ' / ' + safe(contract.rental_total_minutes) + '分</div>',
+            '</div>',
+            '<span class="badge ' + safe(status) + '">' + safe(statusLabel(status)) + '</span>',
+          '</div>',
+          '<div class="summary-grid">',
+            '<div class="summary-item"><span>金額</span><strong>' + safe(money(contract.final_price_jpy)) + '</strong></div>',
+            '<div class="summary-item"><span>決済</span><strong>' + safe(contract.payment_status || "-") + '</strong></div>',
+            '<div class="summary-item"><span>利用状態</span><strong>' + safe(contract.period_status || "-") + '</strong></div>',
+            '<div class="summary-item"><span>更新日</span><strong>' + safe(dateText(contract.updated_at)) + '</strong></div>',
+          '</div>'
+        ].join("");
+
+        card.addEventListener("click", () => loadDetail(id));
+        root.appendChild(card);
+      }
+    }
+
+    async function loadContracts() {
+      document.getElementById("listStatus").style.display = "block";
+      setListStatus("loading", "契約一覧を読み込み中です。");
+      document.getElementById("contractList").innerHTML = "";
+
+      const status = document.getElementById("statusFilter").value;
+      const query = status ? "?status=" + encodeURIComponent(status) : "";
+
+      try {
+        const payload = await fetchJson("/api/v1/business/robot-rental/contracts" + query);
+        renderContracts(payload.contracts || []);
+      } catch (err) {
+        setListStatus("error", "契約一覧を取得できませんでした: " + (err.message || err));
+      }
+    }
+
+    function kv(label, value) {
+      return '<div class="kv"><span>' + safe(label) + '</span><strong>' + safe(value) + '</strong></div>';
+    }
+
+    function renderMiniList(title, rows, fields) {
+      if (!rows || !rows.length) return "";
+      const cards = rows.map((row) => {
+        const body = fields.map((field) => {
+          return '<div><strong>' + safe(field.label) + ':</strong> ' + safe(field.format ? field.format(row[field.key]) : row[field.key]) + '</div>';
+        }).join("");
+        return '<div class="mini-card">' + body + '</div>';
+      }).join("");
+
+      return '<div class="section"><h3>' + safe(title) + '</h3><div class="mini-list">' + cards + '</div></div>';
+    }
+
+    function renderDetail(payload) {
+      const contract = payload.contract;
+      const root = document.getElementById("detailRoot");
+
+      root.innerHTML = [
+        '<div class="detail-head">',
+          '<div>',
+            '<div class="detail-title">' + safe(contract.aiworker_model_code) + ' / ' + safe(contract.role_code) + '</div>',
+            '<div class="detail-sub">契約ID: ' + safe(contract.rental_contract_id) + '</div>',
+          '</div>',
+          '<span class="badge ' + safe(contract.contract_status) + '">' + safe(statusLabel(contract.contract_status)) + '</span>',
+        '</div>',
+
+        '<div class="section"><h3>契約情報</h3>',
+          kv("サービス", contract.service_code),
+          kv("レンタル単位", contract.rental_unit_kind),
+          kv("数量", contract.rental_unit_count),
+          kv("総分数", contract.rental_total_minutes),
+          kv("基本金額", money(contract.base_price_jpy)),
+          kv("最終金額", money(contract.final_price_jpy)),
+          kv("開始予定", dateText(contract.rental_starts_at)),
+          kv("終了予定", dateText(contract.rental_ends_at)),
+          kv("作成日", dateText(contract.created_at)),
+          kv("更新日", dateText(contract.updated_at)),
+        '</div>',
+
+        renderMiniList("明細", payload.lines, [
+          { key: "line_type", label: "種別" },
+          { key: "quantity", label: "数量" },
+          { key: "unit_price_jpy", label: "単価", format: money },
+          { key: "amount_jpy", label: "金額", format: money }
+        ]),
+
+        renderMiniList("利用期間", payload.periods, [
+          { key: "period_status", label: "状態" },
+          { key: "actual_started_at", label: "開始", format: dateText },
+          { key: "actual_ended_at", label: "終了", format: dateText },
+          { key: "remaining_seconds_snapshot", label: "残秒数" }
+        ]),
+
+        renderMiniList("決済", payload.payment_intents, [
+          { key: "payment_status", label: "状態" },
+          { key: "amount_jpy", label: "金額", format: money },
+          { key: "provider_code", label: "種別" },
+          { key: "created_at", label: "作成日", format: dateText }
+        ]),
+
+        renderMiniList("ステータス履歴", payload.status_history, [
+          { key: "from_status", label: "変更前" },
+          { key: "to_status", label: "変更後" },
+          { key: "reason", label: "理由" },
+          { key: "created_at", label: "日時", format: dateText }
+        ]),
+
+        renderMiniList("終了サマリー", payload.end_summaries, [
+          { key: "ended_reason", label: "終了理由" },
+          { key: "used_seconds", label: "利用秒数" },
+          { key: "summary_text", label: "内容" },
+          { key: "created_at", label: "作成日", format: dateText }
+        ]),
+
+        renderMiniList("利用ログ", payload.usage_logs, [
+          { key: "usage_unit_kind", label: "単位" },
+          { key: "usage_unit_count", label: "数量" },
+          { key: "usage_seconds", label: "秒数" },
+          { key: "created_at", label: "日時", format: dateText }
+        ]),
+
+        renderMiniList("安全イベント", payload.safety_events, [
+          { key: "safety_state", label: "状態" },
+          { key: "safety_code", label: "コード" },
+          { key: "event_summary", label: "内容" },
+          { key: "created_at", label: "日時", format: dateText }
+        ]),
+
+        '<div class="actions"><button class="secondary" type="button" id="backToList">一覧を更新</button></div>'
+      ].join("");
+
+      document.getElementById("backToList").addEventListener("click", loadContracts);
+    }
+
+    async function loadDetail(id) {
+      selectedContractId = id;
+      document.querySelectorAll(".contract-card").forEach((card) => {
+        card.classList.toggle("active", card.dataset.contractId === id);
+      });
+
+      const root = document.getElementById("detailRoot");
+      root.innerHTML = '<div class="loading">契約詳細を読み込み中です。</div>';
+
+      try {
+        const payload = await fetchJson("/api/v1/business/robot-rental/contracts/" + encodeURIComponent(id));
+        renderDetail(payload);
+      } catch (err) {
+        root.innerHTML = '<div class="error">契約詳細を取得できませんでした: ' + safe(err.message || err) + '</div>';
+      }
+    }
+
+    document.getElementById("reloadButton").addEventListener("click", loadContracts);
+    document.getElementById("statusFilter").addEventListener("change", loadContracts);
+    loadContracts();
+  </script>
+</body>
+</html>
