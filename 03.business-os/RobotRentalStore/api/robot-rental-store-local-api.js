@@ -1728,9 +1728,310 @@ ROLLBACK;
 }
 // AIWORKER_CONTRACT_VIEWER_R2_END
 
+
+// APPLICATION_CONTRACT_VIEWER_R2_START
+function acvRequireCivilizationContextForRead(req) {
+  const context = getCivilizationContext(req);
+  const check = validateCivilizationContext(context);
+
+  if (!check.ok) {
+    return {
+      ok: false,
+      status: 400,
+      error: check.error || "invalid_civilization_context"
+    };
+  }
+
+  if (!check.persist_allowed || !context.owner_civilization_id) {
+    return {
+      ok: false,
+      status: 400,
+      error: "civilization_context_required"
+    };
+  }
+
+  return {
+    ok: true,
+    context,
+    owner_civilization_id: context.owner_civilization_id
+  };
+}
+
+function acvClampLimit(value) {
+  const n = Number(value || 50);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(1, Math.min(100, Math.trunc(n)));
+}
+
+function acvSafeCode(value, fieldName) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (!/^[A-Za-z0-9_.:-]{1,100}$/.test(text)) {
+    throw new Error("invalid_" + fieldName);
+  }
+  return text;
+}
+
+function acvParsePrefixedJsonRows(text) {
+  const rows = [];
+  for (const line of String(text || "").trim().split("\n").filter(Boolean)) {
+    const tab = line.indexOf("\t");
+    if (tab < 0) continue;
+    rows.push({
+      kind: line.slice(0, tab),
+      value: JSON.parse(line.slice(tab + 1))
+    });
+  }
+  return rows;
+}
+
+function acvHasCols(table, names) {
+  const cols = getColumnInfo("business", table);
+  return names.every((name) => cols.has(name));
+}
+
+function acvOptionalLatestPaymentStatusSql() {
+  if (!acvHasCols("worker_rental_payment_intent", ["owner_civilization_id", "rental_contract_id", "payment_status"])) {
+    return "NULL::text";
+  }
+  const order = acvHasCols("worker_rental_payment_intent", ["created_at"]) ? "ORDER BY pi.created_at DESC" : "";
+  return `(
+    SELECT pi.payment_status
+    FROM business.worker_rental_payment_intent pi
+    WHERE pi.owner_civilization_id = c.owner_civilization_id
+      AND pi.rental_contract_id = c.rental_contract_id
+    ${order}
+    LIMIT 1
+  )`;
+}
+
+function acvOptionalLatestEntitlementStatusSql() {
+  if (!acvHasCols("worker_rental_entitlement_grant", ["owner_civilization_id", "rental_contract_id", "grant_status"])) {
+    return "NULL::text";
+  }
+  const order = acvHasCols("worker_rental_entitlement_grant", ["created_at"]) ? "ORDER BY eg.created_at DESC" : "";
+  return `(
+    SELECT eg.grant_status
+    FROM business.worker_rental_entitlement_grant eg
+    WHERE eg.owner_civilization_id = c.owner_civilization_id
+      AND eg.rental_contract_id = c.rental_contract_id
+    ${order}
+    LIMIT 1
+  )`;
+}
+
+function acvOptionalEntitlementBalanceCountSql() {
+  if (!acvHasCols("worker_rental_entitlement_balance", ["owner_civilization_id", "rental_contract_id"])) {
+    return "0";
+  }
+  return `(
+    SELECT COUNT(*)::int
+    FROM business.worker_rental_entitlement_balance eb
+    WHERE eb.owner_civilization_id = c.owner_civilization_id
+      AND eb.rental_contract_id = c.rental_contract_id
+  )`;
+}
+
+function acvDetailUnionForTable(tableName, aliasName, rowKind, owner, contractId) {
+  if (!acvHasCols(tableName, ["owner_civilization_id", "rental_contract_id"])) {
+    return "";
+  }
+
+  return `
+SELECT ${sqlLit(rowKind)} AS row_kind, to_jsonb(${aliasName})::text
+FROM business.${tableName} ${aliasName}
+WHERE ${aliasName}.owner_civilization_id = ${sqlUuid(owner)}
+  AND ${aliasName}.rental_contract_id = ${sqlUuid(contractId)}
+`;
+}
+
+function listApplicationContracts(req, url) {
+  const contextResult = acvRequireCivilizationContextForRead(req);
+  if (!contextResult.ok) return contextResult;
+
+  const owner = contextResult.owner_civilization_id;
+  const status = String(url.searchParams.get("status") || "").trim();
+  const appCode = acvSafeCode(url.searchParams.get("app_code") || "", "app_code");
+  const limit = acvClampLimit(url.searchParams.get("limit"));
+
+  const allowedStatuses = new Set(["", "quoted", "confirmed", "active", "ended", "canceled"]);
+  if (!allowedStatuses.has(status)) {
+    return { ok: false, status: 400, error: "invalid_contract_status" };
+  }
+
+  const statusWhere = status ? `AND c.contract_status = ${sqlLit(status)}` : "";
+  const appWhere = appCode ? `AND c.app_code = ${sqlLit(appCode)}` : "";
+
+  const paymentStatusExpr = acvOptionalLatestPaymentStatusSql();
+  const entitlementStatusExpr = acvOptionalLatestEntitlementStatusSql();
+  const entitlementBalanceCountExpr = acvOptionalEntitlementBalanceCountSql();
+
+  const out = psql(`
+BEGIN;
+SELECT set_config('app.current_civilization_id', ${sqlLit(owner)}, true);
+
+WITH base AS (
+  SELECT
+    c.rental_contract_id,
+    c.owner_civilization_id,
+    c.app_code,
+    c.service_code,
+    c.contract_status,
+    c.aiworker_model_code,
+    c.role_code,
+    c.rental_unit_kind,
+    c.rental_unit_count,
+    c.rental_total_minutes,
+    c.base_price_jpy,
+    c.final_price_jpy,
+    c.created_at,
+    c.updated_at,
+    ${paymentStatusExpr} AS payment_status,
+    ${entitlementStatusExpr} AS entitlement_status,
+    ${entitlementBalanceCountExpr} AS entitlement_balance_count
+  FROM business.worker_rental_contract c
+  WHERE c.owner_civilization_id = ${sqlUuid(owner)}
+    ${statusWhere}
+    ${appWhere}
+  ORDER BY c.updated_at DESC NULLS LAST, c.created_at DESC NULLS LAST
+  LIMIT ${limit}
+)
+SELECT
+  'APPLICATION_CONTRACT' AS row_kind,
+  jsonb_build_object(
+    'application_contract_id', rental_contract_id,
+    'rental_contract_id', rental_contract_id,
+    'owner_civilization_id', owner_civilization_id,
+    'app_code', app_code,
+    'service_code', service_code,
+    'contract_status', contract_status,
+    'aiworker_model_code', aiworker_model_code,
+    'role_code', role_code,
+    'rental_unit_kind', rental_unit_kind,
+    'rental_unit_count', rental_unit_count,
+    'rental_total_minutes', rental_total_minutes,
+    'base_price_jpy', base_price_jpy,
+    'final_price_jpy', final_price_jpy,
+    'payment_status', payment_status,
+    'entitlement_status', entitlement_status,
+    'entitlement_balance_count', entitlement_balance_count,
+    'created_at', created_at,
+    'updated_at', updated_at
+  )::text
+FROM base;
+
+ROLLBACK;
+`);
+
+  const applicationContracts = acvParsePrefixedJsonRows(out)
+    .filter((row) => row.kind === "APPLICATION_CONTRACT")
+    .map((row) => row.value);
+
+  return {
+    ok: true,
+    status: 200,
+    owner_civilization_id: owner,
+    application_contracts: applicationContracts
+  };
+}
+
+function getApplicationContractDetail(req, applicationContractId) {
+  const contextResult = acvRequireCivilizationContextForRead(req);
+  if (!contextResult.ok) return contextResult;
+
+  if (!isUuidLike(applicationContractId)) {
+    return { ok: false, status: 400, error: "invalid_application_contract_id" };
+  }
+
+  const owner = contextResult.owner_civilization_id;
+
+  const selects = [
+    `
+SELECT 'APPLICATION_CONTRACT' AS row_kind, to_jsonb(c)::text
+FROM business.worker_rental_contract c
+WHERE c.owner_civilization_id = ${sqlUuid(owner)}
+  AND c.rental_contract_id = ${sqlUuid(applicationContractId)}
+`,
+    acvDetailUnionForTable("worker_rental_contract_line", "l", "LINE", owner, applicationContractId),
+    acvDetailUnionForTable("worker_rental_payment_intent", "pi", "PAYMENT_INTENT", owner, applicationContractId),
+    acvDetailUnionForTable("worker_rental_entitlement_grant", "eg", "ENTITLEMENT_GRANT", owner, applicationContractId),
+    acvDetailUnionForTable("worker_rental_entitlement_balance", "eb", "ENTITLEMENT_BALANCE", owner, applicationContractId),
+    acvDetailUnionForTable("worker_rental_entitlement_usage", "eu", "ENTITLEMENT_USAGE", owner, applicationContractId),
+    acvDetailUnionForTable("worker_rental_status_history", "sh", "STATUS_HISTORY", owner, applicationContractId),
+    acvDetailUnionForTable("worker_rental_period", "p", "PERIOD", owner, applicationContractId),
+    acvDetailUnionForTable("worker_rental_end_summary", "es", "END_SUMMARY", owner, applicationContractId)
+  ].filter(Boolean);
+
+  const out = psql(`
+BEGIN;
+SELECT set_config('app.current_civilization_id', ${sqlLit(owner)}, true);
+
+${selects.join("\nUNION ALL\n")};
+
+ROLLBACK;
+`);
+
+  const result = {
+    ok: true,
+    status: 200,
+    owner_civilization_id: owner,
+    application_contract: null,
+    lines: [],
+    payment_intents: [],
+    entitlement_grants: [],
+    entitlement_balances: [],
+    entitlement_usages: [],
+    status_history: [],
+    periods: [],
+    end_summaries: []
+  };
+
+  for (const row of acvParsePrefixedJsonRows(out)) {
+    if (row.kind === "APPLICATION_CONTRACT") result.application_contract = row.value;
+    else if (row.kind === "LINE") result.lines.push(row.value);
+    else if (row.kind === "PAYMENT_INTENT") result.payment_intents.push(row.value);
+    else if (row.kind === "ENTITLEMENT_GRANT") result.entitlement_grants.push(row.value);
+    else if (row.kind === "ENTITLEMENT_BALANCE") result.entitlement_balances.push(row.value);
+    else if (row.kind === "ENTITLEMENT_USAGE") result.entitlement_usages.push(row.value);
+    else if (row.kind === "STATUS_HISTORY") result.status_history.push(row.value);
+    else if (row.kind === "PERIOD") result.periods.push(row.value);
+    else if (row.kind === "END_SUMMARY") result.end_summaries.push(row.value);
+  }
+
+  if (!result.application_contract) {
+    return { ok: false, status: 404, error: "application_contract_not_found" };
+  }
+
+  return result;
+}
+// APPLICATION_CONTRACT_VIEWER_R2_END
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
+
+  // APPLICATION_CONTRACT_VIEWER_R2_ROUTE_START
+  if (req.method === "GET" && url.pathname === "/api/v1/business/application-contracts") {
+    try {
+      const result = listApplicationContracts(req, url);
+      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+    } catch (err) {
+      sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
+    }
+    return;
+  }
+
+  const applicationContractDetailMatch = url.pathname.match(/^\/api\/v1\/business\/application-contracts\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+  if (req.method === "GET" && applicationContractDetailMatch) {
+    try {
+      const result = getApplicationContractDetail(req, applicationContractDetailMatch[1]);
+      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+    } catch (err) {
+      sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
+    }
+    return;
+  }
+  // APPLICATION_CONTRACT_VIEWER_R2_ROUTE_END
 
   // AIWORKER_CONTRACT_VIEWER_R2_ROUTE_START
   if (req.method === "GET" && url.pathname === "/api/v1/business/robot-rental/contracts") {

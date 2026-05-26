@@ -46,9 +46,10 @@ export default function Page() {
         {
           id: "application-contract-view",
           label: "アプリケーション契約閲覧",
+  route: "/aiworker-menu/application-contracts",
           asset,
           position: "bottomRight",
-          status: "準備中",
+          status: "利用可能",
           ariaLabel: "アプリケーション契約閲覧 準備中",
         },
       ]}
