@@ -24,13 +24,14 @@ export default function Page() {
           ariaLabel: "前画面に戻る。戻れない場合はポータルトップ",
         },
         {
-          id: "persona-create",
-          label: "Persona作成",
-          asset,
-          position: "top",
-          status: "準備中",
-          ariaLabel: "Persona作成 Personaビルダー準備中",
-        },
+          {
+            id: "persona-create",
+            label: "Persona作成",
+            href: "/persona-menu/persona-create",
+            asset,
+            position: "top",
+            ariaLabel: "Persona作成メニューを開く",
+          },
         {
           id: "persona-update",
           label: "Persona変更",
