@@ -1,4 +1,5 @@
 // PORTAL_CONCEPT_MAP_NAV_R4
+// MULTILINGUAL_R2_R3_R2_PERSONA_SYNTAX_REPAIR
 import { ConceptMapPage } from "../../features/concept-map/concept-map-page";
 
 const asset = "/portal/concept-map/metallic-persona-green.svg";
@@ -24,14 +25,13 @@ export default function Page() {
           ariaLabel: "前画面に戻る。戻れない場合はポータルトップ",
         },
         {
-          {
-            id: "persona-create",
-            label: "Persona作成",
-            href: "/persona-menu/persona-create",
-            asset,
-            position: "top",
-            ariaLabel: "Persona作成メニューを開く",
-          },
+          id: "persona-create",
+          label: "Persona作成",
+          href: "/persona-menu/persona-create",
+          asset,
+          position: "top",
+          ariaLabel: "Persona作成メニューを開く",
+        },
         {
           id: "persona-update",
           label: "Persona変更",

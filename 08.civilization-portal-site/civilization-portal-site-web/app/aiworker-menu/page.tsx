@@ -2,6 +2,7 @@
 // PORTAL_AIWORKER_ROBOT_RENTAL_R1_R1
 // PORTAL_AIWORKER_MENU_R2
 // PORTAL_AIWORKER_MENU_R3
+// MULTILINGUAL_R2_R3_R2_AIWORKER_ROUTE_TO_HREF_REPAIR
 import { ConceptMapPage } from "../../features/concept-map/concept-map-page";
 
 const asset = "/portal/concept-map/metallic-aiworker-red.svg";
@@ -37,7 +38,7 @@ export default function Page() {
         {
           id: "aiworker-contract-view",
           label: "AI Worker契約閲覧",
-  route: "/aiworker-menu/aiworker-contracts",
+  href: "/aiworker-menu/aiworker-contracts",
           asset,
           position: "bottom",
           status: "利用可能",
@@ -46,7 +47,7 @@ export default function Page() {
         {
           id: "application-contract-view",
           label: "アプリケーション契約閲覧",
-  route: "/aiworker-menu/application-contracts",
+  href: "/aiworker-menu/application-contracts",
           asset,
           position: "bottomRight",
           status: "利用可能",
