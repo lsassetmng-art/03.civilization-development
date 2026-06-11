@@ -1,0 +1,717 @@
+------------------------------------------------------------
+FILE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/api/robot-rental-store-local-api.js
+11:function sendJson(res, status, obj) {
+20:  res.end(body);
+27:    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+146:  if (hasCol(cols, "recommended_role_codes")) {
+147:    const info = cols.get("recommended_role_codes");
+149:      return `COALESCE(array_to_string(${ident("recommended_role_codes")}, ','), '')`;
+151:    return `regexp_replace(COALESCE(${ident("recommended_role_codes")}::text, ''), '[\\[\\]\\{\\}"]', '', 'g')`;
+166:  if (code === "HD-R1C") return ["Friend"];
+195:  const conversation = new Set(["Friend", "Lover"]);
+202:function priceFor(roles, seriesCode) {
+209:  if (roles.includes("Helper") || roles.includes("Friend")) return 300;
+238:  if (String(modelCode).startsWith("BYD")) return "Beyondシリーズ。実務処理、レビュー、統合設計に向く業務系ロボット。";
+239:  return `${modelName || modelCode} のレンタル候補。`;
+304:    const price = priceFor(roles, seriesCode);
+316:      starting_price_jpy: price,
+317:      price_source: "prototype_default_until_price_catalog_connected",
+393:function quote(body, context) {
+448:  const subtotal = item.starting_price_jpy * duration * quantity;
+449:  const discount = body.use_free_ticket ? Math.min(subtotal, item.starting_price_jpy) : 0;
+460:    quote: {
+461:      quote_id: "dryrun-" + Date.now(),
+472:      price_source: item.price_source
+478:  const dry = quote(body, context);
+495:  const q = dry.quote;
+500:  const smokeLabel = shouldRollback ? "quote_rollback_smoke" : "quote_persist";
+506:WITH ins_contract AS (
+507:  INSERT INTO business.worker_rental_contract (
+521:    base_price_jpy,
+522:    applied_entitlement_count,
+525:    final_price_jpy,
+526:    contract_status,
+527:    price_version,
+550:    ${sqlLit("quoted")},
+551:    ${sqlLit(q.price_source || "prototype_default_until_price_catalog_connected")},
+554:      'source_endpoint', ${sqlLit(smokeLabel)},
+555:      'no_payment_yet', true,
+556:      'contract_confirmed', false,
+560:  RETURNING rental_contract_id, owner_civilization_id
+563:  INSERT INTO business.worker_rental_contract_line (
+564:    rental_contract_id,
+570:    unit_price_jpy,
+571:    amount_jpy,
+575:    rental_contract_id,
+583:    ${sqlLit(shouldRollback ? "rollback smoke quote" : "persistent quote")}
+584:  FROM ins_contract
+585:  RETURNING rental_contract_line_id
+589:    rental_contract_id,
+596:    rental_contract_id,
+599:    ${sqlLit("quoted")},
+600:    ${sqlLit(shouldRollback ? "rollback smoke" : "persistent quote")}
+601:  FROM ins_contract
+606:  (SELECT rental_contract_id::text FROM ins_contract),
+607:  (SELECT rental_contract_line_id::text FROM ins_line),
+620:      error: "quote_insert_result_missing",
+631:    contract_status: "quoted",
+633:    rental_contract_id: parts[1],
+634:    rental_contract_line_id: parts[2],
+636:    quote: q
+640:function confirmContract(body, context) {
+646:      error: contextCheck.error || "civilization_context_required_for_confirm",
+651:  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+652:  if (!isUuidLike(contractId)) {
+655:      error: "invalid_rental_contract_id"
+667:    rental_contract_id,
+674:    rental_ends_at,
+676:  FROM business.worker_rental_contract
+677:  WHERE rental_contract_id = ${sqlUuid(contractId)}
+679:    AND contract_status = 'quoted'
+683:  UPDATE business.worker_rental_contract c
+685:    contract_status = 'confirmed',
+689:        'confirmed_at', now(),
+690:        'confirm_source', 'RobotRentalStore',
+691:        'payment_required_later', true
+694:  WHERE c.rental_contract_id = t.rental_contract_id
+696:    c.rental_contract_id,
+698:    c.contract_status
+702:    rental_contract_id,
+709:    rental_contract_id,
+711:    'quoted',
+712:    'confirmed',
+713:    'user confirmed rental application'
+719:    rental_contract_id,
+727:    ends_at,
+729:    actual_ended_at,
+733:    rental_contract_id,
+739:    'pending',
+741:    rental_ends_at,
+753:  (SELECT rental_contract_id::text FROM upd),
+755:  (SELECT contract_status FROM upd),
+769:      error: "contract_not_found_or_not_quoted_or_owner_mismatch",
+770:      rental_contract_id: contractId,
+778:    rental_contract_id: parts[1],
+780:    contract_status: parts[3],
+783:    payment_status: "not_implemented",
+784:    next_action: "payment_or_start_flow"
+795:      error: contextCheck.error || "civilization_context_required_for_payment_intent",
+800:  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+801:  if (!isUuidLike(contractId)) {
+804:      error: "invalid_rental_contract_id"
+817:    rental_contract_id,
+820:    final_price_jpy
+821:  FROM business.worker_rental_contract
+822:  WHERE rental_contract_id = ${sqlUuid(contractId)}
+824:    AND contract_status = 'confirmed'
+829:    rental_payment_intent_id,
+830:    rental_contract_id,
+832:    amount_jpy,
+834:    payment_status,
+837:  FROM business.worker_rental_payment_intent
+838:  WHERE rental_contract_id = ${sqlUuid(contractId)}
+840:    AND payment_status = 'pending'
+845:  INSERT INTO business.worker_rental_payment_intent (
+846:    rental_contract_id,
+849:    amount_jpy,
+851:    payment_status,
+856:    rental_contract_id,
+859:    final_price_jpy,
+861:    'pending',
+863:    'robot-rental-local-' || rental_contract_id::text
+867:    rental_payment_intent_id,
+868:    rental_contract_id,
+870:    amount_jpy,
+872:    payment_status,
+878:    rental_payment_intent_id,
+879:    rental_contract_id,
+881:    amount_jpy,
+883:    payment_status,
+890:    rental_payment_intent_id,
+891:    rental_contract_id,
+893:    amount_jpy,
+895:    payment_status,
+903:  rental_payment_intent_id::text,
+904:  rental_contract_id::text,
+906:  amount_jpy::text,
+908:  payment_status,
+925:      error: "contract_not_found_or_not_confirmed_or_owner_mismatch",
+926:      rental_contract_id: contractId,
+934:    rental_payment_intent_id: parts[1],
+935:    rental_contract_id: parts[2],
+937:    amount_jpy: Number(parts[4]),
+939:    payment_status: parts[6],
+943:    next_action: "external_payment_provider_or_local_payment_flow"
+958:  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+959:  if (!isUuidLike(contractId)) {
+962:      error: "invalid_rental_contract_id"
+974:    rental_contract_id,
+976:    contract_status,
+978:  FROM business.worker_rental_contract
+979:  WHERE rental_contract_id = ${sqlUuid(contractId)}
+981:    AND contract_status = 'confirmed'
+986:    rental_payment_intent_id,
+987:    rental_contract_id,
+989:    payment_status
+990:  FROM business.worker_rental_payment_intent
+991:  WHERE rental_contract_id = ${sqlUuid(contractId)}
+993:    AND payment_status IN ('pending', 'authorized')
+998:  UPDATE business.worker_rental_payment_intent p
+1000:    payment_status = CASE
+1001:      WHEN p.payment_status = 'pending' THEN 'authorized'
+1002:      ELSE p.payment_status
+1006:  WHERE p.rental_payment_intent_id = pay.rental_payment_intent_id
+1008:    p.rental_payment_intent_id,
+1009:    p.payment_status
+1011:upd_contract AS (
+1012:  UPDATE business.worker_rental_contract c
+1014:    contract_status = 'active',
+1020:        'payment_provider_status', 'local_placeholder_authorized'
+1024:  WHERE c.rental_contract_id = t.rental_contract_id
+1026:    c.rental_contract_id,
+1028:    c.contract_status,
+1039:        WHEN upd_contract.rental_total_minutes IS NULL THEN NULL
+1040:        ELSE upd_contract.rental_total_minutes * 60
+1044:  FROM upd_contract
+1045:  WHERE p.rental_contract_id = upd_contract.rental_contract_id
+1046:    AND p.owner_civilization_id = upd_contract.owner_civilization_id
+1047:    AND p.period_status = 'pending'
+1056:    rental_contract_id,
+1063:    rental_contract_id,
+1065:    'confirmed',
+1068:  FROM upd_contract
+1073:  (SELECT rental_contract_id::text FROM upd_contract),
+1074:  (SELECT owner_civilization_id::text FROM upd_contract),
+1075:  (SELECT contract_status FROM upd_contract),
+1081:  (SELECT rental_payment_intent_id::text FROM pay_update),
+1082:  (SELECT payment_status FROM pay_update);
+1094:      error: "contract_not_confirmed_or_payment_intent_missing_or_owner_mismatch",
+1095:      rental_contract_id: contractId,
+1103:    rental_contract_id: parts[1],
+1105:    contract_status: parts[3],
+1111:    rental_payment_intent_id: parts[9],
+1112:    payment_status: parts[10],
+1117:function endRental(body, context) {
+1123:      error: contextCheck.error || "civilization_context_required_for_rental_end",
+1128:  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+1129:  const endedReason = String(body.ended_reason || "user ended rental").trim();
+1131:  if (!isUuidLike(contractId)) {
+1132:    return { ok: false, error: "invalid_rental_contract_id" };
+1143:    rental_contract_id,
+1151:    contract_status
+1152:  FROM business.worker_rental_contract
+1153:  WHERE rental_contract_id = ${sqlUuid(contractId)}
+1155:    AND contract_status = 'active'
+1161:    p.rental_contract_id,
+1167:    ON t.rental_contract_id = p.rental_contract_id
+1173:upd_contract AS (
+1174:  UPDATE business.worker_rental_contract c
+1176:    contract_status = 'ended',
+1180:        'ended_at', now(),
+1181:        'end_source', 'RobotRentalStore'
+1184:  WHERE c.rental_contract_id = t.rental_contract_id
+1186:    c.rental_contract_id,
+1194:    c.contract_status
+1199:    period_status = 'ended',
+1200:    actual_ended_at = COALESCE(p.actual_ended_at, now()),
+1209:    p.actual_ended_at::text AS actual_ended_at,
+1213:      FLOOR(EXTRACT(EPOCH FROM (COALESCE(p.actual_ended_at, now()) - p.actual_started_at)))
+1218:    rental_contract_id,
+1225:    rental_contract_id,
+1228:    'ended',
+1229:    ${sqlLit(endedReason)}
+1230:  FROM upd_contract
+1234:  INSERT INTO business.worker_rental_end_summary (
+1235:    rental_contract_id,
+1244:    ended_reason,
+1249:    c.rental_contract_id,
+1258:    ${sqlLit(endedReason)},
+1260:    'RobotRentalStore rental ended by user'
+1261:  FROM upd_contract c
+1263:  RETURNING rental_end_summary_id
+1267:  (SELECT rental_contract_id::text FROM upd_contract),
+1268:  (SELECT owner_civilization_id::text FROM upd_contract),
+1269:  (SELECT contract_status FROM upd_contract),
+1272:  (SELECT actual_ended_at FROM upd_period),
+1276:  (SELECT rental_end_summary_id::text FROM summary);
+1288:      error: "contract_not_active_or_active_period_missing_or_owner_mismatch",
+1289:      rental_contract_id: contractId,
+1297:    rental_contract_id: parts[1],
+1299:    contract_status: parts[3],
+1302:    actual_ended_at: parts[6],
+1306:    rental_end_summary_id: parts[10],
+1307:    next_action: "rental_ended"
+1312:function cancelRental(body, context) {
+1318:      error: contextCheck.error || "civilization_context_required_for_rental_cancel",
+1323:  const contractId = String(body.rental_contract_id || body.contract_id || "").trim();
+1324:  const cancelReason = String(body.cancel_reason || "user canceled rental").trim();
+1326:  if (!isUuidLike(contractId)) {
+1327:    return { ok: false, error: "invalid_rental_contract_id" };
+1338:    rental_contract_id,
+1340:    contract_status
+1341:  FROM business.worker_rental_contract
+1342:  WHERE rental_contract_id = ${sqlUuid(contractId)}
+1344:    AND contract_status IN ('quoted', 'confirmed')
+1347:upd_contract AS (
+1348:  UPDATE business.worker_rental_contract c
+1350:    contract_status = 'canceled',
+1354:        'canceled_at', now(),
+1355:        'cancel_source', 'RobotRentalStore',
+1356:        'cancel_reason', ${sqlLit(cancelReason)}
+1359:  WHERE c.rental_contract_id = t.rental_contract_id
+1361:    c.rental_contract_id,
+1363:    t.contract_status AS from_status,
+1364:    c.contract_status
+1369:    period_status = 'canceled',
+1370:    actual_ended_at = COALESCE(p.actual_ended_at, now()),
+1373:  FROM upd_contract c
+1374:  WHERE p.rental_contract_id = c.rental_contract_id
+1376:    AND p.period_status IN ('pending')
+1381:upd_payment AS (
+1382:  UPDATE business.worker_rental_payment_intent pi
+1384:    payment_status = 'canceled',
+1386:  FROM upd_contract c
+1387:  WHERE pi.rental_contract_id = c.rental_contract_id
+1389:    AND pi.payment_status IN ('pending', 'authorized')
+1391:    pi.rental_payment_intent_id,
+1392:    pi.payment_status
+1396:    rental_contract_id,
+1403:    rental_contract_id,
+1406:    'canceled',
+1407:    ${sqlLit(cancelReason)}
+1408:  FROM upd_contract
+1413:  (SELECT rental_contract_id::text FROM upd_contract),
+1414:  (SELECT owner_civilization_id::text FROM upd_contract),
+1415:  (SELECT from_status FROM upd_contract),
+1416:  (SELECT contract_status FROM upd_contract),
+1419:  COALESCE((SELECT rental_payment_intent_id::text FROM upd_payment LIMIT 1), ''),
+1420:  COALESCE((SELECT payment_status FROM upd_payment LIMIT 1), ''),
+1433:      error: "contract_not_cancelable_or_owner_mismatch",
+1434:      rental_contract_id: contractId,
+1442:    rental_contract_id: parts[1],
+1445:    contract_status: parts[4],
+1448:    rental_payment_intent_id: parts[7] || null,
+1449:    payment_status: parts[8] || null,
+1451:    next_action: "rental_canceled"
+1509:  const allowedStatuses = new Set(["", "quoted", "confirmed", "active", "ended", "canceled"]);
+1515:      error: "invalid_contract_status"
+1520:  const statusWhere = status ? `AND c.contract_status = ${sqlLit(status)}` : "";
+1528:    c.rental_contract_id,
+1537:    c.contract_status,
+1538:    c.base_price_jpy,
+1539:    c.final_price_jpy,
+1543:      SELECT pi.payment_status
+1544:      FROM business.worker_rental_payment_intent pi
+1546:        AND pi.rental_contract_id = c.rental_contract_id
+1549:    ) AS payment_status,
+1554:        AND p.rental_contract_id = c.rental_contract_id
+1562:        AND p.rental_contract_id = c.rental_contract_id
+1570:        AND sh.rental_contract_id = c.rental_contract_id
+1574:  FROM business.worker_rental_contract c
+1583:    'rental_contract_id', rental_contract_id,
+1592:    'contract_status', contract_status,
+1593:    'base_price_jpy', base_price_jpy,
+1594:    'final_price_jpy', final_price_jpy,
+1597:    'payment_status', payment_status,
+1607:  const contracts = parsePrefixedJsonRows(out)
+1615:    contracts
+1627:      error: "invalid_rental_contract_id"
+1638:FROM business.worker_rental_contract c
+1640:  AND c.rental_contract_id = ${sqlUuid(rentalContractId)}
+1645:FROM business.worker_rental_contract_line l
+1647:  AND l.rental_contract_id = ${sqlUuid(rentalContractId)}
+1654:  AND p.rental_contract_id = ${sqlUuid(rentalContractId)}
+1659:FROM business.worker_rental_payment_intent pi
+1661:  AND pi.rental_contract_id = ${sqlUuid(rentalContractId)}
+1668:  AND sh.rental_contract_id = ${sqlUuid(rentalContractId)}
+1673:FROM business.worker_rental_end_summary es
+1675:  AND es.rental_contract_id = ${sqlUuid(rentalContractId)}
+1682:  AND ul.rental_contract_id = ${sqlUuid(rentalContractId)}
+1689:  AND se.rental_contract_id = ${sqlUuid(rentalContractId)};
+1698:    contract: null,
+1701:    payment_intents: [],
+1703:    end_summaries: [],
+1709:    if (row.kind === "CONTRACT") result.contract = row.value;
+1712:    else if (row.kind === "PAYMENT_INTENT") result.payment_intents.push(row.value);
+1714:    else if (row.kind === "END_SUMMARY") result.end_summaries.push(row.value);
+1719:  if (!result.contract) {
+1723:      error: "contract_not_found"
+1794:  if (!acvHasCols("worker_rental_payment_intent", ["owner_civilization_id", "rental_contract_id", "payment_status"])) {
+1797:  const order = acvHasCols("worker_rental_payment_intent", ["created_at"]) ? "ORDER BY pi.created_at DESC" : "";
+1799:    SELECT pi.payment_status
+1800:    FROM business.worker_rental_payment_intent pi
+1802:      AND pi.rental_contract_id = c.rental_contract_id
+1809:  if (!acvHasCols("worker_rental_entitlement_grant", ["owner_civilization_id", "rental_contract_id", "grant_status"])) {
+1812:  const order = acvHasCols("worker_rental_entitlement_grant", ["created_at"]) ? "ORDER BY eg.created_at DESC" : "";
+1815:    FROM business.worker_rental_entitlement_grant eg
+1817:      AND eg.rental_contract_id = c.rental_contract_id
+1824:  if (!acvHasCols("worker_rental_entitlement_balance", ["owner_civilization_id", "rental_contract_id"])) {
+1829:    FROM business.worker_rental_entitlement_balance eb
+1831:      AND eb.rental_contract_id = c.rental_contract_id
+1835:function acvDetailUnionForTable(tableName, aliasName, rowKind, owner, contractId) {
+1836:  if (!acvHasCols(tableName, ["owner_civilization_id", "rental_contract_id"])) {
+1844:  AND ${aliasName}.rental_contract_id = ${sqlUuid(contractId)}
+1857:  const allowedStatuses = new Set(["", "quoted", "confirmed", "active", "ended", "canceled"]);
+1859:    return { ok: false, status: 400, error: "invalid_contract_status" };
+1862:  const statusWhere = status ? `AND c.contract_status = ${sqlLit(status)}` : "";
+1865:  const paymentStatusExpr = acvOptionalLatestPaymentStatusSql();
+1866:  const entitlementStatusExpr = acvOptionalLatestEntitlementStatusSql();
+1867:  const entitlementBalanceCountExpr = acvOptionalEntitlementBalanceCountSql();
+1875:    c.rental_contract_id,
+1879:    c.contract_status,
+1885:    c.base_price_jpy,
+1886:    c.final_price_jpy,
+1889:    ${paymentStatusExpr} AS payment_status,
+1890:    ${entitlementStatusExpr} AS entitlement_status,
+1891:    ${entitlementBalanceCountExpr} AS entitlement_balance_count
+1892:  FROM business.worker_rental_contract c
+1902:    'application_contract_id', rental_contract_id,
+1903:    'rental_contract_id', rental_contract_id,
+1907:    'contract_status', contract_status,
+1913:    'base_price_jpy', base_price_jpy,
+1914:    'final_price_jpy', final_price_jpy,
+1915:    'payment_status', payment_status,
+1916:    'entitlement_status', entitlement_status,
+1917:    'entitlement_balance_count', entitlement_balance_count,
+1934:    application_contracts: applicationContracts
+1943:    return { ok: false, status: 400, error: "invalid_application_contract_id" };
+1951:FROM business.worker_rental_contract c
+1953:  AND c.rental_contract_id = ${sqlUuid(applicationContractId)}
+1955:    acvDetailUnionForTable("worker_rental_contract_line", "l", "LINE", owner, applicationContractId),
+1956:    acvDetailUnionForTable("worker_rental_payment_intent", "pi", "PAYMENT_INTENT", owner, applicationContractId),
+1957:    acvDetailUnionForTable("worker_rental_entitlement_grant", "eg", "ENTITLEMENT_GRANT", owner, applicationContractId),
+1958:    acvDetailUnionForTable("worker_rental_entitlement_balance", "eb", "ENTITLEMENT_BALANCE", owner, applicationContractId),
+1959:    acvDetailUnionForTable("worker_rental_entitlement_usage", "eu", "ENTITLEMENT_USAGE", owner, applicationContractId),
+1962:    acvDetailUnionForTable("worker_rental_end_summary", "es", "END_SUMMARY", owner, applicationContractId)
+1978:    application_contract: null,
+1980:    payment_intents: [],
+1981:    entitlement_grants: [],
+1982:    entitlement_balances: [],
+1983:    entitlement_usages: [],
+1986:    end_summaries: []
+1990:    if (row.kind === "APPLICATION_CONTRACT") result.application_contract = row.value;
+1992:    else if (row.kind === "PAYMENT_INTENT") result.payment_intents.push(row.value);
+1993:    else if (row.kind === "ENTITLEMENT_GRANT") result.entitlement_grants.push(row.value);
+1994:    else if (row.kind === "ENTITLEMENT_BALANCE") result.entitlement_balances.push(row.value);
+1995:    else if (row.kind === "ENTITLEMENT_USAGE") result.entitlement_usages.push(row.value);
+1998:    else if (row.kind === "END_SUMMARY") result.end_summaries.push(row.value);
+2001:  if (!result.application_contract) {
+2002:    return { ok: false, status: 404, error: "application_contract_not_found" };
+2014:  if (req.method === "GET" && url.pathname === "/api/v1/business/application-contracts") {
+2017:      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+2019:      sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
+2024:  const applicationContractDetailMatch = url.pathname.match(/^\/api\/v1\/business\/application-contracts\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+2028:      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+2030:      sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
+2037:  if (req.method === "GET" && url.pathname === "/api/v1/business/robot-rental/contracts") {
+2040:      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+2042:      sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
+2047:  const aiworkerContractDetailMatch = url.pathname.match(/^\/api\/v1\/business\/robot-rental\/contracts\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+2051:      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+2053:      sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
+2060:      sendJson(res, 200, { ok: true });
+2065:      sendJson(res, 200, {
+2071:        quote_persist_enabled: false,
+2072:        contract_confirm_enabled: false,
+2080:      sendJson(res, 200, {
+2095:        sendJson(res, 404, {
+2103:      sendJson(res, 200, {
+2111:    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/rentals/cancel") {
+2115:      const result = cancelRental(body, context);
+2116:      sendJson(res, result.ok ? 200 : 400, result);
+2120:    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/rentals/end") {
+2124:      const result = endRental(body, context);
+2125:      sendJson(res, result.ok ? 200 : 400, result);
+2134:      sendJson(res, result.ok ? 200 : 400, result);
+2138:    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/payments/intent/create") {
+2143:      sendJson(res, result.ok ? 200 : 400, result);
+2147:    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/contracts/confirm") {
+2151:      const result = confirmContract(body, context);
+2152:      sendJson(res, result.ok ? 200 : 400, result);
+2156:    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/quote/persist") {
+2161:      sendJson(res, result.ok ? 200 : 400, result);
+2165:    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/quote/rollback-smoke") {
+2170:      sendJson(res, result.ok ? 200 : 400, result);
+2174:    if (req.method === "POST" && url.pathname === "/api/v1/business/robot-rental/quote") {
+2178:      const result = quote(body, context);
+2179:      sendJson(res, result.ok ? 200 : 400, result);
+2183:    sendJson(res, 404, {
+2189:    sendJson(res, 500, {
+------------------------------------------------------------
+FILE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/ui/static/application-contracts.html
+6:  <title>アプリケーション契約閲覧</title>
+98:    .contract-card {
+108:    .contract-card:hover {
+112:    .contract-card.active {
+145:    .badge.ended { background: #f2f4f7; color: #475467; }
+146:    .badge.canceled { background: var(--danger); color: #be123c; }
+147:    .badge.confirmed { background: #eff8ff; color: #175cd3; }
+148:    .badge.quoted { background: var(--warn); color: #b45309; }
+259:    <h1>アプリケーション契約閲覧</h1>
+260:    <p>現在のログイン状態に紐づくアプリケーション契約を確認できます。一覧から契約を選択すると詳細を表示します。</p>
+264:    <section class="panel" aria-label="アプリケーション契約一覧">
+265:      <h2>契約一覧</h2>
+271:            <option value="quoted">見積保存済み</option>
+272:            <option value="confirmed">申込確定済み</option>
+273:            <option value="active">利用中</option>
+274:            <option value="ended">利用終了</option>
+275:            <option value="canceled">キャンセル済み</option>
+286:      <div id="listStatus" class="loading">契約一覧を読み込み中です。</div>
+287:      <div id="contractList" class="list" aria-live="polite"></div>
+290:    <section class="panel" aria-label="アプリケーション契約詳細">
+292:        <div class="empty">左の契約一覧から確認したい契約を選択してください。</div>
+302:      quoted: "見積保存済み",
+303:      confirmed: "申込確定済み",
+304:      active: "利用中",
+305:      ended: "利用終了",
+306:      canceled: "キャンセル済み"
+383:    function refreshAppFilter(contracts) {
+386:      const apps = Array.from(new Set(contracts.map((c) => c.app_code).filter(Boolean))).sort();
+397:    function renderContracts(contracts) {
+398:      const root = document.getElementById("contractList");
+401:      if (!contracts.length) {
+402:        setListStatus("empty", "表示できる契約はありません。");
+411:      for (const contract of contracts) {
+412:        const id = contract.application_contract_id || contract.rental_contract_id;
+413:        const state = contract.contract_status || "";
+416:        card.className = "contract-card" + (id === selectedContractId ? " active" : "");
+417:        card.dataset.contractId = id;
+421:              '<div class="card-title">' + safe(contract.app_code) + '</div>',
+422:              '<div class="card-sub">' + safe(contract.service_code) + '</div>',
+427:            '<div class="summary-item"><span>金額</span><strong>' + safe(money(contract.final_price_jpy)) + '</strong></div>',
+428:            '<div class="summary-item"><span>決済</span><strong>' + safe(contract.payment_status || "-") + '</strong></div>',
+429:            '<div class="summary-item"><span>権限</span><strong>' + safe(contract.entitlement_status || contract.entitlement_balance_count || "-") + '</strong></div>',
+430:            '<div class="summary-item"><span>更新日</span><strong>' + safe(dateText(contract.updated_at)) + '</strong></div>',
+435:        root.appendChild(card);
+440:      setListStatus("loading", "契約一覧を読み込み中です。");
+441:      document.getElementById("contractList").innerHTML = "";
+452:        const payload = await fetchJson("/api/v1/business/application-contracts" + suffix);
+453:        latestContracts = payload.application_contracts || [];
+456:        renderContracts(latestContracts);
+458:        setListStatus("error", "契約一覧を取得できませんでした: " + (err.message || err));
+466:    function renderMiniList(title, rows, fields) {
+481:    function renderDetail(payload) {
+482:      const contract = payload.application_contract;
+488:            '<div class="detail-title">' + safe(contract.app_code) + '</div>',
+489:            '<div class="detail-sub">契約ID: ' + safe(contract.rental_contract_id) + '</div>',
+491:          '<span class="badge ' + safe(contract.contract_status) + '">' + safe(statusLabel(contract.contract_status)) + '</span>',
+494:        '<div class="section"><h3>契約情報</h3>',
+495:          kv("アプリ", contract.app_code),
+496:          kv("サービス", contract.service_code),
+497:          kv("状態", statusLabel(contract.contract_status)),
+498:          kv("ロボットモデル", contract.aiworker_model_code),
+499:          kv("ロール", contract.role_code),
+500:          kv("レンタル単位", contract.rental_unit_kind),
+501:          kv("数量", contract.rental_unit_count),
+502:          kv("総分数", contract.rental_total_minutes),
+503:          kv("基本金額", money(contract.base_price_jpy)),
+504:          kv("最終金額", money(contract.final_price_jpy)),
+505:          kv("作成日", dateText(contract.created_at)),
+506:          kv("更新日", dateText(contract.updated_at)),
+509:        renderMiniList("明細", payload.lines, [
+512:          { key: "unit_price_jpy", label: "単価", format: money },
+513:          { key: "amount_jpy", label: "金額", format: money }
+516:        renderMiniList("決済情報", payload.payment_intents, [
+517:          { key: "payment_status", label: "状態" },
+518:          { key: "amount_jpy", label: "金額", format: money },
+523:        renderMiniList("権限付与", payload.entitlement_grants, [
+525:          { key: "entitlement_kind", label: "種別" },
+530:        renderMiniList("権限残高", payload.entitlement_balances, [
+531:          { key: "entitlement_kind", label: "種別" },
+537:        renderMiniList("権限利用", payload.entitlement_usages, [
+538:          { key: "entitlement_kind", label: "種別" },
+539:          { key: "quantity_used", label: "利用数" },
+544:        renderMiniList("利用期間", payload.periods, [
+547:          { key: "actual_ended_at", label: "終了", format: dateText },
+551:        renderMiniList("ステータス履歴", payload.status_history, [
+558:        renderMiniList("終了サマリー", payload.end_summaries, [
+559:          { key: "ended_reason", label: "終了理由" },
+560:          { key: "used_seconds", label: "利用秒数" },
+573:      document.querySelectorAll(".contract-card").forEach((card) => {
+574:        card.classList.toggle("active", card.dataset.contractId === id);
+578:      root.innerHTML = '<div class="loading">契約詳細を読み込み中です。</div>';
+581:        const payload = await fetchJson("/api/v1/business/application-contracts/" + encodeURIComponent(id));
+582:        renderDetail(payload);
+584:        root.innerHTML = '<div class="error">契約詳細を取得できませんでした: ' + safe(err.message || err) + '</div>';
+------------------------------------------------------------
+FILE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/ui/static/contracts.html
+6:  <title>AI Worker契約閲覧</title>
+98:    .contract-card {
+108:    .contract-card:hover {
+112:    .contract-card.active {
+145:    .badge.ended { background: #f2f4f7; color: #475467; }
+146:    .badge.canceled { background: var(--danger); color: #be123c; }
+147:    .badge.confirmed { background: #eff8ff; color: #175cd3; }
+148:    .badge.quoted { background: var(--warn); color: #b45309; }
+269:    <h1>AI Worker契約閲覧</h1>
+270:    <p>現在のログイン状態に紐づくAI Worker契約を確認できます。一覧から契約を選択すると詳細を表示します。</p>
+274:    <section class="panel" aria-label="契約一覧">
+275:      <h2>契約一覧</h2>
+281:            <option value="quoted">見積保存済み</option>
+282:            <option value="confirmed">申込確定済み</option>
+283:            <option value="active">利用中</option>
+284:            <option value="ended">利用終了</option>
+285:            <option value="canceled">キャンセル済み</option>
+290:      <div id="listStatus" class="loading">契約一覧を読み込み中です。</div>
+291:      <div id="contractList" class="list" aria-live="polite"></div>
+294:    <section class="panel" aria-label="契約詳細">
+296:        <div class="empty">左の契約一覧から確認したい契約を選択してください。</div>
+306:      quoted: "見積保存済み",
+307:      confirmed: "申込確定済み",
+308:      active: "利用中",
+309:      ended: "利用終了",
+310:      canceled: "キャンセル済み"
+385:    function renderContracts(contracts) {
+386:      const root = document.getElementById("contractList");
+389:      if (!contracts.length) {
+390:        setListStatus("empty", "表示できる契約はありません。");
+398:      for (const contract of contracts) {
+399:        const id = contract.rental_contract_id;
+400:        const status = contract.contract_status || "";
+403:        card.className = "contract-card" + (id === selectedContractId ? " active" : "");
+404:        card.dataset.contractId = id;
+408:              '<div class="card-title">' + safe(contract.aiworker_model_code) + ' / ' + safe(contract.role_code) + '</div>',
+409:              '<div class="card-sub">' + safe(contract.rental_unit_kind) + ' × ' + safe(contract.rental_unit_count) + ' / ' + safe(contract.rental_total_minutes) + '分</div>',
+414:            '<div class="summary-item"><span>金額</span><strong>' + safe(money(contract.final_price_jpy)) + '</strong></div>',
+415:            '<div class="summary-item"><span>決済</span><strong>' + safe(contract.payment_status || "-") + '</strong></div>',
+416:            '<div class="summary-item"><span>利用状態</span><strong>' + safe(contract.period_status || "-") + '</strong></div>',
+417:            '<div class="summary-item"><span>更新日</span><strong>' + safe(dateText(contract.updated_at)) + '</strong></div>',
+422:        root.appendChild(card);
+428:      setListStatus("loading", "契約一覧を読み込み中です。");
+429:      document.getElementById("contractList").innerHTML = "";
+435:        const payload = await fetchJson("/api/v1/business/robot-rental/contracts" + query);
+436:        renderContracts(payload.contracts || []);
+438:        setListStatus("error", "契約一覧を取得できませんでした: " + (err.message || err));
+446:    function renderMiniList(title, rows, fields) {
+458:    function renderDetail(payload) {
+459:      const contract = payload.contract;
+465:            '<div class="detail-title">' + safe(contract.aiworker_model_code) + ' / ' + safe(contract.role_code) + '</div>',
+466:            '<div class="detail-sub">契約ID: ' + safe(contract.rental_contract_id) + '</div>',
+468:          '<span class="badge ' + safe(contract.contract_status) + '">' + safe(statusLabel(contract.contract_status)) + '</span>',
+471:        '<div class="section"><h3>契約情報</h3>',
+472:          kv("サービス", contract.service_code),
+473:          kv("レンタル単位", contract.rental_unit_kind),
+474:          kv("数量", contract.rental_unit_count),
+475:          kv("総分数", contract.rental_total_minutes),
+476:          kv("基本金額", money(contract.base_price_jpy)),
+477:          kv("最終金額", money(contract.final_price_jpy)),
+478:          kv("開始予定", dateText(contract.rental_starts_at)),
+479:          kv("終了予定", dateText(contract.rental_ends_at)),
+480:          kv("作成日", dateText(contract.created_at)),
+481:          kv("更新日", dateText(contract.updated_at)),
+484:        renderMiniList("明細", payload.lines, [
+487:          { key: "unit_price_jpy", label: "単価", format: money },
+488:          { key: "amount_jpy", label: "金額", format: money }
+491:        renderMiniList("利用期間", payload.periods, [
+494:          { key: "actual_ended_at", label: "終了", format: dateText },
+498:        renderMiniList("決済", payload.payment_intents, [
+499:          { key: "payment_status", label: "状態" },
+500:          { key: "amount_jpy", label: "金額", format: money },
+505:        renderMiniList("ステータス履歴", payload.status_history, [
+512:        renderMiniList("終了サマリー", payload.end_summaries, [
+513:          { key: "ended_reason", label: "終了理由" },
+514:          { key: "used_seconds", label: "利用秒数" },
+519:        renderMiniList("利用ログ", payload.usage_logs, [
+526:        renderMiniList("安全イベント", payload.safety_events, [
+541:      document.querySelectorAll(".contract-card").forEach((card) => {
+542:        card.classList.toggle("active", card.dataset.contractId === id);
+546:      root.innerHTML = '<div class="loading">契約詳細を読み込み中です。</div>';
+549:        const payload = await fetchJson("/api/v1/business/robot-rental/contracts/" + encodeURIComponent(id));
+550:        renderDetail(payload);
+552:        root.innerHTML = '<div class="error">契約詳細を取得できませんでした: ' + safe(err.message || err) + '</div>';
+------------------------------------------------------------
+FILE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/ui/static/index.html
+6:  <title>RobotRentalStore - ロボットレンタル</title>
+43:    .price { margin: 12px 0; font-weight: 800; font-size: 18px; }
+58:    <h1>ロボットレンタル</h1>
+59:    <p>仕事・雑談・接客・補助に使えるAIロボットを選んでレンタルします。</p>
+62:      <span class="badge">ロボットレンタル</span>
+63:      <span class="badge">利用開始対応</span>
+65:    <div id="apiStatus" class="status">ロボット一覧を読み込み中...</div>
+90:        <option>Friend</option>
+107:        見積保存、申込確定、決済予定作成、利用開始の順に進めます。
+112:      <h2>レンタル可能ロボット</h2>
+120:      <label>レンタル単位</label>
+138:        <button onclick="saveQuotePersist()">見積を保存</button>
+139:        <button onclick="confirmContract()">申込を確定</button>
+140:        <button onclick="createPaymentIntent()">決済へ進む</button>
+141:        <button onclick="cancelRental()">申込をキャンセル</button>
+142:        <button onclick="startRental()">利用開始</button>
+143:        <button onclick="endRental()">利用終了</button>
+147:      <div id="saveResult" class="note">見積保存後、申込確定・決済・利用開始へ進めます。</div>
+156:      { model_code: "HD-R3", model_name_ja: "ワーカー", series_code: "HD", manufacturer_code: "helios_dynamics", role_codes: ["Worker"], starting_price_jpy: 500, rental_units: ["hour","day","month"], safety_group: "business", short_description: "汎用AIワーカー。", safety_note: "業務系ロールです。" },
+157:      { model_code: "LVS-12Fv015", model_name_ja: "ビジネスヤンデレ", series_code: "LoVerS", manufacturer_code: "lavi_corporation", role_codes: ["Lover"], starting_price_jpy: 500, rental_units: ["minute","hour"], safety_group: "conversation", short_description: "擬似恋人型演出ロール。", safety_note: "実在恋愛・成人向け性的サービス・監視・脅し・依存誘導は禁止です。" },
+158:      { model_code: "HD-R2S", model_name_ja: "スナイパー", series_code: "HD", manufacturer_code: "helios_dynamics", role_codes: ["CombatSpecialist","Security","Battler"], starting_price_jpy: 800, rental_units: ["hour","day"], safety_group: "combat_security_crisis", short_description: "戦闘専門系。", safety_note: "現実の危害実行支援ではなく、フィクション・警備設計・危機対応・世界観用途に限定します。" }
+170:      if (["Friend", "Lover"].includes(role)) return "chip conversation";
+178:        status.textContent = "ロボット一覧を読み込み中...";
+184:        status.textContent = `${robots.length}件のロボットを表示中`;
+188:        status.textContent = "ロボット一覧を表示中";
+190:      renderCards();
+191:      renderDetail();
+217:    function renderCards() {
+225:          <div class="price">¥${Number(r.starting_price_jpy || 0).toLocaleString()}〜</div>
+234:      renderDetail();
+236:      document.getElementById("saveResult").textContent = "見積保存後、申込確定・決済・利用開始へ進めます。";
+243:    function renderDetail() {
+245:        document.getElementById("detail").innerHTML = `<div class="note">ロボットを選択してください。</div>`;
+266:      if (!selected) throw new Error("ロボット未選択");
+284:      const subtotal = Number(selected.starting_price_jpy || 0) * qty * duration;
+289:    function renderMessage(html, ok = true) {
+298:      const ok = confirm("見積を保存します。よろしいですか？");
+302:        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/quote/persist`, {
+309:        if (!json.ok) throw new Error(json.error || "保存に失敗しました");
+311:        const q = json.quote || {};
+312:        savedRentalContractId = json.rental_contract_id || "";
+316:        renderMessage(`
+317:          <strong>見積を保存しました</strong><br>
+318:          見積番号: ${savedRentalContractId || "-"}<br>
+319:          状態: ${json.contract_status || "quoted"}<br>
+323:        renderMessage(`見積保存失敗: ${err.message}`, false);
+327:    async function confirmContract() {
+329:        alert("先に見積を保存してください。");
+333:      const ok = confirm("申込を確定します。よろしいですか？");
+337:        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/contracts/confirm`, {
+340:          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+344:        if (!json.ok) throw new Error(json.error || "申込確定に失敗しました");
+346:        renderMessage(`
+347:          <strong>申込を確定しました</strong><br>
+348:          申込番号: ${json.rental_contract_id || "-"}<br>
+349:          状態: ${json.contract_status || "confirmed"}<br>
+350:          次の手続き: 決済へ進む
+353:        renderMessage(`申込確定失敗: ${err.message}`, false);
+359:        alert("先に見積保存と申込確定を行ってください。");
+363:      const ok = confirm("決済予定を作成します。よろしいですか？");
+367:        const res = await fetch(`${API_BASE}/api/v1/business/robot-rental/payments/intent/create`, {
+370:          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+374:        if (!json.ok) throw new Error(json.error || "決済予定の作成に失敗しました");
+376:        renderMessage(`
+377:          <strong>決済予定を作成しました</strong><br>
+378:          決済予定番号: ${json.rental_payment_intent_id || "-"}<br>
+379:          金額: ¥${Number(json.amount_jpy || 0).toLocaleString()}<br>
+380:          状態: ${json.payment_status || "pending"}
+383:        renderMessage(`決済予定作成失敗: ${err.message}`, false);
+389:        alert("先に見積保存、申込確定、決済予定作成を行ってください。");
+393:      const ok = confirm("利用を開始します。よろしいですか？");
+400:          body: JSON.stringify({ rental_contract_id: savedRentalContractId })
+404:        if (!json.ok) throw new Error(json.error || "利用開始に失敗しました");
+406:        renderMessage(`
+407:          <strong>利用開始しました</strong><br>
+408:          契約番号: ${json.rental_contract_id || "-"}<br>
+409:          状態: ${json.contract_status || "active"}<br>
+410:          レンタル状態: ${json.period_status || "active"}<br>
+414:        renderMessage(`利用開始失敗: ${err.message}`, false);
+418:    document.getElementById("seriesFilter").addEventListener("change", renderCards);
+419:    document.getElementById("roleFilter").addEventListener("change", renderCards);
+420:    document.getElementById("searchInput").addEventListener("input", renderCards);
+426:async function endRental(){
+427:  if(!savedRentalContractId){alert("先に利用開始まで進めてください。");return;}
+428:  if(!confirm("利用を終了します。よろしいですか？"))return;
+430:    const json=await postJson("/api/v1/business/robot-rental/rentals/end",{rental_contract_id:savedRentalContractId,ended_reason:"user ended rental"});
+431:    renderMessage(`<strong>利用終了しました</strong><br>契約番号: ${json.rental_contract_id}<br>状態: ${json.contract_status||"ended"}<br>レンタル状態: ${json.period_status||"ended"}<br>利用秒数: ${json.used_seconds??"-"}`);
+432:  }catch(e){renderMessage(`利用終了失敗: ${e.message}`,false);}
+436:async function cancelRental(){
+437:  if(!savedRentalContractId){alert("先に見積を保存してください。");return;}
+438:  if(!confirm("申込をキャンセルします。よろしいですか？"))return;
+440:    const json=await postJson("/api/v1/business/robot-rental/rentals/cancel",{rental_contract_id:savedRentalContractId,cancel_reason:"user canceled rental"});
+441:    renderMessage(`<strong>申込をキャンセルしました</strong><br>契約番号: ${json.rental_contract_id}<br>変更前: ${json.from_status||"-"}<br>状態: ${json.contract_status||"canceled"}`);
+442:  }catch(e){renderMessage(`キャンセル失敗: ${e.message}`,false);}

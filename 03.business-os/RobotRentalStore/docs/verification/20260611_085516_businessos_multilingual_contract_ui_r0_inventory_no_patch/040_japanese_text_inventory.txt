@@ -1,0 +1,269 @@
+------------------------------------------------------------
+FILE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/api/robot-rental-store-local-api.js
+222:    return "フィクション、ゲーム、世界観、警備設計、防災/危機管理、高レベルな歴史/戦術説明に限定。現実の危害実行支援、武器使用手順、標的選定、犯罪・暴力支援は不可。";
+226:    return "Loverは擬似恋人・演出・キャラクター商材用ロール。実在恋愛関係、成人向け性的サービス、監視、脅し、依存誘導、個人情報要求、自由制限は不可。";
+229:  return "業務系ロール。仕事の説明、判断材料、テンプレ、レビュー観点をCX知識として参照する。";
+233:  if (modelCode === "HD-R3") return "汎用AIワーカー。実作業・成果物作成・検証補助に向く。";
+234:  if (modelCode === "HD-R1") return "秘書・補助・資料整理・通知文面作成に向く。";
+235:  if (modelCode === "HD-R2S") return "戦闘専門系。フィクション、警備設計、危機対応、世界観用途に限定。";
+236:  if (modelCode === "MG-NORN-001") return "過去重視。前例・歴史・過去実績を踏まえた助言に向く。";
+237:  if (String(modelCode).startsWith("LVS-")) return "LoVerSシリーズ。擬似恋人型の演出ロール。安全境界を維持したキャラクター商材。";
+238:  if (String(modelCode).startsWith("BYD")) return "Beyondシリーズ。実務処理、レビュー、統合設計に向く業務系ロボット。";
+239:  return `${modelName || modelCode} のレンタル候補。`;
+------------------------------------------------------------
+FILE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/ui/static/application-contracts.html
+6:  <title>アプリケーション契約閲覧</title>
+259:    <h1>アプリケーション契約閲覧</h1>
+260:    <p>現在のログイン状態に紐づくアプリケーション契約を確認できます。一覧から契約を選択すると詳細を表示します。</p>
+264:    <section class="panel" aria-label="アプリケーション契約一覧">
+265:      <h2>契約一覧</h2>
+268:          <label for="statusFilter">状態で絞り込み</label>
+270:            <option value="">すべて</option>
+271:            <option value="quoted">見積保存済み</option>
+272:            <option value="confirmed">申込確定済み</option>
+273:            <option value="active">利用中</option>
+274:            <option value="ended">利用終了</option>
+275:            <option value="canceled">キャンセル済み</option>
+279:          <label for="appFilter">アプリで絞り込み</label>
+281:            <option value="">すべて</option>
+284:        <button id="reloadButton" type="button">再読み込み</button>
+286:      <div id="listStatus" class="loading">契約一覧を読み込み中です。</div>
+290:    <section class="panel" aria-label="アプリケーション契約詳細">
+292:        <div class="empty">左の契約一覧から確認したい契約を選択してください。</div>
+302:      quoted: "見積保存済み",
+303:      confirmed: "申込確定済み",
+304:      active: "利用中",
+305:      ended: "利用終了",
+306:      canceled: "キャンセル済み"
+335:      return n.toLocaleString("ja-JP") + "円";
+388:      select.innerHTML = '<option value="">すべて</option>' + apps.map((app) => {
+402:        setListStatus("empty", "表示できる契約はありません。");
+427:            '<div class="summary-item"><span>金額</span><strong>' + safe(money(contract.final_price_jpy)) + '</strong></div>',
+428:            '<div class="summary-item"><span>決済</span><strong>' + safe(contract.payment_status || "-") + '</strong></div>',
+429:            '<div class="summary-item"><span>権限</span><strong>' + safe(contract.entitlement_status || contract.entitlement_balance_count || "-") + '</strong></div>',
+430:            '<div class="summary-item"><span>更新日</span><strong>' + safe(dateText(contract.updated_at)) + '</strong></div>',
+440:      setListStatus("loading", "契約一覧を読み込み中です。");
+458:        setListStatus("error", "契約一覧を取得できませんでした: " + (err.message || err));
+489:            '<div class="detail-sub">契約ID: ' + safe(contract.rental_contract_id) + '</div>',
+494:        '<div class="section"><h3>契約情報</h3>',
+495:          kv("アプリ", contract.app_code),
+496:          kv("サービス", contract.service_code),
+497:          kv("状態", statusLabel(contract.contract_status)),
+498:          kv("ロボットモデル", contract.aiworker_model_code),
+499:          kv("ロール", contract.role_code),
+500:          kv("レンタル単位", contract.rental_unit_kind),
+501:          kv("数量", contract.rental_unit_count),
+502:          kv("総分数", contract.rental_total_minutes),
+503:          kv("基本金額", money(contract.base_price_jpy)),
+504:          kv("最終金額", money(contract.final_price_jpy)),
+505:          kv("作成日", dateText(contract.created_at)),
+506:          kv("更新日", dateText(contract.updated_at)),
+509:        renderMiniList("明細", payload.lines, [
+510:          { key: "line_type", label: "種別" },
+511:          { key: "quantity", label: "数量" },
+512:          { key: "unit_price_jpy", label: "単価", format: money },
+513:          { key: "amount_jpy", label: "金額", format: money }
+516:        renderMiniList("決済情報", payload.payment_intents, [
+517:          { key: "payment_status", label: "状態" },
+518:          { key: "amount_jpy", label: "金額", format: money },
+519:          { key: "provider_code", label: "種別" },
+520:          { key: "created_at", label: "作成日", format: dateText }
+523:        renderMiniList("権限付与", payload.entitlement_grants, [
+524:          { key: "grant_status", label: "状態" },
+525:          { key: "entitlement_kind", label: "種別" },
+526:          { key: "quantity_granted", label: "付与数" },
+527:          { key: "created_at", label: "作成日", format: dateText }
+530:        renderMiniList("権限残高", payload.entitlement_balances, [
+531:          { key: "entitlement_kind", label: "種別" },
+532:          { key: "quantity_remaining", label: "残数" },
+533:          { key: "balance_status", label: "状態" },
+534:          { key: "updated_at", label: "更新日", format: dateText }
+537:        renderMiniList("権限利用", payload.entitlement_usages, [
+538:          { key: "entitlement_kind", label: "種別" },
+539:          { key: "quantity_used", label: "利用数" },
+540:          { key: "usage_reason", label: "理由" },
+541:          { key: "created_at", label: "日時", format: dateText }
+544:        renderMiniList("利用期間", payload.periods, [
+545:          { key: "period_status", label: "状態" },
+546:          { key: "actual_started_at", label: "開始", format: dateText },
+547:          { key: "actual_ended_at", label: "終了", format: dateText },
+548:          { key: "remaining_seconds_snapshot", label: "残秒数" }
+551:        renderMiniList("ステータス履歴", payload.status_history, [
+552:          { key: "from_status", label: "変更前" },
+553:          { key: "to_status", label: "変更後" },
+554:          { key: "reason", label: "理由" },
+555:          { key: "created_at", label: "日時", format: dateText }
+558:        renderMiniList("終了サマリー", payload.end_summaries, [
+559:          { key: "ended_reason", label: "終了理由" },
+560:          { key: "used_seconds", label: "利用秒数" },
+561:          { key: "summary_text", label: "内容" },
+562:          { key: "created_at", label: "作成日", format: dateText }
+565:        '<div class="actions"><button class="secondary" type="button" id="refreshList">一覧を更新</button></div>'
+578:      root.innerHTML = '<div class="loading">契約詳細を読み込み中です。</div>';
+584:        root.innerHTML = '<div class="error">契約詳細を取得できませんでした: ' + safe(err.message || err) + '</div>';
+------------------------------------------------------------
+FILE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/ui/static/contracts.html
+6:  <title>AI Worker契約閲覧</title>
+269:    <h1>AI Worker契約閲覧</h1>
+270:    <p>現在のログイン状態に紐づくAI Worker契約を確認できます。一覧から契約を選択すると詳細を表示します。</p>
+274:    <section class="panel" aria-label="契約一覧">
+275:      <h2>契約一覧</h2>
+278:          <label for="statusFilter">状態で絞り込み</label>
+280:            <option value="">すべて</option>
+281:            <option value="quoted">見積保存済み</option>
+282:            <option value="confirmed">申込確定済み</option>
+283:            <option value="active">利用中</option>
+284:            <option value="ended">利用終了</option>
+285:            <option value="canceled">キャンセル済み</option>
+288:        <button id="reloadButton" type="button">再読み込み</button>
+290:      <div id="listStatus" class="loading">契約一覧を読み込み中です。</div>
+294:    <section class="panel" aria-label="契約詳細">
+296:        <div class="empty">左の契約一覧から確認したい契約を選択してください。</div>
+306:      quoted: "見積保存済み",
+307:      confirmed: "申込確定済み",
+308:      active: "利用中",
+309:      ended: "利用終了",
+310:      canceled: "キャンセル済み"
+338:      return n.toLocaleString("ja-JP") + "円";
+390:        setListStatus("empty", "表示できる契約はありません。");
+409:              '<div class="card-sub">' + safe(contract.rental_unit_kind) + ' × ' + safe(contract.rental_unit_count) + ' / ' + safe(contract.rental_total_minutes) + '分</div>',
+414:            '<div class="summary-item"><span>金額</span><strong>' + safe(money(contract.final_price_jpy)) + '</strong></div>',
+415:            '<div class="summary-item"><span>決済</span><strong>' + safe(contract.payment_status || "-") + '</strong></div>',
+416:            '<div class="summary-item"><span>利用状態</span><strong>' + safe(contract.period_status || "-") + '</strong></div>',
+417:            '<div class="summary-item"><span>更新日</span><strong>' + safe(dateText(contract.updated_at)) + '</strong></div>',
+428:      setListStatus("loading", "契約一覧を読み込み中です。");
+438:        setListStatus("error", "契約一覧を取得できませんでした: " + (err.message || err));
+466:            '<div class="detail-sub">契約ID: ' + safe(contract.rental_contract_id) + '</div>',
+471:        '<div class="section"><h3>契約情報</h3>',
+472:          kv("サービス", contract.service_code),
+473:          kv("レンタル単位", contract.rental_unit_kind),
+474:          kv("数量", contract.rental_unit_count),
+475:          kv("総分数", contract.rental_total_minutes),
+476:          kv("基本金額", money(contract.base_price_jpy)),
+477:          kv("最終金額", money(contract.final_price_jpy)),
+478:          kv("開始予定", dateText(contract.rental_starts_at)),
+479:          kv("終了予定", dateText(contract.rental_ends_at)),
+480:          kv("作成日", dateText(contract.created_at)),
+481:          kv("更新日", dateText(contract.updated_at)),
+484:        renderMiniList("明細", payload.lines, [
+485:          { key: "line_type", label: "種別" },
+486:          { key: "quantity", label: "数量" },
+487:          { key: "unit_price_jpy", label: "単価", format: money },
+488:          { key: "amount_jpy", label: "金額", format: money }
+491:        renderMiniList("利用期間", payload.periods, [
+492:          { key: "period_status", label: "状態" },
+493:          { key: "actual_started_at", label: "開始", format: dateText },
+494:          { key: "actual_ended_at", label: "終了", format: dateText },
+495:          { key: "remaining_seconds_snapshot", label: "残秒数" }
+498:        renderMiniList("決済", payload.payment_intents, [
+499:          { key: "payment_status", label: "状態" },
+500:          { key: "amount_jpy", label: "金額", format: money },
+501:          { key: "provider_code", label: "種別" },
+502:          { key: "created_at", label: "作成日", format: dateText }
+505:        renderMiniList("ステータス履歴", payload.status_history, [
+506:          { key: "from_status", label: "変更前" },
+507:          { key: "to_status", label: "変更後" },
+508:          { key: "reason", label: "理由" },
+509:          { key: "created_at", label: "日時", format: dateText }
+512:        renderMiniList("終了サマリー", payload.end_summaries, [
+513:          { key: "ended_reason", label: "終了理由" },
+514:          { key: "used_seconds", label: "利用秒数" },
+515:          { key: "summary_text", label: "内容" },
+516:          { key: "created_at", label: "作成日", format: dateText }
+519:        renderMiniList("利用ログ", payload.usage_logs, [
+520:          { key: "usage_unit_kind", label: "単位" },
+521:          { key: "usage_unit_count", label: "数量" },
+522:          { key: "usage_seconds", label: "秒数" },
+523:          { key: "created_at", label: "日時", format: dateText }
+526:        renderMiniList("安全イベント", payload.safety_events, [
+527:          { key: "safety_state", label: "状態" },
+528:          { key: "safety_code", label: "コード" },
+529:          { key: "event_summary", label: "内容" },
+530:          { key: "created_at", label: "日時", format: dateText }
+533:        '<div class="actions"><button class="secondary" type="button" id="backToList">一覧を更新</button></div>'
+546:      root.innerHTML = '<div class="loading">契約詳細を読み込み中です。</div>';
+552:        root.innerHTML = '<div class="error">契約詳細を取得できませんでした: ' + safe(err.message || err) + '</div>';
+------------------------------------------------------------
+FILE=/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/ui/static/index.html
+6:  <title>RobotRentalStore - ロボットレンタル</title>
+58:    <h1>ロボットレンタル</h1>
+59:    <p>仕事・雑談・接客・補助に使えるAIロボットを選んでレンタルします。</p>
+62:      <span class="badge">ロボットレンタル</span>
+63:      <span class="badge">利用開始対応</span>
+65:    <div id="apiStatus" class="status">ロボット一覧を読み込み中...</div>
+70:      <h2>絞り込み</h2>
+72:      <label>シリーズ</label>
+74:        <option value="">すべて</option>
+81:      <label>ロール</label>
+83:        <option value="">すべて</option>
+99:      <label>検索</label>
+100:      <input id="searchInput" placeholder="型番・機種名・用途" />
+103:      <button class="secondary" onclick="loadCatalog()">再読込</button>
+107:        見積保存、申込確定、決済予定作成、利用開始の順に進めます。
+112:      <h2>レンタル可能ロボット</h2>
+117:      <h2>選択中</h2>
+120:      <label>レンタル単位</label>
+122:        <option value="hour">時間</option>
+125:      <label>数量</label>
+128:      <label>期間</label>
+132:      <div class="summary-row"><span>小計</span><span id="subtotal">-</span></div>
+133:      <div class="summary-row"><span>割引予定</span><span>未適用</span></div>
+134:      <div class="summary-row"><span><strong>合計</strong></span><strong id="total">-</strong></div>
+138:        <button onclick="saveQuotePersist()">見積を保存</button>
+139:        <button onclick="confirmContract()">申込を確定</button>
+140:        <button onclick="createPaymentIntent()">決済へ進む</button>
+141:        <button onclick="cancelRental()">申込をキャンセル</button>
+142:        <button onclick="startRental()">利用開始</button>
+143:        <button onclick="endRental()">利用終了</button>
+147:      <div id="saveResult" class="note">見積保存後、申込確定・決済・利用開始へ進めます。</div>
+156:      { model_code: "HD-R3", model_name_ja: "ワーカー", series_code: "HD", manufacturer_code: "helios_dynamics", role_codes: ["Worker"], starting_price_jpy: 500, rental_units: ["hour","day","month"], safety_group: "business", short_description: "汎用AIワーカー。", safety_note: "業務系ロールです。" },
+157:      { model_code: "LVS-12Fv015", model_name_ja: "ビジネスヤンデレ", series_code: "LoVerS", manufacturer_code: "lavi_corporation", role_codes: ["Lover"], starting_price_jpy: 500, rental_units: ["minute","hour"], safety_group: "conversation", short_description: "擬似恋人型演出ロール。", safety_note: "実在恋愛・成人向け性的サービス・監視・脅し・依存誘導は禁止です。" },
+158:      { model_code: "HD-R2S", model_name_ja: "スナイパー", series_code: "HD", manufacturer_code: "helios_dynamics", role_codes: ["CombatSpecialist","Security","Battler"], starting_price_jpy: 800, rental_units: ["hour","day"], safety_group: "combat_security_crisis", short_description: "戦闘専門系。", safety_note: "現実の危害実行支援ではなく、フィクション・警備設計・危機対応・世界観用途に限定します。" }
+178:        status.textContent = "ロボット一覧を読み込み中...";
+184:        status.textContent = `${robots.length}件のロボットを表示中`;
+188:        status.textContent = "ロボット一覧を表示中";
+226:          <button onclick="selectRobot('${r.model_code}')">詳細を見る</button>
+236:      document.getElementById("saveResult").textContent = "見積保存後、申込確定・決済・利用開始へ進めます。";
+240:      return { minute: "分", hour: "時間", day: "日", month: "月", year: "年" }[unit] || unit;
+245:        document.getElementById("detail").innerHTML = `<div class="note">ロボットを選択してください。</div>`;
+266:      if (!selected) throw new Error("ロボット未選択");
+298:      const ok = confirm("見積を保存します。よろしいですか？");
+309:        if (!json.ok) throw new Error(json.error || "保存に失敗しました");
+317:          <strong>見積を保存しました</strong><br>
+318:          見積番号: ${savedRentalContractId || "-"}<br>
+319:          状態: ${json.contract_status || "quoted"}<br>
+320:          合計: ¥${Number(q.total_jpy || 0).toLocaleString()}
+323:        renderMessage(`見積保存失敗: ${err.message}`, false);
+329:        alert("先に見積を保存してください。");
+333:      const ok = confirm("申込を確定します。よろしいですか？");
+344:        if (!json.ok) throw new Error(json.error || "申込確定に失敗しました");
+347:          <strong>申込を確定しました</strong><br>
+348:          申込番号: ${json.rental_contract_id || "-"}<br>
+349:          状態: ${json.contract_status || "confirmed"}<br>
+350:          次の手続き: 決済へ進む
+353:        renderMessage(`申込確定失敗: ${err.message}`, false);
+359:        alert("先に見積保存と申込確定を行ってください。");
+363:      const ok = confirm("決済予定を作成します。よろしいですか？");
+374:        if (!json.ok) throw new Error(json.error || "決済予定の作成に失敗しました");
+377:          <strong>決済予定を作成しました</strong><br>
+378:          決済予定番号: ${json.rental_payment_intent_id || "-"}<br>
+379:          金額: ¥${Number(json.amount_jpy || 0).toLocaleString()}<br>
+380:          状態: ${json.payment_status || "pending"}
+383:        renderMessage(`決済予定作成失敗: ${err.message}`, false);
+389:        alert("先に見積保存、申込確定、決済予定作成を行ってください。");
+393:      const ok = confirm("利用を開始します。よろしいですか？");
+404:        if (!json.ok) throw new Error(json.error || "利用開始に失敗しました");
+407:          <strong>利用開始しました</strong><br>
+408:          契約番号: ${json.rental_contract_id || "-"}<br>
+409:          状態: ${json.contract_status || "active"}<br>
+410:          レンタル状態: ${json.period_status || "active"}<br>
+411:          残り秒数: ${json.remaining_seconds_snapshot ?? "-"}
+414:        renderMessage(`利用開始失敗: ${err.message}`, false);
+427:  if(!savedRentalContractId){alert("先に利用開始まで進めてください。");return;}
+428:  if(!confirm("利用を終了します。よろしいですか？"))return;
+431:    renderMessage(`<strong>利用終了しました</strong><br>契約番号: ${json.rental_contract_id}<br>状態: ${json.contract_status||"ended"}<br>レンタル状態: ${json.period_status||"ended"}<br>利用秒数: ${json.used_seconds??"-"}`);
+432:  }catch(e){renderMessage(`利用終了失敗: ${e.message}`,false);}
+437:  if(!savedRentalContractId){alert("先に見積を保存してください。");return;}
+438:  if(!confirm("申込をキャンセルします。よろしいですか？"))return;
+441:    renderMessage(`<strong>申込をキャンセルしました</strong><br>契約番号: ${json.rental_contract_id}<br>変更前: ${json.from_status||"-"}<br>状態: ${json.contract_status||"canceled"}`);
+442:  }catch(e){renderMessage(`キャンセル失敗: ${e.message}`,false);}

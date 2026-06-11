@@ -1,0 +1,160 @@
+/* BUSINESSOS_MULTILINGUAL_I18N_CORE_START */
+(function () {
+  "use strict";
+
+  var BUSINESSOS_MESSAGES = {
+    ja: {
+      "common.reload": "再読み込み",
+      "common.loading": "読み込み中です。",
+      "common.status": "状態",
+      "common.amount": "金額",
+      "common.createdAt": "作成日",
+      "common.updatedAt": "更新日",
+      "common.entitlement": "権限",
+      "contract.list": "契約一覧",
+      "contract.detail": "契約詳細",
+      "status.quoted": "見積保存済み",
+      "status.confirmed": "申込確定済み",
+      "status.active": "利用中",
+      "status.ended": "利用終了",
+      "status.canceled": "キャンセル済み",
+      "payment.pending": "決済待ち",
+      "payment.authorized": "承認済み",
+      "payment.paid": "支払済み",
+      "payment.failed": "決済失敗",
+      "payment.canceled": "キャンセル済み",
+      "payment.refunded": "返金済み",
+      "entitlement.pending": "付与待ち",
+      "entitlement.granted": "付与済み",
+      "entitlement.active": "有効",
+      "entitlement.consumed": "使用済み",
+      "entitlement.expired": "期限切れ",
+      "entitlement.revoked": "取消済み"
+    },
+    en: {
+      "common.reload": "Reload",
+      "common.loading": "Loading.",
+      "common.status": "Status",
+      "common.amount": "Amount",
+      "common.createdAt": "Created",
+      "common.updatedAt": "Updated",
+      "common.entitlement": "Entitlement",
+      "contract.list": "Contract list",
+      "contract.detail": "Contract details",
+      "status.quoted": "Quote saved",
+      "status.confirmed": "Application confirmed",
+      "status.active": "Active",
+      "status.ended": "Ended",
+      "status.canceled": "Canceled",
+      "payment.pending": "Payment pending",
+      "payment.authorized": "Authorized",
+      "payment.paid": "Paid",
+      "payment.failed": "Payment failed",
+      "payment.canceled": "Canceled",
+      "payment.refunded": "Refunded",
+      "entitlement.pending": "Pending",
+      "entitlement.granted": "Granted",
+      "entitlement.active": "Active",
+      "entitlement.consumed": "Used",
+      "entitlement.expired": "Expired",
+      "entitlement.revoked": "Revoked"
+    }
+  };
+
+  function businessosNormalizeLocale(input) {
+    var raw = String(input || "").trim().replace("_", "-").toLowerCase();
+    if (raw === "ja" || raw === "ja-jp") return "ja-jp";
+    if (raw === "en" || raw === "en-us") return "en-us";
+    return "ja-jp";
+  }
+
+  function businessosLocaleToLanguage(localeCode) {
+    return businessosNormalizeLocale(localeCode) === "en-us" ? "en" : "ja";
+  }
+
+  function businessosReadStorage(key) {
+    try {
+      return window.localStorage ? window.localStorage.getItem(key) : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function businessosDetectLocale() {
+    var params = new URLSearchParams(window.location.search || "");
+    var candidates = [
+      params.get("locale_code"),
+      params.get("localeCode"),
+      params.get("language_code"),
+      params.get("languageCode"),
+      window.localeCode,
+      window.__LOCALE_CODE__,
+      window.languageCode,
+      window.__LANGUAGE_CODE__,
+      businessosReadStorage("portal.locale"),
+      businessosReadStorage("portal.language"),
+      businessosReadStorage("civilization.portal.locale"),
+      navigator.language
+    ];
+
+    for (var i = 0; i < candidates.length; i += 1) {
+      if (candidates[i]) return businessosNormalizeLocale(candidates[i]);
+    }
+    return "ja-jp";
+  }
+
+  var businessosLocaleCode = businessosDetectLocale();
+  var businessosLanguage = businessosLocaleToLanguage(businessosLocaleCode);
+
+  function businessosT(key, params) {
+    var table = BUSINESSOS_MESSAGES[businessosLanguage] || BUSINESSOS_MESSAGES.ja;
+    var text = table[key] || BUSINESSOS_MESSAGES.ja[key] || key;
+    if (params) {
+      Object.keys(params).forEach(function (name) {
+        text = text.replace(new RegExp("\\{" + name + "\\}", "g"), String(params[name]));
+      });
+    }
+    return text;
+  }
+
+  function businessosStatusLabel(kind, code) {
+    var prefix = kind === "payment" ? "payment" : kind === "entitlement" ? "entitlement" : "status";
+    return businessosT(prefix + "." + code);
+  }
+
+  function businessosApplyTextBindings(root) {
+    var base = root || document;
+    base.querySelectorAll("[data-i18n]").forEach(function (el) {
+      el.textContent = businessosT(el.getAttribute("data-i18n"));
+    });
+    ["title", "placeholder", "aria-label"].forEach(function (attr) {
+      base.querySelectorAll("[data-i18n-attr-" + attr + "]").forEach(function (el) {
+        el.setAttribute(attr, businessosT(el.getAttribute("data-i18n-attr-" + attr)));
+      });
+    });
+  }
+
+  document.documentElement.lang = businessosLanguage;
+  document.documentElement.setAttribute("data-businessos-locale", businessosLocaleCode);
+
+  window.BusinessOSI18N = {
+    messages: BUSINESSOS_MESSAGES,
+    normalizeLocale: businessosNormalizeLocale,
+    localeToLanguage: businessosLocaleToLanguage,
+    detectLocale: businessosDetectLocale,
+    localeCode: businessosLocaleCode,
+    language: businessosLanguage,
+    t: businessosT,
+    statusLabel: businessosStatusLabel,
+    applyTextBindings: businessosApplyTextBindings
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      businessosApplyTextBindings(document);
+    });
+  } else {
+    businessosApplyTextBindings(document);
+  }
+}());
+/* BUSINESSOS_MULTILINGUAL_I18N_CORE_END */

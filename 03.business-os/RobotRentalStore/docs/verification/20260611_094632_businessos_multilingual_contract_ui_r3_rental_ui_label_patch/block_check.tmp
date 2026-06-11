@@ -1,0 +1,187 @@
+/* BUSINESSOS_MULTILINGUAL_RENTAL_UI_LABELS_START */
+(function () {
+  "use strict";
+
+  var RENTAL_MESSAGES = {
+    ja: {
+      "rental.title": "ロボットレンタル",
+      "rental.subtitle": "AI Workerを契約・レンタルします。",
+      "rental.quote": "見積保存",
+      "rental.quoteSaved": "見積保存済み",
+      "rental.confirm": "申込確定",
+      "rental.confirmed": "申込確定済み",
+      "rental.payment": "決済",
+      "rental.paymentInfo": "決済情報",
+      "rental.start": "利用開始",
+      "rental.end": "利用終了",
+      "rental.cancel": "キャンセル",
+      "rental.canceled": "キャンセル済み",
+      "rental.contractInfo": "契約情報",
+      "rental.entitlementInfo": "権限情報",
+      "rental.lineItems": "明細",
+      "rental.price": "価格",
+      "rental.fee": "料金",
+      "rental.amount": "金額",
+      "rental.robot": "ロボット",
+      "rental.model": "モデル",
+      "rental.series": "シリーズ",
+      "rental.quantity": "数量",
+      "rental.period": "期間",
+      "rental.minutes": "分数",
+      "rental.status": "状態",
+      "rental.save": "保存",
+      "rental.confirmAction": "確認",
+      "rental.close": "閉じる",
+      "rental.back": "戻る"
+    },
+    en: {
+      "rental.title": "Robot Rental",
+      "rental.subtitle": "Contract and rent AI Workers.",
+      "rental.quote": "Save quote",
+      "rental.quoteSaved": "Quote saved",
+      "rental.confirm": "Confirm application",
+      "rental.confirmed": "Application confirmed",
+      "rental.payment": "Payment",
+      "rental.paymentInfo": "Payment information",
+      "rental.start": "Start use",
+      "rental.end": "End use",
+      "rental.cancel": "Cancel",
+      "rental.canceled": "Canceled",
+      "rental.contractInfo": "Contract information",
+      "rental.entitlementInfo": "Entitlement information",
+      "rental.lineItems": "Line items",
+      "rental.price": "Price",
+      "rental.fee": "Fee",
+      "rental.amount": "Amount",
+      "rental.robot": "Robot",
+      "rental.model": "Model",
+      "rental.series": "Series",
+      "rental.quantity": "Quantity",
+      "rental.period": "Period",
+      "rental.minutes": "Minutes",
+      "rental.status": "Status",
+      "rental.save": "Save",
+      "rental.confirmAction": "Confirm",
+      "rental.close": "Close",
+      "rental.back": "Back"
+    }
+  };
+
+  var EXACT_TEXT_KEYS = {
+    "ロボットレンタル": "rental.title",
+    "AI Workerを契約・レンタルします。": "rental.subtitle",
+    "見積保存": "rental.quote",
+    "見積保存済み": "rental.quoteSaved",
+    "申込確定": "rental.confirm",
+    "申込確定済み": "rental.confirmed",
+    "決済": "rental.payment",
+    "決済情報": "rental.paymentInfo",
+    "利用開始": "rental.start",
+    "利用終了": "rental.end",
+    "キャンセル": "rental.cancel",
+    "キャンセル済み": "rental.canceled",
+    "契約情報": "rental.contractInfo",
+    "権限情報": "rental.entitlementInfo",
+    "明細": "rental.lineItems",
+    "価格": "rental.price",
+    "料金": "rental.fee",
+    "金額": "rental.amount",
+    "ロボット": "rental.robot",
+    "モデル": "rental.model",
+    "シリーズ": "rental.series",
+    "数量": "rental.quantity",
+    "期間": "rental.period",
+    "分数": "rental.minutes",
+    "状態": "rental.status",
+    "保存": "rental.save",
+    "確認": "rental.confirmAction",
+    "閉じる": "rental.close",
+    "戻る": "rental.back"
+  };
+
+  function getI18n() {
+    return window.BusinessOSI18N || null;
+  }
+
+  function mergeMessages() {
+    var i18n = getI18n();
+    if (!i18n || !i18n.messages) return;
+
+    Object.keys(RENTAL_MESSAGES).forEach(function (lang) {
+      i18n.messages[lang] = i18n.messages[lang] || {};
+      Object.keys(RENTAL_MESSAGES[lang]).forEach(function (key) {
+        i18n.messages[lang][key] = RENTAL_MESSAGES[lang][key];
+      });
+    });
+  }
+
+  function translate(key) {
+    var i18n = getI18n();
+    if (i18n && typeof i18n.t === "function") return i18n.t(key);
+    var lang = (i18n && i18n.language) || "ja";
+    return (RENTAL_MESSAGES[lang] && RENTAL_MESSAGES[lang][key]) || RENTAL_MESSAGES.ja[key] || key;
+  }
+
+  function replaceExactTextNode(node) {
+    var value = node.nodeValue || "";
+    var trimmed = value.trim();
+    var key = EXACT_TEXT_KEYS[trimmed];
+    if (!key) return;
+
+    var before = value.match(/^\s*/)[0] || "";
+    var after = value.match(/\s*$/)[0] || "";
+    node.nodeValue = before + translate(key) + after;
+  }
+
+  function replaceElementValue(el) {
+    var value = "";
+    if ("value" in el) value = String(el.value || "").trim();
+    var key = EXACT_TEXT_KEYS[value];
+    if (key) el.value = translate(key);
+
+    ["title", "placeholder", "aria-label"].forEach(function (attr) {
+      var attrValue = String(el.getAttribute(attr) || "").trim();
+      var attrKey = EXACT_TEXT_KEYS[attrValue];
+      if (attrKey) el.setAttribute(attr, translate(attrKey));
+    });
+  }
+
+  function applyRentalLabels(root) {
+    mergeMessages();
+
+    var base = root || document;
+    var walker = document.createTreeWalker(base, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (node) {
+        var parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        var tag = parent.tagName ? parent.tagName.toLowerCase() : "";
+        if (tag === "script" || tag === "style") return NodeFilter.FILTER_REJECT;
+        if (!String(node.nodeValue || "").trim()) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+    var nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(replaceExactTextNode);
+
+    base.querySelectorAll("input, button, textarea, select, option, [title], [placeholder], [aria-label]").forEach(replaceElementValue);
+  }
+
+  function run() {
+    applyRentalLabels(document);
+  }
+
+  window.BusinessOSRentalI18N = {
+    messages: RENTAL_MESSAGES,
+    exactTextKeys: EXACT_TEXT_KEYS,
+    apply: applyRentalLabels
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run);
+  } else {
+    run();
+  }
+}());
+/* BUSINESSOS_MULTILINGUAL_RENTAL_UI_LABELS_END */
