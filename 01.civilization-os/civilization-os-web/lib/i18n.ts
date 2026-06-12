@@ -100,3 +100,66 @@ export function normalizeLocale(value: string | null | undefined): SupportedLoca
 export function t(locale: SupportedLocale, key: TranslationKey): string {
   return dictionaries[locale][key] ?? dictionaries[defaultLocale][key];
 }
+
+/* MULTILINGUAL_R2_R5A_I18N_HELPERS */
+
+export function normalizeCivilizationLocaleCode(value: unknown): "ja-jp" | "en-us" {
+  const normalized = String(value ?? "").trim().toLowerCase().replace(/_/g, "-");
+
+  if (normalized === "en" || normalized === "en-us") {
+    return "en-us";
+  }
+
+  if (normalized === "ja" || normalized === "ja-jp") {
+    return "ja-jp";
+  }
+
+  return "ja-jp";
+}
+
+
+export function normalizeCivilizationLanguageCode(value: unknown): "ja" | "en" {
+  const normalized = String(value ?? "").trim().toLowerCase().replace(/_/g, "-");
+
+  if (normalized === "en" || normalized === "en-us") {
+    return "en";
+  }
+
+  return "ja";
+}
+
+
+export function toCivilizationLanguageCode(value: unknown): "ja" | "en" {
+  return normalizeCivilizationLocaleCode(value) === "en-us" ? "en" : "ja";
+}
+
+
+export function resolveCivilizationLocaleCodeFromInputs(values: unknown[]): "ja-jp" | "en-us" {
+  for (const value of values) {
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      return normalizeCivilizationLocaleCode(value);
+    }
+  }
+
+  return "ja-jp";
+}
+
+
+export function normalizeLocaleCode(value: unknown): "ja-jp" | "en-us" {
+  return normalizeCivilizationLocaleCode(value);
+}
+
+
+export function normalizeLanguageCode(value: unknown): "ja" | "en" {
+  return normalizeCivilizationLanguageCode(value);
+}
+
+
+export function toLanguageCode(value: unknown): "ja" | "en" {
+  return toCivilizationLanguageCode(value);
+}
+
+
+export function resolveLocaleCodeFromInputs(values: unknown[]): "ja-jp" | "en-us" {
+  return resolveCivilizationLocaleCodeFromInputs(values);
+}

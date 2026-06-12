@@ -105,3 +105,44 @@ export function civilizationSessionStorageKey(): string {
 export function civilizationSessionTtlDays(): number {
   return Math.round(DEFAULT_SESSION_TTL_MS / (1000 * 60 * 60 * 24));
 }
+
+/* MULTILINGUAL_R2_R5A_SESSION_HELPER */
+export type CivilizationLocaleSessionFields = {
+  localeCode: "ja-jp" | "en-us";
+  languageCode: "ja" | "en";
+};
+
+function normalizeCivilizationSessionLocaleCode(value: unknown): "ja-jp" | "en-us" {
+  const normalized = String(value ?? "").trim().toLowerCase().replace(/_/g, "-");
+
+  if (normalized === "en" || normalized === "en-us") {
+    return "en-us";
+  }
+
+  return "ja-jp";
+}
+
+function toCivilizationSessionLanguageCode(value: unknown): "ja" | "en" {
+  return normalizeCivilizationSessionLocaleCode(value) === "en-us" ? "en" : "ja";
+}
+
+export function withCivilizationSessionLocale<T extends Record<string, unknown>>(
+  session: T,
+  localeInput?: unknown,
+  languageInput?: unknown
+): T & CivilizationLocaleSessionFields {
+  const localeCode = normalizeCivilizationSessionLocaleCode(
+    localeInput ??
+      session.localeCode ??
+      session.locale_code ??
+      session.languageCode ??
+      session.language_code ??
+      languageInput
+  );
+
+  return {
+    ...session,
+    localeCode,
+    languageCode: toCivilizationSessionLanguageCode(localeCode)
+  };
+}
