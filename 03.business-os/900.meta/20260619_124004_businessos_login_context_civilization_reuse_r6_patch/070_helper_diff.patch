@@ -1,0 +1,300 @@
+diff --git a/03.business-os/shared/login-context/businessos-login-context.mjs b/03.business-os/shared/login-context/businessos-login-context.mjs
+index 2bee351..06f1a68 100644
+--- a/03.business-os/shared/login-context/businessos-login-context.mjs
++++ b/03.business-os/shared/login-context/businessos-login-context.mjs
+@@ -1,9 +1,52 @@
++/**
++ * BusinessOS-side consumer adapter for CivilizationOS login context.
++ *
++ * Architecture:
++ * - CivilizationOS owns the canonical login/session context.
++ * - BusinessOS does not define an OS-specific login-context schema.
++ * - This module only parses and normalizes CivilizationOS-derived context for BusinessOS consumers.
++ * - This module is not a login authority.
++ * - This module does not validate sessionRef.
++ * - This module must not store passwords, OAuth tokens, DB URLs, service-role keys, or private keys.
++ *
++ * Compatibility:
++ * - BusinessOSLoginContext and businessos.loginContext are accepted only as legacy/compatibility surfaces.
++ * - CivilizationLoginContext and civilization.loginContext are preferred canonical surfaces.
++ */
++
+ const DEFAULT_LOCALE_CODE = "ja-jp";
+-const DEFAULT_LANGUAGE_CODE = "ja";
+ 
+ export const BUSINESSOS_LOGIN_CONTEXT_ALLOWED_LOCALE_CODES = Object.freeze(["ja-jp", "en-us"]);
+ export const BUSINESSOS_LOGIN_CONTEXT_ALLOWED_LANGUAGE_CODES = Object.freeze(["ja", "en"]);
+ 
++const CONTEXT_FIELD_NAMES = Object.freeze([
++  "civilizationId",
++  "civilization_id",
++  "owner",
++  "ownerId",
++  "owner_id",
++  "sessionRef",
++  "session_ref",
++  "sessionId",
++  "session_id",
++  "localeCode",
++  "locale_code",
++  "locale",
++  "languageCode",
++  "language_code",
++  "language",
++  "requestedOsCode",
++  "requested_os_code",
++  "returnTo",
++  "return_to",
++  "afterLoginPath",
++  "after_login_path",
++  "issuedAt",
++  "issued_at",
++  "expiresAt",
++  "expires_at"
++]);
++
+ const FORBIDDEN_FIELD_PATTERNS = [
+   /password/i,
+   /passwd/i,
+@@ -36,12 +79,8 @@ function safeString(value) {
+   return String(value).trim();
+ }
+ 
+-function normalizeKey(key) {
+-  return String(key || "").trim();
+-}
+-
+ function isForbiddenFieldName(key) {
+-  const normalized = normalizeKey(key);
++  const normalized = String(key || "").trim();
+   return FORBIDDEN_FIELD_PATTERNS.some((pattern) => pattern.test(normalized));
+ }
+ 
+@@ -87,6 +126,41 @@ function collectForbiddenSignals(value, path, out) {
+   }
+ }
+ 
++function parseJsonObject(value) {
++  if (!value) return {};
++  if (typeof value === "object") return toPlainObject(value);
++  try {
++    return toPlainObject(JSON.parse(String(value)));
++  } catch {
++    return {};
++  }
++}
++
++function hasAnyContextField(value) {
++  const source = toPlainObject(value);
++  return CONTEXT_FIELD_NAMES.some((key) => Object.prototype.hasOwnProperty.call(source, key));
++}
++
++function getLocalStorage(globalObject, key) {
++  try {
++    if (!globalObject || !globalObject.localStorage) return "";
++    return globalObject.localStorage.getItem(key) || "";
++  } catch {
++    return "";
++  }
++}
++
++function headerValue(headers, name) {
++  if (!headers) return "";
++
++  if (typeof headers.get === "function") {
++    return safeString(headers.get(name) || headers.get(name.toLowerCase()) || headers.get(name.toUpperCase()));
++  }
++
++  const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
++  return safeString(direct);
++}
++
+ export function businessosNormalizeLocaleCode(input) {
+   const raw = safeString(input).replace("_", "-").toLowerCase();
+ 
+@@ -140,7 +214,15 @@ export function businessosNormalizeLoginContext(raw, options = {}) {
+     warnings.push("FORBIDDEN_AUTH_SECRET_FIELD_STRIPPED");
+   }
+ 
+-  const inputLocale = firstString(sourceObject, ["localeCode", "locale_code", "locale", "languageCode", "language_code", "language"]);
++  const inputLocale = firstString(sourceObject, [
++    "localeCode",
++    "locale_code",
++    "locale",
++    "languageCode",
++    "language_code",
++    "language"
++  ]);
++
+   const localeCode = businessosNormalizeLocaleCode(inputLocale);
+   const languageCode = businessosLocaleCodeToLanguageCode(localeCode);
+ 
+@@ -180,50 +262,6 @@ export function businessosNormalizeLoginContext(raw, options = {}) {
+   };
+ }
+ 
+-function parseJsonObject(value) {
+-  if (!value) return {};
+-  if (typeof value === "object") return toPlainObject(value);
+-  try {
+-    return toPlainObject(JSON.parse(String(value)));
+-  } catch {
+-    return {};
+-  }
+-}
+-
+-function hasAnyContextField(value) {
+-  const source = toPlainObject(value);
+-  return [
+-    "civilizationId",
+-    "civilization_id",
+-    "owner",
+-    "ownerId",
+-    "owner_id",
+-    "sessionRef",
+-    "session_ref",
+-    "sessionId",
+-    "session_id",
+-    "localeCode",
+-    "locale_code",
+-    "languageCode",
+-    "language_code",
+-    "requestedOsCode",
+-    "requested_os_code",
+-    "returnTo",
+-    "return_to",
+-    "afterLoginPath",
+-    "after_login_path"
+-  ].some((key) => Object.prototype.hasOwnProperty.call(source, key));
+-}
+-
+-function getLocalStorage(globalObject, key) {
+-  try {
+-    if (!globalObject || !globalObject.localStorage) return "";
+-    return globalObject.localStorage.getItem(key) || "";
+-  } catch {
+-    return "";
+-  }
+-}
+-
+ export function businessosReadLoginContextFromBrowser(globalObject = globalThis) {
+   const win = globalObject && globalObject.window ? globalObject.window : globalObject;
+ 
+@@ -231,27 +269,8 @@ export function businessosReadLoginContextFromBrowser(globalObject = globalThis)
+     const search = win && win.location && win.location.search ? win.location.search : "";
+     const params = new URLSearchParams(search);
+     const fromUrl = {};
+-    [
+-      "civilizationId",
+-      "civilization_id",
+-      "owner",
+-      "ownerId",
+-      "owner_id",
+-      "sessionRef",
+-      "session_ref",
+-      "sessionId",
+-      "session_id",
+-      "localeCode",
+-      "locale_code",
+-      "languageCode",
+-      "language_code",
+-      "requestedOsCode",
+-      "requested_os_code",
+-      "returnTo",
+-      "return_to",
+-      "afterLoginPath",
+-      "after_login_path"
+-    ].forEach((key) => {
++
++    CONTEXT_FIELD_NAMES.forEach((key) => {
+       const value = params.get(key);
+       if (value) fromUrl[key] = value;
+     });
+@@ -263,66 +282,62 @@ export function businessosReadLoginContextFromBrowser(globalObject = globalThis)
+     return businessosNormalizeLoginContext({}, { source: "empty" });
+   }
+ 
+-  if (win && hasAnyContextField(win.BusinessOSLoginContext)) {
+-    return businessosNormalizeLoginContext(win.BusinessOSLoginContext, { source: "window" });
+-  }
+-
+   if (win && hasAnyContextField(win.CivilizationLoginContext)) {
+-    return businessosNormalizeLoginContext(win.CivilizationLoginContext, { source: "window" });
+-  }
+-
+-  const localBusiness = parseJsonObject(getLocalStorage(win, "businessos.loginContext"));
+-  if (hasAnyContextField(localBusiness)) {
+-    return businessosNormalizeLoginContext(localBusiness, { source: "localStorage" });
++    return businessosNormalizeLoginContext(win.CivilizationLoginContext, { source: "window.CivilizationLoginContext" });
+   }
+ 
+   const localCivilization = parseJsonObject(getLocalStorage(win, "civilization.loginContext"));
+   if (hasAnyContextField(localCivilization)) {
+-    return businessosNormalizeLoginContext(localCivilization, { source: "localStorage" });
++    return businessosNormalizeLoginContext(localCivilization, { source: "localStorage.civilization.loginContext" });
+   }
+ 
+-  return businessosNormalizeLoginContext({}, { source: "empty" });
+-}
++  if (win && hasAnyContextField(win.BusinessOSLoginContext)) {
++    const envelope = businessosNormalizeLoginContext(win.BusinessOSLoginContext, { source: "window.BusinessOSLoginContext.compatibility" });
++    envelope.warnings.push("COMPATIBILITY_SURFACE_BUSINESSOS_LOGIN_CONTEXT");
++    return envelope;
++  }
+ 
+-function headerValue(headers, name) {
+-  if (!headers) return "";
+-  if (typeof headers.get === "function") {
+-    return safeString(headers.get(name) || headers.get(name.toLowerCase()) || headers.get(name.toUpperCase()));
++  const localBusiness = parseJsonObject(getLocalStorage(win, "businessos.loginContext"));
++  if (hasAnyContextField(localBusiness)) {
++    const envelope = businessosNormalizeLoginContext(localBusiness, { source: "localStorage.businessos.loginContext.compatibility" });
++    envelope.warnings.push("COMPATIBILITY_SURFACE_BUSINESSOS_LOGIN_CONTEXT");
++    return envelope;
+   }
+ 
+-  const direct = headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()];
+-  return safeString(direct);
++  return businessosNormalizeLoginContext({}, { source: "empty" });
+ }
+ 
+ export function businessosReadLoginContextFromRequestLike(requestLike = {}) {
+   const request = toPlainObject(requestLike);
+ 
+   if (hasAnyContextField(request.context)) {
+-    return businessosNormalizeLoginContext(request.context, { source: "object" });
++    return businessosNormalizeLoginContext(request.context, { source: "object.context" });
+   }
+ 
+   if (hasAnyContextField(request.body && request.body.context)) {
+-    return businessosNormalizeLoginContext(request.body.context, { source: "object" });
++    return businessosNormalizeLoginContext(request.body.context, { source: "object.body.context" });
+   }
+ 
+   if (hasAnyContextField(request.body)) {
+-    return businessosNormalizeLoginContext(request.body, { source: "object" });
++    return businessosNormalizeLoginContext(request.body, { source: "object.body" });
+   }
+ 
+   const headers = request.headers || {};
+   const fromHeaders = {
+     civilizationId: headerValue(headers, "x-civilization-id"),
+-    owner: headerValue(headers, "x-business-owner") || headerValue(headers, "x-owner"),
++    owner: headerValue(headers, "x-owner") || headerValue(headers, "x-business-owner"),
+     sessionRef: headerValue(headers, "x-civilization-session-ref") || headerValue(headers, "x-session-ref"),
+     localeCode: headerValue(headers, "x-locale-code"),
+     languageCode: headerValue(headers, "x-language-code"),
+     requestedOsCode: headerValue(headers, "x-requested-os-code"),
+     returnTo: headerValue(headers, "x-return-to"),
+-    afterLoginPath: headerValue(headers, "x-after-login-path")
++    afterLoginPath: headerValue(headers, "x-after-login-path"),
++    issuedAt: headerValue(headers, "x-issued-at"),
++    expiresAt: headerValue(headers, "x-expires-at")
+   };
+ 
+   if (hasAnyContextField(fromHeaders)) {
+-    return businessosNormalizeLoginContext(fromHeaders, { source: "header" });
++    return businessosNormalizeLoginContext(fromHeaders, { source: "header.CivilizationOS" });
+   }
+ 
+   if (hasAnyContextField(request.query)) {

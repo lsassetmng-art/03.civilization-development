@@ -1,0 +1,115 @@
+diff --git a/03.business-os/shared/login-context/README.md b/03.business-os/shared/login-context/README.md
+index 0013ac3..12ef7ff 100644
+--- a/03.business-os/shared/login-context/README.md
++++ b/03.business-os/shared/login-context/README.md
+@@ -1,33 +1,52 @@
+-# BusinessOS Login Context Foundation
++# BusinessOS Login Context Consumer Adapter
+ 
+ ## Scope
+ 
+ BusinessOS only.
+ 
+-This module is a parse-only foundation for receiving CivilizationOS login context.
++This module is a BusinessOS-side consumer adapter for the canonical CivilizationOS login/session context.
+ 
++It does not define a BusinessOS-specific login context.
+ It does not make BusinessOS a login authority.
++It does not validate CivilizationOS sessionRef.
++It does not make any app login-required by itself.
+ 
+ ## Authority boundary
+ 
+-- Login authority: CivilizationOS
++- Login/session authority: CivilizationOS
+ - Entry and routing seed: Portal
+-- Consumer: BusinessOS
++- Consumer adapter: BusinessOS
++- User-facing BusinessOS target for later wiring: RobotRentalStore
+ 
+-## Allowed context fields
++## Non-public system app boundary
++
++AICompanyManager is a system/internal non-public app.
++
++Therefore, by default:
++
++- AICompanyManager is excluded from BusinessOS login-context wiring.
++- AICompanyManager is not made login-required by this adapter.
++- AICompanyManager to AIWorkerOS queue/runtime integration is out of scope.
++
++## Canonical context fields
++
++These fields come from CivilizationOS login/session context and should not become OS-specific schemas:
+ 
+ - civilizationId
+ - owner
+ - sessionRef
+ - localeCode
+ - languageCode
+-- requestedOsCode
+-- returnTo
+-- afterLoginPath
+ - issuedAt
+ - expiresAt
+ 
+-Compatibility aliases are normalized where needed.
++## Consumer routing fields
++
++These fields are routing hints and may differ by OS/app:
++
++- requestedOsCode
++- returnTo
++- afterLoginPath
+ 
+ ## Locale rule
+ 
+@@ -36,6 +55,32 @@ Compatibility aliases are normalized where needed.
+ 
+ Unknown locale input falls back to ja-jp / ja.
+ 
++## Browser read priority
++
++1. URL search params
++2. window.CivilizationLoginContext
++3. localStorage civilization.loginContext
++4. window.BusinessOSLoginContext as compatibility-only
++5. localStorage businessos.loginContext as compatibility-only
++6. empty fallback
++
++## Request-like read priority
++
++The request adapter consumes CivilizationOS-derived headers where present:
++
++- x-civilization-id
++- x-owner
++- x-civilization-session-ref
++- x-locale-code
++- x-language-code
++- x-requested-os-code
++- x-return-to
++- x-after-login-path
++- x-issued-at
++- x-expires-at
++
++`x-business-owner` and `x-session-ref` are compatibility aliases only.
++
+ ## Trust rule
+ 
+ Every parsed context is returned with:
+@@ -57,12 +102,14 @@ Do not store or propagate:
+ - DB connection string
+ - bearer token as persisted context
+ 
+-## Current R2 behavior
++## Current behavior
+ 
+ - Parse only
+ - Normalize only
+ - Redact logs
+ - Detect forbidden auth secret fields
++- Prefer CivilizationOS canonical context surfaces
++- Accept BusinessOS-named surfaces only for compatibility
+ - No app consumer wiring
+ - No DB
+ - No API POST
