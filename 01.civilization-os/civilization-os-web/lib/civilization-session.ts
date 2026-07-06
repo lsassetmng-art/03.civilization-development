@@ -1,3 +1,12 @@
+import {
+  createCivilizationLoginContext,
+  hasCivilizationLoginContextIdentity
+} from "./civilization-login-context";
+import type {
+  CivilizationLoginContext,
+  CivilizationLoginContextInput
+} from "./civilization-login-context";
+
 const CIVILIZATION_SESSION_KEY = "civilization_os_session_v1";
 const DEFAULT_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
@@ -146,3 +155,103 @@ export function withCivilizationSessionLocale<T extends Record<string, unknown>>
     languageCode: toCivilizationSessionLanguageCode(localeCode)
   };
 }
+
+
+export type CivilizationLoginContextRuntimeFields = {
+  requestedOsCode?: string;
+  returnTo?: string;
+  afterLoginPath?: string;
+};
+
+type CivilizationLoginContextSessionLike = Record<string, unknown>;
+
+function readCivilizationLoginContextString(
+  source: CivilizationLoginContextSessionLike,
+  keys: readonly string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = source[key];
+
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function assignCivilizationLoginContextString(
+  input: Record<string, unknown>,
+  key: string,
+  value: string | undefined
+): void {
+  if (typeof value === "string" && value.trim().length > 0) {
+    input[key] = value;
+  }
+}
+
+/**
+ * Creates a safe login context from the CivilizationOS session boundary.
+ *
+ * This helper maps only safe session/runtime fields and intentionally excludes
+ * password, OAuth token, refresh token, client secret, DB URL, service role key,
+ * and private key material.
+ */
+export function createCivilizationLoginContextFromSession(
+  session: unknown,
+  runtimeFields: CivilizationLoginContextRuntimeFields = {}
+): CivilizationLoginContext | null {
+  if (!session || typeof session !== "object") {
+    return null;
+  }
+
+  const sessionLike = session as CivilizationLoginContextSessionLike;
+  const input: Record<string, unknown> = {};
+
+  assignCivilizationLoginContextString(
+    input,
+    "civilizationId",
+    readCivilizationLoginContextString(sessionLike, ["civilizationId", "civilization_id"])
+  );
+  assignCivilizationLoginContextString(
+    input,
+    "owner",
+    readCivilizationLoginContextString(sessionLike, ["owner", "ownerId", "owner_id", "civilizationId", "civilization_id"])
+  );
+  assignCivilizationLoginContextString(
+    input,
+    "sessionRef",
+    readCivilizationLoginContextString(sessionLike, ["sessionRef", "session_ref", "sessionId", "session_id"])
+  );
+  assignCivilizationLoginContextString(
+    input,
+    "localeCode",
+    readCivilizationLoginContextString(sessionLike, ["localeCode", "locale_code", "languageCode", "language_code"])
+  );
+  assignCivilizationLoginContextString(
+    input,
+    "languageCode",
+    readCivilizationLoginContextString(sessionLike, ["languageCode", "language_code"])
+  );
+  assignCivilizationLoginContextString(
+    input,
+    "issuedAt",
+    readCivilizationLoginContextString(sessionLike, ["issuedAt", "issued_at"])
+  );
+  assignCivilizationLoginContextString(
+    input,
+    "expiresAt",
+    readCivilizationLoginContextString(sessionLike, ["expiresAt", "expires_at"])
+  );
+
+  assignCivilizationLoginContextString(input, "requestedOsCode", runtimeFields.requestedOsCode);
+  assignCivilizationLoginContextString(input, "returnTo", runtimeFields.returnTo);
+  assignCivilizationLoginContextString(input, "afterLoginPath", runtimeFields.afterLoginPath);
+
+  const context = createCivilizationLoginContext(
+    input as CivilizationLoginContextInput
+  );
+
+  return hasCivilizationLoginContextIdentity(context) ? context : null;
+}
+
