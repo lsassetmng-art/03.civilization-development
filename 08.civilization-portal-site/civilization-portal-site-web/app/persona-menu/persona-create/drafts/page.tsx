@@ -202,6 +202,46 @@ export default function PersonaDraftsPage() {
               <p className="text-sm text-slate-300">
                 このドラフトは端末内保存です。別端末や別ブラウザには同期されません。
               </p>
+              {/* PERSONAOS_R13_DRAFT_RESUME_START */}
+              <div
+                data-persona-draft-resume-action="true"
+                style={{
+                  display: "grid",
+                  gap: 8,
+                  minWidth: 0,
+                }}
+              >
+                <Link
+                  href="/persona-menu/persona-create/image-upload?resumeDraft=1"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: 44,
+                    padding: "10px 16px",
+                    border: "1px solid currentColor",
+                    borderRadius: 10,
+                    color: "inherit",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                  }}
+                >
+                  このドラフトから再開
+                </Link>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    opacity: 0.72,
+                  }}
+                >
+                  入力内容を引き継いで作成画面へ戻ります。
+                  画像本体は保存されていないため、
+                  再開後に選び直してください。
+                </p>
+              </div>
+              {/* PERSONAOS_R13_DRAFT_RESUME_END */}
               <button
                 type="button"
                 onClick={clearDraft}
