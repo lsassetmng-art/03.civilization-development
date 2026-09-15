@@ -63,6 +63,14 @@ function aiwB6R96R1G2LooksRuntimePayload(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
 
   const appPayload = aiwB6R96R1G2FindAppPayload(payload);
+// AIWORKEROS_R84_G19_R9_R3_VALIDATION_INPUT_TARGET_NORMALIZATION_SITE_APPLY
+const preValidationNormalizedRuntimeRequestPayload = aiwR84NormalizeRuntimeRouteInstructionFields(payload);
+if (preValidationNormalizedRuntimeRequestPayload && preValidationNormalizedRuntimeRequestPayload.task_instruction_ja) {
+  payload.task_instruction_ja = preValidationNormalizedRuntimeRequestPayload.task_instruction_ja;
+}
+if (preValidationNormalizedRuntimeRequestPayload && preValidationNormalizedRuntimeRequestPayload !== payload) {
+  Object.assign(payload, preValidationNormalizedRuntimeRequestPayload);
+}
   const statusText = aiwB6R96R1G2FirstText([
     payload.request_status_code,
     payload.status_code,
@@ -327,6 +335,15 @@ function aiwB6R96R1G2BuildRequesterDeliveryPayload(payload) {
   const referenceProfile = aiwB6R96R1G2ReferenceProfile(tier);
   const body = aiwB6R96R1G2BuildBody(role, title, instruction, referenceProfile);
 
+  // AIWORKEROS_R84_G19_R9_R8_R3_R3_ACTIVE_ROUTE_VALIDATION_NORMALIZATION_START
+  const aiwR84R8R3R3ActiveValidationNormalizedPayload = aiwR84NormalizeRuntimeRouteInstructionFields(payload);
+  if (aiwR84R8R3R3ActiveValidationNormalizedPayload && aiwR84R8R3R3ActiveValidationNormalizedPayload.task_instruction_ja) {
+    payload.task_instruction_ja = aiwR84R8R3R3ActiveValidationNormalizedPayload.task_instruction_ja;
+  }
+  if (aiwR84R8R3R3ActiveValidationNormalizedPayload && aiwR84R8R3R3ActiveValidationNormalizedPayload !== payload) {
+    Object.assign(payload, aiwR84R8R3R3ActiveValidationNormalizedPayload);
+  }
+  // AIWORKEROS_R84_G19_R9_R8_R3_R3_ACTIVE_ROUTE_VALIDATION_NORMALIZATION_END
   return {
     contract_version: "requester_deliverable_v1",
     deliverable_title: title,
@@ -4186,7 +4203,123 @@ async function aiwR78CreateRuntimeRequestWithSourceMaterial(...args) {
 // AIW_R78_QUEUE_INTAKE_WIRING_END
 
 
+// AIWORKEROS_R84_G15_VALIDATION_NORMALIZATION_START
+function aiwR84NormalizeRuntimeInstructionText(value) {
+  const seen = new Set();
+
+  function normalizeCandidate(candidate) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+    if (!candidate || typeof candidate !== "object") {
+      return "";
+    }
+    if (seen.has(candidate)) {
+      return "";
+    }
+    seen.add(candidate);
+
+    const directKeys = [
+      "task_instruction_ja",
+      "instructionText",
+      "instruction_text",
+      "instruction",
+      "text",
+      "prompt",
+      "message"
+    ];
+
+    for (const key of directKeys) {
+      const normalized = normalizeCandidate(candidate[key]);
+      if (normalized) return normalized;
+    }
+
+    const wrapperKeys = [
+      "request",
+      "payload",
+      "body",
+      "data",
+      "input"
+    ];
+
+    for (const key of wrapperKeys) {
+      const normalized = normalizeCandidate(candidate[key]);
+      if (normalized) return normalized;
+    }
+
+    return "";
+  }
+
+  return normalizeCandidate(value);
+}
+// AIWORKEROS_R84_G15_VALIDATION_NORMALIZATION_END
+
+// AIWORKEROS_R84_G19_R3_ROUTE_VALIDATION_NORMALIZATION_START
+function aiwR84NormalizeRuntimeRouteInstructionFields(payload) {
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+
+  const pickText = (value) => {
+    if (value == null) return "";
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return String(value).trim();
+    }
+    if (typeof value === "object") {
+      return [
+        value.text,
+        value.instruction_text,
+        value.instructionText,
+        value.task_instruction_ja,
+        value.message,
+        value.prompt
+      ].map((candidate) => candidate == null ? "" : String(candidate).trim()).find(Boolean) || "";
+    }
+    return "";
+  };
+
+  const candidates = [
+    payload.task_instruction_ja,
+    payload.instruction_text,
+    payload.instructionText,
+    payload.text,
+    payload.prompt,
+    payload.message,
+    payload.instruction,
+    payload.request && typeof payload.request === "object" ? payload.request.instruction : undefined,
+    payload.request && typeof payload.request === "object" ? payload.request.text : undefined,
+    payload.payload && typeof payload.payload === "object" ? payload.payload.instruction : undefined,
+    payload.payload && typeof payload.payload === "object" ? payload.payload.text : undefined,
+    payload.body && typeof payload.body === "object" ? payload.body.instruction : undefined,
+    payload.body && typeof payload.body === "object" ? payload.body.text : undefined
+  ];
+
+  const normalizedInstructionText = candidates.map(pickText).find(Boolean) || "";
+  if (!normalizedInstructionText) {
+    return payload;
+  }
+
+  if (!payload.task_instruction_ja || String(payload.task_instruction_ja).trim() === "") {
+    return {
+      ...payload,
+      task_instruction_ja: normalizedInstructionText
+    };
+  }
+
+  return payload;
+}
+// AIWORKEROS_R84_G19_R3_ROUTE_VALIDATION_NORMALIZATION_END
+
+
 function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
+  const normalizedInstructionText = aiwR84NormalizeRuntimeInstructionText(payload);
+  if (normalizedInstructionText && (!payload.task_instruction_ja || String(payload.task_instruction_ja).trim() === "")) {
+    payload = {
+      ...payload,
+      task_instruction_ja: normalizedInstructionText
+    };
+  }
+
   const idempotencyKey = payload.idempotency_key || idempotencyKeyFromHeader || "";
   const sourceRouteCode = String(
     payload.source_route_code ||
@@ -4200,6 +4333,25 @@ function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
     throw e;
   }
 
+  // AIWORKEROS_R84_G19_R9_R6_CREATE_RUNTIME_REQUEST_INSTRUCTION_NORMALIZATION_START
+  if (!aiwR84NormalizeRuntimeInstructionText(payload.task_instruction_ja)) {
+    const aiwR84R6InstructionTextForValidation = aiwR84NormalizeRuntimeInstructionText(
+      payload.instruction_text ||
+      payload.instructionText ||
+      payload.taskInstruction ||
+      payload.task_instruction ||
+      payload.instruction ||
+      payload.prompt ||
+      payload.prompt_ja ||
+      payload.task_description ||
+      payload.taskDescription ||
+      ""
+    );
+    if (aiwR84R6InstructionTextForValidation) {
+      payload.task_instruction_ja = aiwR84R6InstructionTextForValidation;
+    }
+  }
+  // AIWORKEROS_R84_G19_R9_R6_CREATE_RUNTIME_REQUEST_INSTRUCTION_NORMALIZATION_END
   const required = ["app_surface_code", "model_code", "task_domain_code", "task_title", "task_instruction_ja"];
   for (const key of required) {
     if (!payload[key] || String(payload[key]).trim() === "") {
