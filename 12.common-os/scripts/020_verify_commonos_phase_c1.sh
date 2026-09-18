@@ -82,7 +82,7 @@ require_grep "Retry now" "$ROOT/CommonSyncPresentation/dist/commonos.sync.js" "r
 require_grep "aria-live" "$ROOT/CommonUIRuntime/dist/commonos.runtime.js" "state announcement support present"
 require_grep ":focus-visible" "$ROOT/CommonUIRuntime/dist/commonos.components.css" "focus visibility present"
 require_grep "role: \"dialog\"" "$ROOT/CommonUIRuntime/dist/commonos.runtime.js" "semantic dialog role present"
-require_grep "queue meaning remains in the owning domain" "$ROOT/CommonOSPlayground/dist/index.html" "boundary note present"
+require_grep "business meaning remains in the owning domain" "$ROOT/CommonOSPlayground/dist/index.html" "boundary note present"
 
 {
   printf '%s\n' '============================================================'
