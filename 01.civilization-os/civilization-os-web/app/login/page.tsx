@@ -12,7 +12,8 @@ import {
 import {
   createCivilizationSession,
   hasActiveCivilizationSession,
-  saveCivilizationSession
+  saveCivilizationSession,
+  withCivilizationSessionLocale
 } from "@/lib/civilization-session";
 import {
   resolveCivilizationLoginAccount,
@@ -94,13 +95,16 @@ export default function LoginPage() {
     }
 
     saveCivilizationSession(
-      createCivilizationSession({
-        loginMethod: "civilization",
-        loginIdentifier: account.civilizationId,
-        requestedOsCode: redirectContext.requestedOsCode,
-        returnTo: redirectContext.returnTo,
-        afterLoginPath: redirectContext.afterLoginPath
-      })
+      withCivilizationSessionLocale(
+        createCivilizationSession({
+          loginMethod: "civilization",
+          loginIdentifier: account.civilizationId,
+          requestedOsCode: redirectContext.requestedOsCode,
+          returnTo: redirectContext.returnTo,
+          afterLoginPath: redirectContext.afterLoginPath
+        }),
+        redirectContext.localeCode ?? redirectContext.languageCode
+      )
     );
 
     setMessage(t(locale, "auth.contractNotice"));

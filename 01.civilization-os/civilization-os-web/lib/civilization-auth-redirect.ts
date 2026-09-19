@@ -1,4 +1,6 @@
 const passthroughKeys = [
+  "locale_code",
+  "localeCode",
   "language_code",
   "after_login_path",
   "return_to",
@@ -8,7 +10,18 @@ const passthroughKeys = [
   "aerialAccessToken"
 ] as const;
 
+function normalizeLoginLocaleCode(value: string | null | undefined, fallbackLanguageCode = "ja"): "ja-jp" | "en-us" {
+  const raw = String(value ?? fallbackLanguageCode ?? "ja").trim().toLowerCase().replace("_", "-");
+  if (raw === "en" || raw === "en-us" || raw.startsWith("en-")) return "en-us";
+  return "ja-jp";
+}
+
+function toLoginLanguageCode(value: string | null | undefined, fallbackLanguageCode = "ja"): "ja" | "en" {
+  return normalizeLoginLocaleCode(value, fallbackLanguageCode) === "en-us" ? "en" : "ja";
+}
+
 export type LoginRedirectContext = {
+  localeCode: string;
   languageCode: string;
   afterLoginPath: string;
   returnTo: string;
@@ -29,9 +42,21 @@ export function sanitizeInternalPath(value: string | null | undefined, fallback:
 
 export function readLoginRedirectContext(search: string, fallbackLanguageCode = "ja"): LoginRedirectContext {
   const params = new URLSearchParams(search);
-  const languageCode = params.get("language_code") || fallbackLanguageCode;
+  const localeCode = normalizeLoginLocaleCode(
+    params.get("locale_code") ||
+      params.get("localeCode") ||
+      params.get("locale") ||
+      params.get("lang") ||
+      params.get("language_code"),
+    fallbackLanguageCode
+  );
+  const languageCode =
+    params.get("language_code") ||
+    params.get("languageCode") ||
+    toLoginLanguageCode(localeCode, fallbackLanguageCode);
 
   return {
+    localeCode,
     languageCode,
     afterLoginPath: sanitizeInternalPath(params.get("after_login_path"), "/civilization-menu"),
     returnTo: sanitizeInternalPath(params.get("return_to"), "/"),
@@ -44,6 +69,7 @@ export function buildAfterLoginUrl(search: string, fallbackLanguageCode = "ja"):
   const context = readLoginRedirectContext(search, fallbackLanguageCode);
   const nextParams = new URLSearchParams();
 
+  nextParams.set("locale_code", context.localeCode);
   nextParams.set("language_code", context.languageCode);
   nextParams.set("return_to", context.returnTo);
   nextParams.set("requested_os_code", context.requestedOsCode);
@@ -61,6 +87,9 @@ export function buildOauthStartUrl(provider: "google" | "yahoo", search: string,
   const params = new URLSearchParams();
 
   params.set("provider", provider);
+  if (!source.get("locale_code") && !source.get("localeCode")) {
+    params.set("locale_code", normalizeLoginLocaleCode(source.get("language_code"), fallbackLanguageCode));
+  }
   if (!source.get("language_code")) {
     params.set("language_code", fallbackLanguageCode);
   }
@@ -77,6 +106,7 @@ export function appendLoginRedirectParams(target: URLSearchParams, sourceSearch:
   const source = new URLSearchParams(sourceSearch);
   const context = readLoginRedirectContext(sourceSearch, fallbackLanguageCode);
 
+  target.set("locale_code", context.localeCode);
   target.set("language_code", context.languageCode);
   target.set("after_login_path", context.afterLoginPath);
   target.set("return_to", context.returnTo);

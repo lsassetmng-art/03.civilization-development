@@ -1,12 +1,20 @@
 import { randomBytes } from "crypto";
 import type { OAuthProviderCode } from "@/lib/oauth-provider-config";
 
+function normalizeOAuthLocaleCode(value: unknown, fallbackLanguageCode: string = "ja"): "ja-jp" | "en-us" {
+  const raw = String(value ?? fallbackLanguageCode ?? "ja").trim().toLowerCase().replace("_", "-");
+  if (raw === "en" || raw === "en-us" || raw.startsWith("en-")) return "en-us";
+  return "ja-jp";
+}
+
+
 export const OAUTH_STATE_COOKIE_NAME = "civilization_oauth_state";
 export const OAUTH_CONTEXT_COOKIE_NAME = "civilization_oauth_context";
 export const OAUTH_COOKIE_MAX_AGE_SECONDS = 10 * 60;
 
 export type OAuthCallbackContext = {
   provider: OAuthProviderCode;
+  localeCode: string;
   languageCode: string;
   afterLoginPath: string;
   returnTo: string;
@@ -47,12 +55,14 @@ export function normalizeSafeRedirectPath(value: string | null | undefined, fall
 
 export function createOAuthCallbackContext(input: {
   provider: OAuthProviderCode;
+  localeCode: string;
   languageCode: string;
   afterLoginPath: string;
   returnTo: string;
 }): OAuthCallbackContext {
   return {
     provider: input.provider,
+    localeCode: normalizeOAuthLocaleCode(input.localeCode ?? input.languageCode),
     languageCode: input.languageCode,
     afterLoginPath: normalizeSafeRedirectPath(input.afterLoginPath, "/civilization-menu"),
     returnTo: normalizeSafeRedirectPath(input.returnTo, "/"),
@@ -77,6 +87,7 @@ export function decodeOAuthCallbackContext(value: string | undefined): OAuthCall
 
     return {
       provider: parsed.provider,
+      localeCode: normalizeOAuthLocaleCode((parsed as { localeCode?: unknown; locale_code?: unknown }).localeCode ?? (parsed as { locale_code?: unknown }).locale_code ?? parsed.languageCode),
       languageCode: normalizeOAuthLanguageCode(parsed.languageCode),
       afterLoginPath: normalizeSafeRedirectPath(parsed.afterLoginPath, "/civilization-menu"),
       returnTo: normalizeSafeRedirectPath(parsed.returnTo, "/"),

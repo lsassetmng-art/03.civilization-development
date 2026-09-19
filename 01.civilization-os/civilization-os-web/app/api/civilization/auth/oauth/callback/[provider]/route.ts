@@ -203,6 +203,7 @@ function buildSessionFromUserInfo(input: {
       safeString(input.userInfo.nickname) ??
       input.provider + " user",
     email: safeString(input.userInfo.email),
+    localeCode: input.context.localeCode ?? (input.context.languageCode === "en" ? "en-us" : "ja-jp"),
     languageCode: input.context.languageCode,
     createdAt: now.toISOString(),
     expiresAt: expiresAt.toISOString()

@@ -11,6 +11,13 @@ import {
 } from "@/lib/oauth-state";
 import { NextRequest, NextResponse } from "next/server";
 
+function normalizeOAuthStartLocaleCode(value: string | null | undefined): "ja-jp" | "en-us" {
+  const raw = String(value ?? "ja").trim().toLowerCase().replace("_", "-");
+  if (raw === "en" || raw === "en-us" || raw.startsWith("en-")) return "en-us";
+  return "ja-jp";
+}
+
+
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
@@ -42,7 +49,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const languageCode = normalizeOAuthLanguageCode(request.nextUrl.searchParams.get("language_code"));
+  const localeCode = normalizeOAuthStartLocaleCode(
+    request.nextUrl.searchParams.get("locale_code") ||
+      request.nextUrl.searchParams.get("localeCode") ||
+      request.nextUrl.searchParams.get("language_code")
+  );
+  const languageCode = normalizeOAuthLanguageCode(
+    request.nextUrl.searchParams.get("language_code") || (localeCode === "en-us" ? "en" : "ja")
+  );
   const afterLoginPath = normalizeSafeRedirectPath(
     request.nextUrl.searchParams.get("after_login_path"),
     "/civilization-menu"
@@ -51,6 +65,7 @@ export async function GET(request: NextRequest) {
   const state = createOAuthState();
   const context = createOAuthCallbackContext({
     provider,
+    localeCode,
     languageCode,
     afterLoginPath,
     returnTo
