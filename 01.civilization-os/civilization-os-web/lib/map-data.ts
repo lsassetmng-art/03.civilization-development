@@ -73,3 +73,206 @@ export function getContinentByCode(locale: SupportedLocale, code: string | null 
   const continents = getGlobalMapContinents(locale);
   return continents.find((continent) => continent.code === code) ?? continents[0];
 }
+
+
+// ============================================================
+// R11_NAVIGATION_SLICE_BEGIN
+//
+// Runtime navigation projection only.
+// This does not create nation truth, entitlement truth,
+// Persona ownership truth, or head-of-state truth.
+// ============================================================
+
+export type R11ContinentCode =
+  | "north-continent"
+  | "central-continent"
+  | "south-continent";
+
+export type R11LiveNationCode =
+  | "helios"
+  | "nova"
+  | "seiwa"
+  | "gladia"
+  | "orpheus"
+  | "free-cities-union";
+
+export type R11HistoricalNationCode = "aurelia";
+
+export type R11NationCode =
+  | R11LiveNationCode
+  | R11HistoricalNationCode;
+
+export type R11NationEntry = {
+  code: R11NationCode;
+  name: string;
+  runtimeClass:
+    | "CURRENT_SEED_NATION"
+    | "HISTORICAL_DISMANTLED";
+};
+
+const R11_CONTINENT_NATIONS: Record<
+  R11ContinentCode,
+  readonly R11NationEntry[]
+> = {
+  "north-continent": [
+    {
+      code: "helios",
+      name: "Helios Democratic Kingdom",
+      runtimeClass: "CURRENT_SEED_NATION",
+    },
+  ],
+
+  "central-continent": [
+    {
+      code: "nova",
+      name: "Nova Commercial Federation",
+      runtimeClass: "CURRENT_SEED_NATION",
+    },
+    {
+      code: "seiwa",
+      name: "Seiwa State",
+      runtimeClass: "CURRENT_SEED_NATION",
+    },
+    {
+      code: "gladia",
+      name: "Gladia Military Alliance",
+      runtimeClass: "CURRENT_SEED_NATION",
+    },
+  ],
+
+  "south-continent": [
+    {
+      code: "orpheus",
+      name: "Orpheus Oceanic Union",
+      runtimeClass: "CURRENT_SEED_NATION",
+    },
+    {
+      code: "aurelia",
+      name: "Aurelia Federal Republic",
+      runtimeClass: "HISTORICAL_DISMANTLED",
+    },
+    {
+      code: "free-cities-union",
+      name: "Free Cities Union",
+      runtimeClass: "CURRENT_SEED_NATION",
+    },
+  ],
+};
+
+const R11_NATION_CITIES: Record<
+  R11LiveNationCode,
+  readonly string[]
+> = {
+  helios: [
+    "helios_city",
+    "uno",
+    "due",
+    "tre",
+    "quattro",
+    "cinque",
+    "sei",
+    "sette",
+    "otto",
+  ],
+
+  nova: [
+    "center_commercial_city",
+    "asic_city",
+    "gold_city",
+    "bad_drunk",
+    "silver_gate",
+    "cloud_city",
+    "north_port",
+    "south_gate",
+    "lumina",
+    "market_hill",
+  ],
+
+  seiwa: [
+    "kyo",
+    "aomine",
+    "kamihiryo",
+    "higashi_kakona",
+    "nishi_keihin",
+    "minami_kiyohara",
+    "tetsuo",
+    "shin_seigaku",
+    "kita_seihama",
+    "gakuto_shirasagi",
+  ],
+
+  gladia: [
+    "third_base",
+    "first_port_base",
+    "second_base",
+    "fourth_port_base",
+    "west_border_line",
+    "fifth_arsenal_zone",
+    "east_logistics_city",
+    "south_armor_city",
+    "north_training_zone",
+  ],
+
+  orpheus: [
+    "ye_moja",
+    "ye_elewa",
+    "ye_salima",
+    "ye_tuba",
+    "ye_kara",
+    "ye_noa",
+  ],
+
+  "free-cities-union": [
+    "liberta",
+    "freedal",
+    "autonova",
+    "liberos",
+    "freiheim",
+    "sovoda",
+    "azadia",
+    "eleusa",
+    "nondomina",
+    "opena",
+    "concordia",
+    "selefa",
+  ],
+};
+
+export function isR11ContinentCode(
+  value: string | null,
+): value is R11ContinentCode {
+  return (
+    value === "north-continent" ||
+    value === "central-continent" ||
+    value === "south-continent"
+  );
+}
+
+export function isR11LiveNationCode(
+  value: string | null,
+): value is R11LiveNationCode {
+  return (
+    value === "helios" ||
+    value === "nova" ||
+    value === "seiwa" ||
+    value === "gladia" ||
+    value === "orpheus" ||
+    value === "free-cities-union"
+  );
+}
+
+export function getR11ContinentNationEntries(
+  continent: R11ContinentCode,
+): readonly R11NationEntry[] {
+  return R11_CONTINENT_NATIONS[continent];
+}
+
+export function getR11CitiesForNation(
+  nation: R11LiveNationCode,
+): readonly string[] {
+  return R11_NATION_CITIES[nation];
+}
+
+// ============================================================
+// R11_NAVIGATION_SLICE_END
+// ============================================================
