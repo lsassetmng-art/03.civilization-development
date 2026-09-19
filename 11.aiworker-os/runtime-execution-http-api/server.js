@@ -2,10 +2,198 @@
 
 // GKD4E_R3_GUARDRAIL_COMMONJS_START
 const guardrailRuntimePreflight = require("./guardrail/guardrail-runtime-preflight.cjs");
+const {
+  createRuntimeIntakeService,
+  referenceFilesTextToSourceFiles
+} = require("./lib/runtime-intake/runtime-intake-service.cjs");
 
 async function gkd4eR3RunRuntimeGuardrailPreflight(runtimeRequest) {
   return guardrailRuntimePreflight.runAndPersistGuardrailPreflight(runtimeRequest);
 }
+
+// AIWORKEROS_R85_RUNTIME_INTAKE_UNIFICATION_START
+function aiwR85ResolveServerAllowedSourceRoots() {
+  const defaultAicmRoot = path.resolve(
+    __dirname,
+    "../../03.business-os/AICompanyManager/storage/runtime-source-files"
+  );
+
+  return [defaultAicmRoot];
+}
+async function aiwR85PrepareSourceMaterial(
+  payload
+) {
+  if (!aiwR78HasSourceMaterialInput(payload)) {
+    return {
+      ok: true,
+      payload
+    };
+  }
+
+  const adapterResult =
+    await Promise.resolve(
+      aiwR78BuildRuntimeRequestFromQueueItem(
+        payload,
+        {
+          // Server policy only.
+          // Caller-supplied root expansion is not forwarded.
+          allowedSourceRoots:
+            aiwR85ResolveServerAllowedSourceRoots(),
+          maxBytes:
+            2 * 1024 * 1024,
+          rejectOnInvalidSourceFile: true
+        }
+      )
+    );
+
+  if (
+    !adapterResult ||
+    adapterResult.ok !== true
+  ) {
+    return {
+      ok: false,
+      statusCode:
+        Number(
+          adapterResult &&
+          adapterResult.statusCode
+        ) || 400,
+      reason:
+        adapterResult &&
+        adapterResult.reason
+          ? adapterResult.reason
+          : "SOURCE_MATERIAL_VALIDATION_FAILED",
+      message:
+        adapterResult &&
+        adapterResult.message
+          ? adapterResult.message
+          : "source material validation failed",
+      retryable: Boolean(
+        adapterResult &&
+        adapterResult.retryable
+      ),
+      validation_errors:
+        adapterResult &&
+        Array.isArray(
+          adapterResult.validation_errors
+        )
+          ? adapterResult.validation_errors
+          : [],
+      warnings:
+        adapterResult &&
+        Array.isArray(
+          adapterResult.warnings
+        )
+          ? adapterResult.warnings
+          : []
+    };
+  }
+
+  return {
+    ok: true,
+    payload:
+      aiwR78MergeRuntimePayload(
+        payload,
+        adapterResult.runtime_request
+      )
+  };
+}
+
+async function aiwR85BuildKnowledgeContext(
+  payload
+) {
+  const routingContext =
+    await aiwR83NormalizeRuntimeKnowledgeRoutingContext(
+      payload,
+      payload,
+      {
+        routeCode:
+          "r85_runtime_intake",
+        queryFn:
+          aiwR83RuntimeKnowledgeRoutingQueryFn
+      }
+    );
+
+  return {
+    ok: true,
+    payload:
+      aiwR83MergeRuntimeKnowledgeRoutingContext(
+        payload,
+        routingContext
+      )
+  };
+}
+
+function aiwR85IntakeFailureToError(
+  intake
+) {
+  const contract =
+    intake &&
+    intake.error &&
+    typeof intake.error === "object"
+      ? intake.error
+      : {};
+
+  const error =
+    new Error(
+      String(
+        contract.message ||
+        "AIWorkerOS runtime intake failed"
+      )
+    );
+
+  error.code =
+    String(
+      contract.code ||
+      "RUNTIME_INTAKE_FAILED"
+    );
+
+  error.httpStatus =
+    Number(
+      intake &&
+      intake.statusCode
+    ) || 500;
+
+  error.retryable =
+    Boolean(contract.retryable);
+
+  return error;
+}
+
+let aiwR85RuntimeIntakeServiceInstance =
+  null;
+
+function aiwR85RuntimeIntakeService() {
+  if (
+    aiwR85RuntimeIntakeServiceInstance
+  ) {
+    return aiwR85RuntimeIntakeServiceInstance;
+  }
+
+  aiwR85RuntimeIntakeServiceInstance =
+    createRuntimeIntakeService({
+      prepareSourceMaterial:
+        aiwR85PrepareSourceMaterial,
+
+      buildKnowledgeContext:
+        aiwR85BuildKnowledgeContext,
+
+      runGuardrailPreflight:
+        guardrailRuntimePreflight
+          .runGuardrailPreflight,
+
+      persistGuardrailResult:
+        guardrailRuntimePreflight
+          .persistGuardrailRuntimeCheckResult,
+
+      createRuntimeRequestCore:
+        createRuntimeRequest,
+
+      logger: console
+    });
+
+  return aiwR85RuntimeIntakeServiceInstance;
+}
+// AIWORKEROS_R85_RUNTIME_INTAKE_UNIFICATION_END
 // GKD4E_R3_GUARDRAIL_COMMONJS_END
 
 // AIWORKEROS_V10L_C2G_B6R44F_SOURCE_ROUTE_METADATA_START
@@ -4424,8 +4612,25 @@ const server = http.createServer(async (req, res) => {
       }
 
       const idempotencyKey = req.headers["idempotency-key"] || "";
-      const result = createRuntimeRequest(payload, idempotencyKey);
-      return sendJson(res, 201, result);
+      const intake = await aiwR85RuntimeIntakeService().execute({
+        channel: "http",
+        payload,
+        idempotencyKey
+      });
+
+      if (!intake.ok) {
+        return sendJson(
+          res,
+          intake.statusCode || 400,
+          intake
+        );
+      }
+
+      return sendJson(
+        res,
+        intake.statusCode || 201,
+        intake.result
+      );
     }
 
     return sendJson(res, 404, {
@@ -4557,6 +4762,11 @@ function aiwB6R97R14BuildPayload(row) {
     "source_route_code: " + sourceRouteCode
   ].filter(Boolean).join("\n\n");
 
+  const sourceFiles =
+    referenceFilesTextToSourceFiles(
+      row.reference_files_text
+    );
+
   return {
     app_surface_code: String(meta.app_surface_code || "ai_company_manager"),
     model_code: String(meta.model_code || "byd2_003_asic_leader3"),
@@ -4567,6 +4777,9 @@ function aiwB6R97R14BuildPayload(row) {
     source_request_ref: workUnitId,
     requested_by_ref: String(meta.requested_by_ref || "AIWorkerOSConsumer"),
     source_route_code: sourceRouteCode,
+    ...(sourceFiles.length > 0
+      ? { source_files: sourceFiles }
+      : {}),
     metadata_jsonb: {
       aicm_worker_work_unit_id: workUnitId,
       owner_civilization_id: row.owner_civilization_id || "",
@@ -4617,6 +4830,16 @@ function aiwB6R97R14MarkFailed(row, error) {
   const id = row && row.aicm_worker_work_unit_id;
   if (!aiwB6R97R14IsUuid(id)) return;
 
+  const retryable =
+    !(error && error.retryable === false);
+
+  // Nonretryable failures must not match the claim selector:
+  // waiting/waiting_for_artifact_zip OR retryable=true.
+  const nextExecutionState =
+    retryable
+      ? "waiting"
+      : "processing";
+
   // AIW_B6R97R17_PSQL_STDIN_SAFE_ERROR_PATCH: never store DB URL or full SQL command in metadata.
   const rawMessage = String(error && error.message ? error.message : error);
   const message = rawMessage
@@ -4630,8 +4853,8 @@ function aiwB6R97R14MarkFailed(row, error) {
   const sql = [
     "update business.aicm_worker_work_unit",
     "set metadata_jsonb = coalesce(metadata_jsonb, '{}'::jsonb) || jsonb_build_object(",
-    "  'aiworkeros_execution_state', 'waiting',",
-    "  'aiworkeros_retryable', 'true',",
+    "  'aiworkeros_execution_state', " + aiwB6R97R14SqlLiteral(nextExecutionState) + ",",
+    "  'aiworkeros_retryable', " + aiwB6R97R14SqlLiteral(retryable ? "true" : "false") + ",",
     "  'aiworkeros_consumer_claim_state', 'failed',",
     "  'aiworkeros_last_error', " + aiwB6R97R14SqlLiteral(message) + ",",
     "  'aiworkeros_last_failed_at', now()::text",
@@ -4940,8 +5163,26 @@ async function aiwB6R97R14ConsumerOnce(reason) {
       const payload = aiwB6R97R14BuildPayload(row);
       const idempotencyKey = "aiworker-consumer-b6r97r14:" + String(row.aicm_worker_work_unit_id || "");
       try {
-        const result = aiwR78CreateRuntimeRequestWithSourceMaterial(payload, idempotencyKey); // AIW_R78_QUEUE_INTAKE_WIRING_CALL
-        aiwB6R97R14RecordSuccess(row, result, payload);
+        const intake =
+          await aiwR85RuntimeIntakeService().execute({
+            channel: "queue",
+            payload,
+            idempotencyKey
+          });
+
+        if (!intake.ok) {
+          aiwB6R97R14MarkFailed(
+            row,
+            aiwR85IntakeFailureToError(intake)
+          );
+          continue;
+        }
+
+        aiwB6R97R14RecordSuccess(
+          row,
+          intake.result,
+          intake.request || payload
+        );
         processed += 1;
       } catch (error) {
         aiwB6R97R14MarkFailed(row, error);
