@@ -76,6 +76,7 @@ require_grep "processing" "$ROOT/CommonSyncPresentation/dist/commonos.sync.js" "
 require_grep "retry_wait" "$ROOT/CommonSyncPresentation/dist/commonos.sync.js" "retry_wait queue surface present"
 require_grep "sent" "$ROOT/CommonSyncPresentation/dist/commonos.sync.js" "sent queue surface present"
 require_grep "failed" "$ROOT/CommonSyncPresentation/dist/commonos.sync.js" "failed queue surface present"
+require_grep "cancelled: { label: \"cancelled\", kind: \"muted\"" "$ROOT/CommonSyncPresentation/dist/commonos.sync.js" "cancelled queue surface present"
 require_grep "conflict" "$ROOT/CommonSyncPresentation/dist/commonos.sync.js" "conflict queue surface present"
 require_grep "Retry now" "$ROOT/CommonSyncPresentation/dist/commonos.sync.js" "retry action entry point present"
 

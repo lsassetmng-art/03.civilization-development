@@ -8,6 +8,7 @@
     retry_wait: { label: "retry_wait", kind: "warning", copy: "Waiting before the next retry." },
     sent: { label: "sent", kind: "success", copy: "Latest payload was sent successfully." },
     failed: { label: "failed", kind: "danger", copy: "The last sync attempt failed." },
+    cancelled: { label: "cancelled", kind: "muted", copy: "This queued item was cancelled." },
     conflict: { label: "conflict", kind: "danger", copy: "A conflict requires review before apply." }
   };
 
@@ -59,7 +60,7 @@
   }
 
   global.CommonOSSync = {
-    STATES: ["offline", "pending", "processing", "retry_wait", "sent", "failed", "conflict"],
+    STATES: ["offline", "pending", "processing", "retry_wait", "sent", "failed", "cancelled", "conflict"],
     queueCard: queueCard,
     queueGrid: queueGrid
   };
