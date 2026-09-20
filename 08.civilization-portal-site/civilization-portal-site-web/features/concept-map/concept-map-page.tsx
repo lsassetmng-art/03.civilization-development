@@ -11,7 +11,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { buildCivilizationAuthUrl } from "../../lib/auth/civilization-auth-gate";
 
-type NodePosition = "center" | "top" | "left" | "right" | "bottom" | "bottomRight";
+type NodePosition = "center" | "top" | "left" | "right" | "bottom" | "bottomRight" | "bottomLeft";
 type NodeAction = "link" | "back";
 
 type AuthGateSpec = {

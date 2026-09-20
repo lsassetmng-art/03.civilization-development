@@ -61,6 +61,14 @@ export default function Page() {
           position: "left",
           ariaLabel: "AIWorkerメニュー",
         },
+          {
+            id: "lifeos",
+            label: "LifeOS",
+            href: "/lifeos",
+            asset: `${assetBase}/metallic-settings-silver.svg`,
+            position: "bottomLeft",
+            ariaLabel: "LifeOSメニュー",
+          },
         {
           id: "ai-support",
           label: "AIサポート",
