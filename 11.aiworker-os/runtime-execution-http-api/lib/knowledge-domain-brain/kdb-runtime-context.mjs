@@ -116,7 +116,9 @@ async function resolveKdbHelpdeskProviderForRuntimeContext(runtimeArgs = {}) {
     runtimeContext: runtimeArgs?.runtimeContext ?? runtimeArgs,
     appCode: runtimeArgs?.appCode ?? runtimeArgs?.sourceAppCode ?? runtimeArgs?.source_app_code,
     sourceAppCode: runtimeArgs?.sourceAppCode ?? runtimeArgs?.source_app_code,
-    locale: runtimeArgs?.locale ?? runtimeArgs?.languageCode ?? runtimeArgs?.language_code,
+    locale: aiwMlR2NormalizeKdbLocaleCode(runtimeArgs?.locale_code ?? runtimeArgs?.localeCode ?? runtimeArgs?.locale ?? runtimeArgs?.languageCode ?? runtimeArgs?.language_code),
+    localeCode: aiwMlR2NormalizeKdbLocaleCode(runtimeArgs?.locale_code ?? runtimeArgs?.localeCode ?? runtimeArgs?.locale ?? runtimeArgs?.languageCode ?? runtimeArgs?.language_code),
+    languageCode: aiwMlR2KdbLanguageCode(runtimeArgs?.locale_code ?? runtimeArgs?.localeCode ?? runtimeArgs?.locale ?? runtimeArgs?.languageCode ?? runtimeArgs?.language_code),
     userQuestion: runtimeArgs?.userQuestion ?? runtimeArgs?.instructionText ?? runtimeArgs?.instruction_text,
     requestKind: runtimeArgs?.requestKind ?? runtimeArgs?.request_kind,
     screenCode: runtimeArgs?.screenCode ?? runtimeArgs?.screen_code,
@@ -146,6 +148,17 @@ function mergeKdbHelpdeskUsageSummary(baseValue, providerValue) {
   };
 }
 // KDB_HELPDESK_PROVIDER_WIRING_END
+
+function aiwMlR2NormalizeKdbLocaleCode(value) {
+  const normalized = String(value ?? "").trim().toLowerCase().replace(/_/g, "-");
+  if (normalized === "en" || normalized === "en-us" || normalized.startsWith("en-")) return "en-us";
+  return "ja-jp";
+}
+
+function aiwMlR2KdbLanguageCode(value) {
+  return aiwMlR2NormalizeKdbLocaleCode(value) === "en-us" ? "en" : "ja";
+}
+
 
 export async function buildKnowledgeRuntimeContext(args = {}) {
   const classification = classifyKnowledgeDomains(args);

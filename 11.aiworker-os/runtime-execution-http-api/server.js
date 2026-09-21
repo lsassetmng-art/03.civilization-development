@@ -738,6 +738,103 @@ function aiwB6R44gR4ExposeSourceRoutePayload(payload) {
 
 const http = require("http");
 const { buildRuntimeBrainContext, renderPromptBrainContext } = require("./brain-context-bridge.js");
+/* AIWORKEROS_MULTILINGUAL_R2_LOCALE_HELPERS */
+function aiwMlR2Text(value) {
+  if (value == null) return "";
+  return String(value).trim();
+}
+
+function aiwMlR2PickLocaleSource(source) {
+  if (!source || typeof source !== "object") return "";
+  return aiwMlR2Text(
+    source.locale_code ??
+      source.localeCode ??
+      source.locale ??
+      source.language_code ??
+      source.languageCode ??
+      (source.metadata_jsonb && source.metadata_jsonb.locale_code) ??
+      (source.metadata_jsonb && source.metadata_jsonb.localeCode) ??
+      (source.metadata_jsonb && source.metadata_jsonb.locale) ??
+      (source.metadata_jsonb && source.metadata_jsonb.language_code) ??
+      (source.metadata_jsonb && source.metadata_jsonb.languageCode) ??
+      (source.app_read_payload_jsonb && source.app_read_payload_jsonb.locale_code) ??
+      (source.app_read_payload_jsonb && source.app_read_payload_jsonb.localeCode) ??
+      (source.app_read_payload_jsonb && source.app_read_payload_jsonb.locale) ??
+      (source.app_read_payload_jsonb && source.app_read_payload_jsonb.language_code) ??
+      (source.app_read_payload_jsonb && source.app_read_payload_jsonb.languageCode)
+  );
+}
+
+function aiwMlR2NormalizeLocaleCode(...sources) {
+  const raw = sources
+    .map(aiwMlR2PickLocaleSource)
+    .find(Boolean) || sources.map(aiwMlR2Text).find(Boolean) || "ja-jp";
+  const normalized = raw.toLowerCase().replace(/_/g, "-");
+  if (normalized === "en" || normalized === "en-us" || normalized.startsWith("en-")) return "en-us";
+  return "ja-jp";
+}
+
+function aiwMlR2LanguageCode(localeCode) {
+  return aiwMlR2NormalizeLocaleCode(localeCode) === "en-us" ? "en" : "ja";
+}
+
+function aiwMlR2OutputLanguageInstruction(localeCode) {
+  return aiwMlR2NormalizeLocaleCode(localeCode) === "en-us"
+    ? "Output language: English. Keep schema keys and existing database field names unchanged."
+    : "出力言語: 日本語。スキーマキーと既存DBフィールド名は変更しない。";
+}
+
+function aiwMlR2LocaleContext(...sources) {
+  const localeCode = aiwMlR2NormalizeLocaleCode(...sources);
+  const languageCode = aiwMlR2LanguageCode(localeCode);
+  return {
+    localeCode,
+    languageCode,
+    locale_code: localeCode,
+    language_code: languageCode,
+    outputLanguageInstruction: aiwMlR2OutputLanguageInstruction(localeCode)
+  };
+}
+
+function aiwMlR2IsPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function aiwMlR2AttachLocaleMetadata(target, ...sources) {
+  if (!aiwMlR2IsPlainObject(target)) return target;
+  const localeContext = aiwMlR2LocaleContext(target, ...sources);
+  target.localeCode = target.localeCode || localeContext.localeCode;
+  target.languageCode = target.languageCode || localeContext.languageCode;
+  target.locale_code = target.locale_code || localeContext.localeCode;
+  target.language_code = target.language_code || localeContext.languageCode;
+  target.outputLanguageInstruction = target.outputLanguageInstruction || localeContext.outputLanguageInstruction;
+  if (aiwMlR2IsPlainObject(target.outputPayload)) {
+    target.outputPayload.localeCode = target.outputPayload.localeCode || localeContext.localeCode;
+    target.outputPayload.languageCode = target.outputPayload.languageCode || localeContext.languageCode;
+    target.outputPayload.outputLanguageInstruction =
+      target.outputPayload.outputLanguageInstruction || localeContext.outputLanguageInstruction;
+  }
+  if (aiwMlR2IsPlainObject(target.output_contract)) {
+    target.output_contract.localeCode = target.output_contract.localeCode || localeContext.localeCode;
+    target.output_contract.languageCode = target.output_contract.languageCode || localeContext.languageCode;
+    target.output_contract.outputLanguageInstruction =
+      target.output_contract.outputLanguageInstruction || localeContext.outputLanguageInstruction;
+  }
+  if (aiwMlR2IsPlainObject(target.generationBasis)) {
+    target.generationBasis.localeCode = target.generationBasis.localeCode || localeContext.localeCode;
+    target.generationBasis.languageCode = target.generationBasis.languageCode || localeContext.languageCode;
+  }
+  return target;
+}
+
+function aiwMlR2PrefixInstruction(instruction, localeCode) {
+  const base = aiwMlR2Text(instruction);
+  const languageInstruction = aiwMlR2OutputLanguageInstruction(localeCode);
+  if (!base) return languageInstruction;
+  if (base.includes(languageInstruction)) return base;
+  return languageInstruction + "\n\n" + base;
+}
+
 const { URL } = require("url");
 const { spawnSync } = require("child_process");
 const fs = require("fs");
@@ -3115,6 +3212,7 @@ function aiwB6R95R3D1CreateZipAndAttach(responsePayload, deliverable) {
   const path = require("path");
 
   const response = responsePayload && typeof responsePayload === "object" ? responsePayload : {};
+  aiwMlR2AttachLocaleMetadata(response, responsePayload, deliverable, deliverable && deliverable.outputPayload);
   const packageMeta = deliverable?.deliverablePackage || aiwB6R95R3D1BuildZipPackageMeta("requester", "deliverables");
   const generatedArtifacts = aiwB6R95R3D1BuildGeneratedArtifacts(aiwB6R97R43MergeProvidedBodyIntoDeliverable(deliverable, ...arguments, deliverable));
 
@@ -4038,6 +4136,8 @@ function aiwR78ResolveRuntimeAllowedSourceRoots(payload) {
 }
 
 function aiwR78MergeRuntimePayload(existingPayload, runtimeRequest) {
+  runtimeRequest = aiwMlR2AttachLocaleMetadata(runtimeRequest, runtimeRequest, existingPayload);
+  existingPayload = aiwMlR2AttachLocaleMetadata(existingPayload, runtimeRequest, existingPayload);
   if (!aiwR78IsPlainObject(existingPayload)) {
     return runtimeRequest;
   }
@@ -4491,7 +4591,7 @@ function createRuntimeRequest(payload, idempotencyKeyFromHeader) {
     model_code: payload.model_code,
     task_domain_code: payload.task_domain_code,
     task_title: payload.task_title,
-    task_instruction_ja: payload.task_instruction_ja,
+    task_instruction_ja: aiwMlR2PrefixInstruction(payload.task_instruction_ja, aiwMlR2LocaleContext(payload).localeCode),
     source_app_ref: payload.source_app_ref || "HTTP_LOCAL",
     source_request_ref: payload.source_request_ref || "",
     source_route_code: sourceRouteCode,
@@ -4580,6 +4680,9 @@ const server = http.createServer(async (req, res) => {
         url.searchParams.get("includeMissingSources") === "true";
 
       const brainContext = buildRuntimeBrainContext({
+        localeCode: aiwMlR2LocaleContext(payload, runtimeRequest).localeCode,
+        languageCode: aiwMlR2LocaleContext(payload, runtimeRequest).languageCode,
+        outputLanguageInstruction: aiwMlR2LocaleContext(payload, runtimeRequest).outputLanguageInstruction,
         modelCode,
         usePurposeCode,
         domainCodes,
