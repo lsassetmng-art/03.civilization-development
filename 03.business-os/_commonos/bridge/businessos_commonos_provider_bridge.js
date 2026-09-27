@@ -29,3 +29,40 @@ window.BusinessOSCommonOSProviderBridge = {
     'secrets'
   ]
 };
+
+(function (global) {
+  'use strict';
+
+  var bridge = global.BusinessOSCommonOSProviderBridge;
+
+  if (!bridge) {
+    return;
+  }
+
+  bridge.requireProvider = function () {
+    if (!global.CommonOSRuntime) {
+      throw new Error('CommonOSRuntime is required');
+    }
+
+    if (
+      !global.CommonOSShell ||
+      typeof global.CommonOSShell.createShell !== 'function'
+    ) {
+      throw new Error('CommonOSShell.createShell is required');
+    }
+
+    if (
+      !global.CommonOSSync ||
+      typeof global.CommonOSSync.queueCard !== 'function' ||
+      typeof global.CommonOSSync.queueGrid !== 'function'
+    ) {
+      throw new Error('CommonOSSync queue presentation is required');
+    }
+
+    return {
+      runtime: global.CommonOSRuntime,
+      shell: global.CommonOSShell,
+      sync: global.CommonOSSync
+    };
+  };
+})(window);
