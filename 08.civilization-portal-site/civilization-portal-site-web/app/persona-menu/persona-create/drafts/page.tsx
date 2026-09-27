@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { usePortalI18n } from "../../../../components/i18n/portal-i18n-provider";
 
 const DRAFT_STORAGE_KEY = "portal.persona.create.imageUploadDraft.v1";
 
@@ -15,27 +16,67 @@ type Draft = {
   capability?: { supportedWork?: string[] };
 };
 
-function bytes(sizeBytes?: number) {
-  if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes)) return "未記録";
-  if (sizeBytes < 1024) return `${sizeBytes} B`;
-  if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
+function bytes(
+  sizeBytes: number | undefined,
+  missingText: string,
+) {
+  if (
+    typeof sizeBytes !== "number" ||
+    !Number.isFinite(sizeBytes)
+  ) {
+    return missingText;
+  }
+
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+
   return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function dateText(value?: string) {
-  if (!value) return "未記録";
+function dateText(
+  value: string | undefined,
+  locale: "ja" | "en",
+  missingText: string,
+) {
+  if (!value) {
+    return missingText;
+  }
+
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(date);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(
+    locale === "en" ? "en-US" : "ja-JP",
+    {
+      dateStyle: "medium",
+      timeStyle: "short",
+    },
+  ).format(date);
 }
 
-function label(value?: string, fallback = "未設定") {
-  return value && value.trim().length > 0 ? value : fallback;
+function label(
+  value: string | undefined,
+  fallback: string,
+) {
+  return value && value.trim().length > 0
+    ? value
+    : fallback;
 }
 
 export default function PersonaDraftsPage() {
+  const { locale, t } = usePortalI18n();
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [message, setMessage] = useState("ドラフトを確認しています。");
+  const [messageKey, setMessageKey] = useState(
+    "personaDrafts.message.checking",
+  );
   const [loaded, setLoaded] = useState(false);
 
   const loadDraft = () => {
@@ -43,17 +84,17 @@ export default function PersonaDraftsPage() {
       const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (!raw) {
         setDraft(null);
-        setMessage("保存済みドラフトはありません。");
+        setMessageKey("personaDrafts.message.noSaved");
         setLoaded(true);
         return;
       }
 
       setDraft(JSON.parse(raw) as Draft);
-      setMessage("保存済みドラフトを読み込みました。");
+      setMessageKey("personaDrafts.message.loaded");
       setLoaded(true);
     } catch {
       setDraft(null);
-      setMessage("ドラフトの読み込みに失敗しました。保存データが壊れている可能性があります。");
+      setMessageKey("personaDrafts.message.loadFailed");
       setLoaded(true);
     }
   };
@@ -61,7 +102,7 @@ export default function PersonaDraftsPage() {
   const clearDraft = () => {
     localStorage.removeItem(DRAFT_STORAGE_KEY);
     setDraft(null);
-    setMessage("ドラフトを削除しました。");
+    setMessageKey("personaDrafts.message.deleted");
     setLoaded(true);
   };
 
@@ -69,28 +110,28 @@ export default function PersonaDraftsPage() {
     loadDraft();
   }, []);
 
-  const workText = useMemo(() => {
-    const values = draft?.capability?.supportedWork;
-    return values && values.length > 0 ? values.join(" / ") : "未設定";
-  }, [draft]);
+  const values = draft?.capability?.supportedWork;
+  const workText =
+    values && values.length > 0
+      ? values.join(" / ")
+      : t("personaDrafts.value.notSet");
 
   return (
     <main className="min-h-screen bg-slate-950 px-5 py-8 text-slate-100">
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
         <header className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
           <p className="text-sm font-semibold text-cyan-300">Persona Builder</p>
-          <h1 className="mt-2 text-3xl font-bold">作成中ドラフト</h1>
+          <h1 className="mt-2 text-3xl font-bold">{t("personaDrafts.title")}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">
-            この画面は、この端末のブラウザに保存されたPersona画像作成ドラフトを読み取ります。
-            正本作成、審査提出、画像処理、VisualRuntime実行は行いません。
+            {t("personaDrafts.description")}
           </p>
         </header>
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">ドラフト状態</h2>
-              <p className="mt-1 text-sm text-slate-300">{message}</p>
+              <h2 className="text-lg font-semibold">{t("personaDrafts.stateTitle")}</h2>
+              <p className="mt-1 text-sm text-slate-300">{t(messageKey)}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -98,13 +139,13 @@ export default function PersonaDraftsPage() {
                 onClick={loadDraft}
                 className="rounded-full border border-cyan-400/50 px-4 py-2 text-sm font-semibold text-cyan-100"
               >
-                ドラフトを再読み込み
+                {t("personaDrafts.reload")}
               </button>
               <Link
                 href="/persona-menu/persona-create/image-upload"
                 className="rounded-full bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950"
               >
-                作成画面へ戻る
+                {t("personaDrafts.backCreate")}
               </Link>
             </div>
           </div>
@@ -112,15 +153,15 @@ export default function PersonaDraftsPage() {
 
         {loaded && !draft ? (
           <section className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
-            <h2 className="text-xl font-semibold">表示できるドラフトはありません</h2>
+            <h2 className="text-xl font-semibold">{t("personaDrafts.emptyTitle")}</h2>
             <p className="mt-3 text-sm text-slate-300">
-              画像からPersonaを作成する画面でドラフト保存すると、この画面に概要が表示されます。
+              {t("personaDrafts.emptyDescription")}
             </p>
             <Link
               href="/persona-menu/persona-create/image-upload"
               className="mt-5 inline-flex rounded-full bg-slate-100 px-5 py-2 text-sm font-semibold text-slate-950"
             >
-              画像作成画面へ
+              {t("personaDrafts.openImage")}
             </Link>
           </section>
         ) : null}
@@ -128,71 +169,71 @@ export default function PersonaDraftsPage() {
         {draft ? (
           <div className="grid gap-4">
             <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
-              <h2 className="text-lg font-semibold">保存情報</h2>
+              <h2 className="text-lg font-semibold">{t("personaDrafts.savedInfo")}</h2>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div className="rounded-2xl bg-slate-950/70 p-4">
-                  <dt className="text-slate-400">保存日時</dt>
-                  <dd className="mt-1 font-semibold">{dateText(draft.updatedAt)}</dd>
+                  <dt className="text-slate-400">{t("personaDrafts.savedAt")}</dt>
+                  <dd className="mt-1 font-semibold">{dateText(draft.updatedAt, locale, t("personaDrafts.value.notRecorded"))}</dd>
                 </div>
                 <div className="rounded-2xl bg-slate-950/70 p-4">
                   <dt className="text-slate-400">schemaVersion</dt>
-                  <dd className="mt-1 font-semibold">{draft.schemaVersion ?? "未記録"}</dd>
+                  <dd className="mt-1 font-semibold">{draft.schemaVersion ?? t("personaDrafts.value.notRecorded")}</dd>
                 </div>
               </dl>
             </section>
 
             <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
-              <h2 className="text-lg font-semibold">画像メタデータ</h2>
+              <h2 className="text-lg font-semibold">{t("personaDrafts.imageMetadata")}</h2>
               <p className="mt-2 text-sm text-amber-200">
-                画像ファイル本体は保存されていません。fileName / mimeType / sizeBytes のみ表示します。
+                {t("personaDrafts.imageMetadataNotice")}
               </p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
                 <div className="rounded-2xl bg-slate-950/70 p-4">
                   <dt className="text-slate-400">fileName</dt>
-                  <dd className="mt-1 break-words font-semibold">{label(draft.image?.fileName, "未記録")}</dd>
+                  <dd className="mt-1 break-words font-semibold">{label(draft.image?.fileName, t("personaDrafts.value.notRecorded"))}</dd>
                 </div>
                 <div className="rounded-2xl bg-slate-950/70 p-4">
                   <dt className="text-slate-400">mimeType</dt>
-                  <dd className="mt-1 font-semibold">{label(draft.image?.mimeType, "未記録")}</dd>
+                  <dd className="mt-1 font-semibold">{label(draft.image?.mimeType, t("personaDrafts.value.notRecorded"))}</dd>
                 </div>
                 <div className="rounded-2xl bg-slate-950/70 p-4">
                   <dt className="text-slate-400">sizeBytes</dt>
-                  <dd className="mt-1 font-semibold">{bytes(draft.image?.sizeBytes)}</dd>
+                  <dd className="mt-1 font-semibold">{bytes(draft.image?.sizeBytes, t("personaDrafts.value.notRecorded"))}</dd>
                 </div>
               </dl>
             </section>
 
             <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
-              <h2 className="text-lg font-semibold">プロフィール</h2>
+              <h2 className="text-lg font-semibold">{t("personaDrafts.profile")}</h2>
               <dl className="mt-4 grid gap-3 text-sm">
                 <div className="rounded-2xl bg-slate-950/70 p-4">
-                  <dt className="text-slate-400">Persona名</dt>
-                  <dd className="mt-1 font-semibold">{label(draft.profile?.personaName)}</dd>
+                  <dt className="text-slate-400">{t("personaDrafts.personaName")}</dt>
+                  <dd className="mt-1 font-semibold">{label(draft.profile?.personaName, t("personaDrafts.value.notSet"))}</dd>
                 </div>
                 <div className="rounded-2xl bg-slate-950/70 p-4">
-                  <dt className="text-slate-400">説明</dt>
-                  <dd className="mt-1 whitespace-pre-wrap">{label(draft.profile?.description)}</dd>
+                  <dt className="text-slate-400">{t("personaDrafts.descriptionLabel")}</dt>
+                  <dd className="mt-1 whitespace-pre-wrap">{label(draft.profile?.description, t("personaDrafts.value.notSet"))}</dd>
                 </div>
                 <div className="rounded-2xl bg-slate-950/70 p-4">
-                  <dt className="text-slate-400">公開意図</dt>
-                  <dd className="mt-1 font-semibold">{label(draft.profile?.publicIntent)}</dd>
+                  <dt className="text-slate-400">{t("personaDrafts.publicIntent")}</dt>
+                  <dd className="mt-1 font-semibold">{label(draft.profile?.publicIntent, t("personaDrafts.value.notSet"))}</dd>
                 </div>
               </dl>
             </section>
 
             <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
-              <h2 className="text-lg font-semibold">声・話し方 / 能力</h2>
+              <h2 className="text-lg font-semibold">{t("personaDrafts.voiceCapability")}</h2>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
                 <div className="rounded-2xl bg-slate-950/70 p-4">
-                  <dt className="text-slate-400">声</dt>
-                  <dd className="mt-1 font-semibold">{label(draft.voice?.provider)}</dd>
+                  <dt className="text-slate-400">{t("personaDrafts.voice")}</dt>
+                  <dd className="mt-1 font-semibold">{label(draft.voice?.provider, t("personaDrafts.value.notSet"))}</dd>
                 </div>
                 <div className="rounded-2xl bg-slate-950/70 p-4">
-                  <dt className="text-slate-400">話し方</dt>
-                  <dd className="mt-1 font-semibold">{label(draft.voice?.keigoLevel)}</dd>
+                  <dt className="text-slate-400">{t("personaDrafts.speech")}</dt>
+                  <dd className="mt-1 font-semibold">{label(draft.voice?.keigoLevel, t("personaDrafts.value.notSet"))}</dd>
                 </div>
                 <div className="rounded-2xl bg-slate-950/70 p-4">
-                  <dt className="text-slate-400">対応作業</dt>
+                  <dt className="text-slate-400">{t("personaDrafts.supportedWork")}</dt>
                   <dd className="mt-1 font-semibold">{workText}</dd>
                 </div>
               </dl>
@@ -200,7 +241,7 @@ export default function PersonaDraftsPage() {
 
             <section className="flex flex-col gap-3 rounded-3xl border border-slate-800 bg-slate-900/70 p-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-slate-300">
-                このドラフトは端末内保存です。別端末や別ブラウザには同期されません。
+                {t("personaDrafts.localOnly")}
               </p>
               {/* PERSONAOS_R13_DRAFT_RESUME_START */}
               <div
@@ -226,7 +267,7 @@ export default function PersonaDraftsPage() {
                     textDecoration: "none",
                   }}
                 >
-                  このドラフトから再開
+                  {t("personaDrafts.resume")}
                 </Link>
                 <p
                   style={{
@@ -236,9 +277,7 @@ export default function PersonaDraftsPage() {
                     opacity: 0.72,
                   }}
                 >
-                  入力内容を引き継いで作成画面へ戻ります。
-                  画像本体は保存されていないため、
-                  再開後に選び直してください。
+                  {t("personaDrafts.resumeHelp")}
                 </p>
               </div>
               {/* PERSONAOS_R13_DRAFT_RESUME_END */}
@@ -247,7 +286,7 @@ export default function PersonaDraftsPage() {
                 onClick={clearDraft}
                 className="rounded-full border border-rose-400/60 px-4 py-2 text-sm font-semibold text-rose-100"
               >
-                このドラフトを削除
+                {t("personaDrafts.delete")}
               </button>
             </section>
           </div>
@@ -255,10 +294,10 @@ export default function PersonaDraftsPage() {
 
         <nav className="flex flex-wrap gap-3 text-sm">
           <Link href="/persona-menu/persona-create" className="text-cyan-200">
-            作成メニューへ戻る
+            {t("personaDrafts.backCreationMenu")}
           </Link>
           <Link href="/persona-menu" className="text-cyan-200">
-            Personaメニューへ戻る
+            {t("personaDrafts.backPersonaMenu")}
           </Link>
         </nav>
       </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChangeEvent, useMemo, useState } from "react";
+import { usePortalI18n } from "../../../../components/i18n/portal-i18n-provider";
 
 type StepId = "image" | "profile" | "voice" | "capability" | "confirm";
 
@@ -51,31 +52,35 @@ type PersonaImageUploadDraftV1 = PersonaImageUploadFormState & {
 const DRAFT_STORAGE_KEY = "portal.persona.create.imageUploadDraft.v1";
 const DRAFT_ROUTE = "persona-create/image-upload" as const;
 
-const steps: Array<{ id: StepId; label: string; description: string }> = [
+const steps: Array<{
+  id: StepId;
+  labelKey: string;
+  descriptionKey: string;
+}> = [
   {
     id: "image",
-    label: "画像選択",
-    description: "元画像を選択します。ドラフトには画像ファイル本体は保存しません。",
+    labelKey: "personaImage.step.image.label",
+    descriptionKey: "personaImage.step.image.description",
   },
   {
     id: "profile",
-    label: "プロフィール",
-    description: "Personaの基本説明と利用目的を整理します。",
+    labelKey: "personaImage.step.profile.label",
+    descriptionKey: "personaImage.step.profile.description",
   },
   {
     id: "voice",
-    label: "声・話し方",
-    description: "声の扱いと話し方の特徴を分けて入力します。",
+    labelKey: "personaImage.step.voice.label",
+    descriptionKey: "personaImage.step.voice.description",
   },
   {
     id: "capability",
-    label: "能力・スキル",
-    description: "できること、禁止すること、参照方針を設定します。",
+    labelKey: "personaImage.step.capability.label",
+    descriptionKey: "personaImage.step.capability.description",
   },
   {
     id: "confirm",
-    label: "確認",
-    description: "保存前の内容を確認します。まだAPI送信はしません。",
+    labelKey: "personaImage.step.confirm.label",
+    descriptionKey: "personaImage.step.confirm.description",
   },
 ];
 
@@ -141,6 +146,7 @@ function isUsableDraft(value: PersonaImageUploadDraftV1): boolean {
 }
 
 export default function PersonaImageUploadCreatePage() {
+  const { t } = usePortalI18n();
   const [stepIndex, setStepIndex] = useState(0);
   const [imageMeta, setImageMeta] = useState<ImageDraftMeta | null>(null);
   const [formState, setFormState] =
@@ -152,7 +158,7 @@ export default function PersonaImageUploadCreatePage() {
 
   const imageLabel = useMemo(() => {
     if (!imageMeta) {
-      return "画像は未選択です。";
+      return t("personaImage.image.none");
     }
 
     return (
@@ -162,7 +168,7 @@ export default function PersonaImageUploadCreatePage() {
       " / " +
       formatBytes(imageMeta.sizeBytes)
     );
-  }, [imageMeta]);
+  }, [imageMeta, t]);
 
   const canGoNext = currentStep.id !== "image" || Boolean(imageMeta);
 
@@ -218,7 +224,7 @@ export default function PersonaImageUploadCreatePage() {
       mimeType: file.type || "unknown",
       sizeBytes: file.size,
     });
-    setDraftMessage("画像メタデータを取得しました。画像ファイル本体は保存しません。");
+    setDraftMessage(t("personaImage.message.imageMeta"));
   }
 
   function saveDraft() {
@@ -228,7 +234,7 @@ export default function PersonaImageUploadCreatePage() {
 
     const draft = createDraft(formState, imageMeta);
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-    setDraftMessage("ドラフトを保存しました: " + draft.updatedAt);
+    setDraftMessage(t("personaImage.message.savedPrefix") + draft.updatedAt);
   }
 
   function loadDraft() {
@@ -239,7 +245,7 @@ export default function PersonaImageUploadCreatePage() {
     const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
 
     if (!rawDraft) {
-      setDraftMessage("保存済みドラフトはありません。");
+      setDraftMessage(t("personaImage.message.noSaved"));
       return;
     }
 
@@ -247,7 +253,7 @@ export default function PersonaImageUploadCreatePage() {
       const parsedDraft = JSON.parse(rawDraft) as PersonaImageUploadDraftV1;
 
       if (!isUsableDraft(parsedDraft)) {
-        setDraftMessage("ドラフト形式が一致しません。");
+        setDraftMessage(t("personaImage.message.invalid"));
         return;
       }
 
@@ -266,11 +272,9 @@ export default function PersonaImageUploadCreatePage() {
           ...parsedDraft.capability,
         },
       });
-      setDraftMessage(
-        "保存済みドラフトを読み込みました。画像ファイル本体は復元されません。",
-      );
+      setDraftMessage(t("personaImage.message.loaded"));
     } catch {
-      setDraftMessage("ドラフトの読み込みに失敗しました。");
+      setDraftMessage(t("personaImage.message.loadFailed"));
     }
   }
 
@@ -280,7 +284,7 @@ export default function PersonaImageUploadCreatePage() {
     }
 
     localStorage.removeItem(DRAFT_STORAGE_KEY);
-    setDraftMessage("ドラフト削除が完了しました。");
+    setDraftMessage(t("personaImage.message.deleted"));
   }
 
   function goBack() {
@@ -289,7 +293,7 @@ export default function PersonaImageUploadCreatePage() {
 
   function goNext() {
     if (!canGoNext) {
-      setDraftMessage("先に画像を選択してください。");
+      setDraftMessage(t("personaImage.message.selectFirst"));
       return;
     }
 
@@ -304,24 +308,23 @@ export default function PersonaImageUploadCreatePage() {
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl">
-          <p className="text-sm text-cyan-300">Persona作成 / 画像アップロード</p>
-          <h1 className="mt-2 text-3xl font-bold">画像からPersonaを作成</h1>
+          <p className="text-sm text-cyan-300">{t("personaImage.eyebrow")}</p>
+          <h1 className="mt-2 text-3xl font-bold">{t("personaImage.title")}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">
-            この画面は作成UIとclient-onlyドラフト保存です。最終保存、API送信、DB書込、
-            Supabaseアップロード、画像分割、外部実行はまだ行いません。
+            {t("personaImage.description")}
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <Link
               className="rounded-full border border-slate-700 px-4 py-2 text-slate-200 hover:border-cyan-300"
               href="/persona-menu/persona-create"
             >
-              作成メニューへ戻る
+              {t("personaImage.backCreate")}
             </Link>
             <Link
               className="rounded-full border border-slate-700 px-4 py-2 text-slate-200 hover:border-cyan-300"
               href="/persona-menu"
             >
-              Personaメニューへ戻る
+              {t("personaImage.backMenu")}
             </Link>
           </div>
         </header>
@@ -342,23 +345,23 @@ export default function PersonaImageUploadCreatePage() {
               <span className="block text-xs text-slate-400">
                 Step {index + 1}
               </span>
-              <span className="font-semibold">{step.label}</span>
+              <span className="font-semibold">{t(step.labelKey)}</span>
             </button>
           ))}
         </section>
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
           <div className="mb-5">
-            <h2 className="text-2xl font-semibold">{currentStep.label}</h2>
+            <h2 className="text-2xl font-semibold">{t(currentStep.labelKey)}</h2>
             <p className="mt-2 text-sm text-slate-300">
-              {currentStep.description}
+              {t(currentStep.descriptionKey)}
             </p>
           </div>
 
           {currentStep.id === "image" && (
             <div className="grid gap-5">
               <label className="grid gap-2 text-sm">
-                <span className="font-semibold">元画像</span>
+                <span className="font-semibold">{t("personaImage.sourceImage")}</span>
                 <input
                   accept="image/*"
                   className="rounded-2xl border border-slate-700 bg-slate-950 p-3 text-sm"
@@ -367,11 +370,10 @@ export default function PersonaImageUploadCreatePage() {
                 />
               </label>
               <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
-                <p className="font-semibold text-slate-100">選択状態</p>
+                <p className="font-semibold text-slate-100">{t("personaImage.selectionStatus")}</p>
                 <p className="mt-2">{imageLabel}</p>
                 <p className="mt-2 text-xs text-amber-200">
-                  画像ファイル本体は保存しません。ドラフトに保存するのは
-                  fileName / mimeType / sizeBytes のみです。
+                  {t("personaImage.selectionNotice")}
                 </p>
               </div>
             </div>
@@ -380,29 +382,29 @@ export default function PersonaImageUploadCreatePage() {
           {currentStep.id === "profile" && (
             <div className="grid gap-4">
               <label className="grid gap-2 text-sm">
-                <span>Persona名</span>
+                <span>{t("personaImage.profile.personaName")}</span>
                 <input
                   className="rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
                     updateProfileField("personaName", event.target.value)
                   }
-                  placeholder="例：案内役ミサキ"
+                  placeholder={t("personaImage.profile.personaNamePlaceholder")}
                   value={formState.profile.personaName}
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>説明</span>
+                <span>{t("personaImage.profile.description")}</span>
                 <textarea
                   className="min-h-24 rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
                     updateProfileField("description", event.target.value)
                   }
-                  placeholder="見た目や役割の説明"
+                  placeholder={t("personaImage.profile.descriptionPlaceholder")}
                   value={formState.profile.description}
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>性格概要</span>
+                <span>{t("personaImage.profile.personality")}</span>
                 <textarea
                   className="min-h-24 rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
@@ -411,23 +413,23 @@ export default function PersonaImageUploadCreatePage() {
                       event.target.value,
                     )
                   }
-                  placeholder="落ち着いている、説明が丁寧、など"
+                  placeholder={t("personaImage.profile.personalityPlaceholder")}
                   value={formState.profile.personalitySummary}
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>利用目的</span>
+                <span>{t("personaImage.profile.usagePurpose")}</span>
                 <input
                   className="rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
                     updateProfileField("usagePurpose", event.target.value)
                   }
-                  placeholder="例：案内、相談、制作補助"
+                  placeholder={t("personaImage.profile.usagePurposePlaceholder")}
                   value={formState.profile.usagePurpose}
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>公開方針</span>
+                <span>{t("personaImage.profile.publicPolicy")}</span>
                 <select
                   className="rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
@@ -438,10 +440,10 @@ export default function PersonaImageUploadCreatePage() {
                   }
                   value={formState.profile.publicIntent}
                 >
-                  <option value="private">非公開</option>
-                  <option value="review_later">あとで審査に出す</option>
+                  <option value="private">{t("personaImage.profile.public.private")}</option>
+                  <option value="review_later">{t("personaImage.profile.public.reviewLater")}</option>
                   <option value="public_after_review">
-                    審査後に公開を検討
+                    {t("personaImage.profile.public.afterReview")}
                   </option>
                 </select>
               </label>
@@ -451,7 +453,7 @@ export default function PersonaImageUploadCreatePage() {
           {currentStep.id === "voice" && (
             <div className="grid gap-4">
               <label className="grid gap-2 text-sm">
-                <span>声の扱い</span>
+                <span>{t("personaImage.voice.handling")}</span>
                 <select
                   className="rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
@@ -459,37 +461,37 @@ export default function PersonaImageUploadCreatePage() {
                   }
                   value={formState.voice.provider}
                 >
-                  <option value="later">あとで設定</option>
-                  <option value="none">声なし</option>
-                  <option value="voicevox">VOICEVOX候補</option>
-                  <option value="tts">TTS候補</option>
+                  <option value="later">{t("personaImage.voice.later")}</option>
+                  <option value="none">{t("personaImage.voice.none")}</option>
+                  <option value="voicevox">{t("personaImage.voice.voicevox")}</option>
+                  <option value="tts">{t("personaImage.voice.tts")}</option>
                 </select>
               </label>
               <div className="grid gap-4 md:grid-cols-3">
                 <label className="grid gap-2 text-sm">
-                  <span>一人称</span>
+                  <span>{t("personaImage.voice.firstPerson")}</span>
                   <input
                     className="rounded-2xl border border-slate-700 bg-slate-950 p-3"
                     onChange={(event) =>
                       updateVoiceField("firstPerson", event.target.value)
                     }
-                    placeholder="例：私"
+                    placeholder={t("personaImage.voice.firstPersonPlaceholder")}
                     value={formState.voice.firstPerson}
                   />
                 </label>
                 <label className="grid gap-2 text-sm">
-                  <span>二人称</span>
+                  <span>{t("personaImage.voice.secondPerson")}</span>
                   <input
                     className="rounded-2xl border border-slate-700 bg-slate-950 p-3"
                     onChange={(event) =>
                       updateVoiceField("secondPerson", event.target.value)
                     }
-                    placeholder="例：あなた"
+                    placeholder={t("personaImage.voice.secondPersonPlaceholder")}
                     value={formState.voice.secondPerson}
                   />
                 </label>
                 <label className="grid gap-2 text-sm">
-                  <span>敬語レベル</span>
+                  <span>{t("personaImage.voice.keigoLevel")}</span>
                   <select
                     className="rounded-2xl border border-slate-700 bg-slate-950 p-3"
                     onChange={(event) =>
@@ -500,42 +502,42 @@ export default function PersonaImageUploadCreatePage() {
                     }
                     value={formState.voice.keigoLevel}
                   >
-                    <option value="casual">くだけた話し方</option>
-                    <option value="normal">敬語レベル: 標準</option>
-                    <option value="polite">敬語レベル: 丁寧</option>
+                    <option value="casual">{t("personaImage.voice.casual")}</option>
+                    <option value="normal">{t("personaImage.voice.normal")}</option>
+                    <option value="polite">{t("personaImage.voice.polite")}</option>
                   </select>
                 </label>
               </div>
               <label className="grid gap-2 text-sm">
-                <span>決め台詞</span>
+                <span>{t("personaImage.voice.catchphrase")}</span>
                 <input
                   className="rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
                     updateVoiceField("catchphrase", event.target.value)
                   }
-                  placeholder="例：一緒に整理しましょう"
+                  placeholder={t("personaImage.voice.catchphrasePlaceholder")}
                   value={formState.voice.catchphrase}
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>サンプル台詞</span>
+                <span>{t("personaImage.voice.sampleLines")}</span>
                 <textarea
                   className="min-h-24 rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
                     updateVoiceField("sampleLines", event.target.value)
                   }
-                  placeholder="話し方が分かる例文"
+                  placeholder={t("personaImage.voice.sampleLinesPlaceholder")}
                   value={formState.voice.sampleLines}
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>NG表現</span>
+                <span>{t("personaImage.voice.ngExpressions")}</span>
                 <textarea
                   className="min-h-20 rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
                     updateVoiceField("ngExpressions", event.target.value)
                   }
-                  placeholder="使わせたくない表現"
+                  placeholder={t("personaImage.voice.ngExpressionsPlaceholder")}
                   value={formState.voice.ngExpressions}
                 />
               </label>
@@ -545,7 +547,7 @@ export default function PersonaImageUploadCreatePage() {
           {currentStep.id === "capability" && (
             <div className="grid gap-4">
               <label className="grid gap-2 text-sm">
-                <span>得意なこと</span>
+                <span>{t("personaImage.capability.strengths")}</span>
                 <textarea
                   className="min-h-24 rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
@@ -555,7 +557,7 @@ export default function PersonaImageUploadCreatePage() {
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>苦手なこと</span>
+                <span>{t("personaImage.capability.weaknesses")}</span>
                 <textarea
                   className="min-h-24 rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
@@ -565,7 +567,7 @@ export default function PersonaImageUploadCreatePage() {
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>対応できる作業</span>
+                <span>{t("personaImage.capability.supportedWork")}</span>
                 <textarea
                   className="min-h-24 rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
@@ -575,7 +577,7 @@ export default function PersonaImageUploadCreatePage() {
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>禁止する行動</span>
+                <span>{t("personaImage.capability.prohibitedActions")}</span>
                 <textarea
                   className="min-h-24 rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
@@ -588,7 +590,7 @@ export default function PersonaImageUploadCreatePage() {
                 />
               </label>
               <label className="grid gap-2 text-sm">
-                <span>知識参照方針</span>
+                <span>{t("personaImage.capability.knowledgePolicy")}</span>
                 <textarea
                   className="min-h-24 rounded-2xl border border-slate-700 bg-slate-950 p-3"
                   onChange={(event) =>
@@ -603,33 +605,32 @@ export default function PersonaImageUploadCreatePage() {
           {currentStep.id === "confirm" && (
             <div className="grid gap-4">
               <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <h3 className="font-semibold">確認内容</h3>
+                <h3 className="font-semibold">{t("personaImage.confirm.title")}</h3>
                 <dl className="mt-3 grid gap-2 text-sm text-slate-300">
                   <div>
-                    <dt className="text-slate-500">画像</dt>
+                    <dt className="text-slate-500">{t("personaImage.confirm.image")}</dt>
                     <dd>{imageLabel}</dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">Persona名</dt>
-                    <dd>{formState.profile.personaName || "未入力"}</dd>
+                    <dt className="text-slate-500">{t("personaImage.profile.personaName")}</dt>
+                    <dd>{formState.profile.personaName || t("personaImage.confirm.notEntered")}</dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">公開方針</dt>
+                    <dt className="text-slate-500">{t("personaImage.profile.publicPolicy")}</dt>
                     <dd>{formState.profile.publicIntent}</dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">声の扱い</dt>
+                    <dt className="text-slate-500">{t("personaImage.voice.handling")}</dt>
                     <dd>{formState.voice.provider}</dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">敬語レベル</dt>
+                    <dt className="text-slate-500">{t("personaImage.voice.keigoLevel")}</dt>
                     <dd>{formState.voice.keigoLevel}</dd>
                   </div>
                 </dl>
               </div>
               <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
-                最終保存はまだプレビューです。正本作成、審査投入、公開、販売、配布は
-                後続RでAPI契約を設計してから接続します。
+                {t("personaImage.confirm.previewNotice")}
               </div>
             </div>
           )}
@@ -641,7 +642,7 @@ export default function PersonaImageUploadCreatePage() {
               onClick={goBack}
               type="button"
             >
-              戻る
+              {t("personaImage.button.back")}
             </button>
             {stepIndex < steps.length - 1 ? (
               <button
@@ -650,7 +651,7 @@ export default function PersonaImageUploadCreatePage() {
                 onClick={goNext}
                 type="button"
               >
-                次へ
+                {t("personaImage.button.next")}
               </button>
             ) : (
               <button
@@ -658,7 +659,7 @@ export default function PersonaImageUploadCreatePage() {
                 onClick={openCompletionPreview}
                 type="button"
               >
-                完了プレビュー
+                {t("personaImage.button.completePreview")}
               </button>
             )}
             <button
@@ -666,21 +667,21 @@ export default function PersonaImageUploadCreatePage() {
               onClick={saveDraft}
               type="button"
             >
-              ドラフト保存
+              {t("personaImage.button.saveDraft")}
             </button>
             <button
               className="rounded-full border border-slate-700 px-4 py-2 text-sm"
               onClick={loadDraft}
               type="button"
             >
-              保存済みドラフトを読み込み
+              {t("personaImage.button.loadDraft")}
             </button>
             <button
               className="rounded-full border border-rose-400/70 px-4 py-2 text-sm text-rose-100"
               onClick={clearDraft}
               type="button"
             >
-              ドラフト削除
+              {t("personaImage.button.deleteDraft")}
             </button>
           </div>
 
@@ -693,14 +694,14 @@ export default function PersonaImageUploadCreatePage() {
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 text-sm text-slate-300">
           <h2 className="text-base font-semibold text-slate-100">
-            保存境界
+            {t("personaImage.boundary.title")}
           </h2>
           <ul className="mt-3 list-disc space-y-2 pl-5">
-            <li>ドラフト保存はブラウザlocalStorageのみです。</li>
-            <li>画像ファイル本体は保存しません。</li>
-            <li>正本Persona IDはまだ作成しません。</li>
-            <li>API送信、DB書込、外部ストレージ保存は行いません。</li>
-            <li>公開・販売・配布は事前審査と本審査の後に扱います。</li>
+            <li>{t("personaImage.boundary.localOnly")}</li>
+            <li>{t("personaImage.boundary.noImageFile")}</li>
+            <li>{t("personaImage.boundary.noCanonicalId")}</li>
+            <li>{t("personaImage.boundary.noExternalWrite")}</li>
+            <li>{t("personaImage.boundary.reviewBeforePublish")}</li>
           </ul>
         </section>
       </div>
@@ -708,13 +709,12 @@ export default function PersonaImageUploadCreatePage() {
       {showCompletionDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
           <div className="w-full max-w-lg rounded-3xl border border-cyan-300/40 bg-slate-900 p-6 shadow-2xl">
-            <p className="text-sm text-cyan-300">完了プレビュー</p>
+            <p className="text-sm text-cyan-300">{t("personaImage.dialog.eyebrow")}</p>
             <h2 className="mt-2 text-2xl font-bold">
-              Persona作成内容を確認しました
+              {t("personaImage.dialog.title")}
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              この段階ではclient-onlyドラフトと完了プレビューのみです。
-              正本保存、審査提出、画像処理、外部保存はまだ実行していません。
+              {t("personaImage.dialog.description")}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <button
@@ -722,14 +722,14 @@ export default function PersonaImageUploadCreatePage() {
                 onClick={() => setShowCompletionDialog(false)}
                 type="button"
               >
-                閉じる
+                {t("personaImage.dialog.close")}
               </button>
               <button
                 className="rounded-full border border-cyan-300 px-4 py-2 text-sm text-cyan-100"
                 onClick={saveDraft}
                 type="button"
               >
-                この内容をドラフト保存
+                {t("personaImage.dialog.save")}
               </button>
             </div>
           </div>

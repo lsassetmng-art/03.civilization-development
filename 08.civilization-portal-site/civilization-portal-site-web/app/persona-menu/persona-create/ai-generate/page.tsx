@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { usePortalI18n } from "../../../../components/i18n/portal-i18n-provider";
 
 type PersonaAiGenerateDraftV1 = {
   schemaVersion: 1;
@@ -41,6 +42,7 @@ function isUsableDraft(value: unknown): value is PersonaAiGenerateDraftV1 {
 }
 
 export default function PersonaAiGeneratePage() {
+  const { t } = usePortalI18n();
   const [generationConditions, setGenerationConditions] = useState("");
   const [draftMessage, setDraftMessage] = useState("");
 
@@ -52,7 +54,7 @@ export default function PersonaAiGeneratePage() {
     const draft = createDraft(generationConditions);
 
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-    setDraftMessage("AI生成条件ドラフトを保存しました: " + draft.updatedAt);
+    setDraftMessage(t("personaAi.message.savedPrefix") + draft.updatedAt);
   }
 
   function loadDraft() {
@@ -63,7 +65,7 @@ export default function PersonaAiGeneratePage() {
     const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
 
     if (!rawDraft) {
-      setDraftMessage("保存済みのAI生成条件ドラフトはありません。");
+      setDraftMessage(t("personaAi.message.noSaved"));
       return;
     }
 
@@ -71,16 +73,14 @@ export default function PersonaAiGeneratePage() {
       const parsedDraft: unknown = JSON.parse(rawDraft);
 
       if (!isUsableDraft(parsedDraft)) {
-        setDraftMessage("保存済みドラフトの形式を確認できませんでした。");
+        setDraftMessage(t("personaAi.message.invalid"));
         return;
       }
 
       setGenerationConditions(parsedDraft.generationConditions);
-      setDraftMessage(
-        "AI生成条件ドラフトを読み込みました: " + parsedDraft.updatedAt,
-      );
+      setDraftMessage(t("personaAi.message.loadedPrefix") + parsedDraft.updatedAt);
     } catch {
-      setDraftMessage("AI生成条件ドラフトの読み込みに失敗しました。");
+      setDraftMessage(t("personaAi.message.loadFailed"));
     }
   }
 
@@ -90,7 +90,7 @@ export default function PersonaAiGeneratePage() {
     }
 
     localStorage.removeItem(DRAFT_STORAGE_KEY);
-    setDraftMessage("AI生成条件ドラフトを削除しました。");
+    setDraftMessage(t("personaAi.message.deleted"));
   }
 
   return (
@@ -98,12 +98,11 @@ export default function PersonaAiGeneratePage() {
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <header className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl">
           <p className="text-sm text-cyan-300">
-            Persona作成 / PersonaBuilder
+            {t("personaAi.eyebrow")}
           </p>
-          <h1 className="mt-2 text-3xl font-bold">AI自動生成</h1>
+          <h1 className="mt-2 text-3xl font-bold">{t("personaAi.title")}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">
-            作成したいPersonaの条件を自由記述し、AI生成に渡す前段階の
-            client-onlyドラフトとして保存します。
+            {t("personaAi.description")}
           </p>
 
           <div className="mt-4 flex flex-wrap gap-3">
@@ -111,13 +110,13 @@ export default function PersonaAiGeneratePage() {
               className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:border-cyan-300"
               href="/persona-menu/persona-create"
             >
-              Persona作成メニューへ戻る
+              {t("personaAi.backCreate")}
             </Link>
             <Link
               className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:border-cyan-300"
               href="/persona-menu"
             >
-              Personaメニューへ戻る
+              {t("personaAi.backMenu")}
             </Link>
           </div>
         </header>
@@ -127,19 +126,18 @@ export default function PersonaAiGeneratePage() {
             className="block text-sm font-semibold text-slate-100"
             htmlFor="generationConditions"
           >
-            AI生成条件
+            {t("personaAi.conditionsLabel")}
           </label>
 
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            作りたいPersonaの条件を自由に記述します。
-            この入力内容自体は正本Personaではありません。
+            {t("personaAi.conditionsHelp")}
           </p>
 
           <textarea
             className="mt-4 min-h-64 w-full rounded-2xl border border-slate-700 bg-slate-950 p-4 text-sm leading-6 text-slate-100 outline-none transition focus:border-cyan-300"
             id="generationConditions"
             onChange={(event) => setGenerationConditions(event.target.value)}
-            placeholder="作成したいPersonaの条件を入力"
+            placeholder={t("personaAi.placeholder")}
             value={generationConditions}
           />
 
@@ -149,7 +147,7 @@ export default function PersonaAiGeneratePage() {
               onClick={saveDraft}
               type="button"
             >
-              条件をドラフト保存
+              {t("personaAi.save")}
             </button>
 
             <button
@@ -157,7 +155,7 @@ export default function PersonaAiGeneratePage() {
               onClick={loadDraft}
               type="button"
             >
-              保存済みドラフトを読み込み
+              {t("personaAi.load")}
             </button>
 
             <button
@@ -165,7 +163,7 @@ export default function PersonaAiGeneratePage() {
               onClick={clearDraft}
               type="button"
             >
-              ドラフト削除
+              {t("personaAi.delete")}
             </button>
 
             <button
@@ -173,7 +171,7 @@ export default function PersonaAiGeneratePage() {
               disabled
               type="button"
             >
-              AI生成実行（未接続）
+              {t("personaAi.executeDisabled")}
             </button>
           </div>
 
@@ -186,19 +184,19 @@ export default function PersonaAiGeneratePage() {
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 text-sm text-slate-300">
           <h2 className="text-base font-semibold text-slate-100">
-            現在の保存・実行境界
+            {t("personaAi.boundaryTitle")}
           </h2>
 
           <ul className="mt-3 list-disc space-y-2 pl-5">
             <li>
-              保存先はブラウザlocalStorageのAI生成条件ドラフトのみです。
+              {t("personaAi.boundary.localOnly")}
             </li>
-            <li>AI生成処理はまだ実行しません。</li>
-            <li>AIモデル・AI provider・生成APIはまだ接続しません。</li>
-            <li>正本Persona IDは作成しません。</li>
-            <li>API POST、DB書込、外部ストレージ保存は行いません。</li>
+            <li>{t("personaAi.boundary.noExecute")}</li>
+            <li>{t("personaAi.boundary.noProvider")}</li>
+            <li>{t("personaAi.boundary.noCanonicalId")}</li>
+            <li>{t("personaAi.boundary.noExternalWrite")}</li>
             <li>
-              Validation、審査、Approval、Canonical Applyは後続工程です。
+              {t("personaAi.boundary.validationLater")}
             </li>
           </ul>
         </section>

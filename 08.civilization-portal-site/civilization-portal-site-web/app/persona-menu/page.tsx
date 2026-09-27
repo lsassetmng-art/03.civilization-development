@@ -1,18 +1,23 @@
+"use client";
 // PORTAL_CONCEPT_MAP_NAV_R4
 // MULTILINGUAL_R2_R3_R2_PERSONA_SYNTAX_REPAIR
+
+import { useEffect } from "react";
+import { usePortalI18n } from "../../components/i18n/portal-i18n-provider";
 import { ConceptMapPage } from "../../features/concept-map/concept-map-page";
 
 const asset = "/portal/concept-map/metallic-persona-green.svg";
 
-export const metadata = {
-  title: "Personaメニュー | Civilization Portal",
-  description: "Portal-side Persona menu concept map.",
-};
-
 export default function Page() {
+  const { t } = usePortalI18n();
+
+  useEffect(() => {
+    document.title = t("personaMenu.pageTitle");
+  }, [t]);
+
   return (
     <ConceptMapPage
-      title="Personaメニュー"
+      title={t("personaMenu.title")}
       theme="persona"
       nodes={[
         {
@@ -22,39 +27,39 @@ export default function Page() {
           fallbackHref: "/",
           asset,
           position: "center",
-          ariaLabel: "前画面に戻る。戻れない場合はポータルトップ",
+          ariaLabel: t("personaMenu.backAria"),
         },
         {
           id: "persona-create",
-          label: "Persona作成",
+          label: t("personaMenu.create"),
           href: "/persona-menu/persona-create",
           asset,
           position: "top",
-          ariaLabel: "Persona作成メニューを開く",
+          ariaLabel: t("personaMenu.createAria"),
         },
         {
           id: "persona-update",
-          label: "Persona変更",
+          label: t("personaMenu.update"),
           asset,
           position: "left",
-          status: "準備中",
-          ariaLabel: "Persona変更 準備中",
+          status: t("personaMenu.pending"),
+          ariaLabel: t("personaMenu.updateAria"),
         },
         {
           id: "persona-delete",
-          label: "Persona削除",
+          label: t("personaMenu.delete"),
           asset,
           position: "right",
-          status: "準備中",
-          ariaLabel: "Persona削除 準備中",
+          status: t("personaMenu.pending"),
+          ariaLabel: t("personaMenu.deleteAria"),
         },
         {
           id: "persona-view",
-          label: "Persona閲覧",
+          label: t("personaMenu.view"),
           asset,
           position: "bottom",
-          status: "準備中",
-          ariaLabel: "Persona閲覧 準備中",
+          status: t("personaMenu.pending"),
+          ariaLabel: t("personaMenu.viewAria"),
         },
       ]}
     />
