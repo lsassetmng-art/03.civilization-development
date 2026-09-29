@@ -1,16 +1,67 @@
-export default function PersonaOsHomePage() {
+"use client";
+// PORTAL_CONCEPT_MAP_NAV_R4
+// MULTILINGUAL_R2_R3_R2_PERSONA_SYNTAX_REPAIR
+
+import { useEffect } from "react";
+import { usePersonaI18n } from "../components/i18n/persona-i18n-provider";
+import { ConceptMapPage } from "../features/concept-map/concept-map-page";
+
+const asset = "/portal/concept-map/metallic-persona-green.svg";
+
+export default function Page() {
+  const { t } = usePersonaI18n();
+
+  useEffect(() => {
+    document.title = t("personaMenu.pageTitle");
+  }, [t]);
+
   return (
-    <main className="persona-shell">
-      <section className="persona-shell-card">
-        <p className="persona-shell-eyebrow">PersonaOS Web Surface</p>
-        <h1>PersonaOS</h1>
-        <p className="persona-shell-status">migration shell</p>
-        <p className="persona-shell-copy">
-          This isolated shell establishes PersonaOS ownership of the future
-          Persona web surface. No existing Persona business flow has been
-          migrated yet.
-        </p>
-      </section>
-    </main>
+    <ConceptMapPage
+      title={t("personaMenu.title")}
+      theme="persona"
+      nodes={[
+        {
+          id: "persona",
+          label: "Persona",
+          action: "back",
+          fallbackHref: "/",
+          asset,
+          position: "center",
+          ariaLabel: t("personaMenu.backAria"),
+        },
+        {
+          id: "persona-create",
+          label: t("personaMenu.create"),
+          href: "/persona-menu/persona-create",
+          asset,
+          position: "top",
+          ariaLabel: t("personaMenu.createAria"),
+        },
+        {
+          id: "persona-update",
+          label: t("personaMenu.update"),
+          asset,
+          position: "left",
+          status: t("personaMenu.pending"),
+          ariaLabel: t("personaMenu.updateAria"),
+        },
+        {
+          id: "persona-delete",
+          label: t("personaMenu.delete"),
+          asset,
+          position: "right",
+          status: t("personaMenu.pending"),
+          ariaLabel: t("personaMenu.deleteAria"),
+        },
+        {
+          id: "persona-view",
+          label: t("personaMenu.view"),
+          asset,
+          position: "bottom",
+          status: t("personaMenu.pending"),
+          ariaLabel: t("personaMenu.viewAria"),
+        },
+      ]}
+    />
   );
 }

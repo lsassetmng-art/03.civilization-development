@@ -1,3 +1,4 @@
+import { PersonaI18nProvider } from "../components/i18n/persona-i18n-provider";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -14,7 +15,7 @@ type RootLayoutProps = Readonly<{
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body><PersonaI18nProvider>{children}</PersonaI18nProvider></body>
     </html>
   );
 }
