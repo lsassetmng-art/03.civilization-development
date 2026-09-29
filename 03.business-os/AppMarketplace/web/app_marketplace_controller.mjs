@@ -15,29 +15,36 @@ import {
 
 const ROOT_ID = "appMarketplaceRoot";
 
-function createElement(tagName, className, text) {
-  const element = document.createElement(tagName);
-
-  if (className) {
-    element.className = className;
-  }
-
-  if (text !== undefined && text !== null) {
-    element.textContent = String(text);
-  }
-
-  return element;
-}
-
 function resolveLocale(globalObject = globalThis) {
   const envelope = businessosReadLoginContextFromBrowser(globalObject);
   const candidate = envelope &&
     envelope.context &&
     envelope.context.localeCode
-    ? envelope.context.localeCode
-    : "ja-jp";
+      ? envelope.context.localeCode
+      : "ja-jp";
 
   return businessosNormalizeLocaleCode(candidate);
+}
+
+function requireProvider(globalObject) {
+  const bridge = globalObject.BusinessOSCommonOSProviderBridge;
+
+  if (!bridge || typeof bridge.requireProvider !== "function") {
+    throw new Error("BusinessOS CommonOS provider bridge is required");
+  }
+
+  return bridge.requireProvider();
+}
+
+function applyCommonOsTheme(globalObject) {
+  const presenter = globalObject.BusinessOSCommonOSShell;
+  const theme = globalObject.BusinessOSCommonOSThemeTokens;
+
+  if (!presenter || typeof presenter.applyTheme !== "function") {
+    throw new Error("BusinessOS CommonOS theme presenter is required");
+  }
+
+  presenter.applyTheme(theme || {});
 }
 
 export function resolveBusinessOsLaunchHref(
@@ -56,14 +63,6 @@ export function resolveBusinessOsLaunchHref(
     throw new TypeError("Unsafe BusinessOS launch target");
   }
 
-  /*
-   * launchTarget comes from the audited R15B1 projection.
-   *
-   * Keep the browser-facing resolver fail-closed as a second
-   * boundary. Percent encoding and backslashes are rejected
-   * entirely so encoded dot/slash/backslash forms cannot gain
-   * different semantics during URL or server normalization.
-   */
   if (
     launchTarget.startsWith("/") ||
     launchTarget.includes("%") ||
@@ -116,9 +115,16 @@ export function resolveBusinessOsLaunchHref(
   return resolved.href;
 }
 
-function navigateToLaunchTarget(launchTarget) {
-  const href = resolveBusinessOsLaunchHref(launchTarget);
-  window.location.assign(href);
+function navigateToLaunchTarget(
+  launchTarget,
+  globalObject = globalThis
+) {
+  const href = resolveBusinessOsLaunchHref(
+    launchTarget,
+    globalObject.location.href
+  );
+
+  globalObject.location.assign(href);
 }
 
 function assertOpenAction(action) {
@@ -141,254 +147,302 @@ function assertInstallHandoff(handoff) {
   );
 }
 
-function appendMetaRow(container, label, value) {
-  const row = createElement(
-    "div",
-    "businessos-commonos-meta marketplace-meta-row"
+function createMetaRow(
+  rt,
+  label,
+  value,
+  statusKind = "info"
+) {
+  return rt.inline(
+    [
+      rt.el(
+        "span",
+        {
+          className: "marketplace-meta-label",
+          textContent: label
+        },
+        []
+      ),
+      rt.statusChip({
+        label: value,
+        kind: statusKind
+      })
+    ],
+    "marketplace-meta-row"
   );
-
-  const key = createElement(
-    "span",
-    "marketplace-meta-key",
-    label
-  );
-
-  const separator = document.createTextNode(": ");
-  const content = createElement(
-    "span",
-    "marketplace-meta-value",
-    value
-  );
-
-  row.append(key, separator, content);
-  container.append(row);
 }
 
-function createActionButton(label, primary = false) {
-  const button = createElement(
-    "button",
-    primary
-      ? "marketplace-button marketplace-button-primary"
-      : "marketplace-button",
-    label
-  );
-
-  button.type = "button";
-  return button;
-}
-
-function renderHeader(messages) {
-  const header = createElement(
-    "header",
-    "businessos-commonos-header marketplace-header"
-  );
-
-  header.append(
-    createElement("h1", "marketplace-title", messages.pageTitle),
-    createElement("p", "marketplace-lead", messages.pageLead)
-  );
-
-  return header;
-}
-
-function renderList(root, localeCode, messages) {
-  const listView = buildMarketplaceListViewModel();
-
-  const main = createElement(
-    "main",
-    "businessos-commonos-shell marketplace-shell"
-  );
-
-  main.append(renderHeader(messages));
-
-  const panel = createElement(
-    "section",
-    "businessos-commonos-panel businessos-commonos-panel-wide marketplace-panel"
-  );
-
-  const list = createElement(
-    "div",
-    "businessos-commonos-list marketplace-list"
-  );
-
-  for (const item of listView) {
-    const card = createElement(
-      "article",
-      "businessos-commonos-card marketplace-card"
-    );
-
-    const heading = createElement(
-      "h2",
-      "marketplace-card-title",
-      item.appName
-    );
-
-    card.append(heading);
-
-    appendMetaRow(
-      card,
-      messages.runtimeRegistrationLabel,
-      item.runtimeRegistrationStatus === "registered"
-        ? messages.registeredLabel
-        : item.runtimeRegistrationStatus
-    );
-
-    appendMetaRow(
-      card,
-      messages.pwaCapableLabel,
-      item.pwaCapable
-        ? messages.pwaAvailableLabel
-        : "-"
-    );
-
-    const actions = createElement(
-      "div",
-      "marketplace-actions"
-    );
-
-    const detailsButton = createActionButton(
-      messages.detailsAction
-    );
-
-    detailsButton.addEventListener("click", () => {
-      renderDetail(root, item.appCode, localeCode, messages);
-    });
-
-    actions.append(detailsButton);
-
-    if (assertOpenAction(item.openAction)) {
-      const openButton = createActionButton(
-        messages.openAction,
-        true
-      );
-
-      openButton.addEventListener("click", () => {
-        navigateToLaunchTarget(item.openAction.launchTarget);
-      });
-
-      actions.append(openButton);
-    }
-
-    if (assertInstallHandoff(item.installHandoff)) {
-      const installButton = createActionButton(
-        messages.addToDeviceAction
-      );
-
-      installButton.addEventListener("click", () => {
-        navigateToLaunchTarget(
-          item.installHandoff.launchTarget
-        );
-      });
-
-      actions.append(installButton);
-    }
-
-    card.append(actions);
-    list.append(card);
-  }
-
-  panel.append(list);
-  main.append(panel);
-  root.replaceChildren(main);
-}
-
-function renderDetail(root, appCode, localeCode, messages) {
-  const item = buildMarketplaceDetailViewModel(appCode);
-
-  if (!item) {
-    renderList(root, localeCode, messages);
-    return;
-  }
-
-  const main = createElement(
-    "main",
-    "businessos-commonos-shell marketplace-shell"
-  );
-
-  main.append(renderHeader(messages));
-
-  const panel = createElement(
-    "section",
-    "businessos-commonos-panel businessos-commonos-panel-wide marketplace-panel marketplace-detail"
-  );
-
-  panel.append(
-    createElement(
-      "h2",
-      "marketplace-detail-title",
-      item.appName
-    )
-  );
-
-  appendMetaRow(
-    panel,
-    messages.runtimeRegistrationLabel,
-    item.runtimeRegistrationStatus === "registered"
-      ? messages.registeredLabel
-      : item.runtimeRegistrationStatus
-  );
-
-  appendMetaRow(
-    panel,
-    messages.pwaCapableLabel,
-    item.pwaCapable
-      ? messages.pwaAvailableLabel
-      : "-"
-  );
-
-  const note = createElement(
-    "p",
-    "businessos-commonos-meta marketplace-handoff-note",
-    messages.installHandoffNote
-  );
-
-  panel.append(note);
-
-  const actions = createElement(
-    "div",
-    "marketplace-actions"
-  );
-
-  const backButton = createActionButton(
-    messages.backToListAction
-  );
-
-  backButton.addEventListener("click", () => {
-    renderList(root, localeCode, messages);
+function createActionButton(
+  rt,
+  label,
+  primary,
+  onClick
+) {
+  return rt.button({
+    label,
+    kind: primary ? "primary" : "secondary",
+    onClick
   });
+}
 
-  actions.append(backButton);
+function createCardActions(
+  rt,
+  item,
+  messages,
+  globalObject,
+  detailAction
+) {
+  const actions = [];
+
+  if (detailAction) {
+    actions.push(
+      createActionButton(
+        rt,
+        detailAction.label,
+        false,
+        detailAction.onClick
+      )
+    );
+  }
 
   if (assertOpenAction(item.openAction)) {
-    const openButton = createActionButton(
-      messages.openAction,
-      true
+    actions.push(
+      createActionButton(
+        rt,
+        messages.openAction,
+        true,
+        () => {
+          navigateToLaunchTarget(
+            item.openAction.launchTarget,
+            globalObject
+          );
+        }
+      )
     );
-
-    openButton.addEventListener("click", () => {
-      navigateToLaunchTarget(item.openAction.launchTarget);
-    });
-
-    actions.append(openButton);
   }
 
   if (assertInstallHandoff(item.installHandoff)) {
-    const installButton = createActionButton(
-      messages.addToDeviceAction
+    actions.push(
+      createActionButton(
+        rt,
+        messages.addToDeviceAction,
+        false,
+        () => {
+          navigateToLaunchTarget(
+            item.installHandoff.launchTarget,
+            globalObject
+          );
+        }
+      )
     );
-
-    installButton.addEventListener("click", () => {
-      navigateToLaunchTarget(
-        item.installHandoff.launchTarget
-      );
-    });
-
-    actions.append(installButton);
   }
 
-  panel.append(actions);
-  main.append(panel);
-  root.replaceChildren(main);
+  return rt.inline(
+    actions,
+    "marketplace-actions"
+  );
+}
+
+function createMarketplaceCard(
+  provider,
+  item,
+  messages,
+  globalObject,
+  detailAction
+) {
+  const rt = provider.runtime;
+
+  const body = rt.stack(
+    [
+      createMetaRow(
+        rt,
+        messages.runtimeRegistrationLabel,
+        item.runtimeRegistrationStatus === "registered"
+          ? messages.registeredLabel
+          : item.runtimeRegistrationStatus,
+        item.runtimeRegistrationStatus === "registered"
+          ? "success"
+          : "muted"
+      ),
+      createMetaRow(
+        rt,
+        messages.pwaCapableLabel,
+        item.pwaCapable
+          ? messages.pwaAvailableLabel
+          : "-",
+        item.pwaCapable
+          ? "success"
+          : "muted"
+      ),
+      createCardActions(
+        rt,
+        item,
+        messages,
+        globalObject,
+        detailAction
+      )
+    ],
+    "marketplace-card-body"
+  );
+
+  return rt.card({
+    title: item.appName,
+    body
+  });
+}
+
+function createShell(
+  provider,
+  messages,
+  sectionTitle,
+  sectionBody
+) {
+  return provider.shell.createShell({
+    title: messages.pageTitle,
+    subtitle: "BusinessOS",
+    navItems: [
+      {
+        label: messages.pageTitle,
+        href: "#",
+        current: true
+      }
+    ],
+    heroTitle: messages.pageTitle,
+    heroCopy: messages.pageLead,
+    sections: [
+      {
+        title: sectionTitle,
+        body: sectionBody
+      }
+    ]
+  });
+}
+
+function mountShell(
+  root,
+  provider,
+  messages,
+  sectionTitle,
+  sectionBody
+) {
+  const shellNode = createShell(
+    provider,
+    messages,
+    sectionTitle,
+    sectionBody
+  );
+
+  root.replaceChildren(shellNode);
+  root.setAttribute(
+    "data-commonos-provider-connected",
+    "true"
+  );
+
+  return shellNode;
+}
+
+function renderList(
+  root,
+  localeCode,
+  messages,
+  globalObject,
+  provider
+) {
+  const rt = provider.runtime;
+  const listView = buildMarketplaceListViewModel();
+
+  const cards = listView.map((item) =>
+    createMarketplaceCard(
+      provider,
+      item,
+      messages,
+      globalObject,
+      {
+        label: messages.detailsAction,
+        onClick: () => {
+          renderDetail(
+            root,
+            item.appCode,
+            localeCode,
+            messages,
+            globalObject,
+            provider
+          );
+        }
+      }
+    )
+  );
+
+  const listBody = rt.stack(
+    cards,
+    "marketplace-grid"
+  );
+
+  mountShell(
+    root,
+    provider,
+    messages,
+    messages.pageTitle,
+    listBody
+  );
+}
+
+function renderDetail(
+  root,
+  appCode,
+  localeCode,
+  messages,
+  globalObject,
+  provider
+) {
+  const rt = provider.runtime;
+  const item = buildMarketplaceDetailViewModel(appCode);
+
+  if (!item) {
+    renderList(
+      root,
+      localeCode,
+      messages,
+      globalObject,
+      provider
+    );
+    return;
+  }
+
+  const detailCard = createMarketplaceCard(
+    provider,
+    item,
+    messages,
+    globalObject,
+    {
+      label: messages.backToListAction,
+      onClick: () => {
+        renderList(
+          root,
+          localeCode,
+          messages,
+          globalObject,
+          provider
+        );
+      }
+    }
+  );
+
+  const detailBody = rt.stack(
+    [
+      detailCard,
+      rt.panelNote(messages.installHandoffNote)
+    ],
+    "marketplace-detail"
+  );
+
+  mountShell(
+    root,
+    provider,
+    messages,
+    item.appName,
+    detailBody
+  );
 }
 
 export function startAppMarketplace(
@@ -419,7 +473,18 @@ export function startAppMarketplace(
   browserDocument.documentElement.lang = languageCode;
   browserDocument.title = messages.documentTitle;
 
-  renderList(root, localeCode, messages);
+  const provider = requireProvider(globalObject);
+
+  applyCommonOsTheme(globalObject);
+
+  renderList(
+    root,
+    localeCode,
+    messages,
+    globalObject,
+    provider
+  );
+
   return true;
 }
 

@@ -214,4 +214,108 @@ if grep -q 'function normalizeThemeKey' "$R17B_THEME_PRESENTER"; then
   exit 1
 fi
 
+
+# R18_APPMARKETPLACE_PROVIDER_ADOPTION_VERIFY
+MARKETPLACE_HTML="$BUSINESS_ROOT/AppMarketplace/web/index.html"
+MARKETPLACE_CONTROLLER="$BUSINESS_ROOT/AppMarketplace/web/app_marketplace_controller.mjs"
+MARKETPLACE_CSS="$BUSINESS_ROOT/AppMarketplace/web/app_marketplace.css"
+
+verify_marketplace_html() {
+  FILE="$1"
+  PREV=0
+
+  require_file "$FILE"
+
+  if grep -q '12\.common-os' "$FILE"; then
+    fail \
+      "AppMarketplace browser runtime references sibling provider repository"
+  fi
+
+  for ASSET in \
+    "../../_commonos/provider/commonos.tokens.css" \
+    "../../_commonos/provider/commonos.variants.css" \
+    "../../_commonos/provider/commonos.components.css" \
+    "../../_commonos/provider/commonos.shell.css" \
+    "../../_commonos/provider/commonos.sync.css" \
+    "../../_commonos/presenter/businessos_commonos_shell.css" \
+    "./app_marketplace.css" \
+    "../../_commonos/provider/commonos.runtime.js" \
+    "../../_commonos/provider/commonos.shell.js" \
+    "../../_commonos/provider/commonos.sync.js" \
+    "../../_commonos/theme/businessos_commonos_theme_tokens.js" \
+    "../../_commonos/bridge/businessos_commonos_provider_bridge.js" \
+    "../../_commonos/adapter/businessos_commonos_adapter_registry.js" \
+    "../../_commonos/mapper/businessos_commonos_view_mapper.js" \
+    "../../_commonos/sync/businessos_commonos_sync_registry.js" \
+    "../../_commonos/presenter/businessos_commonos_shell.js" \
+    "./app_marketplace_controller.mjs"
+  do
+    COUNT="$(grep -F -c "$ASSET" "$FILE" || true)"
+
+    [ "$COUNT" -eq 1 ] ||
+      fail \
+        "AppMarketplace asset occurrence count $COUNT for $ASSET"
+
+    LINE="$(
+      grep -nF "$ASSET" "$FILE" |
+      head -n 1 |
+      cut -d: -f1
+    )"
+
+    [ -n "$LINE" ] ||
+      fail "AppMarketplace asset line unavailable for $ASSET"
+
+    [ "$LINE" -gt "$PREV" ] ||
+      fail "AppMarketplace asset load order violation at $ASSET"
+
+    PREV="$LINE"
+  done
+}
+
+verify_marketplace_html "$MARKETPLACE_HTML"
+
+require_file "$MARKETPLACE_CONTROLLER"
+require_file "$MARKETPLACE_CSS"
+
+for EXPECT in \
+  "BusinessOSCommonOSProviderBridge" \
+  "bridge.requireProvider()" \
+  "provider.shell.createShell" \
+  "provider.runtime" \
+  "rt.card(" \
+  "rt.button(" \
+  "rt.statusChip(" \
+  "rt.panelNote(" \
+  "data-commonos-provider-connected"
+do
+  grep -Fq "$EXPECT" "$MARKETPLACE_CONTROLLER" ||
+    fail "AppMarketplace Provider usage missing: $EXPECT"
+done
+
+if grep -Eq \
+  'document\.createElement|businessos-commonos-(shell|card|panel|list)|marketplace-button' \
+  "$MARKETPLACE_CONTROLLER"
+then
+  fail "AppMarketplace legacy shared UI reconstruction remains"
+fi
+
+if grep -Eq \
+  '\.cos-(shell|card|sync|button|status|field|dialog|toast)' \
+  "$MARKETPLACE_CSS"
+then
+  fail "AppMarketplace CSS overrides CommonOS core selectors"
+fi
+
+if grep -Eq '\.marketplace-button' "$MARKETPLACE_CSS"; then
+  fail "AppMarketplace legacy button implementation remains"
+fi
+
+if grep -RIE \
+  'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|PERSONA_DATABASE_URL|DATABASE_URL|service[_-]?role[_-]?key' \
+  "$BUSINESS_ROOT/AppMarketplace" \
+  >/dev/null 2>&1
+then
+  fail "privileged material detected in AppMarketplace client"
+fi
+
 echo "VERIFY_OK:BUSINESSOS_COMMONOS_PROVIDER_CONNECTED"
