@@ -318,4 +318,127 @@ then
   fail "privileged material detected in AppMarketplace client"
 fi
 
+
+# R19A_AIOPERATIONDESK_ENTRY_PROVIDER_VERIFY
+AIOD_ENTRY_HTML="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/index.html"
+AIOD_ENTRY_JS="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/assets/aiod_commonos_entry.js"
+AIOD_ENTRY_CSS="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/assets/aiod_commonos_entry.css"
+
+verify_aiod_entry_html() {
+  FILE="$1"
+  PREV=0
+
+  require_file "$FILE"
+
+  if grep -q '12\.common-os' "$FILE"; then
+    fail \
+      "AIOperationDesk browser runtime references sibling CommonOS repository"
+  fi
+
+  for ASSET in \
+    "../../../_commonos/provider/commonos.tokens.css" \
+    "../../../_commonos/provider/commonos.variants.css" \
+    "../../../_commonos/provider/commonos.components.css" \
+    "../../../_commonos/provider/commonos.shell.css" \
+    "../../../_commonos/provider/commonos.sync.css" \
+    "../../../_commonos/presenter/businessos_commonos_shell.css" \
+    "./assets/aiod_commonos_entry.css" \
+    "../../../_commonos/provider/commonos.runtime.js" \
+    "../../../_commonos/provider/commonos.shell.js" \
+    "../../../_commonos/provider/commonos.sync.js" \
+    "../../../_commonos/theme/businessos_commonos_theme_tokens.js" \
+    "../../../_commonos/bridge/businessos_commonos_provider_bridge.js" \
+    "../../../_commonos/adapter/businessos_commonos_adapter_registry.js" \
+    "../../../_commonos/mapper/businessos_commonos_view_mapper.js" \
+    "../../../_commonos/sync/businessos_commonos_sync_registry.js" \
+    "../../../_commonos/presenter/businessos_commonos_shell.js" \
+    "../../../_commonos/bridge/businessos_commonos_pwa_bootstrap.js" \
+    "./assets/aiod_commonos_entry.js"
+  do
+    COUNT="$(grep -F -c "$ASSET" "$FILE" || true)"
+
+    [ "$COUNT" -eq 1 ] ||
+      fail \
+        "AIOperationDesk entry asset occurrence count $COUNT for $ASSET"
+
+    LINE="$(
+      grep -nF "$ASSET" "$FILE" |
+      head -n 1 |
+      cut -d: -f1
+    )"
+
+    [ -n "$LINE" ] ||
+      fail "AIOperationDesk entry asset line unavailable for $ASSET"
+
+    [ "$LINE" -gt "$PREV" ] ||
+      fail "AIOperationDesk entry asset load order violation at $ASSET"
+
+    PREV="$LINE"
+  done
+}
+
+verify_aiod_entry_html "$AIOD_ENTRY_HTML"
+
+require_file "$AIOD_ENTRY_JS"
+require_file "$AIOD_ENTRY_CSS"
+
+for EXPECT in \
+  "BusinessOSCommonOSProviderBridge" \
+  "bridge.requireProvider()" \
+  "BusinessOSCommonOSShell" \
+  "presenter.applyTheme" \
+  "provider.runtime" \
+  "provider.shell.createShell" \
+  "rt.card(" \
+  "data-commonos-provider-connected" \
+  "./console/main_console.html" \
+  "./resident/erp_resident.html" \
+  "./resident/builder_resident.html"
+do
+  grep -Fq "$EXPECT" "$AIOD_ENTRY_JS" ||
+    fail "AIOperationDesk entry Provider contract missing: $EXPECT"
+done
+
+PWA_COUNT="$(
+  grep -F -c \
+    "../../../_commonos/bridge/businessos_commonos_pwa_bootstrap.js" \
+    "$AIOD_ENTRY_HTML" || true
+)"
+
+[ "$PWA_COUNT" -eq 1 ] ||
+  fail "AIOperationDesk PWA bootstrap must occur exactly once"
+
+if grep -Fq './assets/aiod.css' "$AIOD_ENTRY_HTML"; then
+  fail "AIOperationDesk entry still depends on legacy shared aiod.css"
+fi
+
+if grep -Eq \
+  'class="(page|header|toolbar|card|button|badge|list)([ "]|$)' \
+  "$AIOD_ENTRY_HTML"
+then
+  fail "AIOperationDesk legacy entry shared UI classes remain"
+fi
+
+if grep -Eq \
+  '\.cos-(shell|card|sync|button|status|field|dialog|toast)' \
+  "$AIOD_ENTRY_CSS"
+then
+  fail "AIOperationDesk entry CSS overrides CommonOS core selectors"
+fi
+
+if grep -Eq \
+  'document\.createElement|\.innerHTML[[:space:]]*=' \
+  "$AIOD_ENTRY_JS"
+then
+  fail "AIOperationDesk entry recreates shared UI with direct DOM/innerHTML"
+fi
+
+if grep -RIE \
+  'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|PERSONA_DATABASE_URL|DATABASE_URL|service[_-]?role[_-]?key' \
+  "$BUSINESS_ROOT/AIOperationDesk/030.frontend" \
+  >/dev/null 2>&1
+then
+  fail "privileged material detected in AIOperationDesk frontend"
+fi
+
 echo "VERIFY_OK:BUSINESSOS_COMMONOS_PROVIDER_CONNECTED"
