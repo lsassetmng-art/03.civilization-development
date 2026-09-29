@@ -1,3 +1,15 @@
+/* ==========================================================
+ * AICompanyManager multilingual presentation binding
+ * Presentation only: domain/API/storage/code semantics remain unchanged.
+ * ========================================================== */
+function aicmMultilingualText(key, fallback) {
+  if (typeof window !== "undefined" &&
+      window.AICMI18n &&
+      typeof window.AICMI18n.t === "function") {
+    return window.AICMI18n.t(key, fallback);
+  }
+  return fallback;
+}
 /*
  * AICompanyManager production core
  * Clean candidate.
@@ -772,13 +784,13 @@ function setMessage(type, message) {
   }
 
   function pageTitle() {
-    if (state.screen === "company-new") return "AI企業新規追加";
-    if (state.screen === "department-new") return "部門新規追加";
-    if (state.screen === "section-new") return "課新規追加";
-    if (state.screen === "placement-new") return "Worker配置";
-    if (state.screen === "settings") return "AI企業設定";
-    if (state.screen === "artifact-list") return "成果物一覧";
-    return "AI企業ダッシュボード";
+    if (state.screen === "company-new") return aicmMultilingualText("screenCompanyNew", "AI企業新規追加");
+    if (state.screen === "department-new") return aicmMultilingualText("screenDepartmentNew", "部門新規追加");
+    if (state.screen === "section-new") return aicmMultilingualText("screenSectionNew", "課新規追加");
+    if (state.screen === "placement-new") return aicmMultilingualText("screenPlacementNew", "Worker配置");
+    if (state.screen === "settings") return aicmMultilingualText("screenSettings", "AI企業設定");
+    if (state.screen === "artifact-list") return aicmMultilingualText("screenArtifactList", "成果物一覧");
+    return aicmMultilingualText("screenDashboard", "AI企業ダッシュボード");
   }
 
   
@@ -856,11 +868,11 @@ function renderShell(content) {
       '    @media (min-width:721px){.aicm-production-main-nav{display:grid;}.aicm-mobile-bottom-nav{display:none;}}',
       '  </style>',
       '  <nav class="aicm-core-tabs aicm-production-main-nav" aria-label="AICompanyManager navigation">',
-      '    <button type="button" data-core-action="go" data-screen="dashboard">AI企業ダッシュボード</button>',
-      '    <button type="button" data-core-action="go" data-screen="artifact-list">成果物一覧</button>',
-      '    <button type="button" data-core-action="task-ledger-open">部門別タスク台帳</button>',
-      '    <button type="button" data-core-action="go" data-screen="review-list">レビュー・承認待ち一覧</button>',
-      '    <button type="button" data-core-action="go" data-screen="worker-runtime-request">AI実行Workbench</button>',
+      '    <button type="button" data-core-action="go" data-screen="dashboard">' + aicmMultilingualText("navDashboard", "AI企業ダッシュボード") + '</button>',
+      '    <button type="button" data-core-action="go" data-screen="artifact-list">' + aicmMultilingualText("navArtifacts", "成果物一覧") + '</button>',
+      '    <button type="button" data-core-action="task-ledger-open">' + aicmMultilingualText("navTaskLedger", "部門別タスク台帳") + '</button>',
+      '    <button type="button" data-core-action="go" data-screen="review-list">' + aicmMultilingualText("navReviews", "レビュー・承認待ち一覧") + '</button>',
+      '    <button type="button" data-core-action="go" data-screen="worker-runtime-request">' + aicmMultilingualText("navWorkbench", "AI実行Workbench") + '</button>',
       '  </nav>',
       '  <nav class="aicm-mobile-bottom-nav" aria-label="AICompanyManager mobile navigation">',
       '    <button type="button" data-core-action="go" data-screen="dashboard" aria-label="AI企業ダッシュボード"><span class="aicm-bottom-nav-line">ホーム</span></button>',
@@ -882,7 +894,7 @@ function renderShell(content) {
     var parts = [];
 
     if (state.loading) {
-      parts.push('<div class="aicm-core-message">読込中...</div>');
+      parts.push('<div class="aicm-core-message">' + aicmMultilingualText("commonLoading", "読込中...") + '</div>');
     }
 
     if (state.noticeMessage) {
@@ -902,7 +914,7 @@ function renderShell(content) {
     }
 
     return [
-      '<label>AI企業</label>',
+      '<label>' + aicmMultilingualText("labelAiCompany", "AI企業") + '</label>',
       '<select data-core-field="selectedCompanyId">',
       state.context.companies.map(function (company) {
         var selected = company.aicm_user_company_id === state.selectedCompanyId ? " selected" : "";
@@ -920,7 +932,7 @@ function renderShell(content) {
     }
 
     return [
-      '<label>部門</label>',
+      '<label>' + aicmMultilingualText("labelDepartment", "部門") + '</label>',
       '<select data-core-field="selectedDepartmentId">',
       departments.map(function (department) {
         var selected = department.aicm_user_company_department_id === state.selectedDepartmentId ? " selected" : "";
@@ -1013,12 +1025,12 @@ function renderDashboard() {
       '  <div class="aicm-core-card aicm-card-primary">',
       '    <div class="aicm-card-title-row">',
       '      <div>',
-      '        <p class="aicm-eyebrow">AI企業</p>',
-      '        <h2>AI企業選択</h2>',
+      '        <p class="aicm-eyebrow">' + aicmMultilingualText("dashboardEyebrow", "AI企業") + '</p>',
+      '        <h2>' + aicmMultilingualText("dashboardSelectTitle", "AI企業選択") + '</h2>',
       '      </div>',
       '      <div class="aicm-dashboard-action-row">',
-      '        <button type="button" data-core-action="go" data-screen="company-new">AI企業新規追加</button>',
-      '        <button type="button" data-core-action="reload">AI企業を表示</button>',
+      '        <button type="button" data-core-action="go" data-screen="company-new">' + aicmMultilingualText("dashboardAddCompany", "AI企業新規追加") + '</button>',
+      '        <button type="button" data-core-action="reload">' + aicmMultilingualText("dashboardReload", "AI企業を表示") + '</button>',
       '      </div>',
       '    </div>',
       renderCompanySelect(),
@@ -1026,15 +1038,15 @@ function renderDashboard() {
       '  </div>',
 
       '  <div class="aicm-core-card">',
-      '    <p class="aicm-eyebrow">会社概要</p>',
-      '    <h2>会社概要</h2>',
+      '    <p class="aicm-eyebrow">' + aicmMultilingualText("dashboardOverviewEyebrow", "会社概要") + '</p>',
+      '    <h2>' + aicmMultilingualText("dashboardOverviewTitle", "会社概要") + '</h2>',
       company ? renderCompanyOverview(company, departments, sections, placements) : renderNoCompanyCard(),
       '  </div>',
       '</section>',
 
       '<section class="aicm-core-card">',
-      '  <p class="aicm-eyebrow">部門 / 課</p>',
-      '  <h2>部門 / 課</h2>',
+      '  <p class="aicm-eyebrow">' + aicmMultilingualText("dashboardOrgEyebrow", "部門 / 課") + '</p>',
+      '  <h2>' + aicmMultilingualText("dashboardOrgTitle", "部門 / 課") + '</h2>',
       renderTree(departments),
       '</section>'
     ].join(""));
