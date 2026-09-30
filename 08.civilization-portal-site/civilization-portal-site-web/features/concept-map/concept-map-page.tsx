@@ -138,6 +138,12 @@ function positionStyle(position: NodePosition): CSSProperties {
         transform:
           "translate(calc(-50% - clamp(44px, 6vw, 56px)), calc(-50% + clamp(120px, 16vw, 144px)))",
       };
+    case "bottomLeft":
+      return {
+        ...base,
+        transform:
+          "translate(calc(-50% - clamp(42px, 6.5vw, 68px)), calc(-50% + clamp(120px, 16vw, 144px)))",
+      };
     case "bottomRight":
       return {
         ...base,
