@@ -1,7 +1,18 @@
 # SHARED JS WORKSPACE
 
-status: scaffold-only
+status: active
+phase: GameOS R26 / M01 Builder Foundation
 
-notes:
-- created as implementation target scaffold
-- fill only after design freeze
+responsibilities:
+- request normalization
+- required-field validation
+- workspace/runtime/template compatibility validation
+- idempotency intent comparison
+- M01 response/read-model mapping
+- initial revision seed state contract
+
+rules:
+- storage-neutral
+- no database access
+- no UI ownership
+- no Persona canonical mutation

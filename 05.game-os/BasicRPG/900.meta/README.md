@@ -1,7 +1,9 @@
 # META WORKSPACE
 
-status: scaffold-only
+status: active
 
-notes:
-- created as implementation target scaffold
-- fill only after design freeze
+purpose:
+BasicRPG implementation metadata.
+
+Detailed R26 validation evidence is written to:
+05.game-os/900.meta/GAMEOS_R26_M01_IMPLEMENTATION_VALIDATION_REPORT.txt
