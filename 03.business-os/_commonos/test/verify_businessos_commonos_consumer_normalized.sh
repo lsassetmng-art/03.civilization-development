@@ -441,4 +441,188 @@ then
   fail "privileged material detected in AIOperationDesk frontend"
 fi
 
+
+# R19B_AIOPERATIONDESK_CONSOLE_PROVIDER_VERIFY
+AIOD_CONSOLE_ROOT="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/console"
+AIOD_CONSOLE_JS="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/assets/aiod_commonos_console.js"
+AIOD_CONSOLE_CSS="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/assets/aiod_commonos_console.css"
+
+verify_aiod_console_html() {
+  FILE="$1"
+  LIVE_SCRIPT="${2:-}"
+  PREV=0
+
+  require_file "$FILE"
+
+  if grep -q '12\.common-os' "$FILE"; then
+    fail "AIOperationDesk console references sibling CommonOS repository"
+  fi
+
+  for ASSET in \
+    "../../../../_commonos/provider/commonos.tokens.css" \
+    "../../../../_commonos/provider/commonos.variants.css" \
+    "../../../../_commonos/provider/commonos.components.css" \
+    "../../../../_commonos/provider/commonos.shell.css" \
+    "../../../../_commonos/provider/commonos.sync.css" \
+    "../../../../_commonos/presenter/businessos_commonos_shell.css" \
+    "../assets/aiod_commonos_console.css" \
+    "../../../../_commonos/provider/commonos.runtime.js" \
+    "../../../../_commonos/provider/commonos.shell.js" \
+    "../../../../_commonos/provider/commonos.sync.js" \
+    "../../../../_commonos/theme/businessos_commonos_theme_tokens.js" \
+    "../../../../_commonos/bridge/businessos_commonos_provider_bridge.js" \
+    "../../../../_commonos/adapter/businessos_commonos_adapter_registry.js" \
+    "../../../../_commonos/mapper/businessos_commonos_view_mapper.js" \
+    "../../../../_commonos/sync/businessos_commonos_sync_registry.js" \
+    "../../../../_commonos/presenter/businessos_commonos_shell.js" \
+    "../assets/aiod_commonos_console.js"
+  do
+    COUNT="$(grep -F -c "$ASSET" "$FILE" || true)"
+
+    [ "$COUNT" -eq 1 ] ||
+      fail "AIOperationDesk asset count $COUNT for $ASSET"
+
+    LINE="$(
+      grep -nF "$ASSET" "$FILE" |
+      head -n 1 |
+      cut -d: -f1
+    )"
+
+    [ -n "$LINE" ] ||
+      fail "AIOperationDesk asset line unavailable for $ASSET"
+
+    [ "$LINE" -gt "$PREV" ] ||
+      fail "AIOperationDesk asset load order violation at $ASSET"
+
+    PREV="$LINE"
+  done
+
+  grep -Fq 'id="aiodCommonOsConsoleRoot"' "$FILE" ||
+    fail "AIOperationDesk CommonOS root missing"
+
+  grep -Fq 'data-aiod-console-surface=' "$FILE" ||
+    fail "AIOperationDesk console surface marker missing"
+
+  if grep -Fq '../assets/aiod.css' "$FILE"; then
+    fail "AIOperationDesk console still references legacy aiod.css"
+  fi
+
+  if [ -n "$LIVE_SCRIPT" ]; then
+    COUNT="$(grep -F -c "./$LIVE_SCRIPT" "$FILE" || true)"
+
+    [ "$COUNT" -eq 1 ] ||
+      fail "AIOperationDesk live script count $COUNT for $LIVE_SCRIPT"
+
+    LIVE_LINE="$(
+      grep -nF "./$LIVE_SCRIPT" "$FILE" |
+      head -n 1 |
+      cut -d: -f1
+    )"
+
+    [ "$LIVE_LINE" -gt "$PREV" ] ||
+      fail "AIOperationDesk live script load order violation"
+  fi
+}
+
+verify_aiod_console_html \
+  "$AIOD_CONSOLE_ROOT/main_console.html" \
+  "dashboard_live.js"
+
+verify_aiod_console_html \
+  "$AIOD_CONSOLE_ROOT/queue_board.html" \
+  "queue_board_live.js"
+
+verify_aiod_console_html \
+  "$AIOD_CONSOLE_ROOT/review_inbox.html" \
+  "review_inbox_live.js"
+
+verify_aiod_console_html \
+  "$AIOD_CONSOLE_ROOT/approval_inbox.html" \
+  "approval_inbox_live.js"
+
+verify_aiod_console_html \
+  "$AIOD_CONSOLE_ROOT/failure_retry_center.html" \
+  "failure_retry_center_live.js"
+
+verify_aiod_console_html \
+  "$AIOD_CONSOLE_ROOT/summary_center.html" \
+  "summary_center_live.js"
+
+verify_aiod_console_html \
+  "$AIOD_CONSOLE_ROOT/registry_manager.html"
+
+verify_aiod_console_html \
+  "$AIOD_CONSOLE_ROOT/notification_settings.html"
+
+verify_aiod_console_html \
+  "$AIOD_CONSOLE_ROOT/resident_surface_monitor.html"
+
+require_file "$AIOD_CONSOLE_JS"
+require_file "$AIOD_CONSOLE_CSS"
+
+for EXPECT in \
+  "BusinessOSCommonOSProviderBridge" \
+  "bridge.requireProvider()" \
+  "BusinessOSCommonOSShell" \
+  "presenter.applyTheme" \
+  "provider.runtime" \
+  "provider.shell.createShell" \
+  "rt.card(" \
+  "rt.statusChip(" \
+  "rt.list(" \
+  "data-commonos-provider-connected"
+do
+  grep -Fq "$EXPECT" "$AIOD_CONSOLE_JS" ||
+    fail "AIOperationDesk Provider usage missing: $EXPECT"
+done
+
+if grep -Eq \
+  'document\.createElement|\.innerHTML[[:space:]]*=' \
+  "$AIOD_CONSOLE_JS"
+then
+  fail "AIOperationDesk direct shared DOM renderer remains"
+fi
+
+if grep -Eq \
+  '\.cos-(shell|card|sync|button|status|field|dialog|toast|list)' \
+  "$AIOD_CONSOLE_CSS"
+then
+  fail "AIOperationDesk CSS overrides CommonOS core selectors"
+fi
+
+for LIVE in \
+  dashboard_live.js \
+  queue_board_live.js \
+  review_inbox_live.js \
+  approval_inbox_live.js \
+  failure_retry_center_live.js \
+  summary_center_live.js
+do
+  FILE="$AIOD_CONSOLE_ROOT/$LIVE"
+
+  require_file "$FILE"
+
+  grep -Fq 'window.AIODCommonOSConsole' "$FILE" ||
+    fail "AIOperationDesk CommonOS helper missing in $LIVE"
+
+  if grep -Fq '../assets/aiod_render.js' "$FILE"; then
+    fail "AIOperationDesk legacy renderer remains in $LIVE"
+  fi
+
+  if grep -Eq \
+    'document\.createElement|\.innerHTML[[:space:]]*=' \
+    "$FILE"
+  then
+    fail "AIOperationDesk direct renderer remains in $LIVE"
+  fi
+done
+
+if grep -RIE \
+  'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|PERSONA_DATABASE_URL|DATABASE_URL|service[_-]?role[_-]?key' \
+  "$BUSINESS_ROOT/AIOperationDesk/030.frontend" \
+  >/dev/null 2>&1
+then
+  fail "privileged material detected in AIOperationDesk frontend"
+fi
+
 echo "VERIFY_OK:BUSINESSOS_COMMONOS_PROVIDER_CONNECTED"
