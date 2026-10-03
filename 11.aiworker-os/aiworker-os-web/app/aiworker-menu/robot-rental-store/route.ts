@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const robotRentalStoreHtmlPath = "/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/ui/static/index.html";
+const robotRentalStoreHtmlPath = "${process.cwd()}/public/robot-rental-store-ui/index.html";
 
 export async function GET() {
   try {

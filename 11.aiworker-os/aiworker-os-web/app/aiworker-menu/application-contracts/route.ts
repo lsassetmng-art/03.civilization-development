@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 export const dynamic = "force-dynamic";
 
 const APPLICATION_CONTRACTS_HTML_PATH =
-  "/data/data/com.termux/files/home/03.civilization-development/03.business-os/RobotRentalStore/ui/static/application-contracts.html";
+  "${process.cwd()}/public/robot-rental-store-ui/application-contracts.html";
 
 export async function GET() {
   const html = await readFile(APPLICATION_CONTRACTS_HTML_PATH, "utf8");
