@@ -9,6 +9,7 @@ import {
 import {
   decodeOAuthCallbackContext,
   normalizeSafeRedirectPath,
+  resolveOAuthPostLoginTarget,
   OAUTH_CONTEXT_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
   type OAuthCallbackContext
@@ -205,16 +206,23 @@ function buildSessionFromUserInfo(input: {
     email: safeString(input.userInfo.email),
     localeCode: input.context.localeCode ?? (input.context.languageCode === "en" ? "en-us" : "ja-jp"),
     languageCode: input.context.languageCode,
+    requestedOsCode: input.context.requestedOsCode,
     createdAt: now.toISOString(),
     expiresAt: expiresAt.toISOString()
   };
 }
 
-function sessionHandoffResponse(sessionPayload: unknown, afterLoginPath: string) {
-  const safeAfterLoginPath = normalizeSafeRedirectPath(afterLoginPath, "/civilization-menu");
+function sessionHandoffResponse(
+  sessionPayload: unknown,
+  context: OAuthCallbackContext
+) {
+  const redirectTarget = resolveOAuthPostLoginTarget(
+    context,
+    process.env.AIWORKEROS_PUBLIC_BASE_URL
+  );
   const sessionPayloadJson = jsonForHtmlScript(sessionPayload);
   const storageKeyJson = jsonForHtmlScript(CIVILIZATION_OAUTH_SESSION_STORAGE_KEY);
-  const redirectJson = jsonForHtmlScript(safeAfterLoginPath);
+  const redirectJson = jsonForHtmlScript(redirectTarget);
 
   const body = [
     "<!doctype html>",
@@ -230,7 +238,7 @@ function sessionHandoffResponse(sessionPayload: unknown, afterLoginPath: string)
     "<p>ログイン情報を保存しています。</p>",
     "<noscript>",
     "<p>JavaScriptを有効にしてから続行してください。</p>",
-    '<a href="' + htmlEscape(safeAfterLoginPath) + '">続行</a>',
+    '<a href="' + htmlEscape(redirectTarget) + '">続行</a>',
     "</noscript>",
     "</main>",
     "<script>",
@@ -342,7 +350,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       context: contextCookie
     });
 
-    return sessionHandoffResponse(sessionPayload, contextCookie.afterLoginPath);
+    return sessionHandoffResponse(sessionPayload, contextCookie);
   } catch {
     return authErrorResponse({
       provider,

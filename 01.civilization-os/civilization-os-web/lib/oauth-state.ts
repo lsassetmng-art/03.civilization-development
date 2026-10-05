@@ -18,6 +18,7 @@ export type OAuthCallbackContext = {
   languageCode: string;
   afterLoginPath: string;
   returnTo: string;
+  requestedOsCode: string;
   createdAt: string;
 };
 
@@ -30,6 +31,18 @@ export function normalizeOAuthLanguageCode(value: string | null | undefined): st
     return "en";
   }
   return "ja";
+}
+
+export function normalizeRequestedOsCode(
+  value: string | null | undefined
+): string {
+  const candidate = String(value ?? "").trim().toLowerCase();
+
+  if (/^[a-z0-9][a-z0-9_-]{0,63}$/.test(candidate)) {
+    return candidate;
+  }
+
+  return "civilization";
 }
 
 export function normalizeSafeRedirectPath(value: string | null | undefined, fallback: string): string {
@@ -53,12 +66,58 @@ export function normalizeSafeRedirectPath(value: string | null | undefined, fall
   return candidate;
 }
 
+export function resolveOAuthPostLoginTarget(
+  context: Pick<OAuthCallbackContext, "afterLoginPath" | "requestedOsCode">,
+  aiworkerBaseUrl: string | null | undefined
+): string {
+  const internalTarget = normalizeSafeRedirectPath(
+    context.afterLoginPath,
+    "/civilization-menu"
+  );
+
+  if (normalizeRequestedOsCode(context.requestedOsCode) !== "aiworker") {
+    return internalTarget;
+  }
+
+  const configuredBaseUrl = String(aiworkerBaseUrl ?? "").trim();
+
+  if (!configuredBaseUrl) {
+    return internalTarget;
+  }
+
+  try {
+    const baseUrl = new URL(configuredBaseUrl);
+
+    const isHttps = baseUrl.protocol === "https:";
+    const isLocalHttp =
+      baseUrl.protocol === "http:" &&
+      (
+        baseUrl.hostname === "localhost" ||
+        baseUrl.hostname === "127.0.0.1" ||
+        baseUrl.hostname === "[::1]"
+      );
+
+    if (!isHttps && !isLocalHttp) {
+      return internalTarget;
+    }
+
+    if (baseUrl.username || baseUrl.password) {
+      return internalTarget;
+    }
+
+    return new URL("/aiworker-menu", baseUrl.origin).toString();
+  } catch {
+    return internalTarget;
+  }
+}
+
 export function createOAuthCallbackContext(input: {
   provider: OAuthProviderCode;
   localeCode: string;
   languageCode: string;
   afterLoginPath: string;
   returnTo: string;
+  requestedOsCode: string;
 }): OAuthCallbackContext {
   return {
     provider: input.provider,
@@ -66,6 +125,7 @@ export function createOAuthCallbackContext(input: {
     languageCode: input.languageCode,
     afterLoginPath: normalizeSafeRedirectPath(input.afterLoginPath, "/civilization-menu"),
     returnTo: normalizeSafeRedirectPath(input.returnTo, "/"),
+    requestedOsCode: normalizeRequestedOsCode(input.requestedOsCode),
     createdAt: new Date().toISOString()
   };
 }
@@ -91,6 +151,13 @@ export function decodeOAuthCallbackContext(value: string | undefined): OAuthCall
       languageCode: normalizeOAuthLanguageCode(parsed.languageCode),
       afterLoginPath: normalizeSafeRedirectPath(parsed.afterLoginPath, "/civilization-menu"),
       returnTo: normalizeSafeRedirectPath(parsed.returnTo, "/"),
+        requestedOsCode: normalizeRequestedOsCode(
+          typeof parsed.requestedOsCode === "string"
+            ? parsed.requestedOsCode
+            : typeof (parsed as { requested_os_code?: unknown }).requested_os_code === "string"
+              ? (parsed as { requested_os_code?: string }).requested_os_code
+              : undefined
+        ),
       createdAt: typeof parsed.createdAt === "string" ? parsed.createdAt : new Date().toISOString()
     };
   } catch {

@@ -4,6 +4,7 @@ import {
   createOAuthState,
   encodeOAuthCallbackContext,
   normalizeOAuthLanguageCode,
+  normalizeRequestedOsCode,
   normalizeSafeRedirectPath,
   OAUTH_CONTEXT_COOKIE_NAME,
   OAUTH_COOKIE_MAX_AGE_SECONDS,
@@ -62,13 +63,18 @@ export async function GET(request: NextRequest) {
     "/civilization-menu"
   );
   const returnTo = normalizeSafeRedirectPath(request.nextUrl.searchParams.get("return_to"), "/");
+  const requestedOsCode = normalizeRequestedOsCode(
+    request.nextUrl.searchParams.get("requested_os_code") ||
+      request.nextUrl.searchParams.get("requestedOsCode")
+  );
   const state = createOAuthState();
   const context = createOAuthCallbackContext({
     provider,
     localeCode,
     languageCode,
     afterLoginPath,
-    returnTo
+    returnTo,
+    requestedOsCode
   });
 
   const { authorizationUrl, missingEnvNames } = buildOAuthAuthorizationUrl({
