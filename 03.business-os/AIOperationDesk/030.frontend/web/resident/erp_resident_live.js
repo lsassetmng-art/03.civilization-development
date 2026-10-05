@@ -1,7 +1,13 @@
 import { aiodApi } from "../assets/aiod_api_client.js";
-import { setPre } from "../assets/aiod_render.js";
 
-async function compile(surfaceType, supportedAppCode, laneType, requestText) {
+const ui = window.AIODCommonOSResident;
+
+async function compile(
+  surfaceType,
+  supportedAppCode,
+  laneType,
+  requestText
+) {
   const result = await aiodApi.compileRequest({
     request_channel: "text",
     request_text: requestText,
@@ -24,24 +30,44 @@ async function compile(surfaceType, supportedAppCode, laneType, requestText) {
     attachments: []
   });
 
-  setPre("residentActionOutput", JSON.stringify(result, null, 2));
+  ui.setOutput(JSON.stringify(result, null, 2));
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  const submit = document.getElementById("stubResidentSubmit");
-  if (!submit) {
-    return;
-  }
+  ui.mount();
 
-  submit.addEventListener("click", async () => {
+  ui.onClick("stubResidentSubmit", async () => {
     try {
-      const surfaceType = document.getElementById("surfaceType")?.value || "erp_resident_surface";
-      const supportedAppCode = document.getElementById("supportedAppCode")?.value || "ERP";
-      const laneType = document.getElementById("laneType")?.value || "consult";
-      const requestText = document.getElementById("requestText")?.value || "";
-      await compile(surfaceType, supportedAppCode, laneType, requestText);
+      const surfaceType = ui.value(
+        "surfaceType",
+        "erp_resident_surface"
+      );
+
+      const supportedAppCode = ui.value(
+        "supportedAppCode",
+        "ERP"
+      );
+
+      const laneType = ui.value(
+        "laneType",
+        "consult"
+      );
+
+      const requestText = ui.value(
+        "requestText",
+        ""
+      );
+
+      await compile(
+        surfaceType,
+        supportedAppCode,
+        laneType,
+        requestText
+      );
     } catch (e) {
-      setPre("residentActionOutput", `erp resident error: ${e?.message || e}`);
+      ui.setOutput(
+        `erp resident error: ${e?.message || e}`
+      );
     }
   });
 });

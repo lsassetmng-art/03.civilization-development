@@ -1,16 +1,24 @@
-function bindQuickActionButtons() {
-  const buttons = document.querySelectorAll("[data-stub-action]");
-  const output = document.getElementById("residentActionOutput");
+function requireResidentUi() {
+  const ui = window.AIODCommonOSResident;
 
-  if (!output) {
-    return;
+  if (!ui || typeof ui.mount !== "function") {
+    throw new Error(
+      "AI Operation Desk CommonOS resident helper is required"
+    );
   }
 
-  buttons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const action = button.getAttribute("data-stub-action") || "unknown";
-      output.textContent = `stub resident action selected: ${action}`;
-    });
+  return ui;
+}
+
+function bindQuickActionButtons() {
+  const ui = requireResidentUi();
+
+  ui.mount();
+
+  ui.bindStubActions((action) => {
+    ui.setOutput(
+      `stub resident action selected: ${action}`
+    );
   });
 }
 

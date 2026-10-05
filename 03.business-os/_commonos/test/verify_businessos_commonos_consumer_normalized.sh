@@ -625,4 +625,176 @@ then
   fail "privileged material detected in AIOperationDesk frontend"
 fi
 
+
+# R19C_AIOPERATIONDESK_RESIDENT_PROVIDER_VERIFY
+AIOD_RESIDENT_ROOT="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/resident"
+AIOD_RESIDENT_JS="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/assets/aiod_commonos_resident.js"
+AIOD_RESIDENT_CSS="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/assets/aiod_commonos_resident.css"
+AIOD_RESIDENT_QUICK_JS="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web/assets/aiod_resident.js"
+
+verify_aiod_resident_html() {
+  FILE="$1"
+  MODULE="$2"
+  PREV=0
+
+  require_file "$FILE"
+
+  if grep -q '12\.common-os' "$FILE"; then
+    fail "AIOperationDesk resident references sibling CommonOS repository"
+  fi
+
+  for ASSET in \
+    "../../../../_commonos/provider/commonos.tokens.css" \
+    "../../../../_commonos/provider/commonos.variants.css" \
+    "../../../../_commonos/provider/commonos.components.css" \
+    "../../../../_commonos/provider/commonos.shell.css" \
+    "../../../../_commonos/provider/commonos.sync.css" \
+    "../../../../_commonos/presenter/businessos_commonos_shell.css" \
+    "../assets/aiod_commonos_resident.css" \
+    "../../../../_commonos/provider/commonos.runtime.js" \
+    "../../../../_commonos/provider/commonos.shell.js" \
+    "../../../../_commonos/provider/commonos.sync.js" \
+    "../../../../_commonos/theme/businessos_commonos_theme_tokens.js" \
+    "../../../../_commonos/bridge/businessos_commonos_provider_bridge.js" \
+    "../../../../_commonos/adapter/businessos_commonos_adapter_registry.js" \
+    "../../../../_commonos/mapper/businessos_commonos_view_mapper.js" \
+    "../../../../_commonos/sync/businessos_commonos_sync_registry.js" \
+    "../../../../_commonos/presenter/businessos_commonos_shell.js" \
+    "../assets/aiod_commonos_resident.js"
+  do
+    COUNT="$(grep -F -c "$ASSET" "$FILE" || true)"
+
+    [ "$COUNT" -eq 1 ] ||
+      fail "AIOperationDesk resident asset count $COUNT for $ASSET"
+
+    LINE="$(
+      grep -nF "$ASSET" "$FILE" |
+      head -n 1 |
+      cut -d: -f1
+    )"
+
+    [ -n "$LINE" ] ||
+      fail "AIOperationDesk resident asset line unavailable for $ASSET"
+
+    [ "$LINE" -gt "$PREV" ] ||
+      fail "AIOperationDesk resident asset order violation at $ASSET"
+
+    PREV="$LINE"
+  done
+
+  grep -Fq 'id="aiodCommonOsResidentRoot"' "$FILE" ||
+    fail "AIOperationDesk resident CommonOS root missing"
+
+  grep -Fq 'data-aiod-resident-surface=' "$FILE" ||
+    fail "AIOperationDesk resident surface marker missing"
+
+  if grep -Fq '../assets/aiod.css' "$FILE"; then
+    fail "AIOperationDesk resident still references legacy aiod.css"
+  fi
+
+  COUNT="$(grep -F -c "$MODULE" "$FILE" || true)"
+
+  [ "$COUNT" -eq 1 ] ||
+    fail "AIOperationDesk resident module count $COUNT for $MODULE"
+
+  MODULE_LINE="$(
+    grep -nF "$MODULE" "$FILE" |
+    head -n 1 |
+    cut -d: -f1
+  )"
+
+  [ "$MODULE_LINE" -gt "$PREV" ] ||
+    fail "AIOperationDesk resident module load order violation"
+}
+
+verify_aiod_resident_html \
+  "$AIOD_RESIDENT_ROOT/builder_quick_panel.html" \
+  "../assets/aiod_resident.js"
+
+verify_aiod_resident_html \
+  "$AIOD_RESIDENT_ROOT/builder_resident.html" \
+  "./builder_resident_live.js"
+
+verify_aiod_resident_html \
+  "$AIOD_RESIDENT_ROOT/erp_quick_panel.html" \
+  "../assets/aiod_resident.js"
+
+verify_aiod_resident_html \
+  "$AIOD_RESIDENT_ROOT/erp_resident.html" \
+  "./erp_resident_live.js"
+
+require_file "$AIOD_RESIDENT_JS"
+require_file "$AIOD_RESIDENT_CSS"
+require_file "$AIOD_RESIDENT_QUICK_JS"
+
+for EXPECT in \
+  "BusinessOSCommonOSProviderBridge" \
+  "bridge.requireProvider()" \
+  "BusinessOSCommonOSShell" \
+  "presenter.applyTheme" \
+  "provider.runtime" \
+  "provider.shell.createShell" \
+  "rt.button(" \
+  "rt.statusChip(" \
+  "rt.selectField(" \
+  "rt.textArea(" \
+  "rt.table(" \
+  "data-commonos-provider-connected"
+do
+  grep -Fq "$EXPECT" "$AIOD_RESIDENT_JS" ||
+    fail "AIOperationDesk resident Provider usage missing: $EXPECT"
+done
+
+if grep -Eq \
+  'document\.createElement|\.innerHTML[[:space:]]*=' \
+  "$AIOD_RESIDENT_JS"
+then
+  fail "AIOperationDesk resident direct shared DOM renderer remains"
+fi
+
+if grep -Eq \
+  '\.cos-(shell|card|sync|button|status|field|dialog|toast|list|table)' \
+  "$AIOD_RESIDENT_CSS"
+then
+  fail "AIOperationDesk resident CSS overrides CommonOS core selectors"
+fi
+
+grep -Fq 'window.AIODCommonOSResident' \
+  "$AIOD_RESIDENT_QUICK_JS" ||
+  fail "AIOperationDesk quick action helper not connected"
+
+for LIVE in \
+  builder_resident_live.js \
+  erp_resident_live.js
+do
+  FILE="$AIOD_RESIDENT_ROOT/$LIVE"
+
+  require_file "$FILE"
+
+  grep -Fq 'window.AIODCommonOSResident' "$FILE" ||
+    fail "AIOperationDesk CommonOS resident helper missing in $LIVE"
+
+  grep -Fq 'aiodApi.compileRequest' "$FILE" ||
+    fail "AIOperationDesk compileRequest missing in $LIVE"
+
+  if grep -Fq '../assets/aiod_render.js' "$FILE"; then
+    fail "AIOperationDesk legacy renderer remains in $LIVE"
+  fi
+
+  if grep -Eq \
+    'document\.createElement|\.innerHTML[[:space:]]*=' \
+    "$FILE"
+  then
+    fail "AIOperationDesk resident live direct renderer remains"
+  fi
+done
+
+if grep -RIE \
+  'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|PERSONA_DATABASE_URL|DATABASE_URL|service[_-]?role[_-]?key' \
+  "$BUSINESS_ROOT/AIOperationDesk/030.frontend" \
+  >/dev/null 2>&1
+then
+  fail "privileged material detected in AIOperationDesk frontend"
+fi
+
 echo "VERIFY_OK:BUSINESSOS_COMMONOS_PROVIDER_CONNECTED"
