@@ -10,8 +10,8 @@ for FILE in \
   "$APP_ROOT/020.backend/edge/index.ts" \
   "$APP_ROOT/020.backend/edge/README_RUNTIME.md" \
   "$APP_ROOT/030.frontend/web/assets/aiod_api_client.js" \
-  "$APP_ROOT/030.frontend/web/assets/aiod_console_live.js" \
-  "$APP_ROOT/030.frontend/web/assets/aiod_resident_live.js" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_console.js" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_resident.js" \
   "$APP_ROOT/030.frontend/web/console/main_console.html" \
   "$APP_ROOT/030.frontend/web/resident/erp_resident.html" \
   "$APP_ROOT/030.frontend/web/resident/builder_resident.html" \

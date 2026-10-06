@@ -34,14 +34,14 @@ for FILE in \
   "$APP_ROOT/020.backend/edge/routes/route_dispatch.js" \
   "$APP_ROOT/030.frontend/web/index.html" \
   "$APP_ROOT/030.frontend/web/dev_server.ts" \
-  "$APP_ROOT/030.frontend/web/assets/aiod.css" \
-  "$APP_ROOT/030.frontend/web/assets/aiod.js" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_entry.css" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_entry.js" \
   "$APP_ROOT/030.frontend/web/assets/aiod_api_client.js" \
-  "$APP_ROOT/030.frontend/web/assets/aiod_console.js" \
-  "$APP_ROOT/030.frontend/web/assets/aiod_console_live.js" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_console.js" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_console.js" \
   "$APP_ROOT/030.frontend/web/assets/aiod_resident.js" \
-  "$APP_ROOT/030.frontend/web/assets/aiod_resident_live.js" \
-  "$APP_ROOT/030.frontend/web/assets/aiod_render.js" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_resident.js" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_console.js" \
   "$APP_ROOT/030.frontend/web/console/main_console.html" \
   "$APP_ROOT/030.frontend/web/console/dashboard_live.js" \
   "$APP_ROOT/030.frontend/web/console/queue_board.html" \

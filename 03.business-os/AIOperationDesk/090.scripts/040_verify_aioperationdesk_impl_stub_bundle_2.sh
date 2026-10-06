@@ -7,7 +7,7 @@ for FILE in \
   "$APP_ROOT/020.backend/lib/aiod_mock_store.js" \
   "$APP_ROOT/020.backend/edge/aiod_router_stub.js" \
   "$APP_ROOT/020.backend/edge/README.md" \
-  "$APP_ROOT/030.frontend/web/assets/aiod_console.js" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_console.js" \
   "$APP_ROOT/030.frontend/web/assets/aiod_resident.js" \
   "$APP_ROOT/030.frontend/web/console/queue_board.html" \
   "$APP_ROOT/030.frontend/web/console/review_inbox.html" \

@@ -9,8 +9,8 @@ for FILE in \
   "$APP_ROOT/020.backend/lib/aiod_response.js" \
   "$APP_ROOT/020.backend/edge/aiod_handlers_stub.js" \
   "$APP_ROOT/030.frontend/web/index.html" \
-  "$APP_ROOT/030.frontend/web/assets/aiod.css" \
-  "$APP_ROOT/030.frontend/web/assets/aiod.js" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_entry.css" \
+  "$APP_ROOT/030.frontend/web/assets/aiod_commonos_entry.js" \
   "$APP_ROOT/030.frontend/web/console/main_console.html" \
   "$APP_ROOT/030.frontend/web/resident/erp_resident.html" \
   "$APP_ROOT/030.frontend/web/resident/builder_resident.html" \

@@ -797,4 +797,59 @@ then
   fail "privileged material detected in AIOperationDesk frontend"
 fi
 
+
+# R19D_AIOPERATIONDESK_LEGACY_UI_RETIRE_VERIFY
+AIOD_R19D_WEB="$BUSINESS_ROOT/AIOperationDesk/030.frontend/web"
+AIOD_R19D_ASSETS="$AIOD_R19D_WEB/assets"
+
+for ACTIVE in \
+  "$AIOD_R19D_ASSETS/aiod_commonos_entry.js" \
+  "$AIOD_R19D_ASSETS/aiod_commonos_entry.css" \
+  "$AIOD_R19D_ASSETS/aiod_commonos_console.js" \
+  "$AIOD_R19D_ASSETS/aiod_commonos_console.css" \
+  "$AIOD_R19D_ASSETS/aiod_commonos_resident.js" \
+  "$AIOD_R19D_ASSETS/aiod_commonos_resident.css" \
+  "$AIOD_R19D_ASSETS/aiod_api_client.js" \
+  "$AIOD_R19D_ASSETS/aiod_resident.js"
+do
+  require_file "$ACTIVE"
+done
+
+for LEGACY in \
+  "$AIOD_R19D_ASSETS/aiod.css" \
+  "$AIOD_R19D_ASSETS/aiod.js" \
+  "$AIOD_R19D_ASSETS/aiod_console.js" \
+  "$AIOD_R19D_ASSETS/aiod_console_live.js" \
+  "$AIOD_R19D_ASSETS/aiod_render.js" \
+  "$AIOD_R19D_ASSETS/aiod_resident_live.js"
+do
+  if [ -e "$LEGACY" ]; then
+    fail "retired AIOperationDesk legacy UI asset remains: $LEGACY"
+  fi
+done
+
+for LEGACY_NAME in \
+  "aiod.css" \
+  "aiod.js" \
+  "aiod_console.js" \
+  "aiod_console_live.js" \
+  "aiod_render.js" \
+  "aiod_resident_live.js"
+do
+  if grep -R -F "$LEGACY_NAME" \
+    "$AIOD_R19D_WEB" \
+    >/dev/null 2>&1
+  then
+    fail "retired AIOperationDesk runtime reference remains: $LEGACY_NAME"
+  fi
+done
+
+if grep -RIE \
+  'document\.createElement|\.innerHTML[[:space:]]*=' \
+  "$AIOD_R19D_WEB" \
+  >/dev/null 2>&1
+then
+  fail "legacy direct DOM construction remains in AIOperationDesk web runtime"
+fi
+
 echo "VERIFY_OK:BUSINESSOS_COMMONOS_PROVIDER_CONNECTED"
