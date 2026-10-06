@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { tryHandleStudioChannelRoute } from "../_shared/streaming/studio/routes/studioChannelRoutes.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -71,6 +72,9 @@ serve(async (req) => {
   if (url.pathname === "/stream-studio-phase1/health") {
     return ok({ status: "ok", service: "stream-studio-phase1" });
   }
+
+  const channelResponse = await tryHandleStudioChannelRoute(req);
+  if (channelResponse) return channelResponse;
 
   const base = ["stream-studio-phase1", "api", "stream-studio"];
   if (base.some((v, i) => parts[i] !== v)) {
