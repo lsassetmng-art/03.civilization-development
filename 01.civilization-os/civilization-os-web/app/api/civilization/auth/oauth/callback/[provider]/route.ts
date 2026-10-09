@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { setCivilizationServerSessionCookie } from "@/lib/civilization-server-session";
 import {
   buildOAuthRedirectUri,
   getOAuthProviderConfig,
@@ -214,7 +215,8 @@ function buildSessionFromUserInfo(input: {
 
 function sessionHandoffResponse(
   sessionPayload: unknown,
-  context: OAuthCallbackContext
+  context: OAuthCallbackContext,
+  secureCookie: boolean
 ) {
   const redirectTarget = resolveOAuthPostLoginTarget(
     context,
@@ -266,6 +268,11 @@ function sessionHandoffResponse(
     }
   });
 
+  setCivilizationServerSessionCookie(
+    response,
+    sessionPayload,
+    secureCookie
+  );
   clearOAuthCookies(response);
   return response;
 }
@@ -350,7 +357,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
       context: contextCookie
     });
 
-    return sessionHandoffResponse(sessionPayload, contextCookie);
+    return sessionHandoffResponse(
+      sessionPayload,
+      contextCookie,
+      resolveOAuthProviderEnv(
+        provider
+      ).publicBaseUrl.startsWith("https://")
+    );
   } catch {
     return authErrorResponse({
       provider,
