@@ -107,6 +107,32 @@ export function clearCivilizationSession(): void {
   }
 }
 
+export async function logoutCivilizationSession(): Promise<boolean> {
+  let response: Response;
+
+  try {
+    response = await fetch(
+      "/api/civilization/auth/logout",
+      {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        keepalive: true
+      }
+    );
+  } catch {
+    return false;
+  }
+
+  if (!response.ok) {
+    return false;
+  }
+
+  clearCivilizationSession();
+
+  return true;
+}
+
 export function civilizationSessionStorageKey(): string {
   return CIVILIZATION_SESSION_KEY;
 }
