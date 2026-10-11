@@ -1,5 +1,6 @@
 import {
   civilizationServerSessionConfigured,
+  readCivilizationServerSession,
   setCivilizationServerSessionCookie
 } from "@/lib/civilization-server-session";
 
@@ -307,6 +308,119 @@ function validAiWorkerTarget(
   } catch {
     return false;
   }
+}
+
+
+export async function GET(
+  request: NextRequest
+): Promise<NextResponse> {
+  const sessionResult =
+    readCivilizationServerSession(
+      request
+    );
+
+  if (
+    sessionResult.status ===
+      "not_configured"
+  ) {
+    return noStoreJson(
+      {
+        ok: false,
+        error:
+          "session_signing_not_configured"
+      },
+      503
+    );
+  }
+
+  if (
+    sessionResult.status !==
+      "ok"
+  ) {
+    return noStoreJson(
+      {
+        ok: false,
+        error:
+          "unauthenticated"
+      },
+      401
+    );
+  }
+
+  const params =
+    request.nextUrl.searchParams;
+
+  const languageCode =
+    normalizeOAuthLanguageCode(
+      params.get("language_code") ??
+      params.get("languageCode")
+    );
+
+  const localeCode =
+    normalizeLocaleCode(
+      params.get("locale_code") ??
+      params.get("localeCode"),
+      languageCode
+    );
+
+  const afterLoginPath =
+    normalizeSafeRedirectPath(
+      params.get("after_login_path"),
+      "/civilization-menu"
+    );
+
+  const returnTo =
+    normalizeSafeRedirectPath(
+      params.get("return_to"),
+      "/"
+    );
+
+  const requestedOsCode =
+    normalizeRequestedOsCode(
+      params.get("requested_os_code") ??
+      params.get("requestedOsCode")
+    );
+
+  const redirectTarget =
+    resolveOAuthPostLoginTarget(
+      {
+        afterLoginPath,
+        requestedOsCode
+      },
+      process.env
+        .AIWORKEROS_PUBLIC_BASE_URL
+    );
+
+  if (
+    requestedOsCode === "aiworker" &&
+    !validAiWorkerTarget(
+      redirectTarget
+    )
+  ) {
+    return noStoreJson(
+      {
+        ok: false,
+        error:
+          "aiworker_target_not_configured"
+      },
+      503
+    );
+  }
+
+  return noStoreJson(
+    {
+      ok: true,
+      redirectTarget,
+      context: {
+        localeCode,
+        languageCode,
+        afterLoginPath,
+        returnTo,
+        requestedOsCode
+      }
+    },
+    200
+  );
 }
 
 export async function POST(

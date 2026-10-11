@@ -14,6 +14,80 @@ export type CivilizationAuthGateInput = {
 
 const supportedLanguageCodes = new Set(["ja", "en", "zh", "ko", "fr", "es", "de"]);
 
+const civilizationOsAuthTargets =
+  new Set(["civilization", "aiworker"]);
+
+function normalizeCivilizationAuthorizeUrl(
+  value: string | null | undefined
+): string | null {
+  const raw =
+    String(value ?? "").trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const url =
+      new URL(raw);
+
+    const secure =
+      url.protocol === "https:";
+
+    const localHttp =
+      url.protocol === "http:" &&
+      (
+        url.hostname === "localhost" ||
+        url.hostname === "127.0.0.1" ||
+        url.hostname === "[::1]"
+      );
+
+    if (
+      !secure &&
+      !localHttp
+    ) {
+      return null;
+    }
+
+    if (
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== "/login"
+    ) {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function resolveAuthBasePath(
+  input: CivilizationAuthGateInput
+): string | null {
+  const requestedOsCode =
+    input.requestedOsCode
+      .trim()
+      .toLowerCase();
+
+  if (
+    civilizationOsAuthTargets.has(
+      requestedOsCode
+    )
+  ) {
+    return normalizeCivilizationAuthorizeUrl(
+      process.env
+        .NEXT_PUBLIC_CIVILIZATION_AUTH_AUTHORIZE_URL
+    );
+  }
+
+  return input.basePath ?? "/login";
+}
+
+
 function normalizeLanguageCode(value: string | null | undefined): string | null {
   if (!value) {
     return null;
@@ -158,6 +232,12 @@ export function buildCivilizationAuthUrl(input: CivilizationAuthGateInput): stri
     params.set("aerial_access_token", input.aerialAccessToken);
   }
 
-  const basePath = input.basePath ?? "/login";
+  const basePath =
+    resolveAuthBasePath(input);
+
+  if (!basePath) {
+    return "/error";
+  }
+
   return `${basePath}?${params.toString()}`;
 }

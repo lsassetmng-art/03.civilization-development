@@ -141,6 +141,34 @@ function isLoginApiSuccess(
   );
 }
 
+
+type LoginContinuationSuccess = {
+  ok: true;
+  redirectTarget: string;
+};
+
+function isLoginContinuationSuccess(
+  value: unknown
+): value is LoginContinuationSuccess {
+  if (
+    typeof value !== "object" ||
+    value === null
+  ) {
+    return false;
+  }
+
+  const result =
+    value as
+      Partial<LoginContinuationSuccess>;
+
+  return (
+    result.ok === true &&
+    typeof result.redirectTarget ===
+      "string" &&
+    result.redirectTarget.length > 0
+  );
+}
+
 export default function LoginPage() {
   const portalContext =
     usePortalContext();
@@ -225,6 +253,89 @@ export default function LoginPage() {
     [
       locale
     ]
+  );
+
+
+  useEffect(
+    () => {
+      let cancelled = false;
+
+      const redirectContext =
+        readLoginRedirectContext(
+          window.location.search,
+          locale
+        );
+
+      const params =
+        new URLSearchParams();
+
+      params.set(
+        "locale_code",
+        redirectContext.localeCode
+      );
+
+      params.set(
+        "language_code",
+        redirectContext.languageCode
+      );
+
+      params.set(
+        "after_login_path",
+        redirectContext.afterLoginPath
+      );
+
+      params.set(
+        "return_to",
+        redirectContext.returnTo
+      );
+
+      params.set(
+        "requested_os_code",
+        redirectContext.requestedOsCode
+      );
+
+      void (async () => {
+        try {
+          const response =
+            await fetch(
+              "/api/civilization/auth/login?" +
+                params.toString(),
+              {
+                method: "GET",
+                credentials:
+                  "same-origin",
+                cache: "no-store"
+              }
+            );
+
+          if (!response.ok) {
+            return;
+          }
+
+          const payload: unknown =
+            await response
+              .json()
+              .catch(() => null);
+
+          if (
+            !cancelled &&
+            isLoginContinuationSuccess(
+              payload
+            )
+          ) {
+            window.location.href =
+              payload.redirectTarget;
+          }
+        } catch {
+          // Keep normal login visible.
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    },
+    [locale]
   );
 
   async function handleSubmit(

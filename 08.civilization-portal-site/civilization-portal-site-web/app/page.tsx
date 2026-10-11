@@ -53,7 +53,7 @@ export default function Page() {
           id: "aiworker",
           label: "AI Worker",
           authGate: {
-            afterLoginPath: `${(process.env.NEXT_PUBLIC_AIWORKEROS_URL ?? "").replace(/\/+$/, "")}/aiworker-menu`,
+            afterLoginPath: "/civilization-menu",
             returnTo: "/",
             requestedOsCode: "aiworker",
           },
