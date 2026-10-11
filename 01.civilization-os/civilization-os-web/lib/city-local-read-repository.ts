@@ -487,6 +487,7 @@ export async function findCurrentActivePlacement(
       WHERE
         p.facility_registry_id = $1::uuid
         AND p.placement_status = 'active'
+        AND p.effective_from <= now()
         AND p.effective_until IS NULL
       LIMIT 1
       `,
@@ -541,6 +542,7 @@ export async function listFacilitiesForCity(
         p.nation_id = $1::uuid
         AND p.city_code = $2
         AND p.placement_status = 'active'
+        AND p.effective_from <= now()
         AND p.effective_until IS NULL
       ORDER BY
         f.facility_code,
