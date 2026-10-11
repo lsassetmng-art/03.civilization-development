@@ -1,36 +1,67 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { AppShell } from "@/components/AppShell";
-import { HandoffPanel } from "@/components/HandoffPanel";
-import { usePortalContext } from "@/components/usePortalContext";
 import {
-  buildAfterLoginUrl,
+  FormEvent,
+  useEffect,
+  useState
+} from "react";
+
+import {
+  AppShell
+} from "@/components/AppShell";
+
+import {
+  HandoffPanel
+} from "@/components/HandoffPanel";
+
+import {
+  usePortalContext
+} from "@/components/usePortalContext";
+
+import {
   buildOauthStartUrl,
   readLoginRedirectContext
 } from "@/lib/civilization-auth-redirect";
-import {
-  createCivilizationSession,
-  hasActiveCivilizationSession,
-  saveCivilizationSession,
-  withCivilizationSessionLocale
-} from "@/lib/civilization-session";
-import {
-  resolveCivilizationLoginAccount,
-  systemLoginId
-} from "@/lib/civilization-login-accounts";
-import { t } from "@/lib/i18n";
 
-function providerLabel(locale: string, provider: "google" | "yahoo"): string {
+import {
+  saveCivilizationSession,
+  type CivilizationSession
+} from "@/lib/civilization-session";
+
+import {
+  testLoginId
+} from "@/lib/civilization-login-accounts";
+
+import {
+  t
+} from "@/lib/i18n";
+
+function providerLabel(
+  locale: string,
+  provider:
+    | "google"
+    | "yahoo"
+): string {
   if (locale === "ja") {
-    return provider === "google" ? "Googleでログイン" : "Yahooでログイン";
+    return provider ===
+      "google"
+      ? "Googleでログイン"
+      : "Yahooでログイン";
   }
 
-  return provider === "google" ? "Continue with Google" : "Continue with Yahoo";
+  return provider ===
+    "google"
+    ? "Continue with Google"
+    : "Continue with Yahoo";
 }
 
-function providerNotice(locale: string, provider: string | null): string {
-  if (!provider) return "";
+function providerNotice(
+  locale: string,
+  provider: string | null
+): string {
+  if (!provider) {
+    return "";
+  }
 
   if (locale === "ja") {
     return `${provider}ログインはOAuth設定後に有効化します。現在はログイン成功扱いにしません。`;
@@ -39,7 +70,9 @@ function providerNotice(locale: string, provider: string | null): string {
   return `${provider} login will be enabled after OAuth configuration. It is not treated as successful login yet.`;
 }
 
-function invalidLoginMessage(locale: string): string {
+function invalidLoginMessage(
+  locale: string
+): string {
   if (locale === "ja") {
     return "Login ID またはパスワードが一致しません。";
   }
@@ -47,68 +80,278 @@ function invalidLoginMessage(locale: string): string {
   return "Login ID or password does not match.";
 }
 
-function testAccountNotice(locale: string): string {
+function unavailableLoginMessage(
+  locale: string
+): string {
   if (locale === "ja") {
-    return `テスト用 Login ID: ${systemLoginId()}`;
+    return "テストログインは現在利用できません。";
   }
 
-  return `Test Login ID: ${systemLoginId()}`;
+  return "Test login is currently unavailable.";
+}
+
+function testAccountNotice(
+  locale: string
+): string {
+  if (locale === "ja") {
+    return `テスト用 Login ID: ${testLoginId()}`;
+  }
+
+  return `Test Login ID: ${testLoginId()}`;
+}
+
+type LoginApiSuccess = {
+  ok: true;
+  clientSession:
+    CivilizationSession;
+  redirectTarget: string;
+};
+
+function isLoginApiSuccess(
+  value: unknown
+): value is LoginApiSuccess {
+  if (
+    typeof value !== "object" ||
+    value === null
+  ) {
+    return false;
+  }
+
+  const result =
+    value as Partial<LoginApiSuccess>;
+
+  const session =
+    result.clientSession as
+      | Partial<CivilizationSession>
+      | undefined;
+
+  return (
+    result.ok === true &&
+    typeof result.redirectTarget ===
+      "string" &&
+    result.redirectTarget.length >
+      0 &&
+    session?.version === 1 &&
+    typeof session.issuedAt ===
+      "number" &&
+    typeof session.expiresAt ===
+      "number" &&
+    session.loginMethod ===
+      "civilization"
+  );
 }
 
 export default function LoginPage() {
-  const portalContext = usePortalContext();
-  const locale = portalContext.languageCode;
-  const [message, setMessage] = useState("");
-  const [googleHref, setGoogleHref] = useState("/api/civilization/auth/oauth/start?provider=google");
-  const [yahooHref, setYahooHref] = useState("/api/civilization/auth/oauth/start?provider=yahoo");
+  const portalContext =
+    usePortalContext();
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const provider = params.get("auth_provider");
-    const providerStatus = params.get("auth_provider_status");
+  const locale =
+    portalContext.languageCode;
 
-    if (provider && providerStatus === "not_configured") {
-      setMessage(providerNotice(locale, provider));
-    }
+  const [
+    message,
+    setMessage
+  ] =
+    useState("");
 
-    setGoogleHref(buildOauthStartUrl("google", window.location.search, locale));
-    setYahooHref(buildOauthStartUrl("yahoo", window.location.search, locale));
+  const [
+    submitting,
+    setSubmitting
+  ] =
+    useState(false);
 
-    if (hasActiveCivilizationSession()) {
-      window.location.replace(buildAfterLoginUrl(window.location.search, locale));
-    }
-  }, [locale]);
+  const [
+    googleHref,
+    setGoogleHref
+  ] =
+    useState(
+      "/api/civilization/auth/oauth/start?provider=google"
+    );
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const [
+    yahooHref,
+    setYahooHref
+  ] =
+    useState(
+      "/api/civilization/auth/oauth/start?provider=yahoo"
+    );
+
+  useEffect(
+    () => {
+      const params =
+        new URLSearchParams(
+          window.location.search
+        );
+
+      const provider =
+        params.get(
+          "auth_provider"
+        );
+
+      const providerStatus =
+        params.get(
+          "auth_provider_status"
+        );
+
+      if (
+        provider &&
+        providerStatus ===
+          "not_configured"
+      ) {
+        setMessage(
+          providerNotice(
+            locale,
+            provider
+          )
+        );
+      }
+
+      setGoogleHref(
+        buildOauthStartUrl(
+          "google",
+          window.location.search,
+          locale
+        )
+      );
+
+      setYahooHref(
+        buildOauthStartUrl(
+          "yahoo",
+          window.location.search,
+          locale
+        )
+      );
+    },
+    [
+      locale
+    ]
+  );
+
+  async function handleSubmit(
+    event:
+      FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
-    const formData = new FormData(event.currentTarget);
-    const loginIdentifier = String(formData.get("loginIdentifier") ?? "");
-    const password = String(formData.get("password") ?? "");
-    const redirectContext = readLoginRedirectContext(window.location.search, locale);
-
-    const account = resolveCivilizationLoginAccount({ loginIdentifier, password });
-
-    if (!account) {
-      setMessage(invalidLoginMessage(locale));
+    if (submitting) {
       return;
     }
 
-    saveCivilizationSession(
-      withCivilizationSessionLocale(
-        createCivilizationSession({
-          loginMethod: "civilization",
-          loginIdentifier: account.civilizationId,
-          requestedOsCode: redirectContext.requestedOsCode,
-          returnTo: redirectContext.returnTo,
-          afterLoginPath: redirectContext.afterLoginPath
-        }),
-        redirectContext.localeCode ?? redirectContext.languageCode
-      )
-    );
+    const formData =
+      new FormData(
+        event.currentTarget
+      );
 
-    setMessage(t(locale, "auth.contractNotice"));
-    window.location.href = buildAfterLoginUrl(window.location.search, locale);
+    const loginIdentifier =
+      String(
+        formData.get(
+          "loginIdentifier"
+        ) ??
+        ""
+      );
+
+    const password =
+      String(
+        formData.get(
+          "password"
+        ) ??
+        ""
+      );
+
+    const redirectContext =
+      readLoginRedirectContext(
+        window.location.search,
+        locale
+      );
+
+    setMessage("");
+    setSubmitting(true);
+
+    try {
+      const response =
+        await fetch(
+          "/api/civilization/auth/login",
+          {
+            method: "POST",
+            credentials:
+              "same-origin",
+            cache: "no-store",
+            headers: {
+              "content-type":
+                "application/json"
+            },
+            body:
+              JSON.stringify(
+                {
+                  loginIdentifier,
+                  password,
+                  localeCode:
+                    redirectContext
+                      .localeCode,
+                  languageCode:
+                    redirectContext
+                      .languageCode,
+                  afterLoginPath:
+                    redirectContext
+                      .afterLoginPath,
+                  returnTo:
+                    redirectContext
+                      .returnTo,
+                  requestedOsCode:
+                    redirectContext
+                      .requestedOsCode
+                }
+              )
+          }
+        );
+
+      const payload: unknown =
+        await response
+          .json()
+          .catch(
+            () => null
+          );
+
+      if (
+        response.status === 401
+      ) {
+        setMessage(
+          invalidLoginMessage(
+            locale
+          )
+        );
+        return;
+      }
+
+      if (
+        !response.ok ||
+        !isLoginApiSuccess(
+          payload
+        )
+      ) {
+        setMessage(
+          unavailableLoginMessage(
+            locale
+          )
+        );
+        return;
+      }
+
+      saveCivilizationSession(
+        payload.clientSession
+      );
+
+      window.location.href =
+        payload.redirectTarget;
+    } catch {
+      setMessage(
+        unavailableLoginMessage(
+          locale
+        )
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -120,18 +363,54 @@ export default function LoginPage() {
           <p>{t(locale, "auth.login.description")}</p>
 
           <form className="form" onSubmit={handleSubmit}>
-            <label><span>{locale === "ja" ? "Login ID" : "Login ID"}</span><input name="loginIdentifier" required /></label>
-            <label><span>{t(locale, "auth.password")}</span><input name="password" type="password" required /></label>
-            <button type="submit">{t(locale, "auth.loginAction")}</button>
+            <label>
+              <span>Login ID</span>
+              <input
+                name="loginIdentifier"
+                required
+                autoComplete="username"
+              />
+            </label>
+
+            <label>
+              <span>{t(locale, "auth.password")}</span>
+              <input
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+              />
+            </label>
+
+            <button
+              type="submit"
+              disabled={submitting}
+            >
+              {t(locale, "auth.loginAction")}
+            </button>
           </form>
 
-          <div className="notice">{testAccountNotice(locale)}</div>
+          <div className="notice">
+            {testAccountNotice(locale)}
+          </div>
 
-          <div className="auth-provider-stack" aria-label="social-login">
-            <a className="auth-provider-button" href={googleHref} data-auth-provider="google">
+          <div
+            className="auth-provider-stack"
+            aria-label="social-login"
+          >
+            <a
+              className="auth-provider-button"
+              href={googleHref}
+              data-auth-provider="google"
+            >
               {providerLabel(locale, "google")}
             </a>
-            <a className="auth-provider-button" href={yahooHref} data-auth-provider="yahoo">
+
+            <a
+              className="auth-provider-button"
+              href={yahooHref}
+              data-auth-provider="yahoo"
+            >
               {providerLabel(locale, "yahoo")}
             </a>
           </div>
@@ -142,10 +421,19 @@ export default function LoginPage() {
               : "Google/Yahoo login will be enabled after OAuth configuration. It is not treated as successful while unconfigured."}
           </div>
 
-          {message ? <div className="notice">{message}</div> : null}
+          {message
+            ? (
+                <div className="notice">
+                  {message}
+                </div>
+              )
+            : null}
         </section>
 
-        <HandoffPanel locale={locale} target={portalContext} />
+        <HandoffPanel
+          locale={locale}
+          target={portalContext}
+        />
       </div>
     </AppShell>
   );
