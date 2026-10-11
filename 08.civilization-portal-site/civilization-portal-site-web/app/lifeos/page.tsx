@@ -12,7 +12,7 @@ import {
 type SearchParams = Record<string, string | string[] | undefined>;
 
 type LifeOSPageProps = {
-  readonly searchParams?: SearchParams | Promise<SearchParams>;
+  readonly searchParams?: Promise<SearchParams>;
 };
 
 const toneBackground: Record<LifeOSMenuItem["tone"], string> = {
@@ -24,7 +24,8 @@ const toneBackground: Record<LifeOSMenuItem["tone"], string> = {
 };
 
 export default async function LifeOSPage({ searchParams }: LifeOSPageProps) {
-  const resolvedSearchParams = await Promise.resolve(searchParams ?? {});
+  const resolvedSearchParams: SearchParams =
+    searchParams ? await searchParams : {};
   const context = createLifeOSCivilizationLoginContext({
     civilizationId: firstSearchParam(resolvedSearchParams.civilizationId ?? resolvedSearchParams.civilization_id),
     owner: firstSearchParam(resolvedSearchParams.owner),
