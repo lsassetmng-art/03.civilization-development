@@ -294,6 +294,39 @@ export default function LoginPage() {
         redirectContext.requestedOsCode
       );
 
+      if (
+        redirectContext
+          .handoffState
+      ) {
+        params.set(
+          "handoff_state",
+          redirectContext
+            .handoffState
+        );
+      }
+
+      if (
+        redirectContext
+          .codeChallenge
+      ) {
+        params.set(
+          "code_challenge",
+          redirectContext
+            .codeChallenge
+        );
+      }
+
+      if (
+        redirectContext
+          .codeChallengeMethod
+      ) {
+        params.set(
+          "code_challenge_method",
+          redirectContext
+            .codeChallengeMethod
+        );
+      }
+
       void (async () => {
         try {
           const response =
@@ -410,7 +443,16 @@ export default function LoginPage() {
                       .returnTo,
                   requestedOsCode:
                     redirectContext
-                      .requestedOsCode
+                      .requestedOsCode,
+                  handoffState:
+                    redirectContext
+                      .handoffState,
+                  codeChallenge:
+                    redirectContext
+                      .codeChallenge,
+                  codeChallengeMethod:
+                    redirectContext
+                      .codeChallengeMethod
                 }
               )
           }

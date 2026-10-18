@@ -1,4 +1,7 @@
 import { createHash } from "crypto";
+import {
+  issueAiWorkerHandoff
+} from "@/lib/civilization-auth-handoff";
 import { setCivilizationServerSessionCookie } from "@/lib/civilization-server-session";
 import {
   buildOAuthRedirectUri,
@@ -213,15 +216,62 @@ function buildSessionFromUserInfo(input: {
   };
 }
 
-function sessionHandoffResponse(
+async function sessionHandoffResponse(
   sessionPayload: unknown,
   context: OAuthCallbackContext,
   secureCookie: boolean
 ) {
-  const redirectTarget = resolveOAuthPostLoginTarget(
+  let redirectTarget = resolveOAuthPostLoginTarget(
     context,
     process.env.AIWORKEROS_PUBLIC_BASE_URL
   );
+
+  if (
+    context.requestedOsCode ===
+      "aiworker"
+  ) {
+    const civilizationId =
+      safeString(
+        (
+          sessionPayload as {
+            civilizationId?: unknown;
+          }
+        ).civilizationId
+      );
+
+    if (!civilizationId) {
+      throw new Error(
+        "civilization_id_missing"
+      );
+    }
+
+    const handoff =
+      await issueAiWorkerHandoff(
+        {
+          serverSessionActorKey:
+            civilizationId,
+          state:
+            context.handoffState,
+          codeChallenge:
+            context.codeChallenge,
+          codeChallengeMethod:
+            context
+              .codeChallengeMethod
+        }
+      );
+
+    if (
+      handoff.status !==
+        "ok"
+    ) {
+      throw new Error(
+        "aiworker_handoff_failed"
+      );
+    }
+
+    redirectTarget =
+      handoff.redirectTarget;
+  }
   const sessionPayloadJson = jsonForHtmlScript(sessionPayload);
   const storageKeyJson = jsonForHtmlScript(CIVILIZATION_OAUTH_SESSION_STORAGE_KEY);
   const redirectJson = jsonForHtmlScript(redirectTarget);
@@ -264,7 +314,8 @@ function sessionHandoffResponse(
     status: 200,
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store"
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer"
     }
   });
 
@@ -357,7 +408,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       context: contextCookie
     });
 
-    return sessionHandoffResponse(
+    return await sessionHandoffResponse(
       sessionPayload,
       contextCookie,
       resolveOAuthProviderEnv(

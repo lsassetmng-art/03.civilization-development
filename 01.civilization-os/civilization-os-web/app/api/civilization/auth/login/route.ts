@@ -1,4 +1,8 @@
 import {
+  issueAiWorkerHandoff
+} from "@/lib/civilization-auth-handoff";
+
+import {
   civilizationServerSessionConfigured,
   readCivilizationServerSession,
   setCivilizationServerSessionCookie
@@ -310,6 +314,157 @@ function validAiWorkerTarget(
   }
 }
 
+type HandoffFields = {
+  state?: string;
+  codeChallenge?: string;
+  codeChallengeMethod?: string;
+};
+
+function handoffFieldsFromSearch(
+  params: URLSearchParams
+): HandoffFields {
+  return {
+    state:
+      params.get(
+        "handoff_state"
+      ) ??
+      undefined,
+    codeChallenge:
+      params.get(
+        "code_challenge"
+      ) ??
+      undefined,
+    codeChallengeMethod:
+      params.get(
+        "code_challenge_method"
+      ) ??
+      undefined
+  };
+}
+
+function handoffFieldsFromBody(
+  body: JsonRecord
+): HandoffFields {
+  return {
+    state:
+      optionalString(
+        body.handoffState,
+        256
+      ),
+    codeChallenge:
+      optionalString(
+        body.codeChallenge,
+        256
+      ),
+    codeChallengeMethod:
+      optionalString(
+        body.codeChallengeMethod,
+        32
+      )
+  };
+}
+
+async function resolveAuthenticatedTarget(
+  input: {
+    civilizationId: string;
+    afterLoginPath: string;
+    requestedOsCode: string;
+    handoff: HandoffFields;
+  }
+): Promise<
+  | {
+      ok: true;
+      redirectTarget: string;
+    }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+    }
+> {
+  const normalTarget =
+    resolveOAuthPostLoginTarget(
+      {
+        afterLoginPath:
+          input.afterLoginPath,
+        requestedOsCode:
+          input.requestedOsCode
+      },
+      process.env
+        .AIWORKEROS_PUBLIC_BASE_URL
+    );
+
+  if (
+    input.requestedOsCode !==
+      "aiworker"
+  ) {
+    return {
+      ok: true,
+      redirectTarget:
+        normalTarget
+    };
+  }
+
+  if (
+    !validAiWorkerTarget(
+      normalTarget
+    )
+  ) {
+    return {
+      ok: false,
+      status: 503,
+      error:
+        "aiworker_target_not_configured"
+    };
+  }
+
+  const handoffResult =
+    await issueAiWorkerHandoff(
+      {
+        serverSessionActorKey:
+          input.civilizationId,
+        state:
+          input.handoff.state,
+        codeChallenge:
+          input.handoff
+            .codeChallenge,
+        codeChallengeMethod:
+          input.handoff
+            .codeChallengeMethod
+      }
+    );
+
+  if (
+    handoffResult.status ===
+      "ok"
+  ) {
+    return {
+      ok: true,
+      redirectTarget:
+        handoffResult
+          .redirectTarget
+    };
+  }
+
+  if (
+    handoffResult.status ===
+      "invalid_request"
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error:
+        "invalid_aiworker_handoff"
+    };
+  }
+
+  return {
+    ok: false,
+    status: 503,
+    error:
+      "aiworker_handoff_unavailable"
+  };
+}
 
 export async function GET(
   request: NextRequest
@@ -381,31 +536,36 @@ export async function GET(
       params.get("requestedOsCode")
     );
 
-  const redirectTarget =
-    resolveOAuthPostLoginTarget(
+  const targetResult =
+    await resolveAuthenticatedTarget(
       {
+        civilizationId:
+          sessionResult
+            .session
+            .civilizationId,
         afterLoginPath,
-        requestedOsCode
-      },
-      process.env
-        .AIWORKEROS_PUBLIC_BASE_URL
+        requestedOsCode,
+        handoff:
+          handoffFieldsFromSearch(
+            params
+          )
+      }
     );
 
-  if (
-    requestedOsCode === "aiworker" &&
-    !validAiWorkerTarget(
-      redirectTarget
-    )
-  ) {
+  if (!targetResult.ok) {
     return noStoreJson(
       {
         ok: false,
         error:
-          "aiworker_target_not_configured"
+          targetResult.error
       },
-      503
+      targetResult.status
     );
   }
+
+  const redirectTarget =
+    targetResult
+      .redirectTarget;
 
   return noStoreJson(
     {
@@ -592,32 +752,35 @@ export async function POST(
       )
     );
 
-  const redirectTarget =
-    resolveOAuthPostLoginTarget(
+  const targetResult =
+    await resolveAuthenticatedTarget(
       {
+        civilizationId:
+          verification
+            .civilizationId,
         afterLoginPath,
-        requestedOsCode
-      },
-      process.env
-        .AIWORKEROS_PUBLIC_BASE_URL
+        requestedOsCode,
+        handoff:
+          handoffFieldsFromBody(
+            body
+          )
+      }
     );
 
-  if (
-    requestedOsCode ===
-      "aiworker" &&
-    !validAiWorkerTarget(
-      redirectTarget
-    )
-  ) {
+  if (!targetResult.ok) {
     return noStoreJson(
       {
         ok: false,
         error:
-          "aiworker_target_not_configured"
+          targetResult.error
       },
-      503
+      targetResult.status
     );
   }
+
+  const redirectTarget =
+    targetResult
+      .redirectTarget;
 
   const issuedAtMs =
     Date.now();

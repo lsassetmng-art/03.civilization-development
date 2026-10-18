@@ -58,17 +58,38 @@ function isUuidLike(value) {
 function getCivilizationContext(req) {
   const headerValue = String(
     req.headers["x-civilization-id"] ||
-    req.headers["x-owner-civilization-id"] ||
     ""
   ).trim();
 
-  const envValue = String(process.env.ROBOT_RENTAL_STORE_DEV_CIVILIZATION_ID || "").trim();
-  const civilizationId = headerValue || envValue || null;
+  const allowDevFallback =
+    process.env.NODE_ENV !== "production" &&
+    String(
+      process.env.ROBOT_RENTAL_STORE_ALLOW_DEV_CIVILIZATION_ID ||
+      ""
+    ).toLowerCase() === "true";
+
+  const envValue =
+    allowDevFallback
+      ? String(
+          process.env.ROBOT_RENTAL_STORE_DEV_CIVILIZATION_ID ||
+          ""
+        ).trim()
+      : "";
+
+  const civilizationId =
+    headerValue ||
+    envValue ||
+    null;
 
   return {
     owner_civilization_id: civilizationId,
     civilization_context_present: Boolean(civilizationId),
-    civilization_context_source: headerValue ? "header" : envValue ? "env_dev_fallback" : "missing",
+    civilization_context_source:
+      headerValue
+        ? "trusted_aiworker_proxy_header"
+        : envValue
+          ? "explicit_dev_fallback"
+          : "missing",
     context_required_for_persist: true
   };
 }
@@ -76,8 +97,8 @@ function getCivilizationContext(req) {
 function validateCivilizationContext(context) {
   if (!context || !context.owner_civilization_id) {
     return {
-      ok: true,
-      warning: "civilization_context_missing_for_dry_run",
+      ok: false,
+      error: "authentication_required",
       persist_allowed: false
     };
   }
@@ -94,6 +115,54 @@ function validateCivilizationContext(context) {
     ok: true,
     persist_allowed: true
   };
+}
+
+function businessHttpStatus(result) {
+  if (result && result.ok) {
+    return 200;
+  }
+
+  const error = String(
+    result && result.error
+      ? result.error
+      : ""
+  );
+
+  if (
+    error === "authentication_required" ||
+    error.startsWith("civilization_context_required")
+  ) {
+    return 401;
+  }
+
+  if (
+    error === "invalid_civilization_id_format" ||
+    error.includes("owner_mismatch") ||
+    error === "contract_not_found" ||
+    error === "application_contract_not_found"
+  ) {
+    return 403;
+  }
+
+  const explicitStatus =
+    Number(
+      result &&
+      result.status
+        ? result.status
+        : 0
+    );
+
+  if (
+    Number.isInteger(
+      explicitStatus
+    ) &&
+    explicitStatus >= 400 &&
+    explicitStatus <= 599
+  ) {
+    return explicitStatus;
+  }
+
+  return 400;
 }
 
 function ident(name) {
@@ -2014,7 +2083,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/api/v1/business/application-contracts") {
     try {
       const result = listApplicationContracts(req, url);
-      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+      sendJson(res, businessHttpStatus(result), result);
     } catch (err) {
       sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
     }
@@ -2025,7 +2094,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && applicationContractDetailMatch) {
     try {
       const result = getApplicationContractDetail(req, applicationContractDetailMatch[1]);
-      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+      sendJson(res, businessHttpStatus(result), result);
     } catch (err) {
       sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
     }
@@ -2037,7 +2106,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/api/v1/business/robot-rental/contracts") {
     try {
       const result = listContracts(req, url);
-      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+      sendJson(res, businessHttpStatus(result), result);
     } catch (err) {
       sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
     }
@@ -2048,7 +2117,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && aiworkerContractDetailMatch) {
     try {
       const result = getContractDetail(req, aiworkerContractDetailMatch[1]);
-      sendJson(res, result.status || (result.ok ? 200 : 400), result);
+      sendJson(res, businessHttpStatus(result), result);
     } catch (err) {
       sendJson(res, 500, { ok: false, error: "internal_error", detail: String(err && err.message ? err.message : err) });
     }
@@ -2113,7 +2182,7 @@ const server = http.createServer(async (req, res) => {
       const body = raw ? JSON.parse(raw) : {};
       const context = getCivilizationContext(req);
       const result = cancelRental(body, context);
-      sendJson(res, result.ok ? 200 : 400, result);
+      sendJson(res, businessHttpStatus(result), result);
       return;
     }
 
@@ -2122,7 +2191,7 @@ const server = http.createServer(async (req, res) => {
       const body = raw ? JSON.parse(raw) : {};
       const context = getCivilizationContext(req);
       const result = endRental(body, context);
-      sendJson(res, result.ok ? 200 : 400, result);
+      sendJson(res, businessHttpStatus(result), result);
       return;
     }
 
@@ -2131,7 +2200,7 @@ const server = http.createServer(async (req, res) => {
       const body = raw ? JSON.parse(raw) : {};
       const context = getCivilizationContext(req);
       const result = startRental(body, context);
-      sendJson(res, result.ok ? 200 : 400, result);
+      sendJson(res, businessHttpStatus(result), result);
       return;
     }
 
@@ -2140,7 +2209,7 @@ const server = http.createServer(async (req, res) => {
       const body = raw ? JSON.parse(raw) : {};
       const context = getCivilizationContext(req);
       const result = createPaymentIntent(body, context);
-      sendJson(res, result.ok ? 200 : 400, result);
+      sendJson(res, businessHttpStatus(result), result);
       return;
     }
 
@@ -2149,7 +2218,7 @@ const server = http.createServer(async (req, res) => {
       const body = raw ? JSON.parse(raw) : {};
       const context = getCivilizationContext(req);
       const result = confirmContract(body, context);
-      sendJson(res, result.ok ? 200 : 400, result);
+      sendJson(res, businessHttpStatus(result), result);
       return;
     }
 
@@ -2158,7 +2227,7 @@ const server = http.createServer(async (req, res) => {
       const body = raw ? JSON.parse(raw) : {};
       const context = getCivilizationContext(req);
       const result = persistQuote(body, context, "persist");
-      sendJson(res, result.ok ? 200 : 400, result);
+      sendJson(res, businessHttpStatus(result), result);
       return;
     }
 
@@ -2167,7 +2236,7 @@ const server = http.createServer(async (req, res) => {
       const body = raw ? JSON.parse(raw) : {};
       const context = getCivilizationContext(req);
       const result = persistQuote(body, context, "rollback_smoke");
-      sendJson(res, result.ok ? 200 : 400, result);
+      sendJson(res, businessHttpStatus(result), result);
       return;
     }
 
@@ -2176,7 +2245,7 @@ const server = http.createServer(async (req, res) => {
       const body = raw ? JSON.parse(raw) : {};
       const context = getCivilizationContext(req);
       const result = quote(body, context);
-      sendJson(res, result.ok ? 200 : 400, result);
+      sendJson(res, businessHttpStatus(result), result);
       return;
     }
 

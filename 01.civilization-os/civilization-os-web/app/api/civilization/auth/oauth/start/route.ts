@@ -10,112 +10,330 @@ import {
   OAUTH_COOKIE_MAX_AGE_SECONDS,
   OAUTH_STATE_COOKIE_NAME
 } from "@/lib/oauth-state";
-import { NextRequest, NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse
+} from "next/server";
 
-function normalizeOAuthStartLocaleCode(value: string | null | undefined): "ja-jp" | "en-us" {
-  const raw = String(value ?? "ja").trim().toLowerCase().replace("_", "-");
-  if (raw === "en" || raw === "en-us" || raw.startsWith("en-")) return "en-us";
+function normalizeOAuthStartLocaleCode(
+  value:
+    string |
+    null |
+    undefined
+): "ja-jp" | "en-us" {
+  const raw =
+    String(
+      value ??
+      "ja"
+    )
+      .trim()
+      .toLowerCase()
+      .replace(
+        "_",
+        "-"
+      );
+
+  if (
+    raw === "en" ||
+    raw === "en-us" ||
+    raw.startsWith(
+      "en-"
+    )
+  ) {
+    return "en-us";
+  }
+
   return "ja-jp";
 }
 
+function boundedParam(
+  value:
+    string |
+    null,
+  minLength: number,
+  maxLength: number
+): string | undefined {
+  if (!value) {
+    return undefined;
+  }
 
-export const runtime = "nodejs";
+  const trimmed =
+    value.trim();
 
-export async function GET(request: NextRequest) {
-  const provider = parseOAuthProvider(request.nextUrl.searchParams.get("provider"));
+  if (
+    trimmed.length <
+      minLength ||
+    trimmed.length >
+      maxLength ||
+    !/^[A-Za-z0-9_-]+$/
+      .test(
+        trimmed
+      )
+  ) {
+    return undefined;
+  }
+
+  return trimmed;
+}
+
+export const runtime =
+  "nodejs";
+
+export async function GET(
+  request: NextRequest
+) {
+  const provider =
+    parseOAuthProvider(
+      request.nextUrl
+        .searchParams
+        .get(
+          "provider"
+        )
+    );
 
   if (!provider) {
     return NextResponse.json(
       {
         ok: false,
-        errorCode: "invalid_oauth_provider",
-        message: "Unsupported CivilizationOS OAuth provider.",
-        allowedProviders: ["google", "yahoo"]
+        errorCode:
+          "invalid_oauth_provider",
+        message:
+          "Unsupported CivilizationOS OAuth provider.",
+        allowedProviders: [
+          "google",
+          "yahoo"
+        ]
       },
-      { status: 400 }
+      {
+        status: 400
+      }
     );
   }
 
-  const env = resolveOAuthProviderEnv(provider);
-  if (env.missingEnvNames.length > 0) {
+  const env =
+    resolveOAuthProviderEnv(
+      provider
+    );
+
+  if (
+    env.missingEnvNames
+      .length >
+    0
+  ) {
     return NextResponse.json(
       {
         ok: false,
-        errorCode: "oauth_not_configured",
+        errorCode:
+          "oauth_not_configured",
         provider,
-        missingEnvNames: env.missingEnvNames,
-        message: "CivilizationOS OAuth provider is not configured."
+        missingEnvNames:
+          env.missingEnvNames,
+        message:
+          "CivilizationOS OAuth provider is not configured."
       },
-      { status: 503 }
+      {
+        status: 503
+      }
     );
   }
 
-  const localeCode = normalizeOAuthStartLocaleCode(
-    request.nextUrl.searchParams.get("locale_code") ||
-      request.nextUrl.searchParams.get("localeCode") ||
-      request.nextUrl.searchParams.get("language_code")
-  );
-  const languageCode = normalizeOAuthLanguageCode(
-    request.nextUrl.searchParams.get("language_code") || (localeCode === "en-us" ? "en" : "ja")
-  );
-  const afterLoginPath = normalizeSafeRedirectPath(
-    request.nextUrl.searchParams.get("after_login_path"),
-    "/civilization-menu"
-  );
-  const returnTo = normalizeSafeRedirectPath(request.nextUrl.searchParams.get("return_to"), "/");
-  const requestedOsCode = normalizeRequestedOsCode(
-    request.nextUrl.searchParams.get("requested_os_code") ||
-      request.nextUrl.searchParams.get("requestedOsCode")
-  );
-  const state = createOAuthState();
-  const context = createOAuthCallbackContext({
-    provider,
-    localeCode,
-    languageCode,
-    afterLoginPath,
-    returnTo,
-    requestedOsCode
-  });
+  const searchParams =
+    request.nextUrl
+      .searchParams;
 
-  const { authorizationUrl, missingEnvNames } = buildOAuthAuthorizationUrl({
-    provider,
-    state,
-    languageCode,
-    afterLoginPath,
-    returnTo
-  });
+  const localeCode =
+    normalizeOAuthStartLocaleCode(
+      searchParams.get(
+        "locale_code"
+      ) ||
+      searchParams.get(
+        "localeCode"
+      ) ||
+      searchParams.get(
+        "language_code"
+      )
+    );
 
-  if (missingEnvNames.length > 0) {
+  const languageCode =
+    normalizeOAuthLanguageCode(
+      searchParams.get(
+        "language_code"
+      ) ||
+      (
+        localeCode ===
+          "en-us"
+          ? "en"
+          : "ja"
+      )
+    );
+
+  const afterLoginPath =
+    normalizeSafeRedirectPath(
+      searchParams.get(
+        "after_login_path"
+      ),
+      "/civilization-menu"
+    );
+
+  const returnTo =
+    normalizeSafeRedirectPath(
+      searchParams.get(
+        "return_to"
+      ),
+      "/"
+    );
+
+  const requestedOsCode =
+    normalizeRequestedOsCode(
+      searchParams.get(
+        "requested_os_code"
+      ) ||
+      searchParams.get(
+        "requestedOsCode"
+      )
+    );
+
+  const handoffState =
+    boundedParam(
+      searchParams.get(
+        "handoff_state"
+      ),
+      32,
+      128
+    );
+
+  const codeChallenge =
+    boundedParam(
+      searchParams.get(
+        "code_challenge"
+      ),
+      43,
+      43
+    );
+
+  const codeChallengeMethod =
+    searchParams.get(
+      "code_challenge_method"
+    ) ??
+    undefined;
+
+  if (
+    requestedOsCode ===
+      "aiworker" &&
+    (
+      !handoffState ||
+      !codeChallenge ||
+      codeChallengeMethod !==
+        "S256"
+    )
+  ) {
     return NextResponse.json(
       {
         ok: false,
-        errorCode: "oauth_not_configured",
+        errorCode:
+          "aiworker_handoff_required"
+      },
+      {
+        status: 400
+      }
+    );
+  }
+
+  const state =
+    createOAuthState();
+
+  const context =
+    createOAuthCallbackContext(
+      {
+        provider,
+        localeCode,
+        languageCode,
+        afterLoginPath,
+        returnTo,
+        requestedOsCode,
+        handoffState,
+        codeChallenge,
+        codeChallengeMethod
+      }
+    );
+
+  const {
+    authorizationUrl,
+    missingEnvNames
+  } =
+    buildOAuthAuthorizationUrl(
+      {
+        provider,
+        state,
+        languageCode,
+        afterLoginPath,
+        returnTo
+      }
+    );
+
+  if (
+    missingEnvNames.length >
+    0
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode:
+          "oauth_not_configured",
         provider,
         missingEnvNames,
-        message: "CivilizationOS OAuth provider is not configured."
+        message:
+          "CivilizationOS OAuth provider is not configured."
       },
-      { status: 503 }
+      {
+        status: 503
+      }
     );
   }
 
-  const response = NextResponse.redirect(authorizationUrl, 302);
-  const secureCookie = env.publicBaseUrl.startsWith("https://");
+  const response =
+    NextResponse.redirect(
+      authorizationUrl,
+      302
+    );
 
-  response.cookies.set(OAUTH_STATE_COOKIE_NAME, state, {
-    httpOnly: true,
-    maxAge: OAUTH_COOKIE_MAX_AGE_SECONDS,
-    path: "/",
-    sameSite: "lax",
-    secure: secureCookie
-  });
+  const secureCookie =
+    env.publicBaseUrl
+      .startsWith(
+        "https://"
+      );
 
-  response.cookies.set(OAUTH_CONTEXT_COOKIE_NAME, encodeOAuthCallbackContext(context), {
-    httpOnly: true,
-    maxAge: OAUTH_COOKIE_MAX_AGE_SECONDS,
-    path: "/",
-    sameSite: "lax",
-    secure: secureCookie
-  });
+  response.cookies.set(
+    OAUTH_STATE_COOKIE_NAME,
+    state,
+    {
+      httpOnly: true,
+      maxAge:
+        OAUTH_COOKIE_MAX_AGE_SECONDS,
+      path: "/",
+      sameSite:
+        "lax",
+      secure:
+        secureCookie
+    }
+  );
+
+  response.cookies.set(
+    OAUTH_CONTEXT_COOKIE_NAME,
+    encodeOAuthCallbackContext(
+      context
+    ),
+    {
+      httpOnly: true,
+      maxAge:
+        OAUTH_COOKIE_MAX_AGE_SECONDS,
+      path: "/",
+      sameSite:
+        "lax",
+      secure:
+        secureCookie
+    }
+  );
 
   return response;
 }
