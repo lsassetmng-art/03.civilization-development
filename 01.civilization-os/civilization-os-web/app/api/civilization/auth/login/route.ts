@@ -364,6 +364,78 @@ function handoffFieldsFromBody(
   };
 }
 
+function buildAiWorkerContinuationTarget(
+  input: {
+    localeCode: string;
+    languageCode: string;
+    afterLoginPath: string;
+    returnTo: string;
+    handoff: HandoffFields;
+  }
+): string {
+  const params =
+    new URLSearchParams();
+
+  params.set(
+    "locale_code",
+    input.localeCode
+  );
+
+  params.set(
+    "language_code",
+    input.languageCode
+  );
+
+  params.set(
+    "after_login_path",
+    input.afterLoginPath
+  );
+
+  params.set(
+    "return_to",
+    input.returnTo
+  );
+
+  params.set(
+    "requested_os_code",
+    "aiworker"
+  );
+
+  if (input.handoff.state) {
+    params.set(
+      "handoff_state",
+      input.handoff.state
+    );
+  }
+
+  if (
+    input.handoff
+      .codeChallenge
+  ) {
+    params.set(
+      "code_challenge",
+      input.handoff
+        .codeChallenge
+    );
+  }
+
+  if (
+    input.handoff
+      .codeChallengeMethod
+  ) {
+    params.set(
+      "code_challenge_method",
+      input.handoff
+        .codeChallengeMethod
+    );
+  }
+
+  return (
+    "/login?" +
+    params.toString()
+  );
+}
+
 async function resolveAuthenticatedTarget(
   input: {
     civilizationId: string;
@@ -752,35 +824,80 @@ export async function POST(
       )
     );
 
-  const targetResult =
-    await resolveAuthenticatedTarget(
-      {
-        civilizationId:
-          verification
-            .civilizationId,
-        afterLoginPath,
-        requestedOsCode,
-        handoff:
-          handoffFieldsFromBody(
-            body
-          )
-      }
+  const handoff =
+    handoffFieldsFromBody(
+      body
     );
 
-  if (!targetResult.ok) {
-    return noStoreJson(
-      {
-        ok: false,
-        error:
-          targetResult.error
-      },
-      targetResult.status
-    );
+  let redirectTarget:
+    string;
+
+  if (
+    requestedOsCode ===
+      "aiworker"
+  ) {
+    if (
+      !handoff.state ||
+      !handoff.codeChallenge ||
+      handoff.codeChallengeMethod !==
+        "S256"
+    ) {
+      return noStoreJson(
+        {
+          ok: false,
+          error:
+            "invalid_aiworker_handoff"
+        },
+        400
+      );
+    }
+
+    const configuredTarget =
+      resolveOAuthPostLoginTarget(
+        {
+          afterLoginPath,
+          requestedOsCode
+        },
+        process.env
+          .AIWORKEROS_PUBLIC_BASE_URL
+      );
+
+    if (
+      !validAiWorkerTarget(
+        configuredTarget
+      )
+    ) {
+      return noStoreJson(
+        {
+          ok: false,
+          error:
+            "aiworker_target_not_configured"
+        },
+        503
+      );
+    }
+
+    redirectTarget =
+      buildAiWorkerContinuationTarget(
+        {
+          localeCode,
+          languageCode,
+          afterLoginPath,
+          returnTo,
+          handoff
+        }
+      );
+  } else {
+    redirectTarget =
+      resolveOAuthPostLoginTarget(
+        {
+          afterLoginPath,
+          requestedOsCode
+        },
+        process.env
+          .AIWORKEROS_PUBLIC_BASE_URL
+      );
   }
-
-  const redirectTarget =
-    targetResult
-      .redirectTarget;
 
   const issuedAtMs =
     Date.now();

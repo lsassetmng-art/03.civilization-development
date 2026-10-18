@@ -1,7 +1,4 @@
 import { createHash } from "crypto";
-import {
-  issueAiWorkerHandoff
-} from "@/lib/civilization-auth-handoff";
 import { setCivilizationServerSessionCookie } from "@/lib/civilization-server-session";
 import {
   buildOAuthRedirectUri,
@@ -216,65 +213,114 @@ function buildSessionFromUserInfo(input: {
   };
 }
 
+function buildAiWorkerSignedSessionContinuation(
+  context:
+    OAuthCallbackContext
+): string {
+  const params =
+    new URLSearchParams();
+
+  params.set(
+    "locale_code",
+    context.localeCode
+  );
+
+  params.set(
+    "language_code",
+    context.languageCode
+  );
+
+  params.set(
+    "after_login_path",
+    context.afterLoginPath
+  );
+
+  params.set(
+    "return_to",
+    context.returnTo
+  );
+
+  params.set(
+    "requested_os_code",
+    "aiworker"
+  );
+
+  if (context.handoffState) {
+    params.set(
+      "handoff_state",
+      context.handoffState
+    );
+  }
+
+  if (context.codeChallenge) {
+    params.set(
+      "code_challenge",
+      context.codeChallenge
+    );
+  }
+
+  if (
+    context.codeChallengeMethod
+  ) {
+    params.set(
+      "code_challenge_method",
+      context.codeChallengeMethod
+    );
+  }
+
+  return (
+    "/login?" +
+    params.toString()
+  );
+}
+
 async function sessionHandoffResponse(
   sessionPayload: unknown,
   context: OAuthCallbackContext,
   secureCookie: boolean
 ) {
-  let redirectTarget = resolveOAuthPostLoginTarget(
-    context,
-    process.env.AIWORKEROS_PUBLIC_BASE_URL
-  );
+  let redirectTarget =
+    resolveOAuthPostLoginTarget(
+      context,
+      process.env
+        .AIWORKEROS_PUBLIC_BASE_URL
+    );
 
   if (
     context.requestedOsCode ===
       "aiworker"
   ) {
-    const civilizationId =
-      safeString(
-        (
-          sessionPayload as {
-            civilizationId?: unknown;
-          }
-        ).civilizationId
-      );
-
-    if (!civilizationId) {
-      throw new Error(
-        "civilization_id_missing"
-      );
-    }
-
-    const handoff =
-      await issueAiWorkerHandoff(
-        {
-          serverSessionActorKey:
-            civilizationId,
-          state:
-            context.handoffState,
-          codeChallenge:
-            context.codeChallenge,
-          codeChallengeMethod:
-            context
-              .codeChallengeMethod
-        }
-      );
-
     if (
-      handoff.status !==
-        "ok"
+      !context.handoffState ||
+      !context.codeChallenge ||
+      context.codeChallengeMethod !==
+        "S256"
     ) {
       throw new Error(
-        "aiworker_handoff_failed"
+        "invalid_aiworker_handoff"
       );
     }
 
     redirectTarget =
-      handoff.redirectTarget;
+      buildAiWorkerSignedSessionContinuation(
+        context
+      );
   }
-  const sessionPayloadJson = jsonForHtmlScript(sessionPayload);
-  const storageKeyJson = jsonForHtmlScript(CIVILIZATION_OAUTH_SESSION_STORAGE_KEY);
-  const redirectJson = jsonForHtmlScript(redirectTarget);
+
+  const sessionPayloadJson =
+    jsonForHtmlScript(
+      sessionPayload
+    );
+
+  const storageKeyJson =
+    jsonForHtmlScript(
+      CIVILIZATION_OAUTH_SESSION_STORAGE_KEY
+    );
+
+  const redirectJson =
+    jsonForHtmlScript(
+      redirectTarget
+    );
 
   const body = [
     "<!doctype html>",
@@ -310,21 +356,39 @@ async function sessionHandoffResponse(
     "</html>"
   ].join("");
 
-  const response = new NextResponse(body, {
-    status: 200,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-      "referrer-policy": "no-referrer"
-    }
-  });
+  const response =
+    new NextResponse(
+      body,
+      {
+        status: 200,
+        headers: {
+          "content-type":
+            "text/html; charset=utf-8",
+          "cache-control":
+            "no-store",
+          "referrer-policy":
+            "no-referrer"
+        }
+      }
+    );
 
-  setCivilizationServerSessionCookie(
-    response,
-    sessionPayload,
-    secureCookie
+  const cookieSet =
+    setCivilizationServerSessionCookie(
+      response,
+      sessionPayload,
+      secureCookie
+    );
+
+  if (!cookieSet) {
+    throw new Error(
+      "session_signing_failed"
+    );
+  }
+
+  clearOAuthCookies(
+    response
   );
-  clearOAuthCookies(response);
+
   return response;
 }
 
