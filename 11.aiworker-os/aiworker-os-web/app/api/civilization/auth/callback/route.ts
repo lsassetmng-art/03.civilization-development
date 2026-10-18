@@ -1,4 +1,5 @@
 import {
+  buildAiWorkerPublicReturnUrl,
   clearAiWorkerAuthCookies,
   readAiWorkerAuthCookies,
   secureCookieForRequest
@@ -149,16 +150,17 @@ export async function GET(
   }
 
   const target =
-    request.nextUrl.clone();
+    buildAiWorkerPublicReturnUrl(
+      auth.returnTo
+    );
 
-  target.pathname =
-    auth.returnTo;
-
-  target.search =
-    "";
-
-  target.hash =
-    "";
+  if (!target) {
+    return errorResponse(
+      request,
+      "aiworker_public_base_not_configured",
+      503
+    );
+  }
 
   const secure =
     secureCookieForRequest(

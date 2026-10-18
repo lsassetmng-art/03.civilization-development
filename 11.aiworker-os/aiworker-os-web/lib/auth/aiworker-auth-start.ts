@@ -103,10 +103,94 @@ function configuredCivilizationBaseUrl():
   }
 }
 
+function configuredAiWorkerPublicBaseUrl():
+  string | null {
+  const raw =
+    process.env
+      .AIWORKEROS_PUBLIC_BASE_URL
+      ?.trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const url =
+      new URL(raw);
+
+    const secure =
+      url.protocol ===
+      "https:";
+
+    const localHttp =
+      url.protocol ===
+        "http:" &&
+      (
+        url.hostname ===
+          "localhost" ||
+        url.hostname ===
+          "127.0.0.1" ||
+        url.hostname ===
+          "[::1]"
+      );
+
+    if (
+      !secure &&
+      !localHttp
+    ) {
+      return null;
+    }
+
+    if (
+      url.username ||
+      url.password
+    ) {
+      return null;
+    }
+
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+export function buildAiWorkerPublicReturnUrl(
+  returnTo:
+    string |
+    null |
+    undefined
+): string | null {
+  const base =
+    configuredAiWorkerPublicBaseUrl();
+
+  if (!base) {
+    return null;
+  }
+
+  return new URL(
+    safeInternalReturnPath(
+      returnTo
+    ),
+    base
+  ).toString();
+}
+
 export function secureCookieForRequest(
   request:
     NextRequest
 ): boolean {
+  const configuredBase =
+    configuredAiWorkerPublicBaseUrl();
+
+  if (configuredBase) {
+    return (
+      new URL(
+        configuredBase
+      ).protocol ===
+      "https:"
+    );
+  }
+
   const hostname =
     request.nextUrl
       .hostname;
