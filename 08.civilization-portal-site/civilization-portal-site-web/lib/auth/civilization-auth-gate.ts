@@ -15,7 +15,31 @@ export type CivilizationAuthGateInput = {
 const supportedLanguageCodes = new Set(["ja", "en", "zh", "ko", "fr", "es", "de"]);
 
 const civilizationOsAuthTargets =
-  new Set(["civilization", "aiworker"]);
+  new Set(["civilization"]);
+
+function normalizeAiWorkerAuthStartUrl(value: string | null | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw);
+
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== "/api/civilization/auth/start"
+    ) {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
 
 function normalizeCivilizationAuthorizeUrl(
   value: string | null | undefined
@@ -72,6 +96,12 @@ function resolveAuthBasePath(
     input.requestedOsCode
       .trim()
       .toLowerCase();
+
+  if (requestedOsCode === "aiworker") {
+    return normalizeAiWorkerAuthStartUrl(
+      process.env.NEXT_PUBLIC_AIWORKER_AUTH_START_URL
+    );
+  }
 
   if (
     civilizationOsAuthTargets.has(
@@ -237,6 +267,16 @@ export function buildCivilizationAuthUrl(input: CivilizationAuthGateInput): stri
 
   if (!basePath) {
     return "/error";
+  }
+
+  if (input.requestedOsCode.trim().toLowerCase() === "aiworker") {
+    const authParams = new URLSearchParams();
+
+    authParams.set("locale_code", localeCode);
+    authParams.set("language_code", languageCode);
+    authParams.set("return_to", "/aiworker-menu");
+
+    return `${basePath}?${authParams.toString()}`;
   }
 
   return `${basePath}?${params.toString()}`;

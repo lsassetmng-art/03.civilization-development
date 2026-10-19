@@ -28,12 +28,7 @@ export default function CivilizationMenuPage() {
   }, [locale]);
 
   function goBack() {
-    if (window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-
-    window.location.href = withPortalLanguage("/login", locale);
+    window.location.assign("/api/civilization/navigation/portal");
   }
 
   return (
@@ -45,7 +40,7 @@ export default function CivilizationMenuPage() {
             <span className="civ-blue-node-text">{copy.observeTitle}</span>
           </Link>
 
-          <button className="civ-blue-node civ-blue-node-center" type="button" onClick={goBack}>
+          <button className="civ-blue-node civ-blue-node-center" type="button" onClick={goBack} aria-label="ポータルサイトに戻る">
             <span className="civ-blue-node-gloss" aria-hidden="true" />
             <span className="civ-blue-node-text">{copy.civilizationTitle}</span>
           </button>
