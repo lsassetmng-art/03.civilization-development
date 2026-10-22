@@ -72,9 +72,15 @@ export async function GET(
       request
     );
 
+  const continuationUrl =
+    new URL(loginUrl);
+
+  continuationUrl.pathname =
+    "/api/civilization/auth/continue";
+
   const response =
     NextResponse.redirect(
-      loginUrl,
+      continuationUrl,
       302
     );
 
