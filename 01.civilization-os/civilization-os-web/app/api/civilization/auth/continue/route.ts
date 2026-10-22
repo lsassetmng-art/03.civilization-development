@@ -9,6 +9,42 @@ export const dynamic = "force-dynamic";
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
+function civilizationPublicOrigin(): string | null {
+  const raw =
+    process.env.CIVILIZATION_OS_PUBLIC_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_CIVILIZATION_OS_BASE_URL?.trim();
+
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw);
+
+    const allowed =
+      url.protocol === "https:" ||
+      (
+        url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(
+          url.hostname
+        )
+      );
+
+    if (
+      !allowed ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== "/"
+    ) {
+      return null;
+    }
+
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
 function redirectNoStore(target: URL): NextResponse {
   const response = NextResponse.redirect(target, 302);
   response.headers.set("cache-control", "no-store");
@@ -91,7 +127,13 @@ export async function GET(
   const result = await existingLoginContinuation(request);
 
   if (result.status === 401) {
-    const login = new URL("/login", request.url);
+    const publicOrigin = civilizationPublicOrigin();
+
+    if (!publicOrigin) {
+      return fail("civilization_public_origin_not_configured", 503);
+    }
+
+    const login = new URL("/login", publicOrigin);
     login.search = request.nextUrl.search;
     return redirectNoStore(login);
   }
