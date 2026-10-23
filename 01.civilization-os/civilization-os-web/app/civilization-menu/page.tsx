@@ -40,7 +40,7 @@ export default function CivilizationMenuPage() {
             <span className="civ-blue-node-text">{copy.observeTitle}</span>
           </Link>
 
-          <button className="civ-blue-node civ-blue-node-center" type="button" onClick={goBack} aria-label="ポータルサイトに戻る">
+          <button className="civ-blue-node civ-blue-node-center" data-current-menu-node="true" type="button" onClick={goBack} aria-label="ポータルサイトに戻る">
             <span className="civ-blue-node-gloss" aria-hidden="true" />
             <span className="civ-blue-node-text">{copy.civilizationTitle}</span>
           </button>
@@ -52,6 +52,14 @@ export default function CivilizationMenuPage() {
             </Link>
           ) : null}
         </div>
+        <aside
+          className="civ-current-menu-legend"
+          data-current-menu-legend="true"
+          aria-label="凡例"
+        >
+          <span className="civ-current-menu-ring-sample" aria-hidden="true" />
+          <span>赤い輪郭：現在表示中の画面</span>
+        </aside>
       </section>
     </AppShell>
   );

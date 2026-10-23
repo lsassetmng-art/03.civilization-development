@@ -95,7 +95,7 @@ const titleBarStyle: CSSProperties = {
 
 const pageStyleBase: CSSProperties = {
   minHeight: "100vh",
-  overflow: "hidden",
+  overflow: "auto",
   color: "#0f172a",
 };
 
@@ -104,6 +104,8 @@ const bodyStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
+  flexDirection: "column",
+  gap: "12px",
   padding: "12px",
 };
 
@@ -180,6 +182,7 @@ function NodeVisual({ node }: { node: ConceptNode }) {
   return (
     <span
       data-portal-concept-node={node.id}
+      data-current-menu-node={node.position === "center" ? "true" : undefined}
       style={{
         width: size,
         height: size,
@@ -188,6 +191,8 @@ function NodeVisual({ node }: { node: ConceptNode }) {
         position: "relative",
         textDecoration: "none",
         borderRadius: "999px",
+        outline: node.position === "center" ? "3px solid #dc2626" : undefined,
+        outlineOffset: node.position === "center" ? "5px" : undefined,
         filter: node.href || node.action === "back" || node.authGate ? "none" : "grayscale(.08) opacity(.82)",
       }}
     >
@@ -329,6 +334,40 @@ export function ConceptMapPage({ title, nodes, theme }: ConceptMapPageProps) {
             <NodeShell key={node.id} node={node} />
           ))}
         </div>
+        <aside
+          data-current-menu-legend="true"
+          aria-label="凡例"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+            maxWidth: "calc(100vw - 24px)",
+            padding: "8px 14px",
+            border: "1px solid rgba(15,23,42,.16)",
+            borderRadius: "999px",
+            background: "rgba(255,255,255,.88)",
+            color: "#334155",
+            fontSize: "13px",
+            fontWeight: 700,
+            flexShrink: 0,
+            boxSizing: "border-box",
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              display: "inline-block",
+              width: "14px",
+              height: "14px",
+              flexShrink: 0,
+              borderRadius: "999px",
+              outline: "3px solid #dc2626",
+              outlineOffset: "2px",
+            }}
+          />
+          <span>赤い輪郭：現在表示中の画面</span>
+        </aside>
       </section>
     </main>
   );
