@@ -69,6 +69,96 @@ body:has([data-portal-concept-map-page]) [data-portal-global-footer] {
 body:has([data-portal-concept-map-page]) {
   margin: 0 !important;
 }
+
+/* R16: separate Portal touch targets on mobile and small tablets. */
+@media (max-width: 900px) {
+  main[data-portal-concept-map-page="portal"] {
+    overflow: auto !important;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-map] {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(3, auto);
+    width: min(calc(100vw - 24px), 420px) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    column-gap: clamp(8px, 2vw, 12px);
+    row-gap: clamp(18px, 4vw, 26px);
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell] {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    display: block;
+    width: max-content;
+    height: max-content;
+    min-width: 0;
+    justify-self: center;
+    align-self: center;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node] {
+    width: min(27vw, 110px) !important;
+    height: min(27vw, 110px) !important;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="portal"]
+    [data-portal-concept-node] {
+    width: min(28vw, 118px) !important;
+    height: min(28vw, 118px) !important;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="civilization"] {
+    grid-area: 1 / 2;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="aiworker"] {
+    grid-area: 2 / 1;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="portal"] {
+    grid-area: 2 / 2;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="persona"] {
+    grid-area: 2 / 3;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="lifeos"] {
+    grid-area: 3 / 1;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="ai-support"] {
+    grid-area: 3 / 2;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="settings"] {
+    grid-area: 3 / 3;
+  }
+
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell]:focus-visible {
+    outline: 3px solid #2563eb;
+    outline-offset: 3px;
+    border-radius: 999px;
+  }
+}
+
 `;
 
 const mapStyle: CSSProperties = {
@@ -258,6 +348,7 @@ function NodeShell({ node }: { node: ConceptNode }) {
     return (
       <button
         type="button"
+        data-portal-concept-node-shell={node.id}
         data-portal-concept-back-node={node.id}
         aria-label={node.ariaLabel ?? `${node.label} 前画面に戻る`}
         onClick={() => goBack(node.fallbackHref ?? "/")}
@@ -280,6 +371,7 @@ function NodeShell({ node }: { node: ConceptNode }) {
     return (
       <Link
         href={fallbackHref}
+        data-portal-concept-node-shell={node.id}
         data-portal-auth-gate-node={node.id}
         data-after-login-path={node.authGate.afterLoginPath}
         data-requested-os-code={node.authGate.requestedOsCode}
@@ -297,14 +389,14 @@ function NodeShell({ node }: { node: ConceptNode }) {
 
   if (node.href) {
     return (
-      <Link href={node.href} aria-label={node.ariaLabel ?? node.label} style={commonStyle}>
+      <Link href={node.href} data-portal-concept-node-shell={node.id} aria-label={node.ariaLabel ?? node.label} style={commonStyle}>
         <NodeVisual node={node} />
       </Link>
     );
   }
 
   return (
-    <div aria-disabled="true" aria-label={node.ariaLabel ?? `${node.label} 準備中`} style={commonStyle}>
+    <div data-portal-concept-node-shell={node.id} aria-disabled="true" aria-label={node.ariaLabel ?? `${node.label} 準備中`} style={commonStyle}>
       <NodeVisual node={node} />
     </div>
   );
@@ -330,7 +422,7 @@ export function ConceptMapPage({ title, nodes, theme }: ConceptMapPageProps) {
       </header>
 
       <section style={bodyStyle} aria-label={title}>
-        <div style={mapStyle}>
+        <div data-portal-concept-node-map="true" style={mapStyle}>
           {nodes.map((node) => (
             <NodeShell key={node.id} node={node} />
           ))}
