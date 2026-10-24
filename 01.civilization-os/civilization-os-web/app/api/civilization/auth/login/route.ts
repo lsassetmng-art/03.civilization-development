@@ -1,6 +1,7 @@
 import {
   issueAiWorkerHandoff
 } from "@/lib/civilization-auth-handoff";
+import { issuePersonaHandoff } from "@/lib/persona-auth-handoff";
 
 import {
   civilizationServerSessionConfigured,
@@ -466,6 +467,19 @@ async function resolveAuthenticatedTarget(
         .AIWORKEROS_PUBLIC_BASE_URL
     );
 
+  if (input.requestedOsCode === "persona") {
+    const issued = await issuePersonaHandoff({
+      serverSessionActorKey: input.civilizationId,
+      state: input.handoff.state,
+      codeChallenge: input.handoff.codeChallenge,
+      codeChallengeMethod: input.handoff.codeChallengeMethod
+    });
+    if (issued.status !== "ok") {
+      return { ok: false, status: issued.status === "invalid_request" ? 400 : 503, error: "persona_handoff_unavailable" };
+    }
+    return { ok: true, redirectTarget: issued.redirectTarget };
+  }
+
   if (
     input.requestedOsCode !==
       "aiworker"
@@ -832,7 +846,19 @@ export async function POST(
   let redirectTarget:
     string;
 
-  if (
+  if (requestedOsCode === "persona") {
+    const issued = await issuePersonaHandoff({
+      serverSessionActorKey: verification.civilizationId,
+      state: handoff.state,
+      codeChallenge: handoff.codeChallenge,
+      codeChallengeMethod: handoff.codeChallengeMethod
+    });
+    if (issued.status !== "ok") {
+      return noStoreJson({ ok: false, error: "persona_handoff_unavailable" },
+        issued.status === "invalid_request" ? 400 : 503);
+    }
+    redirectTarget = issued.redirectTarget;
+  } else if (
     requestedOsCode ===
       "aiworker"
   ) {

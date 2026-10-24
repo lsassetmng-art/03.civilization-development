@@ -218,8 +218,7 @@ export async function GET(
     undefined;
 
   if (
-    requestedOsCode ===
-      "aiworker" &&
+    (requestedOsCode === "aiworker" || requestedOsCode === "persona") &&
     (
       !handoffState ||
       !codeChallenge ||
@@ -231,7 +230,7 @@ export async function GET(
       {
         ok: false,
         errorCode:
-          "aiworker_handoff_required"
+          requestedOsCode === "persona" ? "persona_handoff_required" : "aiworker_handoff_required"
       },
       {
         status: 400

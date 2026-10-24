@@ -97,6 +97,10 @@ function resolveAuthBasePath(
       .trim()
       .toLowerCase();
 
+  if (requestedOsCode === "persona") {
+    return "/api/persona/auth/start";
+  }
+
   if (requestedOsCode === "aiworker") {
     return normalizeAiWorkerAuthStartUrl(
       process.env.NEXT_PUBLIC_AIWORKER_AUTH_START_URL

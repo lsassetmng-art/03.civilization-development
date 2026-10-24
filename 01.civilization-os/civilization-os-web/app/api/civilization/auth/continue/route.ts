@@ -98,6 +98,28 @@ function checkedCallback(
   }
 }
 
+function checkedPersonaCallback(raw: string, expectedState: string): URL | null {
+  const configured = process.env.CIVILIZATION_PORTAL_PUBLIC_BASE_URL?.trim();
+  if (!configured) return null;
+  try {
+    const base = new URL(configured);
+    const target = new URL(raw);
+    if (
+      base.protocol !== "https:" ||
+      base.username || base.password ||
+      target.origin !== base.origin ||
+      target.username || target.password || target.hash ||
+      target.pathname !== "/api/persona/auth/callback" ||
+      target.searchParams.getAll("state").length !== 1 ||
+      target.searchParams.get("state") !== expectedState ||
+      target.searchParams.getAll("code").length !== 1 ||
+      !target.searchParams.get("code") ||
+      target.searchParams.get("code")!.length > 4096
+    ) return null;
+    return target;
+  } catch { return null; }
+}
+
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse> {
@@ -107,7 +129,7 @@ export async function GET(
 
   if (
     params.getAll("requested_os_code").length !== 1 ||
-    params.get("requested_os_code") !== "aiworker" ||
+    !["aiworker", "persona"].includes(params.get("requested_os_code") ?? "") ||
     params.getAll("handoff_state").length !== 1 ||
     !state ||
     state.length < 43 ||
@@ -155,10 +177,9 @@ export async function GET(
     return fail("invalid_continuation_response", 503);
   }
 
-  const callback = checkedCallback(
-    data.redirectTarget,
-    state
-  );
+  const callback = params.get("requested_os_code") === "persona"
+    ? checkedPersonaCallback(data.redirectTarget, state)
+    : checkedCallback(data.redirectTarget, state);
 
   if (!callback) {
     return fail("invalid_aiworker_callback", 503);

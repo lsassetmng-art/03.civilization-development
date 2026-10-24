@@ -214,8 +214,8 @@ function buildSessionFromUserInfo(input: {
 }
 
 function buildAiWorkerSignedSessionContinuation(
-  context:
-    OAuthCallbackContext
+  context: OAuthCallbackContext,
+  requestedOsCode: string = "aiworker"
 ): string {
   const params =
     new URLSearchParams();
@@ -242,7 +242,7 @@ function buildAiWorkerSignedSessionContinuation(
 
   params.set(
     "requested_os_code",
-    "aiworker"
+    requestedOsCode
   );
 
   if (context.handoffState) {
@@ -268,10 +268,7 @@ function buildAiWorkerSignedSessionContinuation(
     );
   }
 
-  return (
-    "/login?" +
-    params.toString()
-  );
+  return (requestedOsCode === "persona" ? "/api/civilization/auth/continue?" : "/login?") + params.toString();
 }
 
 async function sessionHandoffResponse(
@@ -287,8 +284,7 @@ async function sessionHandoffResponse(
     );
 
   if (
-    context.requestedOsCode ===
-      "aiworker"
+    (context.requestedOsCode === "aiworker" || context.requestedOsCode === "persona")
   ) {
     if (
       !context.handoffState ||
@@ -296,14 +292,13 @@ async function sessionHandoffResponse(
       context.codeChallengeMethod !==
         "S256"
     ) {
-      throw new Error(
-        "invalid_aiworker_handoff"
-      );
+      throw new Error(context.requestedOsCode === "persona" ? "invalid_persona_handoff" : "invalid_aiworker_handoff");
     }
 
     redirectTarget =
       buildAiWorkerSignedSessionContinuation(
-        context
+        context,
+        context.requestedOsCode
       );
   }
 
