@@ -11,7 +11,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { buildCivilizationAuthUrl } from "../../lib/auth/civilization-auth-gate";
 
-type NodePosition = "center" | "top" | "left" | "right" | "bottom" | "bottomRight" | "bottomLeft";
+type NodePosition = "center" | "top" | "left" | "right" | "bottom" | "bottomRight" | "bottomLeft" | "outerTopLeft" | "outerTopRight" | "outerBottomLeft" | "outerBottomRight";
 type NodeAction = "link" | "back";
 
 type AuthGateSpec = {
@@ -38,11 +38,15 @@ type ConceptNode = {
 type ConceptMapPageProps = {
   title: string;
   nodes: ConceptNode[];
-  theme: "portal" | "persona" | "aiworker";
+  theme: "portal" | "persona" | "aiworker" | "osmenu";
 };
 
 const themeStyle: Record<ConceptMapPageProps["theme"], { background: string }> = {
   portal: {
+    background:
+      "radial-gradient(circle at 50% 34%, rgba(255,255,255,.96), rgba(231,238,255,.9) 46%, rgba(210,218,238,.92))",
+  },
+  osmenu: {
     background:
       "radial-gradient(circle at 50% 34%, rgba(255,255,255,.96), rgba(231,238,255,.9) 46%, rgba(210,218,238,.92))",
   },
@@ -151,6 +155,61 @@ body:has([data-portal-concept-map-page]) {
     grid-area: 3 / 3;
   }
 
+  /* R18: existing 3-column metallic circles; only add a fourth row. */
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="staticart"] { grid-area: 1 / 1; }
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="streaming"] { grid-area: 1 / 3; }
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="business"] { grid-area: 4 / 1; }
+  main[data-portal-concept-map-page="portal"]
+    [data-portal-concept-node-shell="game"] { grid-area: 4 / 3; }
+
+  /* The public OS entry shells use the exact Portal concept-map visual vocabulary. */
+  main[data-portal-concept-map-page="osmenu"] {
+    overflow: auto !important;
+  }
+  main[data-portal-concept-map-page="osmenu"]
+    [data-portal-concept-node-map] {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(3, auto);
+    width: min(calc(100vw - 24px), 420px) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    column-gap: clamp(8px, 2vw, 12px);
+    row-gap: clamp(18px, 4vw, 26px);
+  }
+  main[data-portal-concept-map-page="osmenu"]
+    [data-portal-concept-node-shell] {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    display: block;
+    width: max-content;
+    height: max-content;
+    min-width: 0;
+    justify-self: center;
+    align-self: center;
+  }
+  main[data-portal-concept-map-page="osmenu"]
+    [data-portal-concept-node] {
+    width: min(27vw, 110px) !important;
+    height: min(27vw, 110px) !important;
+  }
+  main[data-portal-concept-map-page="osmenu"]
+    [data-portal-concept-position="center"] { grid-area: 2 / 2; }
+  main[data-portal-concept-map-page="osmenu"]
+    [data-portal-concept-position="top"] { grid-area: 1 / 2; }
+  main[data-portal-concept-map-page="osmenu"]
+    [data-portal-concept-position="left"] { grid-area: 2 / 1; }
+  main[data-portal-concept-map-page="osmenu"]
+    [data-portal-concept-position="right"] { grid-area: 2 / 3; }
+  main[data-portal-concept-map-page="osmenu"]
+    [data-portal-concept-position="bottom"] { grid-area: 3 / 2; }
+
   main[data-portal-concept-map-page="portal"]
     [data-portal-concept-node-shell]:focus-visible {
     outline: 3px solid #2563eb;
@@ -208,6 +267,14 @@ function positionStyle(position: NodePosition): CSSProperties {
   };
 
   switch (position) {
+    case "outerTopLeft":
+      return { ...base, transform: "translate(calc(-50% - clamp(235px, 32vw, 270px)), calc(-50% - clamp(175px, 24vh, 210px)))" };
+    case "outerTopRight":
+      return { ...base, transform: "translate(calc(-50% + clamp(235px, 32vw, 270px)), calc(-50% - clamp(175px, 24vh, 210px)))" };
+    case "outerBottomLeft":
+      return { ...base, transform: "translate(calc(-50% - clamp(235px, 32vw, 270px)), calc(-50% + clamp(175px, 24vh, 210px)))" };
+    case "outerBottomRight":
+      return { ...base, transform: "translate(calc(-50% + clamp(235px, 32vw, 270px)), calc(-50% + clamp(175px, 24vh, 210px)))" };
     case "center":
       return { ...base, transform: "translate(-50%, -50%)" };
     case "top":
@@ -354,6 +421,7 @@ function NodeShell({ node }: { node: ConceptNode }) {
       <button
         type="button"
         data-portal-concept-node-shell={node.id}
+        data-portal-concept-position={node.position}
         data-portal-concept-back-node={node.id}
         aria-label={node.ariaLabel ?? `${node.label} 前画面に戻る`}
         onClick={() => goBack(node.fallbackHref ?? "/")}
@@ -377,6 +445,7 @@ function NodeShell({ node }: { node: ConceptNode }) {
       <Link
         href={fallbackHref}
         data-portal-concept-node-shell={node.id}
+        data-portal-concept-position={node.position}
         data-portal-auth-gate-node={node.id}
         data-after-login-path={node.authGate.afterLoginPath}
         data-requested-os-code={node.authGate.requestedOsCode}
@@ -394,14 +463,16 @@ function NodeShell({ node }: { node: ConceptNode }) {
 
   if (node.href) {
     return (
-      <Link href={node.href} data-portal-concept-node-shell={node.id} aria-label={node.ariaLabel ?? node.label} style={commonStyle}>
+      <Link href={node.href} data-portal-concept-node-shell={node.id}
+        data-portal-concept-position={node.position} aria-label={node.ariaLabel ?? node.label} style={commonStyle}>
         <NodeVisual node={node} />
       </Link>
     );
   }
 
   return (
-    <div data-portal-concept-node-shell={node.id} aria-disabled="true" aria-label={node.ariaLabel ?? `${node.label} 準備中`} style={commonStyle}>
+    <div data-portal-concept-node-shell={node.id}
+        data-portal-concept-position={node.position} aria-disabled="true" aria-label={node.ariaLabel ?? `${node.label} 準備中`} style={commonStyle}>
       <NodeVisual node={node} />
     </div>
   );
