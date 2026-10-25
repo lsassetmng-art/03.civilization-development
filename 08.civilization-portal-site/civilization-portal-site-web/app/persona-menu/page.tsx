@@ -23,8 +23,7 @@ export default function Page() {
         {
           id: "persona",
           label: "Persona",
-          action: "back",
-          fallbackHref: "/",
+          href: "/",
           asset,
           position: "center",
           ariaLabel: t("personaMenu.backAria"),
