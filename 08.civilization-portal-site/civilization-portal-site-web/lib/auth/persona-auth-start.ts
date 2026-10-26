@@ -19,6 +19,15 @@ export const PERSONA_AUTH_RETURN_COOKIE_NAME =
 const AUTH_COOKIE_MAX_AGE_SECONDS =
   5 * 60;
 
+// R19: exact public menu return destinations for CivilizationOS identity login.
+// These paths do not authorize any OS application function.
+const PORTAL_OS_MENU_RETURN_PATHS = new Set([
+  "/streaming-menu",
+  "/business-menu",
+  "/staticart-menu",
+  "/game-menu"
+]);
+
 function safeInternalReturnPath(
   value:
     string |
@@ -33,7 +42,7 @@ function safeInternalReturnPath(
 
   if (
     !candidate ||
-    !(candidate === "/persona-menu" || candidate.startsWith("/persona-menu/")) ||
+    !(candidate === "/persona-menu" || candidate.startsWith("/persona-menu/") || PORTAL_OS_MENU_RETURN_PATHS.has(candidate)) ||
     candidate.startsWith(
       "//"
     ) ||

@@ -21,11 +21,10 @@ export default function Page() {
         {
           id: "aiworker",
           label: "AI Worker",
-          action: "back",
-          fallbackHref: "/",
+          href: "https://d23uyfsvo1nolg.cloudfront.net/",
           asset,
           position: "center",
-          ariaLabel: "前画面に戻る。戻れない場合は ポータルトップ",
+          ariaLabel: "Civilization Portalへ戻る",
         },
         {
           id: "aiworker-contract",
