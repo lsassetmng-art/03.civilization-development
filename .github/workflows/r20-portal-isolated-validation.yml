@@ -29,6 +29,9 @@ jobs:
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
+      PORTAL_PERSONA_SESSION_SIGNING_SECRET: "r20-isolated-test-secret-not-for-production-2026"
+      CIVILIZATION_OS_PUBLIC_BASE_URL: "http://127.0.0.1:3108"
+      CIVILIZATION_PORTAL_PUBLIC_BASE_URL: "http://127.0.0.1:3107"
 
     steps:
       - name: Checkout R20
@@ -102,3 +105,28 @@ jobs:
           done
 
           echo "R20_UNAUTH_HTTP=PASS"
+
+      - name: R20-5 Auth and session HTTP validation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          npm run start -- --hostname 127.0.0.1 --port 3107 > "$RUNNER_TEMP/r20-auth.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          READY=0
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3107/; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$READY" != "1" ]; then
+            cat "$RUNNER_TEMP/r20-auth.log"
+            exit 1
+          fi
+
+          node tests/r20-auth-http.mjs
