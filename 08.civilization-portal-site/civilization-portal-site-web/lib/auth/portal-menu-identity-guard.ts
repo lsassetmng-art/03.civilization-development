@@ -9,7 +9,8 @@ const PATHS = {
   streaming: "/streaming-menu",
   business: "/business-menu",
   staticart: "/staticart-menu",
-  game: "/game-menu"
+  game: "/game-menu",
+  lifeos: "/lifeos"
 } as const;
 
 export async function requireCivilizationIdentityForPublicMenu(

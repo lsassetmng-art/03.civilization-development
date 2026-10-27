@@ -462,9 +462,36 @@ function NodeShell({ node }: { node: ConceptNode }) {
   }
 
   if (node.href) {
+    const protectedMenuPaths = [
+      "/lifeos",
+      "/staticart-menu",
+      "/streaming-menu",
+      "/business-menu",
+      "/game-menu"
+    ];
+
+    if (protectedMenuPaths.includes(node.href)) {
+      return (
+        <a
+          href={node.href}
+          data-portal-concept-node-shell={node.id}
+          data-portal-concept-position={node.position}
+          aria-label={node.ariaLabel ?? node.label}
+          style={commonStyle}
+        >
+          <NodeVisual node={node} />
+        </a>
+      );
+    }
+
     return (
-      <Link href={node.href} data-portal-concept-node-shell={node.id}
-        data-portal-concept-position={node.position} aria-label={node.ariaLabel ?? node.label} style={commonStyle}>
+      <Link
+        href={node.href}
+        data-portal-concept-node-shell={node.id}
+        data-portal-concept-position={node.position}
+        aria-label={node.ariaLabel ?? node.label}
+        style={commonStyle}
+      >
         <NodeVisual node={node} />
       </Link>
     );

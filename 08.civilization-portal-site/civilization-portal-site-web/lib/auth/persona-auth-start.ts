@@ -25,7 +25,8 @@ const PORTAL_OS_MENU_RETURN_PATHS = new Set([
   "/streaming-menu",
   "/business-menu",
   "/staticart-menu",
-  "/game-menu"
+  "/game-menu",
+  "/lifeos"
 ]);
 
 function safeInternalReturnPath(
