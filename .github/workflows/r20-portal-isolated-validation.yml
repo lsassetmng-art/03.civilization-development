@@ -1,0 +1,53 @@
+name: R20 Portal Isolated Validation
+
+on:
+  push:
+    branches:
+      - work/r20-portal-lifeos-auth-navigation-20261027
+    paths:
+      - '08.civilization-portal-site/civilization-portal-site-web/**'
+      - '.github/workflows/r20-portal-isolated-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r20-portal-isolated-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: 08.civilization-portal-site/civilization-portal-site-web
+
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout R20
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: 08.civilization-portal-site/civilization-portal-site-web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript validation
+        run: npx tsc --noEmit
+
+      - name: Next.js build
+        run: npm run build
