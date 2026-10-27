@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 
-const BASE = "http://127.0.0.1:3107";
+const BASE = "http://127.0.0.1:3109";
 const SECRET = process.env.PORTAL_PERSONA_SESSION_SIGNING_SECRET;
 
 assert.ok(SECRET?.length >= 32, "Missing isolated test secret");
@@ -13,6 +13,14 @@ const routes = [
   "/staticart-menu",
   "/game-menu"
 ];
+
+const expectedHtml = {
+  "/lifeos": 'aria-label="LifeOS menu"',
+  "/streaming-menu": "StreamStudio",
+  "/business-menu": "AI企業管理",
+  "/staticart-menu": "作品管理",
+  "/game-menu": "ゲーム制作"
+};
 
 function sessionCookie({
   actor = "r20-test-actor",
@@ -66,14 +74,20 @@ for (const route of routes) {
   );
 
   const allowed = await get(route, sessionCookie());
-  assert.ok(
-    ![302, 303, 307, 308].includes(allowed.status),
-    `Valid session redirected on ${route}: ${allowed.status}`
+  assert.equal(
+    allowed.status,
+    200,
+    `Valid session must return HTTP 200 on ${route}`
   );
+
+  const html = await allowed.text();
+
   assert.ok(
-    allowed.status < 500,
-    `Valid session server error on ${route}: ${allowed.status}`
+    html.includes(expectedHtml[route]),
+    `Expected OS menu content missing on ${route}`
   );
+
+  console.log(`AUTH_HTML_200_PASS=${route}`);
 
   const tampered = await get(route, sessionCookie() + "tampered");
   assert.ok(

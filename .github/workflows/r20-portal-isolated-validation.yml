@@ -111,13 +111,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          npm run start -- --hostname 127.0.0.1 --port 3107 > "$RUNNER_TEMP/r20-auth.log" 2>&1 &
+          npm run start -- --hostname 127.0.0.1 --port 3109 > "$RUNNER_TEMP/r20-auth.log" 2>&1 &
           SERVER_PID=$!
-          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
 
           READY=0
           for i in $(seq 1 30); do
-            if curl -fsS -o /dev/null http://127.0.0.1:3107/; then
+            if curl -fsS -o /dev/null http://127.0.0.1:3109/; then
               READY=1
               break
             fi
