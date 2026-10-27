@@ -51,3 +51,54 @@ jobs:
 
       - name: Next.js build
         run: npm run build
+
+      - name: Unauthenticated OS route HTTP validation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PORT=3107 npm run start -- --hostname 127.0.0.1 --port 3107 > "$RUNNER_TEMP/r20-next.log" 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY=0
+          for i in $(seq 1 30); do
+            if curl -sS -o /dev/null --max-time 2 http://127.0.0.1:3107/; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$READY" != "1" ]; then
+            cat "$RUNNER_TEMP/r20-next.log"
+            exit 1
+          fi
+
+          for route in lifeos streaming-menu business-menu staticart-menu game-menu; do
+            headers="$(curl -sS -D - -o /dev/null --max-time 10 "http://127.0.0.1:3107/$route")"
+            status="$(printf '%s\n' "$headers" | head -1 | tr -d '\r')"
+            location="$(printf '%s\n' "$headers" | grep -i '^location:' | head -1 | tr -d '\r' || true)"
+
+            echo "ROUTE=/$route"
+            echo "STATUS=$status"
+            echo "LOCATION=$location"
+
+            if ! printf '%s' "$status" | grep -Eq 'HTTP/[0-9.]+ 30[2378]'; then
+              echo "FAIL=NO_AUTH_REDIRECT"
+              exit 1
+            fi
+
+            if ! printf '%s' "$location" | grep -Fq "/api/persona/auth/start?return_to=%2F$route"; then
+              echo "FAIL=UNEXPECTED_REDIRECT"
+              exit 1
+            fi
+
+            echo "PASS=/$route"
+          done
+
+          echo "R20_UNAUTH_HTTP=PASS"
