@@ -135,3 +135,42 @@ jobs:
           fi
 
           node tests/r20-auth-http.mjs
+
+      - name: R20-7A Mock handoff E2E
+        shell: bash
+        env:
+          CIVILIZATION_OS_PUBLIC_BASE_URL: "http://127.0.0.1:3108"
+          CIVILIZATION_PORTAL_PUBLIC_BASE_URL: "http://127.0.0.1:3110"
+        run: |
+          set -euo pipefail
+
+          node tests/r20-mock-civilization.mjs > "$RUNNER_TEMP/r20-mock.log" 2>&1 &
+          MOCK_PID=$!
+
+          npm run start -- --hostname 127.0.0.1 --port 3110 > "$RUNNER_TEMP/r20-e2e.log" 2>&1 &
+          PORTAL_PID=$!
+
+          cleanup() {
+            kill "$MOCK_PID" "$PORTAL_PID" 2>/dev/null || true
+            wait "$MOCK_PID" "$PORTAL_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          READY=0
+
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3108/health &&
+               curl -fsS -o /dev/null http://127.0.0.1:3110/; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$READY" != "1" ]; then
+            cat "$RUNNER_TEMP/r20-mock.log"
+            cat "$RUNNER_TEMP/r20-e2e.log"
+            exit 1
+          fi
+
+          node tests/r20-handoff-e2e.mjs
