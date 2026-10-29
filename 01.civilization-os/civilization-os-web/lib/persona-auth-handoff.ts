@@ -1,3 +1,5 @@
+import { consumePersonaHandoffCode } from "./persona-handoff-replay-guard";
+
 import {
   createCipheriv,
   createDecipheriv,
@@ -532,6 +534,23 @@ export async function exchangePersonaHandoff(
     return {
       status: "invalid"
     };
+  }
+
+  if (typeof input.code !== "string") {
+    return { status: "invalid_request" };
+  }
+
+  const consumption = await consumePersonaHandoffCode(
+    input.code,
+    payload.expiresAtMs
+  );
+
+  if (consumption === "unavailable") {
+    return { status: "unavailable" };
+  }
+
+  if (consumption === "replayed") {
+    return { status: "invalid" };
   }
 
   return {

@@ -1,0 +1,128 @@
+name: R20 Persona Replay Guard Isolated DB
+
+on:
+  push:
+    branches:
+      - work/r20-portal-lifeos-auth-navigation-20261027
+    paths:
+      - '01.civilization-os/civilization-os-web/**'
+      - '.github/workflows/r20-persona-replay-guard-db.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r20-persona-replay-guard-db
+  cancel-in-progress: true
+
+jobs:
+  replay-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r20-ci-admin-only
+          POSTGRES_DB: r20_replay_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d r20_replay_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: 01.civilization-os/civilization-os-web
+
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGDATABASE: r20_replay_ci
+      PGUSER: postgres
+      PGPASSWORD: r20-ci-admin-only
+      R20_CI_DATABASE_URL: postgresql://r20_replay_runtime:r20-ci-only-password@127.0.0.1:5432/r20_replay_ci
+      R20_REPLAY_ISOLATED_CI: "true"
+
+    steps:
+      - name: Checkout R20
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: 01.civilization-os/civilization-os-web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Static replay contracts
+        run: |
+          node tests/r20-replay-guard-contract.mjs
+          node tests/r20-replay-guard-security.mjs
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: Verify isolated database target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PGHOST" = "127.0.0.1"
+          test "$PGPORT" = "5432"
+          test "$PGDATABASE" = "r20_replay_ci"
+          test "$PGUSER" = "postgres"
+          actual="$(psql -X -At -v ON_ERROR_STOP=1 -c 'SELECT current_database()')"
+          test "$actual" = "r20_replay_ci"
+          echo "R20_CI_DATABASE_TARGET=PASS"
+
+      - name: Initialize isolated database
+        run: psql -X -v ON_ERROR_STOP=1 -f sql/r20_replay_guard_ci_bootstrap.sql
+
+      - name: Prepare isolated migration
+        run: |
+          node tests/r20-replay-ci-migration.mjs "$RUNNER_TEMP/r20-migration.sql"
+
+      - name: Apply migration to isolated CI database
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PGHOST" = "127.0.0.1"
+          test "$PGPORT" = "5432"
+          test "$PGDATABASE" = "r20_replay_ci"
+          test "$PGUSER" = "postgres"
+          PGOPTIONS="-c r20.isolated_migration_approved=yes" \
+            psql -X -v ON_ERROR_STOP=1 \
+            -f "$RUNNER_TEMP/r20-migration.sql"
+
+      - name: Grant isolated runtime execute
+        run: |
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          GRANT EXECUTE ON FUNCTION
+            civilization.consume_persona_auth_handoff(text, timestamptz)
+            TO r20_replay_runtime;
+          SQL
+
+      - name: Initial and replay DB test
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f sql/r20_replay_guard_ci_test.sql
+
+      - name: Runtime role and RLS security
+        run: node tests/r20-replay-runtime-security.mjs
+
+      - name: Concurrent DB test
+        run: node tests/r20-replay-concurrency.mjs
+
+      - name: DB failure mapping static contract
+        run: node tests/r20-replay-db-failure.mjs
