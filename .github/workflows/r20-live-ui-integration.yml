@@ -1,0 +1,309 @@
+name: R20 B5 Live Browser Integration
+
+on:
+  push:
+    branches:
+      - work/r20-portal-lifeos-auth-navigation-20261027
+    paths:
+      - '01.civilization-os/civilization-os-web/**'
+      - '.github/workflows/r20-live-ui-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r20-b5-live-ui
+  cancel-in-progress: true
+
+jobs:
+  replay-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: r20-ci-admin-only
+          POSTGRES_DB: r20_replay_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d r20_replay_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: 01.civilization-os/civilization-os-web
+
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGDATABASE: r20_replay_ci
+      PGUSER: postgres
+      PGPASSWORD: r20-ci-admin-only
+      R20_CI_DATABASE_URL: postgresql://r20_replay_runtime:r20-ci-only-password@127.0.0.1:5432/r20_replay_ci
+      R20_REPLAY_ISOLATED_CI: "true"
+
+    steps:
+      - name: Checkout R20
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: 01.civilization-os/civilization-os-web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Static replay contracts
+        run: |
+          node tests/r20-replay-guard-contract.mjs
+          node tests/r20-replay-guard-security.mjs
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: Verify isolated database target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PGHOST" = "127.0.0.1"
+          test "$PGPORT" = "5432"
+          test "$PGDATABASE" = "r20_replay_ci"
+          test "$PGUSER" = "postgres"
+          actual="$(psql -X -At -v ON_ERROR_STOP=1 -c 'SELECT current_database()')"
+          test "$actual" = "r20_replay_ci"
+          echo "R20_CI_DATABASE_TARGET=PASS"
+
+      - name: Initialize isolated database
+        run: psql -X -v ON_ERROR_STOP=1 -f sql/r20_replay_guard_ci_bootstrap.sql
+
+      - name: Prepare isolated migration
+        run: |
+          node tests/r20-replay-ci-migration.mjs "$RUNNER_TEMP/r20-migration.sql"
+
+      - name: Apply migration to isolated CI database
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PGHOST" = "127.0.0.1"
+          test "$PGPORT" = "5432"
+          test "$PGDATABASE" = "r20_replay_ci"
+          test "$PGUSER" = "postgres"
+          PGOPTIONS="-c r20.isolated_migration_approved=yes" \
+            psql -X -v ON_ERROR_STOP=1 \
+            -f "$RUNNER_TEMP/r20-migration.sql"
+
+      - name: Grant isolated runtime execute
+        run: |
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          GRANT EXECUTE ON FUNCTION
+            civilization.consume_persona_auth_handoff(text, timestamptz)
+            TO r20_replay_runtime;
+          SQL
+
+      - name: Configure isolated PostgreSQL TLS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$R20_REPLAY_ISOLATED_CI" = "true"
+          test "$PGHOST" = "127.0.0.1"
+          test "$PGDATABASE" = "r20_replay_ci"
+
+          TLS_DIR="$RUNNER_TEMP/r20-postgres-tls"
+          mkdir -m 700 -p "$TLS_DIR"
+
+          openssl req -x509 -newkey rsa:3072 -sha256 \
+            -nodes -days 1 \
+            -keyout "$TLS_DIR/ca.key" \
+            -out "$TLS_DIR/ca.crt" \
+            -subj "/CN=R20 Isolated CI CA" \
+            >/dev/null 2>&1
+
+          openssl req -newkey rsa:3072 -sha256 \
+            -nodes \
+            -keyout "$TLS_DIR/server.key" \
+            -out "$TLS_DIR/server.csr" \
+            -subj "/CN=127.0.0.1" \
+            >/dev/null 2>&1
+
+          printf '%s\n' \
+            'subjectAltName=IP:127.0.0.1,DNS:localhost' \
+            'extendedKeyUsage=serverAuth' \
+            > "$TLS_DIR/server.ext"
+
+          openssl x509 -req \
+            -in "$TLS_DIR/server.csr" \
+            -CA "$TLS_DIR/ca.crt" \
+            -CAkey "$TLS_DIR/ca.key" \
+            -CAcreateserial \
+            -out "$TLS_DIR/server.crt" \
+            -days 1 -sha256 \
+            -extfile "$TLS_DIR/server.ext" \
+            >/dev/null 2>&1
+
+          CID="$(docker ps --filter 'ancestor=postgres:17' --format '{{.ID}}')"
+          test "$(printf '%s\n' "$CID" | grep -c .)" = 1
+
+          docker exec -u root "$CID" \
+            mkdir -p /var/lib/postgresql/data/r20_tls
+
+          docker cp "$TLS_DIR/server.crt" \
+            "$CID:/var/lib/postgresql/data/r20_tls/server.crt"
+
+          docker cp "$TLS_DIR/server.key" \
+            "$CID:/var/lib/postgresql/data/r20_tls/server.key"
+
+          docker exec -u root "$CID" sh -c \
+            'chown -R postgres:postgres /var/lib/postgresql/data/r20_tls && chmod 700 /var/lib/postgresql/data/r20_tls && chmod 600 /var/lib/postgresql/data/r20_tls/server.key'
+
+          docker exec -u postgres "$CID" psql \
+            -U postgres -d r20_replay_ci \
+            -v ON_ERROR_STOP=1 \
+            -c "ALTER SYSTEM SET ssl = 'on'" \
+            -c "ALTER SYSTEM SET ssl_cert_file = 'r20_tls/server.crt'" \
+            -c "ALTER SYSTEM SET ssl_key_file = 'r20_tls/server.key'"
+
+          docker exec -u postgres "$CID" psql \
+            -U postgres -d r20_replay_ci \
+            -v ON_ERROR_STOP=1 \
+            -c "SELECT pg_reload_conf()"
+
+          for i in $(seq 1 20); do
+            if PGSSLMODE=verify-full \
+               PGSSLROOTCERT="$TLS_DIR/ca.crt" \
+               psql -X -At -v ON_ERROR_STOP=1 \
+               -c "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()" \
+               2>/dev/null | grep -qx t; then
+              {
+                echo "PGSSLROOTCERT=$TLS_DIR/ca.crt"
+                echo "PGSSLMODE=verify-full"
+                echo "NODE_EXTRA_CA_CERTS=$TLS_DIR/ca.crt"
+              } >> "$GITHUB_ENV"
+              echo "CI_TLS_VERIFY_FULL=PASS"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "CI_TLS_VERIFY_FULL=FAIL"
+          exit 1
+
+      - name: Initial and replay DB test
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f sql/r20_replay_guard_ci_test.sql
+
+      - name: Runtime role and RLS security
+        run: node tests/r20-replay-runtime-security.mjs
+
+      - name: Concurrent DB test
+        run: node tests/r20-replay-concurrency.mjs
+
+      - name: R20 isolated HTTP DB integration
+        run: node tests/r20-persona-http-isolated.mjs
+
+      - name: DB failure mapping static contract
+        run: node tests/r20-replay-db-failure.mjs
+
+      - name: Install browser and reverse proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nginx libnss3-tools >/dev/null
+          cd "$GITHUB_WORKSPACE/08.civilization-portal-site/civilization-portal-site-web"
+          npm ci --no-audit --no-fund
+          npm install --no-save --package-lock=false playwright@1.58.2
+          npx playwright install --with-deps chromium
+
+      - name: Configure trusted local HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          CERT_DIR="$RUNNER_TEMP/r20-web-tls"
+          mkdir -p "$CERT_DIR"
+          openssl req -x509 -newkey rsa:3072 -nodes -days 1 -sha256 \
+            -keyout "$CERT_DIR/local.key" -out "$CERT_DIR/local.crt" \
+            -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' >/dev/null 2>&1
+          sudo cp "$CERT_DIR/local.crt" /usr/local/share/ca-certificates/r20-web-ci.crt
+          sudo update-ca-certificates >/dev/null 2>&1
+          mkdir -p "$HOME/.pki/nssdb"
+          certutil -d "sql:$HOME/.pki/nssdb" -N --empty-password 2>/dev/null || true
+          certutil -d "sql:$HOME/.pki/nssdb" -A -n r20-web-ci -t 'C,,' -i "$CERT_DIR/local.crt"
+          sudo tee /etc/nginx/sites-available/default >/dev/null <<NGINX
+          server {
+            listen 3447 ssl;
+            server_name localhost;
+            ssl_certificate $CERT_DIR/local.crt;
+            ssl_certificate_key $CERT_DIR/local.key;
+            location / {
+              proxy_pass http://127.0.0.1:3107;
+              proxy_set_header Host \$http_host;
+              proxy_set_header X-Forwarded-Proto https;
+              proxy_set_header X-Forwarded-Host \$http_host;
+            }
+          }
+          server {
+            listen 3448 ssl;
+            server_name localhost;
+            ssl_certificate $CERT_DIR/local.crt;
+            ssl_certificate_key $CERT_DIR/local.key;
+            location / {
+              proxy_pass http://127.0.0.1:3108;
+              proxy_set_header Host \$http_host;
+              proxy_set_header X-Forwarded-Proto https;
+              proxy_set_header X-Forwarded-Host \$http_host;
+            }
+          }
+          NGINX
+          sudo nginx -t
+          sudo systemctl restart nginx
+          echo "NODE_EXTRA_CA_CERTS=$CERT_DIR/local.crt" >> "$GITHUB_ENV"
+
+      - name: Real login and LifeOS UI with DB-backed handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          CIV="$GITHUB_WORKSPACE/01.civilization-os/civilization-os-web"
+          PORTAL="$GITHUB_WORKSPACE/08.civilization-portal-site/civilization-portal-site-web"
+          test "$R20_REPLAY_ISOLATED_CI" = true
+          test "$PGDATABASE" = r20_replay_ci
+          export CIVILIZATION_PORTAL_PUBLIC_BASE_URL=https://localhost:3447
+          export CIVILIZATION_OS_PUBLIC_BASE_URL=https://localhost:3448
+          export R20_PORTAL_URL="$CIVILIZATION_PORTAL_PUBLIC_BASE_URL"
+          export R20_CIVILIZATION_URL="$CIVILIZATION_OS_PUBLIC_BASE_URL"
+          export CIVILIZATION_TEST_LOGIN_ENABLED=true
+          export R20_TEST_LOGIN_PASSWORD="$(openssl rand -hex 24)"
+          export CIVILIZATION_TEST_LOGIN_PASSWORD_SCRYPT="$(node -e 'const {randomBytes,scryptSync}=require("crypto");const salt=randomBytes(24);process.stdout.write("scrypt-v1$"+salt.toString("base64url")+"$"+scryptSync(process.env.R20_TEST_LOGIN_PASSWORD,salt,32).toString("base64url"))')"
+          export CIVILIZATION_SERVER_SESSION_SIGNING_SECRET="$(openssl rand -hex 48)"
+          export PORTAL_PERSONA_SESSION_SIGNING_SECRET="$(openssl rand -hex 48)"
+          export CIVILIZATION_AUTH_HANDOFF_SEAL_KEY="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
+          export PERSONA_DATABASE_URL="${R20_CI_DATABASE_URL}?sslmode=verify-full&sslrootcert=${PGSSLROOTCERT}"
+          (cd "$CIV" && npm run dev -- --hostname 127.0.0.1 --port 3108 > "$RUNNER_TEMP/r20-civ-ui.log" 2>&1) &
+          CIV_PID=$!
+          (cd "$PORTAL" && npm run dev -- --hostname 127.0.0.1 --port 3107 > "$RUNNER_TEMP/r20-portal-ui.log" 2>&1) &
+          PORTAL_PID=$!
+          trap 'kill "$CIV_PID" "$PORTAL_PID" 2>/dev/null || true' EXIT
+          READY=0
+          for i in $(seq 1 90); do
+            if curl --cacert "$RUNNER_TEMP/r20-web-tls/local.crt" -fsS -o /dev/null https://localhost:3447/ && \
+               curl --cacert "$RUNNER_TEMP/r20-web-tls/local.crt" -fsS -o /dev/null https://localhost:3448/login; then
+              READY=1; break
+            fi
+            sleep 2
+          done
+          test "$READY" = 1 || { tail -n 30 "$RUNNER_TEMP/r20-civ-ui.log"; tail -n 30 "$RUNNER_TEMP/r20-portal-ui.log"; exit 1; }
+          (cd "$PORTAL" && node tests/r20-live-ui-integration.mjs)
