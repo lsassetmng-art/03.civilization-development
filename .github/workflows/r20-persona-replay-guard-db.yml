@@ -114,6 +114,94 @@ jobs:
             TO r20_replay_runtime;
           SQL
 
+      - name: Configure isolated PostgreSQL TLS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$R20_REPLAY_ISOLATED_CI" = "true"
+          test "$PGHOST" = "127.0.0.1"
+          test "$PGDATABASE" = "r20_replay_ci"
+
+          TLS_DIR="$RUNNER_TEMP/r20-postgres-tls"
+          mkdir -m 700 -p "$TLS_DIR"
+
+          openssl req -x509 -newkey rsa:3072 -sha256 \
+            -nodes -days 1 \
+            -keyout "$TLS_DIR/ca.key" \
+            -out "$TLS_DIR/ca.crt" \
+            -subj "/CN=R20 Isolated CI CA" \
+            >/dev/null 2>&1
+
+          openssl req -newkey rsa:3072 -sha256 \
+            -nodes \
+            -keyout "$TLS_DIR/server.key" \
+            -out "$TLS_DIR/server.csr" \
+            -subj "/CN=127.0.0.1" \
+            >/dev/null 2>&1
+
+          printf '%s\n' \
+            'subjectAltName=IP:127.0.0.1' \
+            'extendedKeyUsage=serverAuth' \
+            > "$TLS_DIR/server.ext"
+
+          openssl x509 -req \
+            -in "$TLS_DIR/server.csr" \
+            -CA "$TLS_DIR/ca.crt" \
+            -CAkey "$TLS_DIR/ca.key" \
+            -CAcreateserial \
+            -out "$TLS_DIR/server.crt" \
+            -days 1 -sha256 \
+            -extfile "$TLS_DIR/server.ext" \
+            >/dev/null 2>&1
+
+          CID="$(docker ps --filter 'ancestor=postgres:17' --format '{{.ID}}')"
+          test "$(printf '%s\n' "$CID" | grep -c .)" = 1
+
+          docker exec -u root "$CID" \
+            mkdir -p /var/lib/postgresql/data/r20_tls
+
+          docker cp "$TLS_DIR/server.crt" \
+            "$CID:/var/lib/postgresql/data/r20_tls/server.crt"
+
+          docker cp "$TLS_DIR/server.key" \
+            "$CID:/var/lib/postgresql/data/r20_tls/server.key"
+
+          docker exec -u root "$CID" sh -c \
+            'chown -R postgres:postgres /var/lib/postgresql/data/r20_tls && chmod 700 /var/lib/postgresql/data/r20_tls && chmod 600 /var/lib/postgresql/data/r20_tls/server.key'
+
+          docker exec -u postgres "$CID" psql \
+            -U postgres -d r20_replay_ci \
+            -v ON_ERROR_STOP=1 \
+            -c "ALTER SYSTEM SET ssl = 'on'" \
+            -c "ALTER SYSTEM SET ssl_cert_file = 'r20_tls/server.crt'" \
+            -c "ALTER SYSTEM SET ssl_key_file = 'r20_tls/server.key'"
+
+          docker exec -u postgres "$CID" psql \
+            -U postgres -d r20_replay_ci \
+            -v ON_ERROR_STOP=1 \
+            -c "SELECT pg_reload_conf()"
+
+          for i in $(seq 1 20); do
+            if PGSSLMODE=verify-full \
+               PGSSLROOTCERT="$TLS_DIR/ca.crt" \
+               psql -X -At -v ON_ERROR_STOP=1 \
+               -c "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()" \
+               2>/dev/null | grep -qx t; then
+              {
+                echo "PGSSLROOTCERT=$TLS_DIR/ca.crt"
+                echo "PGSSLMODE=verify-full"
+                echo "NODE_EXTRA_CA_CERTS=$TLS_DIR/ca.crt"
+              } >> "$GITHUB_ENV"
+              echo "CI_TLS_VERIFY_FULL=PASS"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "CI_TLS_VERIFY_FULL=FAIL"
+          exit 1
+
       - name: Initial and replay DB test
         run: |
           psql -X -v ON_ERROR_STOP=1 -f sql/r20_replay_guard_ci_test.sql
@@ -123,6 +211,9 @@ jobs:
 
       - name: Concurrent DB test
         run: node tests/r20-replay-concurrency.mjs
+
+      - name: R20 isolated HTTP DB integration
+        run: node tests/r20-persona-http-isolated.mjs
 
       - name: DB failure mapping static contract
         run: node tests/r20-replay-db-failure.mjs
