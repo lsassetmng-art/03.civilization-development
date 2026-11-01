@@ -1,3 +1,6 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { readPersonaServerSession } from "../../lib/auth/persona-server-session";
 import {
   createLifeOSCivilizationLoginContext,
   hasLifeOSCivilizationLoginContextIdentity,
@@ -24,6 +27,14 @@ const toneBackground: Record<LifeOSMenuItem["tone"], string> = {
 };
 
 export default async function LifeOSPage({ searchParams }: LifeOSPageProps) {
+  const session = readPersonaServerSession({
+    cookies: await cookies(),
+  });
+
+  if (session.status !== "ok") {
+    redirect("/api/persona/auth/start?return_to=%2Flifeos");
+  }
+
   const resolvedSearchParams: SearchParams =
     searchParams ? await searchParams : {};
   const context = createLifeOSCivilizationLoginContext({
