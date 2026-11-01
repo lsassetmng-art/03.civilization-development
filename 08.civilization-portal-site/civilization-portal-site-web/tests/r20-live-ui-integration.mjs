@@ -10,8 +10,39 @@ const browser = await chromium.launch({ headless: true });
 try {
   const context = await browser.newContext({ ignoreHTTPSErrors: false });
   const page = await context.newPage();
-  await page.goto(new URL('/lifeos', portal).href);
-  await page.waitForURL(url => url.origin === new URL(civilization).origin && url.pathname === '/login', { timeout: 45000 });
+  const navigationEvents = [];
+  const record = (kind, value) => {
+    navigationEvents.push({ kind, value: String(value).slice(0, 500) });
+    if (navigationEvents.length > 40) navigationEvents.shift();
+  };
+
+  page.on('framenavigated', frame => {
+    if (frame === page.mainFrame()) record('navigation', frame.url());
+  });
+  page.on('requestfailed', request => {
+    if (request.isNavigationRequest()) {
+      record('requestfailed', request.url() + ' ' + (request.failure()?.errorText ?? ''));
+    }
+  });
+  page.on('response', response => {
+    if (response.request().isNavigationRequest()) {
+      record('response', response.status() + ' ' + response.url());
+    }
+  });
+  page.on('pageerror', error => record('pageerror', error.message));
+
+  try {
+    const initialResponse = await page.goto(new URL('/lifeos', portal).href);
+    record('initial-response', initialResponse?.status() ?? 'none');
+    await page.waitForURL(url => url.origin === new URL(civilization).origin && url.pathname === '/login', { timeout: 45000 });
+  } catch (error) {
+    console.error('R20_UI_DIAGNOSTIC=' + JSON.stringify({
+      finalUrl: page.url(),
+      events: navigationEvents,
+      error: String(error).slice(0, 700)
+    }));
+    throw error;
+  }
   assert.equal(new URL(page.url()).searchParams.get('requested_os_code'), 'persona');
   await page.getByLabel('Login ID').fill('test');
   await page.locator('input[type="password"]').fill(password);
