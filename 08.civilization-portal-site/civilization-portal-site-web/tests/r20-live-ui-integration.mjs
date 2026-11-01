@@ -54,6 +54,85 @@ try {
   assert.ok(!cookies.some(c => c.name === 'persona_auth_pkce_v1' && c.value), 'PKCE cookie not cleared');
   await page.reload();
   await page.locator('[aria-label="LifeOS menu"]').waitFor({ state: 'visible' });
+
+  const sections = [
+    'dashboard',
+    'habits',
+    'health',
+    'review',
+    'settings'
+  ];
+
+  const actions = [
+    'daily_checkin',
+    'log_habit',
+    'log_health_metric',
+    'create_goal_event'
+  ];
+
+  for (const section of sections) {
+    await page.goto(new URL('/lifeos', portal).href);
+    await page.locator('[aria-label="LifeOS menu"]').waitFor();
+
+    await page.locator(
+      '[aria-label="LifeOS menu"] a[href="/lifeos?section=' + section + '"]'
+    ).click();
+
+    await page.waitForURL(
+      url => url.pathname === '/lifeos' &&
+        url.searchParams.get('section') === section
+    );
+
+    await page.locator(
+      '[data-lifeos-view="section:' + section + '"]'
+    ).waitFor({ state: 'visible' });
+
+    await page.reload();
+
+    await page.locator(
+      '[data-lifeos-view="section:' + section + '"]'
+    ).waitFor({ state: 'visible' });
+
+    await page.getByRole('link', {
+      name: /LifeOSトップへ戻る|Back to LifeOS/
+    }).click();
+
+    await page.locator('[aria-label="LifeOS menu"]').waitFor();
+  }
+
+  for (const action of actions) {
+    await page.goto(new URL('/lifeos', portal).href);
+    await page.locator('[aria-label="LifeOS menu"]').waitFor();
+
+    await page.locator(
+      '.quick-actions a[href="/lifeos?action=' + action + '"]'
+    ).click();
+
+    await page.waitForURL(
+      url => url.pathname === '/lifeos' &&
+        url.searchParams.get('action') === action
+    );
+
+    await page.locator(
+      '[data-lifeos-view="action:' + action + '"]'
+    ).waitFor({ state: 'visible' });
+
+    await page.goBack();
+    await page.locator('[aria-label="LifeOS menu"]').waitFor();
+  }
+
+  await page.goto(new URL('/lifeos?section=invalid', portal).href);
+
+  await page.getByRole('alert').waitFor({ state: 'visible' });
+
+  await page.goto(new URL('/lifeos?section=health', portal).href);
+
+  await page.locator(
+    '[data-lifeos-view="section:health"]'
+  ).waitFor({ state: 'visible' });
+
+  console.log('R20_LIFEOS_NAVIGATION_UI=PASS');
+
   console.log('R20_B5_LIVE_UI=PASS');
 } finally {
   await browser.close();

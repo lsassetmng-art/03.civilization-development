@@ -55,6 +55,27 @@ export default async function LifeOSPage({ searchParams }: LifeOSPageProps) {
     localeCode: context.localeCode,
   });
 
+  const selectedSection = firstSearchParam(resolvedSearchParams.section);
+  const selectedAction = firstSearchParam(resolvedSearchParams.action);
+
+  const selectedItem = selectedSection
+    ? menu.menuItems.find((item) => item.id === selectedSection)
+    : undefined;
+
+  const selectedQuickAction = !selectedSection && selectedAction
+    ? menu.quickActions.find((action) => action.id === selectedAction)
+    : undefined;
+
+  const invalidNavigation =
+    Boolean(selectedSection && !selectedItem) ||
+    Boolean(selectedAction && !selectedQuickAction) ||
+    Boolean(selectedSection && selectedAction);
+
+  const activeNavigation =
+    !invalidNavigation
+      ? selectedItem ?? selectedQuickAction
+      : undefined;
+
   const missingIdentity = !hasLifeOSCivilizationLoginContextIdentity(context);
   const expired = isLifeOSCivilizationLoginContextExpired(context);
 
@@ -80,6 +101,35 @@ export default async function LifeOSPage({ searchParams }: LifeOSPageProps) {
         <StatusPanel title={menu.strings.expiredTitle} body={menu.strings.expiredBody} />
       ) : null}
 
+      {activeNavigation ? (
+        <section
+          className="lifeos-detail"
+          aria-label="LifeOS selected view"
+          data-lifeos-view={
+            selectedItem
+              ? `section:${selectedItem.id}`
+              : `action:${selectedQuickAction?.id}`
+          }
+        >
+          <a className="lifeos-back-link" href="/lifeos">
+            {menu.languageCode === "en" ? "Back to LifeOS" : "LifeOSトップへ戻る"}
+          </a>
+          <h2>{getLifeOSLocalizedText(activeNavigation.title, menu.languageCode)}</h2>
+          <p>{getLifeOSLocalizedText(activeNavigation.description, menu.languageCode)}</p>
+          <p role="status">
+            {menu.languageCode === "en"
+              ? "This feature is not yet available. No data has been saved."
+              : "この機能は現在利用できません。データの保存は行われません。"}
+          </p>
+        </section>
+      ) : invalidNavigation ? (
+        <section className="lifeos-detail" role="alert">
+          <h2>{menu.languageCode === "en" ? "Invalid navigation" : "無効な画面指定"}</h2>
+          <a className="lifeos-back-link" href="/lifeos">
+            {menu.languageCode === "en" ? "Back to LifeOS" : "LifeOSトップへ戻る"}
+          </a>
+        </section>
+      ) : (
       <section className="menu-grid" aria-label="LifeOS menu">
         {menu.menuItems.map((item) => {
           const title = getLifeOSLocalizedText(item.title, menu.languageCode);
@@ -112,7 +162,9 @@ export default async function LifeOSPage({ searchParams }: LifeOSPageProps) {
           );
         })}
       </section>
+      )}
 
+      {!activeNavigation && !invalidNavigation ? (
       <section className="quick-actions" aria-label={menu.strings.quickActionsTitle}>
         <h2>{menu.strings.quickActionsTitle}</h2>
         <div className="quick-action-grid">
@@ -124,6 +176,7 @@ export default async function LifeOSPage({ searchParams }: LifeOSPageProps) {
           ))}
         </div>
       </section>
+      ) : null}
 
       <footer className="trace">
         <span>{menu.strings.traceLabel}</span>
@@ -213,6 +266,30 @@ export default async function LifeOSPage({ searchParams }: LifeOSPageProps) {
           margin: 0;
           color: #66584c;
           line-height: 1.6;
+        }
+
+        .lifeos-detail {
+          max-width: 960px;
+          margin: 0 auto;
+          border: 1px solid rgba(31,39,35,0.10);
+          border-radius: 24px;
+          padding: 24px;
+          background: rgba(255,255,255,0.78);
+        }
+
+        .lifeos-detail h2 {
+          font-size: 28px;
+          margin: 20px 0 12px;
+        }
+
+        .lifeos-detail p {
+          line-height: 1.7;
+        }
+
+        .lifeos-back-link {
+          color: inherit;
+          font-weight: 600;
+          text-underline-offset: 4px;
         }
 
         .menu-grid {
