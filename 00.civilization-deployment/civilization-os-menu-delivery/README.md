@@ -29,3 +29,18 @@ validation and explicit GO.
 
 Rollback: restore the four OS route targets to portal
 through the approved deployment procedure.
+
+## M6-R1 R4 readiness regression
+
+createServer accepts an optional readinessDirectories argument
+for isolated test injection. The default remains all four
+production menu directories.
+
+The HTTP regression checks 503 on missing readiness files,
+including HEAD without a response body. Liveness remains 200.
+
+The R4 GitHub Actions workflow executes Gateway contracts,
+delivery contracts, health tests and the real Chromium mobile
+UI test through the Gateway.
+
+This does not authorize production routing changes.

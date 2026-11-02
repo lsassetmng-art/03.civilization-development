@@ -78,7 +78,9 @@ function respondHealth(req, res, status, message) {
   res.end(req.method === 'HEAD' ? undefined : body);
 }
 
-export function createServer() {
+export function createServer({
+  readinessDirectories = Object.values(ROUTES)
+} = {}) {
   return http.createServer(async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       reject(res, 405);
@@ -90,7 +92,7 @@ export function createServer() {
       return;
     }
     if (rawPath === '/readyz') {
-      const available = await deliveryReady();
+      const available = await deliveryReady(readinessDirectories);
       respondHealth(
         req,
         res,

@@ -20,6 +20,49 @@ test('readiness validates required files', async () => {
   );
 });
 
+
+test('HTTP readiness returns 503 for unavailable files', async () => {
+  const server = createServer({
+    readinessDirectories: ['__m6_r1_missing_directory__']
+  });
+
+  try {
+    const origin = await listen(server);
+
+    for (const method of ['GET', 'HEAD']) {
+      const response = await fetch(origin + '/readyz', {
+        method
+      });
+
+      assert.equal(response.status, 503);
+      assert.equal(
+        response.headers.get('cache-control'),
+        'no-store'
+      );
+
+      if (method === 'GET') {
+        assert.equal(
+          await response.text(),
+          'unavailable' + NL
+        );
+      } else {
+        assert.equal(await response.text(), '');
+      }
+    }
+
+    const alive = await fetch(origin + '/healthz');
+    assert.equal(alive.status, 200);
+  } finally {
+    if (server.listening) {
+      await new Promise((resolve, reject) =>
+        server.close(error =>
+          error ? reject(error) : resolve()
+        )
+      );
+    }
+  }
+});
+
 test('health endpoints enforce status and methods', async () => {
   const server = createServer();
   try {
