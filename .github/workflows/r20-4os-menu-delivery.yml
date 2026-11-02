@@ -1,0 +1,26 @@
+name: R20 4OS Menu Delivery
+on:
+  push:
+    branches:
+      - work/r20-4os-menu-delivery-20261102
+  workflow_dispatch:
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: node --check 00.civilization-deployment/civilization-os-menu-delivery/server.mjs
+      - name: Gateway contracts
+        run: node --test 00.civilization-deployment/civilization-web-gateway/tests/gateway-contract.test.mjs 00.civilization-deployment/civilization-web-gateway/tests/gateway-7os-contract.test.mjs
+      - name: Delivery HTTP integration
+        run: node --test 00.civilization-deployment/civilization-os-menu-delivery/tests/delivery.test.mjs
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Existing Chromium UI integration
+        run: node 00.civilization-deployment/civilization-web-gateway/tests/r20-7os-browser-integration.mjs
