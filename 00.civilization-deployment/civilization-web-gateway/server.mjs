@@ -4,6 +4,40 @@ import { pathToFileURL } from "node:url";
 
 const PERSONA_ROOT = "/persona-menu";
 
+const OS_ROUTE_DEFINITIONS = Object.freeze([
+  ["business", "/business-menu", "BUSINESSOS"],
+  ["life", "/lifeos", "LIFEOS"],
+  ["streaming", "/streaming-menu", "STREAMINGOS"],
+  ["staticart", "/staticart-menu", "STATICARTOS"],
+  ["game", "/game-menu", "GAMEOS"],
+  ["aiworker", "/aiworker-menu", "AIWORKEROS"]
+]);
+
+function matchesNamespace(pathname, root) {
+  return pathname === root || pathname.startsWith(root + "/");
+}
+
+function normalizeOsRoutes(input) {
+  const routes = {};
+
+  for (const [owner, root, prefix] of OS_ROUTE_DEFINITIONS) {
+    const entry = input?.[owner] ?? {};
+    const target = entry.target ?? "portal";
+
+    if (target !== "portal" && target !== "os") {
+      throw new Error(prefix + "_ROUTE_TARGET must be portal or os");
+    }
+
+    const origin = target === "os"
+      ? normalizeOrigin(prefix + "_WEB_UPSTREAM_ORIGIN", entry.origin)
+      : null;
+
+    routes[owner] = Object.freeze({ owner, root, target, origin });
+  }
+
+  return Object.freeze(routes);
+}
+
 const BASE_HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -113,12 +147,15 @@ export function normalizeConfig(input) {
     input.personaRouteTarget
   );
 
+  const osRoutes = normalizeOsRoutes(input.osRoutes);
+
   return Object.freeze({
     host,
     port,
     portalOrigin,
     personaOrigin,
-    personaRouteTarget
+    personaRouteTarget,
+    osRoutes
   });
 }
 
@@ -128,7 +165,16 @@ export function loadConfig(env = process.env) {
     port: env.CIVILIZATION_WEB_GATEWAY_PORT,
     portalOrigin: env.CIVILIZATION_PORTAL_UPSTREAM_ORIGIN,
     personaOrigin: env.PERSONAOS_WEB_UPSTREAM_ORIGIN,
-    personaRouteTarget: env.PERSONAOS_ROUTE_TARGET
+    personaRouteTarget: env.PERSONAOS_ROUTE_TARGET,
+    osRoutes: Object.fromEntries(
+      OS_ROUTE_DEFINITIONS.map(([owner, , prefix]) => [
+        owner,
+        {
+          target: env[prefix + "_ROUTE_TARGET"] ?? "portal",
+          origin: env[prefix + "_WEB_UPSTREAM_ORIGIN"]
+        }
+      ])
+    )
   });
 }
 
@@ -153,6 +199,18 @@ export function selectUpstream(config, requestUrl) {
       owner: "persona",
       origin: config.personaOrigin
     });
+  }
+
+  for (const route of Object.values(config.osRoutes)) {
+    if (
+      route.target === "os" &&
+      matchesNamespace(parsed.pathname, route.root)
+    ) {
+      return Object.freeze({
+        owner: route.owner,
+        origin: route.origin
+      });
+    }
   }
 
   return Object.freeze({

@@ -1,0 +1,51 @@
+name: R20 7OS Browser Integration
+
+on:
+  push:
+    branches:
+      - work/r20-7os-browser-integration-20261102
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r20-7os-browser-integration
+  cancel-in-progress: true
+
+jobs:
+  browser-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    env:
+      CI: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Gateway contracts
+        run: |
+          node --test \
+            00.civilization-deployment/civilization-web-gateway/tests/gateway-contract.test.mjs \
+            00.civilization-deployment/civilization-web-gateway/tests/gateway-7os-contract.test.mjs
+
+      - name: Install Playwright
+        working-directory: 08.civilization-portal-site/civilization-portal-site-web
+        run: |
+          npm ci --no-audit --no-fund
+          npm install --no-save --package-lock=false playwright@1.58.2
+          npx playwright install --with-deps chromium
+
+      - name: Real HTTP and Chromium UI
+        run: |
+          node \
+            00.civilization-deployment/civilization-web-gateway/tests/r20-7os-browser-integration.mjs
