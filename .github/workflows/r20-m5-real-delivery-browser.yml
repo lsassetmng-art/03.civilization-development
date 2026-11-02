@@ -1,0 +1,31 @@
+name: R20 M5 Real Delivery Browser
+
+on:
+  push:
+    branches:
+      - work/r20-m5-real-delivery-browser-20261102
+  workflow_dispatch:
+
+jobs:
+  browser-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax checks
+        run: |
+          node --check 00.civilization-deployment/civilization-os-menu-delivery/server.mjs
+          node --check 00.civilization-deployment/civilization-os-menu-delivery/tests/real-browser.test.mjs
+      - name: Gateway contracts
+        run: |
+          node --test 00.civilization-deployment/civilization-web-gateway/tests/gateway-contract.test.mjs 00.civilization-deployment/civilization-web-gateway/tests/gateway-7os-contract.test.mjs
+      - name: Delivery HTTP integration
+        run: node --test 00.civilization-deployment/civilization-os-menu-delivery/tests/delivery.test.mjs
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Real delivery Chromium UI
+        run: node 00.civilization-deployment/civilization-os-menu-delivery/tests/real-browser.test.mjs
