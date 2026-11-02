@@ -10,6 +10,15 @@ const ROUTES = Object.freeze({
   '/streaming-menu': '06.streaming-os/os-menu',
   '/staticart-menu': '10.staticart-os/os-menu'
 });
+const REQUIRED_FILES = Object.freeze([
+  'index.html',
+  'menu.css',
+  'menu.js',
+  'menu-contract.json'
+]);
+
+const NEWLINE = String.fromCharCode(10);
+
 const MIME = Object.freeze({
   'index.html': 'text/html; charset=utf-8',
   'menu.css': 'text/css; charset=utf-8',
@@ -28,6 +37,47 @@ function reject(res, code) {
   res.end(body);
 }
 
+export async function deliveryReady(
+  directories = Object.values(ROUTES)
+) {
+  for (const directory of directories) {
+    const base = path.resolve(ROOT, directory);
+    let realBase;
+    try {
+      realBase = await realpath(base);
+    } catch {
+      return false;
+    }
+    for (const filename of REQUIRED_FILES) {
+      try {
+        const realFile = await realpath(
+          path.join(base, filename)
+        );
+        if (
+          path.dirname(realFile) !== realBase ||
+          !(await stat(realFile)).isFile()
+        ) {
+          return false;
+        }
+      } catch {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function respondHealth(req, res, status, message) {
+  const body = Buffer.from(message + NEWLINE, 'utf8');
+  res.writeHead(status, {
+    'content-type': 'text/plain; charset=utf-8',
+    'content-length': body.length,
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff'
+  });
+  res.end(req.method === 'HEAD' ? undefined : body);
+}
+
 export function createServer() {
   return http.createServer(async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -35,6 +85,20 @@ export function createServer() {
       return;
     }
     const rawPath = (req.url || '/').split(/[?#]/, 1)[0];
+    if (rawPath === '/healthz') {
+      respondHealth(req, res, 200, 'ok');
+      return;
+    }
+    if (rawPath === '/readyz') {
+      const available = await deliveryReady();
+      respondHealth(
+        req,
+        res,
+        available ? 200 : 503,
+        available ? 'ready' : 'unavailable'
+      );
+      return;
+    }
     const route = Object.entries(ROUTES).find(([prefix]) =>
       rawPath === prefix || rawPath.startsWith(prefix + '/')
     );
