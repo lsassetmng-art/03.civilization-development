@@ -1,0 +1,60 @@
+name: R40 Z207 Portal Auth Integrated UI
+
+on:
+  push:
+    branches:
+      - "work/r40-z207-portal-auth-integration-20261107"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portal-auth-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify integrated source SHA256
+        run: node tests/r40-z207-verify.cjs
+
+      - name: Install Portal dependencies
+        working-directory: 08.civilization-portal-site/civilization-portal-site-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Portal typecheck
+        working-directory: 08.civilization-portal-site/civilization-portal-site-web
+        run: ./node_modules/.bin/tsc --noEmit --incremental false
+
+      - name: Install CivilizationOS dependencies
+        working-directory: 01.civilization-os/civilization-os-web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: CivilizationOS typecheck
+        working-directory: 01.civilization-os/civilization-os-web
+        run: npm run typecheck
+
+      - name: Install Playwright client
+        run: |
+          mkdir -p /opt/r40-ui/evidence
+          cd /opt/r40-ui
+          npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.58.2
+
+      - name: Browser UI tests
+        env:
+          NEXT_PUBLIC_CIVILIZATION_OS_BASE_URL: https://civilization.invalid
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: node tests/r40-z148-ui.cjs
+
+      - name: Upload UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r40-z207-ui-evidence
+          path: /opt/r40-ui/evidence/
+          if-no-files-found: warn
+          retention-days: 7

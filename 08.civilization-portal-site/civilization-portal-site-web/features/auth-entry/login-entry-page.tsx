@@ -1,19 +1,17 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { usePortalI18n } from "../../components/i18n/portal-i18n-provider";
-import { startPortalAuth } from "../../services/civilization-auth/auth-gateway";
+import { buildCivilizationLoginUrl } from "../../services/civilization-auth/auth-gateway";
 import type { PortalAuthProfilePreset } from "../../types/portal-api";
 
 export function LoginEntryPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = usePortalI18n();
   const [busyPreset, setBusyPreset] = useState<PortalAuthProfilePreset | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const returnTarget = searchParams.get("returnTarget") ?? "/me/launcher";
   const requestedOsCode = searchParams.get("requestedOsCode") ?? undefined;
 
   const runLogin = async (preset: PortalAuthProfilePreset) => {
@@ -21,16 +19,10 @@ export function LoginEntryPage() {
     setError(null);
 
     try {
-      const response = await startPortalAuth({
-        mode: "login",
-        profilePreset: preset,
-        returnContext: {
-          returnTarget,
-          requestedOsCode,
-          requestTimestamp: new Date().toISOString(),
-        },
-      });
-      router.push(response.redirectUrl);
+      // Profile presets never grant entitlements; CivilizationOS owns identity.
+      void preset;
+      const target = buildCivilizationLoginUrl(requestedOsCode);
+      window.location.assign(target);
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : t("common.error");
@@ -54,7 +46,7 @@ export function LoginEntryPage() {
         <article className="card">
           <p className="eyebrow">{t("login.guidance")}</p>
           {error ? <p className="status-error">{error}</p> : null}
-          <div className="action-row">
+          <div className="action-row" data-testid="portal-login-profiles">
             <button
               type="button"
               className="button-primary"
