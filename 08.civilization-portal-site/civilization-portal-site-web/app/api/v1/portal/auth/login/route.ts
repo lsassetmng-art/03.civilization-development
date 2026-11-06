@@ -1,27 +1,9 @@
 import { NextResponse } from "next/server";
-import type {
-  PortalApiMeta,
-  PortalAuthResponse,
-  PortalLoginRequest,
-} from "../../../../../../types/portal-api";
-import { buildMockPortalAuthData } from "../../../../../../services/mock-server/auth-mock";
 
-const createMeta = (): PortalApiMeta => ({
-  success: true,
-  requestId: crypto.randomUUID(),
-  timestamp: new Date().toISOString(),
-});
-
-export async function POST(request: Request): Promise<NextResponse<PortalAuthResponse>> {
-  const body = (await request.json().catch(() => ({}))) as Partial<PortalLoginRequest>;
-  const data = buildMockPortalAuthData("login", {
-    ...body,
-    mode: "login",
-  });
-
-  return NextResponse.json({
-    meta: createMeta(),
-    data,
-    redirectUrl: data.redirectTo,
-  });
+/** Portal does not own credentials or issue authentication sessions. */
+export async function POST(): Promise<NextResponse> {
+  return NextResponse.json(
+    { ok: false, error: "AUTH_OWNED_BY_CIVILIZATION_OS" },
+    { status: 503, headers: { "Cache-Control": "no-store" } },
+  );
 }

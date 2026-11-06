@@ -4,7 +4,6 @@ import {
 } from "../../types/auth";
 import type {
   PortalAuthMode,
-  PortalAuthProfilePreset,
   PortalAuthResponse,
   PortalLoginRequest,
   PortalSignupRequest,
@@ -12,34 +11,15 @@ import type {
 
 const SESSION_KEY = "civilization.portal.session";
 
-const safeParse = (value: string | null): PortalSessionSummary | null => {
-  if (!value) return null;
-
-  try {
-    const parsed = JSON.parse(value) as Partial<PortalSessionSummary>;
-    return {
-      isLoggedIn: Boolean(parsed.isLoggedIn),
-      civilizationUserId: parsed.civilizationUserId,
-      displayName: parsed.displayName,
-      entityType: parsed.entityType ?? DEFAULT_PORTAL_SESSION.entityType,
-      affiliations: Array.isArray(parsed.affiliations) ? parsed.affiliations : [],
-      contractTier: parsed.contractTier ?? DEFAULT_PORTAL_SESSION.contractTier,
-      betaFlags: Array.isArray(parsed.betaFlags) ? parsed.betaFlags : [],
-      region: parsed.region ?? DEFAULT_PORTAL_SESSION.region,
-    };
-  } catch {
-    return null;
-  }
-};
-
 export const getGatewaySessionSummary = (): PortalSessionSummary => {
   if (typeof window === "undefined") return DEFAULT_PORTAL_SESSION;
-  return safeParse(window.localStorage.getItem(SESSION_KEY)) ?? DEFAULT_PORTAL_SESSION;
+  return DEFAULT_PORTAL_SESSION;
 };
 
 export const setGatewaySessionSummary = (session: PortalSessionSummary): void => {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  // Client-side storage is not an authentication authority.
+  void session;
 };
 
 export const clearGatewaySessionSummary = (): void => {
@@ -52,55 +32,33 @@ export const clearGatewaySession = (): void => {
 };
 
 export const getActiveAuthBridgeMode = (): string =>
-  typeof window === "undefined" ? "server-fallback" : "browser-storage";
+  "civilization-server-auth-required";
 
-const presetToTier = (preset?: PortalAuthProfilePreset): PortalSessionSummary["contractTier"] => {
-  if (preset === "business" || preset === "business-operator") return "business";
-  if (preset === "personal" || preset === "staticart-beta-creator") return "personal";
-  if (preset === "free-member") return "free";
-  return "free";
-};
-
-const presetToAffiliations = (preset?: PortalAuthProfilePreset): string[] =>
-  preset === "business" || preset === "business-operator" ? ["operator"] : [];
-
+/** Authentication is owned by CivilizationOS. Never mint a Portal session here. */
 export const startPortalAuth = async (
-  input: PortalLoginRequest | PortalSignupRequest,
+  _input: PortalLoginRequest | PortalSignupRequest,
 ): Promise<PortalAuthResponse> => {
-  const redirectTo =
-    input.returnContext?.returnTarget ??
-    input.returnTarget ??
-    "/me/launcher";
-
-  const session: PortalSessionSummary = {
-    isLoggedIn: true,
-    civilizationUserId: "mock-user",
-    displayName:
-      "displayName" in input && input.displayName
-        ? input.displayName
-        : "Portal User",
-    entityType: "human",
-    affiliations: presetToAffiliations(input.profilePreset),
-    contractTier: presetToTier(input.profilePreset),
-    betaFlags: [],
-    region: "JP",
-  };
-
-  setGatewaySessionSummary(session);
-
-  return {
-    meta: {
-      success: true,
-      requestId: "mock-auth",
-      timestamp: new Date().toISOString(),
-    },
-    data: {
-      session,
-      redirectTo,
-    },
-    redirectUrl: redirectTo,
-  };
+  throw new Error("Portal authentication must be completed in CivilizationOS.");
 };
+
+/** Build a navigation-only handoff. This function does not authenticate a user. */
+export function buildCivilizationLoginUrl(requestedOsCode?: string): string {
+  if (requestedOsCode && requestedOsCode !== "civilization") {
+    throw new Error("OS-specific handoff requires a verified authentication contract.");
+  }
+  const configured = process.env.NEXT_PUBLIC_CIVILIZATION_OS_BASE_URL;
+  if (!configured) throw new Error("CivilizationOS login URL is not configured.");
+  let base: URL;
+  try { base = new URL(configured); } catch { throw new Error("Invalid CivilizationOS login URL."); }
+  if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
+    throw new Error("Invalid CivilizationOS login URL.");
+  }
+  const target = new URL("/login", base);
+  target.searchParams.set("requested_os_code", "civilization");
+  target.searchParams.set("after_login_path", "/civilization-menu");
+  target.searchParams.set("return_to", "/");
+  return target.toString();
+}
 
 export const resolvePortalAuthReturn = (input: {
   status?: string;
@@ -115,12 +73,12 @@ export const resolvePortalAuthReturn = (input: {
     "/me/launcher";
 
   return {
-    status: input.status ?? "success",
+    status: "unauthenticated",
     mode: input.mode ?? "login",
     returnTarget: redirectTo,
     requestedOsCode: input.requestedOsCode,
     redirectTo,
     redirectUrl: redirectTo,
-    message: "Authentication return resolved.",
+    message: "Authentication has not been verified by CivilizationOS.",
   };
 };
