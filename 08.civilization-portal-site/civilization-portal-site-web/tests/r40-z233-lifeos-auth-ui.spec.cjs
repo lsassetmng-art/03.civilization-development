@@ -51,7 +51,7 @@ for (const item of cases) {
     ).toHaveCount(0);
 
     await expect(
-      page.locator("main")
+      page.getByTestId("lifeos-auth-required")
     ).toBeVisible();
   });
 }
