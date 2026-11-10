@@ -25,9 +25,9 @@ export async function GET(request: NextRequest) {
     });
     if (!exchange.ok) return deny(exchange.status === 503 ? 503 : 401);
     const data: unknown = await exchange.json();
-    if (!data || typeof data !== "object" || !("civilizationId" in data) || typeof data.civilizationId !== "string") return deny(401);
+    if (!data || typeof data !== "object" || !("civilizationId" in data) || typeof data.civilizationId !== "string" || !("sid" in data) || typeof data.sid !== "string") return deny(401);
     const response = NextResponse.redirect(new URL("/lifeos", request.url), 303);
-    if (!setSession(response, data.civilizationId)) return deny(503);
+    if (!setSession(response, data.civilizationId, data.sid)) return deny(503);
     clearState(response);
     response.cookies.set("lifeos_portal_pkce_v1", "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/lifeos/auth", maxAge: 0 });
     return noStore(response);

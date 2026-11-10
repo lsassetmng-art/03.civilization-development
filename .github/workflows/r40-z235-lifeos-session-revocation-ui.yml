@@ -1,0 +1,94 @@
+name: R40-Z235 LifeOS session revocation UI
+
+on:
+  push:
+    branches:
+      - work/r40-z235-lifeos-session-revocation-20261108
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r40-z235-lifeos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lifeos-session-revocation-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: 08.civilization-portal-site/civilization-portal-site-web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: 08.civilization-portal-site/civilization-portal-site-web/package-lock.json
+
+      - name: Install Portal dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck Portal
+        run: npx --no-install tsc --noEmit --incremental false
+
+      - name: Install Playwright test runner
+        run: npm install --no-save --no-package-lock --no-audit --no-fund @playwright/test@1.56.1
+
+      - name: Install Chromium
+        run: npx --no-install playwright install --with-deps chromium
+
+
+      - name: Run R235 browser UI tests
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          CI: '1'
+        run: |
+          set -euo pipefail
+          node --check tests/r40-z235-lifeos-auth-ui.spec.cjs
+          cat > "$RUNNER_TEMP/r40-z235-playwright.config.cjs" <<'CONFIG'
+          module.exports = {
+            testDir: process.env.GITHUB_WORKSPACE +
+              "/08.civilization-portal-site/civilization-portal-site-web/tests",
+            testMatch: "r40-z235-lifeos-auth-ui.spec.cjs",
+            outputDir: process.env.GITHUB_WORKSPACE +
+              "/08.civilization-portal-site/civilization-portal-site-web/test-results",
+            timeout: 180000,
+            retries: 0,
+            workers: 1,
+            reporter: [
+              ["line"],
+              ["html", {
+                outputFolder: process.env.GITHUB_WORKSPACE +
+                  "/08.civilization-portal-site/civilization-portal-site-web/playwright-report",
+                open: "never"
+              }]
+            ],
+            use: {
+              browserName: "chromium",
+              headless: true,
+              trace: "retain-on-failure",
+              screenshot: "only-on-failure"
+            }
+          };
+          CONFIG
+          npx --no-install playwright test \
+            --config="$RUNNER_TEMP/r40-z235-playwright.config.cjs"
+
+      - name: Upload R235 UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r40-z235-lifeos-session-revocation-ui-evidence
+          path: |
+            08.civilization-portal-site/civilization-portal-site-web/playwright-report/
+            08.civilization-portal-site/civilization-portal-site-web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

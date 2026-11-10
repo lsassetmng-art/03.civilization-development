@@ -1,5 +1,7 @@
+import { revokeLifeosSession } from "@/lib/lifeos-handoff-db";
 import {
-  clearCivilizationServerSessionCookie
+  clearCivilizationServerSessionCookie,
+  readCivilizationServerSession
 } from "@/lib/civilization-server-session";
 
 import {
@@ -47,6 +49,17 @@ function secureCookie(
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse> {
+  const origin = request.headers.get("origin");
+  if (!origin || origin !== request.nextUrl.origin) {
+    return NextResponse.json(
+      { ok: false, error: "invalid_origin" },
+      {
+        status: 403,
+        headers: { "cache-control": "no-store" }
+      }
+    );
+  }
+
   const response =
     new NextResponse(
       null,
@@ -58,6 +71,24 @@ export async function POST(
         }
       }
     );
+
+  const existing = readCivilizationServerSession(request);
+  if (existing.status === "ok" && existing.session.lifeosSessionId) {
+    try {
+      const revoked = await revokeLifeosSession(existing.session.lifeosSessionId);
+      if (!revoked) {
+        return NextResponse.json(
+          { ok: false, error: "session_revocation_failed" },
+          { status: 503, headers: { "cache-control": "no-store" } }
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "session_revocation_unavailable" },
+        { status: 503, headers: { "cache-control": "no-store" } }
+      );
+    }
+  }
 
   clearCivilizationServerSessionCookie(
     response,

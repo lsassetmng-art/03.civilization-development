@@ -15,8 +15,11 @@ export async function POST(request: NextRequest) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return deny(400);
   const data = body as Record<string, unknown>;
   try {
-    const id = await consumeLifeosCode(data.code, origin, data.state, data.code_verifier);
-    if (!id) return deny(401);
-    return NextResponse.json({ ok: true, civilizationId: id }, { headers: { "cache-control": "no-store" } });
+    const session = await consumeLifeosCode(data.code, origin, data.state, data.code_verifier);
+    if (!session) return deny(401);
+    return NextResponse.json(
+      { ok: true, civilizationId: session.civilizationId, sid: session.sid },
+      { headers: { "cache-control": "no-store" } }
+    );
   } catch { return deny(503); }
 }

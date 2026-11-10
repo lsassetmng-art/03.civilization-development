@@ -29,7 +29,15 @@ export async function GET(request: NextRequest) {
     return response;
   }
   try {
-    const code = await issueLifeosCode(session.session.civilizationId, origin, state, challenge);
+    if (!session.session.lifeosSessionId) return deny(401);
+    const code = await issueLifeosCode(
+      session.session.civilizationId,
+      session.session.lifeosSessionId,
+      session.session.expiresAt,
+      origin,
+      state,
+      challenge
+    );
     if (!code) return deny(503);
     const callback = new URL("/api/lifeos/auth/callback", origin);
     callback.searchParams.set("code", code);

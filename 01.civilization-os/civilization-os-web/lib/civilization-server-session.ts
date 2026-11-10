@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import type { NextRequest, NextResponse } from "next/server";
 
 export const CIVILIZATION_SERVER_SESSION_COOKIE_NAME =
@@ -11,6 +11,7 @@ const MIN_SECRET_LENGTH = 32;
 export type CivilizationServerSession = {
   version: 1;
   civilizationId: string;
+  lifeosSessionId?: string;
   provider?: string;
   issuedAt: string;
   expiresAt: string;
@@ -122,6 +123,7 @@ function normalizeSession(
   return {
     version: VERSION,
     civilizationId,
+    lifeosSessionId: readString(input, "lifeosSessionId"),
     provider: readString(input, "provider"),
     issuedAt,
     expiresAt,
@@ -273,6 +275,12 @@ export function setCivilizationServerSessionCookie(
   const session = normalizeSession(
     sessionInput
   );
+
+  // The SID is generated once per signed CivilizationOS cookie.
+  // The LifeOS database must never generate or rotate this value.
+  if (session && !session.lifeosSessionId) {
+    session.lifeosSessionId = randomBytes(32).toString("base64url");
+  }
 
   if (!session) {
     return false;
