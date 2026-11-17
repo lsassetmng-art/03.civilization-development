@@ -5,6 +5,10 @@ import {
   randomBytes,
   timingSafeEqual
 } from "crypto";
+import {
+  recordPersonaHandoff,
+  consumePersonaHandoff
+} from "@/lib/persona-auth-ledger";
 
 const HANDOFF_TTL_MS =
   120 * 1000;
@@ -147,45 +151,25 @@ function safeEqual(
   }
 }
 
-function personaCallback():
-  string |
-  null {
-  const raw =
-    process.env
-      .CIVILIZATION_PORTAL_PUBLIC_BASE_URL
-      ?.trim();
-
-  if (!raw) {
-    return null;
-  }
-
+/** Only server configuration can select either audited callback namespace. */
+export function resolvePersonaCallbackUrl(): string | null {
+  const mode = process.env.CIVILIZATION_PERSONA_CALLBACK_MODE ?? "portal";
+  if (mode !== "portal" && mode !== "persona") return null;
+  const raw = mode === "portal"
+    ? process.env.CIVILIZATION_PORTAL_PUBLIC_BASE_URL?.trim()
+    : process.env.PERSONAOS_PUBLIC_BASE_URL?.trim();
+  if (!raw) return null;
   try {
-    const base =
-      new URL(raw);
-
-    const allowed =
-      base.protocol === "https:" ||
-      (
-        base.protocol === "http:" &&
-        (
-          base.hostname === "localhost" ||
-          base.hostname === "127.0.0.1" ||
-          base.hostname === "[::1]"
-        )
-      );
-
+    const base = new URL(raw);
+    const secure = base.protocol === "https:";
     if (
-      !allowed ||
-      base.username ||
-      base.password
-    ) {
-      return null;
-    }
-
-    return new URL(
-      "/api/persona/auth/callback",
-      base.origin
-    ).toString();
+      !secure || base.username || base.password || base.search ||
+      base.hash || base.pathname !== "/"
+    ) return null;
+    const callbackPath = mode === "portal"
+      ? "/api/persona/auth/callback"
+      : "/persona-menu/api/auth/callback";
+    return new URL(callbackPath, base.origin).toString();
   } catch {
     return null;
   }
@@ -344,7 +328,7 @@ export async function issuePersonaHandoff(
     sealKey();
 
   const callback =
-    personaCallback();
+    resolvePersonaCallbackUrl();
 
   if (
     !key ||
@@ -425,6 +409,16 @@ export async function issuePersonaHandoff(
       "state",
       input.state
     );
+
+    // Fail closed: the code is never issued unless it is atomically registered.
+    const registered = await recordPersonaHandoff({
+      code,
+      actorKey: payload.serverSessionActorKey,
+      stateHash: payload.stateHash,
+      pkceChallenge: payload.codeChallenge,
+      callbackUrl: callback
+    });
+    if (registered !== "ok") return { status: "unavailable" };
 
     return {
       status: "ok",
@@ -533,6 +527,19 @@ export async function exchangePersonaHandoff(
       status: "invalid"
     };
   }
+
+  // Successful PKCE decryption is not sufficient: consume once in the DB.
+  const callback = resolvePersonaCallbackUrl();
+  if (!callback) return { status: "not_configured" };
+  const consumed = await consumePersonaHandoff({
+    code: input.code as string,
+    actorKey: payload.serverSessionActorKey,
+    stateHash: payload.stateHash,
+    pkceChallenge: payload.codeChallenge,
+    callbackUrl: callback
+  });
+  if (consumed === "unavailable") return { status: "unavailable" };
+  if (consumed !== "ok") return { status: "invalid" };
 
   return {
     status: "ok",

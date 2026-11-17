@@ -1,5 +1,6 @@
 import { GET as existingLoginContinuation }
   from "../login/route";
+import { resolvePersonaCallbackUrl } from "@/lib/persona-auth-handoff";
 
 import { NextRequest, NextResponse }
   from "next/server";
@@ -99,25 +100,26 @@ function checkedCallback(
 }
 
 function checkedPersonaCallback(raw: string, expectedState: string): URL | null {
-  const configured = process.env.CIVILIZATION_PORTAL_PUBLIC_BASE_URL?.trim();
+  const configured = resolvePersonaCallbackUrl();
   if (!configured) return null;
   try {
-    const base = new URL(configured);
+    const expected = new URL(configured);
     const target = new URL(raw);
     if (
-      base.protocol !== "https:" ||
-      base.username || base.password ||
-      target.origin !== base.origin ||
+      target.origin !== expected.origin ||
+      target.pathname !== expected.pathname ||
       target.username || target.password || target.hash ||
-      target.pathname !== "/api/persona/auth/callback" ||
       target.searchParams.getAll("state").length !== 1 ||
       target.searchParams.get("state") !== expectedState ||
       target.searchParams.getAll("code").length !== 1 ||
       !target.searchParams.get("code") ||
-      target.searchParams.get("code")!.length > 4096
+      target.searchParams.get("code")!.length > 4096 ||
+      [...target.searchParams.keys()].some(key => key !== "state" && key !== "code")
     ) return null;
     return target;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(
