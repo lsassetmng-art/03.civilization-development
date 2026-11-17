@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { normalizeVerifyOrigin, verifyMenuIdentity, denyMenuRequest } from './auth-gate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ROUTES = Object.freeze({
@@ -28,7 +29,8 @@ function reject(res, code) {
   res.end(body);
 }
 
-export function createServer() {
+export function createServer({ authVerifyOrigin = process.env.OS_MENU_AUTH_VERIFY_ORIGIN } = {}) {
+  const identityOrigin = normalizeVerifyOrigin(authVerifyOrigin);
   return http.createServer(async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       reject(res, 405);
@@ -48,6 +50,12 @@ export function createServer() {
       return;
     }
     if (!Object.hasOwn(MIME, filename)) { reject(res, 404); return; }
+    // Authentication is verified before reading/sending any OS-owned menu bytes.
+    const auth = await verifyMenuIdentity(req, identityOrigin);
+    if (auth !== 'authorized') {
+      denyMenuRequest(req, res, auth, prefix, filename);
+      return;
+    }
     const base = path.resolve(ROOT, directory);
     try {
       const [realBase, realFile] = await Promise.all([
@@ -61,7 +69,8 @@ export function createServer() {
       res.writeHead(200, {
         'content-type': MIME[filename],
         'content-length': data.length,
-        'cache-control': 'no-store',
+        'cache-control': 'private, no-store, max-age=0',
+        'vary': 'Cookie',
         'x-content-type-options': 'nosniff'
       });
       res.end(req.method === 'HEAD' ? undefined : data);

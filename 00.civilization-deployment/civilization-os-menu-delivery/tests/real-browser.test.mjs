@@ -51,7 +51,14 @@ async function listen(server) {
 }
 
 function portalServer() {
-  return http.createServer((_req, res) => {
+  return http.createServer((req, res) => {
+    if (req.url === '/api/portal/menu-identity') {
+      res.writeHead(req.headers.cookie === 'test_menu=valid' ? 204 : 401, {
+        'cache-control': 'no-store'
+      });
+      res.end();
+      return;
+    }
     res.writeHead(200, {
       "content-type": "text/html; charset=utf-8",
       "x-upstream-owner": "portal"
@@ -85,7 +92,7 @@ function config(portalOrigin, deliveryOrigin, enabled) {
 
 try {
   const portalOrigin = await listen(portalServer());
-  const deliveryOrigin = await listen(createDelivery());
+  const deliveryOrigin = await listen(createDelivery({authVerifyOrigin: portalOrigin}));
 
   const gatewayOrigin = await listen(
     createGatewayServer(
@@ -101,6 +108,31 @@ try {
     isMobile: true,
     hasTouch: true
   });
+
+  // Explicit pre-auth browser navigation: no OS markup is allowed to paint.
+  for (const [owner, route] of specs) {
+    const unauthPage = await context.newPage();
+    const exposed = [];
+    unauthPage.on('console', msg => {
+      if (msg.text().startsWith('UNAUTH_MENU_RENDERED:')) exposed.push(msg.text());
+    });
+    await unauthPage.addInitScript(() => {
+      new MutationObserver(() => {
+        if (/^\/(business|game|streaming|staticart)-menu(?:\/|$)/.test(location.pathname) &&
+            document.querySelector('#os-title, .shell .hero')) {
+          console.log('UNAUTH_MENU_RENDERED:' + location.pathname);
+        }
+      }).observe(document, {childList: true, subtree: true});
+    });
+    await unauthPage.goto(gatewayOrigin + route + '/', {
+      waitUntil: 'networkidle', timeout: 30000
+    });
+    check(await unauthPage.locator('#portal-title').count() === 1,
+      owner + ': unauthenticated redirect to Portal login fixture');
+    check(exposed.length === 0, owner + ': preauth menu never rendered');
+    await unauthPage.close();
+  }
+  await context.addCookies([{name: 'test_menu', value: 'valid', url: gatewayOrigin}]);
 
   for (const [owner, route, directory] of specs) {
     const contract = JSON.parse(
