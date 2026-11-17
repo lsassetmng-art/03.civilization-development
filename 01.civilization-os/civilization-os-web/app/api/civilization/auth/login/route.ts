@@ -11,6 +11,7 @@ import {
 import {
   normalizeOAuthLanguageCode,
   normalizeRequestedOsCode,
+  resolvePersonaPostLoginTarget,
   normalizeSafeRedirectPath,
   resolveOAuthPostLoginTarget
 } from "@/lib/oauth-state";
@@ -454,6 +455,13 @@ async function resolveAuthenticatedTarget(
       error: string;
     }
 > {
+  if (input.requestedOsCode === "persona") {
+    const target = resolvePersonaPostLoginTarget(process.env.PERSONAOS_PUBLIC_BASE_URL);
+    return target
+      ? { ok: true, redirectTarget: target }
+      : { ok: false, status: 503, error: "persona_target_not_configured" };
+  }
+
   const normalTarget =
     resolveOAuthPostLoginTarget(
       {
@@ -832,7 +840,13 @@ export async function POST(
   let redirectTarget:
     string;
 
-  if (
+  if (requestedOsCode === "persona") {
+    const target = resolvePersonaPostLoginTarget(process.env.PERSONAOS_PUBLIC_BASE_URL);
+    if (!target) {
+      return noStoreJson({ ok: false, error: "persona_target_not_configured" }, 503);
+    }
+    redirectTarget = target;
+  } else if (
     requestedOsCode ===
       "aiworker"
   ) {

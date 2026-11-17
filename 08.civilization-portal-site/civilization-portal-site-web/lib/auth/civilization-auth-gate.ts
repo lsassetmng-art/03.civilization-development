@@ -15,7 +15,7 @@ export type CivilizationAuthGateInput = {
 const supportedLanguageCodes = new Set(["ja", "en", "zh", "ko", "fr", "es", "de"]);
 
 const civilizationOsAuthTargets =
-  new Set(["civilization"]);
+  new Set(["civilization", "persona"]);
 
 function normalizeAiWorkerAuthStartUrl(value: string | null | undefined): string | null {
   const raw = String(value ?? "").trim();

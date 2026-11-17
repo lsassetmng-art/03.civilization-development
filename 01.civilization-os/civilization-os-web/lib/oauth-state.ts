@@ -193,6 +193,25 @@ export function normalizeSafeRedirectPath(
   return candidate;
 }
 
+/** Public gateway origin for PersonaOS, configured by CivilizationOS only. */
+export function resolvePersonaPostLoginTarget(
+  publicBaseUrl: string | null | undefined
+): string | null {
+  const raw = String(publicBaseUrl ?? "").trim();
+  if (!raw) return null;
+  try {
+    const base = new URL(raw);
+    const secure = base.protocol === "https:";
+    const loopback = base.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(base.hostname);
+    if ((!secure && !loopback) || base.username || base.password ||
+        base.search || base.hash || base.pathname !== "/") return null;
+    return new URL("/persona-menu", base.origin).toString();
+  } catch {
+    return null;
+  }
+}
+
 export function resolveOAuthPostLoginTarget(
   context:
     Pick<

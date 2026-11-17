@@ -10,6 +10,7 @@ import {
 import {
   decodeOAuthCallbackContext,
   normalizeSafeRedirectPath,
+  resolvePersonaPostLoginTarget,
   resolveOAuthPostLoginTarget,
   OAUTH_CONTEXT_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
@@ -285,6 +286,12 @@ async function sessionHandoffResponse(
       process.env
         .AIWORKEROS_PUBLIC_BASE_URL
     );
+
+  if (context.requestedOsCode === "persona") {
+    const target = resolvePersonaPostLoginTarget(process.env.PERSONAOS_PUBLIC_BASE_URL);
+    if (!target) throw new Error("persona_target_not_configured");
+    redirectTarget = target;
+  }
 
   if (
     context.requestedOsCode ===
