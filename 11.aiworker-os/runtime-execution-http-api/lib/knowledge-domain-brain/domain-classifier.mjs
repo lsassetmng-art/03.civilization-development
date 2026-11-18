@@ -113,3 +113,37 @@ export function classifyKnowledgeDomains(input = {}) {
 export function getKnowledgeDomainCodes() {
   return { ...DOMAIN_CODES };
 }
+
+// Adds domain-specific, metadata-only providers without changing runtime ownership.
+// Unknown source files are included for review, not treated as decoded content.
+export function mergeArchitectureMediaDomainCodes(domainCodes = [], input = {}) {
+  const values = Array.isArray(domainCodes) ? domainCodes : [domainCodes];
+  const merged = [];
+  const add = (value) => {
+    if (typeof value !== "string") return;
+    const code = value.trim();
+    if (code && !merged.includes(code)) merged.push(code);
+  };
+  values.forEach(add);
+
+  const safeInput = input && typeof input === "object" ? input : {};
+  const instructionText = normalizeText([
+    safeInput.instructionText,
+    safeInput.instruction,
+    safeInput.prompt,
+    safeInput.artifactKind,
+  ].filter((value) => typeof value === "string").join(" "));
+  const classification = classifyKnowledgeDomains({
+    instructionText,
+    artifactKind: safeInput.artifactKind,
+    sourceRouteCode: safeInput.sourceRouteCode,
+  });
+  const classified = [classification.primaryDomainCode, ...classification.secondaryDomainCodes];
+  if (classified.includes(DOMAIN_CODES.ARCHITECTURE)) add(DOMAIN_CODES.ARCHITECTURE);
+
+  const hasSourceFiles = Array.isArray(safeInput.sourceFiles) && safeInput.sourceFiles.length > 0;
+  if (hasSourceFiles || /(?:media|image|audio|video|photo|画像|写真|音声|動画|映像|音楽)/i.test(instructionText)) {
+    add("media_analysis");
+  }
+  return merged;
+}
