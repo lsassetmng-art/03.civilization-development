@@ -64,10 +64,14 @@ export default function Page() {
           {
             id: "lifeos",
             label: "LifeOS",
-            href: "/lifeos",
+            authGate: {
+              afterLoginPath: "/lifeos",
+              returnTo: "/",
+              requestedOsCode: "lifeos",
+            },
             asset: `${assetBase}/metallic-settings-silver.svg`,
             position: "bottomLeft",
-            ariaLabel: "LifeOSメニュー",
+            ariaLabel: "LifeOSログイン",
           },
         {
           id: "ai-support",
